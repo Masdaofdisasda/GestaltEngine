@@ -10,6 +10,3 @@ target_compile_features(GestaltApp PRIVATE cxx_std_20)
 
 # Link with other modules/libraries
 target_link_libraries(GestaltApp PRIVATE SDL2::SDL2 Vulkan::Vulkan application foundation graphics)
-
-# If using C++20 modules, specify module paths (if needed)
-target_compile_options(GestaltApp PRIVATE "-fmodule-file=<module-file>")
