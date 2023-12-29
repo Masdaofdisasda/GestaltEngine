@@ -9,7 +9,7 @@ CPMAddPackage(
   GITHUB_REPOSITORY TheLartians/Format.cmake
   OPTIONS 
       # set to yes skip cmake formatting
-      "FORMAT_SKIP_CMAKE NO"
+      "FORMAT_SKIP_CMAKE YES"
       # set to yes skip clang formatting
       "FORMAT_SKIP_CLANG NO"
       # path to exclude
@@ -18,6 +18,7 @@ CPMAddPackage(
 
 find_package(Vulkan REQUIRED)
 find_package(SDL2 CONFIG REQUIRED)
+find_package(fmt CONFIG REQUIRED)
 
 # Specify the C++ standard
 set(CMAKE_CXX_STANDARD 20)
@@ -27,8 +28,7 @@ if(MSVC)
     add_compile_options(
 	/experimental:module 
 	/std:c++latest 
-	/EHsc
-	/MD)
+	)
 endif()
 
 # Set output directories

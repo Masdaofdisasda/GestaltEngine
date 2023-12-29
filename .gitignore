@@ -32,3 +32,6 @@
 *.app
 
 /project
+/bin/shaders
+/bin/release/*.pdb
+/bin/debug/*.pdb
