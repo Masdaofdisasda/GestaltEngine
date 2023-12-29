@@ -1,86 +1,99 @@
-
 #if defined(_WIN32)
 #  define VK_USE_PLATFORM_WIN32_KHR
 #endif
 
-// Tell SDL not to mess with main()
 #define SDL_MAIN_HANDLED
+#define VOLK_IMPLEMENTATION
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
-#include <vulkan/vulkan.h>
+#include <Volk/volk.h>
 
-import std.core;
+#include <iostream>
+#include <vector>
 
-int main() {
-  // Create an SDL window that supports Vulkan rendering.
-  if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-    std::cout << "Could not initialize SDL." << std::endl;
+int main(int argc, char** argv) {
+  // Initialize Volk
+  if (volkInitialize() != VK_SUCCESS) {
+    std::cerr << "Failed to initialize Volk" << std::endl;
     return 1;
   }
+
+  // Initialize SDL with video support.
+  if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+    std::cerr << "Could not initialize SDL: " << SDL_GetError() << std::endl;
+    return 1;
+  }
+
+  // Create an SDL window that supports Vulkan rendering.
   SDL_Window* window = SDL_CreateWindow("Vulkan Window", SDL_WINDOWPOS_CENTERED,
                                         SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_VULKAN);
-  if (window == NULL) {
-    std::cout << "Could not create SDL window." << std::endl;
+  if (window == nullptr) {
+    std::cerr << "Could not create SDL window: " << SDL_GetError() << std::endl;
+    SDL_Quit();
     return 1;
   }
 
-  // Get WSI extensions from SDL (we can add more if we like - we just can't remove these)
-  unsigned extension_count;
-  if (!SDL_Vulkan_GetInstanceExtensions(window, &extension_count, NULL)) {
-    std::cout << "Could not get the number of required instance extensions from SDL." << std::endl;
+  // Get WSI extensions from SDL
+  unsigned extension_count = 0;
+  if (!SDL_Vulkan_GetInstanceExtensions(window, &extension_count, nullptr)) {
+    std::cerr << "Could not get the number of required instance extensions from SDL." << std::endl;
+    SDL_DestroyWindow(window);
+    SDL_Quit();
     return 1;
   }
+
   std::vector<const char*> extensions(extension_count);
   if (!SDL_Vulkan_GetInstanceExtensions(window, &extension_count, extensions.data())) {
-    std::cout << "Could not get the names of required instance extensions from SDL." << std::endl;
+    std::cerr << "Could not get the names of required instance extensions from SDL." << std::endl;
+    SDL_DestroyWindow(window);
+    SDL_Quit();
     return 1;
   }
 
-  // Use validation layers if this is a debug build
+  // Use validation layers in debug mode
   std::vector<const char*> layers;
 #if defined(_DEBUG)
   layers.push_back("VK_LAYER_KHRONOS_validation");
 #endif
 
-  // VkApplicationInfo allows the programmer to specifiy some basic information about the
-  // program, which can be useful for layers and tools to provide more debug information.
+  // VkApplicationInfo setup
   VkApplicationInfo appInfo = {};
   appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-  appInfo.pNext = NULL;
   appInfo.pApplicationName = "Vulkan Program Template";
-  appInfo.applicationVersion = 1;
-  appInfo.pEngineName = "LunarG SDK";
-  appInfo.engineVersion = 1;
+  appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+  appInfo.pEngineName = "No Engine";
+  appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
   appInfo.apiVersion = VK_API_VERSION_1_0;
 
-  // VkInstanceCreateInfo is where the programmer specifies the layers and/or extensions that
-  // are needed.
+  // VkInstanceCreateInfo setup
   VkInstanceCreateInfo instInfo = {};
   instInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-  instInfo.pNext = NULL;
-  instInfo.flags = 0;
   instInfo.pApplicationInfo = &appInfo;
   instInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
   instInfo.ppEnabledExtensionNames = extensions.data();
   instInfo.enabledLayerCount = static_cast<uint32_t>(layers.size());
   instInfo.ppEnabledLayerNames = layers.data();
 
-  // Create the Vulkan instance.
+  // Create the Vulkan instance
   VkInstance instance;
-  VkResult result = vkCreateInstance(&instInfo, NULL, &instance);
-  if (result == VK_ERROR_INCOMPATIBLE_DRIVER) {
-    std::cout << "Unable to find a compatible Vulkan Driver." << std::endl;
-    return 1;
-  } else if (result) {
-    std::cout << "Could not create a Vulkan instance (for unknown reasons)." << std::endl;
+  VkResult result = vkCreateInstance(&instInfo, nullptr, &instance);
+  if (result != VK_SUCCESS) {
+    std::cerr << "Could not create a Vulkan instance: " << result << std::endl;
+    SDL_DestroyWindow(window);
+    SDL_Quit();
     return 1;
   }
+
+  volkLoadInstance(instance);
 
   // Create a Vulkan surface for rendering
   VkSurfaceKHR surface;
   if (!SDL_Vulkan_CreateSurface(window, instance, &surface)) {
-    std::cout << "Could not create a Vulkan surface." << std::endl;
+    std::cerr << "Could not create a Vulkan surface." << std::endl;
+    vkDestroyInstance(instance, nullptr);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
     return 1;
   }
 
@@ -106,10 +119,10 @@ int main() {
   }
 
   // Clean up.
-  vkDestroySurfaceKHR(instance, surface, NULL);
+  vkDestroySurfaceKHR(instance, surface, nullptr);
+  vkDestroyInstance(instance, nullptr);
   SDL_DestroyWindow(window);
   SDL_Quit();
-  vkDestroyInstance(instance, NULL);
 
   return 0;
 }

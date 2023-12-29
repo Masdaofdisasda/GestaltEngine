@@ -22,6 +22,7 @@ def create_vs_build(build_dir, cmake_path='..', vs_version='Visual Studio 17 202
     os.makedirs(build_dir, exist_ok=True)
 
     # Construct the CMake command
+    # cmake '..' -G 'Visual Studio 17 2022' -A 'x64' -DCMAKE_TOOLCHAIN_FILE='C:/src/vcpkg/scripts/buildsystems/vcpkg.cmake'
     cmake_command = [
         'cmake',
         cmake_path,

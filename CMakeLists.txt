@@ -12,10 +12,8 @@ CPMAddPackage(
       "FORMAT_SKIP_CMAKE NO"
       # set to yes skip clang formatting
       "FORMAT_SKIP_CLANG NO"
-      # path to exclude (optional, supports regular expressions)
+      # path to exclude
       "CMAKE_FORMAT_EXCLUDE cmake/CPM.cmake"
-      # extra arguments for cmake_format (optional)
-      "CMAKE_FORMAT_EXTRA_ARGS -c /path/to/cmake-format.{yaml,json,py}"
 )
 
 find_package(Vulkan REQUIRED)
@@ -26,7 +24,11 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 if(MSVC)
-    add_compile_options(/experimental:module /std:c++latest)
+    add_compile_options(
+	/experimental:module 
+	/std:c++latest 
+	/EHsc
+	/MD)
 endif()
 
 # Set output directories
