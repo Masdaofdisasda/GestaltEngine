@@ -1,36 +1,29 @@
+message(STATUS "Configuring source...")
+
 add_subdirectory(external)
 add_subdirectory(gestalt/application)
 add_subdirectory(gestalt/foundation)
 add_subdirectory(gestalt/graphics)
 
-add_executable(GestaltApp gestalt/main.cpp)
+add_executable(${APPLICATION_NAME} gestalt/main.cpp)
+target_compile_features(${APPLICATION_NAME} PRIVATE cxx_std_20)
 
-# Specify C++20, this is required for modules
-target_compile_features(GestaltApp PRIVATE cxx_std_20)
+target_link_libraries(${APPLICATION_NAME} PRIVATE SDL2::SDL2 Vulkan::Vulkan application foundation graphics)
 
-target_link_libraries(graphics PRIVATE fmt::fmt)
-
-# Link with other modules/libraries
-target_link_libraries(GestaltApp PRIVATE SDL2::SDL2 Vulkan::Vulkan application foundation graphics)
-
-# Find the glslangValidator program
 find_program(GLSL_VALIDATOR glslangValidator HINTS /usr/bin /usr/local/bin $ENV{VULKAN_SDK}/Bin/ $ENV{VULKAN_SDK}/Bin32/)
+message(STATUS "GLSL Validator found: ${GLSL_VALIDATOR}")
 
-# Specify the directory for shader source files and compiled shader files
 set(SHADER_SOURCE_DIR "${PROJECT_SOURCE_DIR}/source/gestalt/graphics/shaders")
 set(SHADER_BINARY_DIR "${CMAKE_SOURCE_DIR}/bin/shaders")
 
-# Create the directory for compiled shader files if it does not exist
 file(MAKE_DIRECTORY ${SHADER_BINARY_DIR})
 
-# Find all shader files
 file(GLOB_RECURSE GLSL_SOURCE_FILES
     "${SHADER_SOURCE_DIR}/*.frag"
     "${SHADER_SOURCE_DIR}/*.vert"
     "${SHADER_SOURCE_DIR}/*.comp"
 )
 
-# Compile each shader
 foreach(GLSL ${GLSL_SOURCE_FILES})
   message(STATUS "Building Shader: ${GLSL}")
   get_filename_component(FILE_NAME ${GLSL} NAME)
@@ -42,10 +35,9 @@ foreach(GLSL ${GLSL_SOURCE_FILES})
   list(APPEND SPIRV_BINARY_FILES ${SPIRV})
 endforeach(GLSL)
 
-# Add custom target for shaders
 add_custom_target(
     Shaders 
     DEPENDS ${SPIRV_BINARY_FILES}
 )
 
-add_dependencies(GestaltApp Shaders)
+add_dependencies(${APPLICATION_NAME} Shaders)
