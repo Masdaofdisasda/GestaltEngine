@@ -80,6 +80,8 @@ public:
 
         VkPipeline _gradientPipeline;
         VkPipelineLayout _gradientPipelineLayout;
+        VkPipelineLayout _trianglePipelineLayout;
+        VkPipeline _trianglePipeline;
 
         DeletionQueue _mainDeletionQueue;
         VmaAllocator _allocator;
@@ -103,6 +105,7 @@ public:
 	void draw();
         void draw_background(VkCommandBuffer cmd);
         void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView);
+        void draw_geometry(VkCommandBuffer cmd);
 	void run();
 
   private:
@@ -112,6 +115,7 @@ public:
         void init_sync_structures();
         void init_descriptors();
         void init_pipelines();
+        void init_triangle_pipeline();
         void init_background_pipelines();
         void init_imgui();
 
