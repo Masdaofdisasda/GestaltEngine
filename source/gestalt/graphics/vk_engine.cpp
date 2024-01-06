@@ -16,7 +16,7 @@ VulkanEngine* loadedEngine = nullptr;
 
 VulkanEngine& VulkanEngine::Get() { return *loadedEngine; }
 
-constexpr bool bUseValidationLayers = false;
+constexpr bool bUseValidationLayers = true;
 
 void VulkanEngine::init()
 {
@@ -37,7 +37,7 @@ void VulkanEngine::init()
         _windowExtent.height,
         window_flags);
 
-  init_vulkan();
+    init_vulkan();
 
     init_swapchain();
 
@@ -99,11 +99,59 @@ void VulkanEngine::init_vulkan() {
     // Get the VkDevice handle used in the rest of a vulkan application
     _device = vkbDevice.device;
     _chosenGPU = physicalDevice.physical_device;
+
+  VkImageCreateInfo imageInfo{};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.format = VK_FORMAT_UNDEFINED;  // Intentionally incorrect
+    imageInfo.extent.width = 1024;
+    imageInfo.extent.height = 1024;
+    imageInfo.extent.depth = 1;
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 1;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    VkImage image;
+    vkCreateImage(_device, &imageInfo, nullptr, &image);  // Should trigger a validation layer error
 }
 
-void VulkanEngine::init_swapchain() {
-    // nothing yet
+void VulkanEngine::create_swapchain(uint32_t width, uint32_t height) {
+    vkb::SwapchainBuilder swapchainBuilder{_chosenGPU, _device, _surface};
+
+    _swapchainImageFormat = VK_FORMAT_B8G8R8A8_UNORM;
+
+    vkb::Swapchain vkbSwapchain
+        = swapchainBuilder
+              //.use_default_format_selection()
+              .set_desired_format(VkSurfaceFormatKHR{
+                  .format = _swapchainImageFormat, .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
+              // use vsync present mode
+              .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
+              .set_desired_extent(width, height)
+              .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+              .build()
+              .value();
+
+    _swapchainExtent = vkbSwapchain.extent;
+    // store swapchain and its related images
+    _swapchain = vkbSwapchain.swapchain;
+    _swapchainImages = vkbSwapchain.get_images().value();
+    _swapchainImageViews = vkbSwapchain.get_image_views().value();
 }
+
+void VulkanEngine::destroy_swapchain() {
+    vkDestroySwapchainKHR(_device, _swapchain, nullptr);
+
+    // destroy swapchain resources
+    for (int i = 0; i < _swapchainImageViews.size(); i++) {
+      vkDestroyImageView(_device, _swapchainImageViews[i], nullptr);
+    }
+}
+
+void VulkanEngine::init_swapchain() { create_swapchain(_windowExtent.width, _windowExtent.height); }
+
 void VulkanEngine::init_commands() {
     // nothing yet
 }
@@ -111,15 +159,17 @@ void VulkanEngine::init_sync_structures() {
     // nothing yet
 }
 
-void VulkanEngine::cleanup()
-{
+void VulkanEngine::cleanup() {
     if (_isInitialized) {
+      destroy_swapchain();
 
-        SDL_DestroyWindow(_window);
+      vkDestroySurfaceKHR(_instance, _surface, nullptr);
+      vkDestroyDevice(_device, nullptr);
+
+      vkb::destroy_debug_utils_messenger(_instance, _debug_messenger);
+      vkDestroyInstance(_instance, nullptr);
+      SDL_DestroyWindow(_window);
     }
-
-    // clear engine pointer
-    loadedEngine = nullptr;
 }
 
 void VulkanEngine::draw()
