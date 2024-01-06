@@ -24,6 +24,8 @@ file(GLOB_RECURSE GLSL_SOURCE_FILES
     "${SHADER_SOURCE_DIR}/*.comp"
 )
 
+source_group("Source" FILES ${GLSL_SOURCE_FILES})
+
 foreach(GLSL ${GLSL_SOURCE_FILES})
   message(STATUS "Building Shader: ${GLSL}")
   get_filename_component(FILE_NAME ${GLSL} NAME)
@@ -37,6 +39,7 @@ endforeach(GLSL)
 
 add_custom_target(
     Shaders 
+    SOURCES ${GLSL_SOURCE_FILES}
     DEPENDS ${SPIRV_BINARY_FILES}
 )
 
