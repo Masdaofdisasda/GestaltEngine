@@ -5,6 +5,7 @@
 
 #include <vk_types.h>
 #include <vk_descriptors.h>
+#include "vk_loader.h"
 
 struct DeletionQueue {
   std::deque<std::function<void()>> deletors;
@@ -67,6 +68,7 @@ public:
         std::vector<VkImageView> _swapchainImageViews;
         VkExtent2D _swapchainExtent;
         AllocatedImage _drawImage;
+        AllocatedImage _depthImage;
         VkExtent2D _drawExtent;
 
         FrameData _frames[FRAME_OVERLAP];
@@ -86,6 +88,7 @@ public:
         VkPipeline _meshPipeline;
 
         GPUMeshBuffers rectangle;
+        std::vector<std::shared_ptr<MeshAsset>> testMeshes;
 
         DeletionQueue _mainDeletionQueue;
         VmaAllocator _allocator;

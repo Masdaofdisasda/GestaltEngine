@@ -22,6 +22,8 @@ message(STATUS "Vulkan found: INCLUDE_DIRS=${Vulkan_INCLUDE_DIRS}, LIBRARIES=${V
 find_package(SDL2 CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
+find_package(Stb REQUIRED)
+find_package(fastgltf CONFIG REQUIRED)
 
 include(FetchContent)
 FetchContent_Declare(
