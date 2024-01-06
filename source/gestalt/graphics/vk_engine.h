@@ -68,16 +68,23 @@ public:
         DeletionQueue _mainDeletionQueue;
         VmaAllocator _allocator;
 
+        // immediate submit structures
+        VkFence _immFence;
+        VkCommandBuffer _immCommandBuffer;
+        VkCommandPool _immCommandPool;
+
 	struct SDL_Window* _window{ nullptr };
 
 	static VulkanEngine& Get();
 
-        FrameData& get_current_frame() { return _frames[_frameNumber % FRAME_OVERLAP]; };
+        FrameData& get_current_frame() { return _frames[_frameNumber % FRAME_OVERLAP]; }
+        void immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function);
 
 	void init();
 	void cleanup();
 	void draw();
         void draw_background(VkCommandBuffer cmd);
+        void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView);
 	void run();
 
   private:
@@ -88,6 +95,7 @@ public:
         void init_descriptors();
         void init_pipelines();
         void init_background_pipelines();
+        void init_imgui();
 
         void create_swapchain(uint32_t width, uint32_t height);
         void destroy_swapchain();

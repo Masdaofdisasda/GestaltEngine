@@ -21,6 +21,7 @@ find_package(Vulkan REQUIRED)
 message(STATUS "Vulkan found: INCLUDE_DIRS=${Vulkan_INCLUDE_DIRS}, LIBRARIES=${Vulkan_LIBRARIES}")
 find_package(SDL2 CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
 
 include(FetchContent)
 FetchContent_Declare(
