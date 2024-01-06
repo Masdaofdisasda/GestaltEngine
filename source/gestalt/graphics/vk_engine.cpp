@@ -365,12 +365,12 @@ void VulkanEngine::init_background_pipelines() {
     VkShaderModule gradientShader;
     if (!vkutil::load_shader_module("../shaders/gradient_color.comp.spv", _device,
                                     &gradientShader)) {
-      fmt::print("Error when building the compute shader \n");
+      fmt::println("Error when building the compute shader");
     }
 
     VkShaderModule skyShader;
     if (!vkutil::load_shader_module("../shaders/sky.comp.spv", _device, &skyShader)) {
-      fmt::print("Error when building the compute shader \n");
+      fmt::println("Error when building the compute shader");
     }
 
     VkPipelineShaderStageCreateInfo stageinfo{};
@@ -586,7 +586,7 @@ void VulkanEngine::draw() {
     draw_geometry(cmd);
 
     // transition the draw image and the swapchain image into their correct transfer layouts
-    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL,
+    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                              VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED,
                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
