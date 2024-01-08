@@ -59,6 +59,7 @@ public:
 	bool _isInitialized{ false };
 	int _frameNumber {0};
         bool stop_rendering{false};
+        bool resize_requested{false}; 
         VkExtent2D _windowExtent{1700, 900};
 
         VkSwapchainKHR _swapchain;
@@ -70,6 +71,7 @@ public:
         AllocatedImage _drawImage;
         AllocatedImage _depthImage;
         VkExtent2D _drawExtent;
+        float renderScale = 1.f;
 
         FrameData _frames[FRAME_OVERLAP];
 
@@ -117,6 +119,7 @@ public:
   private:
         void init_vulkan();
         void init_swapchain();
+        void resize_swapchain();
         void init_commands();
         void init_sync_structures();
         void init_descriptors();
