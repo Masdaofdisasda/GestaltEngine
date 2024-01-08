@@ -251,6 +251,7 @@ void VulkanEngine::init_commands() {
 }
 
 void VulkanEngine::init_sync_structures() {
+
     // create synchronization structures
     // one fence to control when the gpu has finished rendering the frame,
     // and 2 semaphores to synchronize rendering with swapchain
@@ -272,6 +273,7 @@ void VulkanEngine::init_sync_structures() {
 }
 
 void VulkanEngine::init_descriptors() {
+
     // create a descriptor pool that will hold 10 sets with 1 image each
     std::vector<DescriptorAllocator::PoolSizeRatio> sizes = {{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1}};
 
@@ -317,6 +319,7 @@ void VulkanEngine::init_pipelines() {
 }
 
 void VulkanEngine::init_mesh_pipeline() {
+
     VkShaderModule triangleFragShader;
     if (!vkutil::load_shader_module("../shaders/colored_triangle.frag.spv", _device,
                                     &triangleFragShader)) {
@@ -344,19 +347,12 @@ void VulkanEngine::init_mesh_pipeline() {
 
     // use the triangle layout we created
     pipelineBuilder._pipelineLayout = _meshPipelineLayout;
-    // connecting the vertex and pixel shaders to the pipeline
     pipelineBuilder.set_shaders(triangleVertexShader, triangleFragShader);
-    // it will draw triangles
     pipelineBuilder.set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-    // filled triangles
     pipelineBuilder.set_polygon_mode(VK_POLYGON_MODE_FILL);
-    // no backface culling
     pipelineBuilder.set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
-    // no multisampling
     pipelineBuilder.set_multisampling_none();
-    // no blending
-    pipelineBuilder.disable_blending();
-
+    pipelineBuilder.enable_blending_additive();
     pipelineBuilder.enable_depthtest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
 
     // connect the image format we will draw into, from draw image

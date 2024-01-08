@@ -113,6 +113,30 @@ void PipelineBuilder::disable_blending() {
   _colorBlendAttachment.blendEnable = VK_FALSE;
 }
 
+void PipelineBuilder::enable_blending_additive() {
+  _colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+                                         | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+  _colorBlendAttachment.blendEnable = VK_TRUE;
+  _colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+  _colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_DST_ALPHA;
+  _colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+  _colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+  _colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+  _colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+}
+
+void PipelineBuilder::enable_blending_alphablend() {
+  _colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+                                         | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+  _colorBlendAttachment.blendEnable = VK_TRUE;
+  _colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+  _colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_DST_ALPHA;
+  _colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+  _colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+  _colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+  _colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+}
+
 void PipelineBuilder::set_color_attachment_format(VkFormat format) {
   _colorAttachmentformat = format;
   // connect the format to the renderInfo  structure
