@@ -82,12 +82,9 @@ public:
 
         VkPipeline _gradientPipeline;
         VkPipelineLayout _gradientPipelineLayout;
-        VkPipelineLayout _trianglePipelineLayout;
-        VkPipeline _trianglePipeline;
-        VkPipelineLayout _meshPipelineLayout;
         VkPipeline _meshPipeline;
+        VkPipelineLayout _meshPipelineLayout;
 
-        GPUMeshBuffers rectangle;
         std::vector<std::shared_ptr<MeshAsset>> testMeshes;
 
         DeletionQueue _mainDeletionQueue;
@@ -115,9 +112,6 @@ public:
 	void init();
 	void cleanup();
 	void draw();
-        void draw_background(VkCommandBuffer cmd);
-        void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView);
-        void draw_geometry(VkCommandBuffer cmd);
 	void run();
 
   private:
@@ -127,11 +121,14 @@ public:
         void init_sync_structures();
         void init_descriptors();
         void init_pipelines();
-        void init_triangle_pipeline();
         void init_mesh_pipeline();
         void init_background_pipelines();
         void init_imgui();
         void init_default_data();
+
+        void draw_background(VkCommandBuffer cmd);
+        void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView);
+        void draw_geometry(VkCommandBuffer cmd);
 
         void create_swapchain(uint32_t width, uint32_t height);
         void destroy_swapchain();
