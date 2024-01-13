@@ -4,7 +4,16 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
 
+#if _DEBUG
+#define VMA_DEBUG_INITIALIZE_ALLOCATIONS 1
+#  define VMA_DEBUG_LOG_FORMAT(format, ...)
+#define VMA_DEBUG_LOG_FORMAT(format, ...) do { \
+    printf((format), __VA_ARGS__); \
+    printf("\n"); \
+} while(false)
+#endif
 #define VMA_IMPLEMENTATION
+#define VMA_VULKAN_VERSION 1003000
 #include <vma/vk_mem_alloc.h>
 
 #include <imgui.h>
@@ -124,7 +133,7 @@ void VulkanEngine::init_vulkan() {
     allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
     vmaCreateAllocator(&allocatorInfo, &_allocator);
 
-    _mainDeletionQueue.push_function([&]() { vmaDestroyAllocator(_allocator); });
+    _mainDeletionQueue.push_function([&]() { vmaDestroyAllocator(_allocator); }, "");
 }
 
 void VulkanEngine::create_swapchain(uint32_t width, uint32_t height) {
@@ -172,7 +181,6 @@ void VulkanEngine::init_swapchain() {
 
     VkImageUsageFlags drawImageUsages{};
     drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    //drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     drawImageUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
     drawImageUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
@@ -219,7 +227,7 @@ void VulkanEngine::init_swapchain() {
 
       vkDestroyImageView(_device, _depthImage.imageView, nullptr);
       vmaDestroyImage(_allocator, _depthImage.image, _depthImage.allocation);
-    });
+    }, "");
 }
 
 void VulkanEngine::resize_swapchain() {
@@ -262,7 +270,7 @@ void VulkanEngine::init_commands() {
     VK_CHECK(vkAllocateCommandBuffers(_device, &cmdAllocInfo, &_immCommandBuffer));
 
     _mainDeletionQueue.push_function(
-        [=]() { vkDestroyCommandPool(_device, _immCommandPool, nullptr); });
+        [=]() { vkDestroyCommandPool(_device, _immCommandPool, nullptr); }, "");
 }
 
 void VulkanEngine::init_sync_structures() {
@@ -284,7 +292,7 @@ void VulkanEngine::init_sync_structures() {
     }
 
     VK_CHECK(vkCreateFence(_device, &fenceCreateInfo, nullptr, &_immFence));
-    _mainDeletionQueue.push_function([=]() { vkDestroyFence(_device, _immFence, nullptr); });
+    _mainDeletionQueue.push_function([=]() { vkDestroyFence(_device, _immFence, nullptr); }, "");
 }
 
 void VulkanEngine::init_descriptors() {
@@ -321,7 +329,7 @@ void VulkanEngine::init_descriptors() {
     _mainDeletionQueue.push_function([=]() {
       vkDestroyDescriptorSetLayout(_device, _drawImageDescriptorLayout, nullptr);
       globalDescriptorAllocator.destroy_pool(_device);
-    });
+    }, "");
 }
 
 
@@ -384,7 +392,7 @@ void VulkanEngine::init_mesh_pipeline() {
     _mainDeletionQueue.push_function([&]() {
       vkDestroyPipelineLayout(_device, _meshPipelineLayout, nullptr);
       vkDestroyPipeline(_device, _meshPipeline, nullptr);
-    });
+    }, "");
 }
 
 
@@ -462,14 +470,13 @@ void VulkanEngine::init_background_pipelines() {
     // destroy structures properly
     vkDestroyShaderModule(_device, gradientShader, nullptr);
     vkDestroyShaderModule(_device, skyShader, nullptr);
+
     _mainDeletionQueue.push_function([&]() {
-      vkDestroyPipelineLayout(_device, _gradientPipelineLayout, nullptr);
       for (auto&& effect : backgroundEffects) {
         vkDestroyPipeline(_device, effect.pipeline, nullptr);
       }
-      vkDestroyPipeline(_device, sky.pipeline, nullptr);
-      vkDestroyPipeline(_device, gradient.pipeline, nullptr);
-    });
+      vkDestroyPipelineLayout(_device, _gradientPipelineLayout, nullptr);
+    }, "");
 }
 
 void VulkanEngine::init_imgui() {
@@ -530,9 +537,9 @@ void VulkanEngine::init_imgui() {
 
     // add the destroy the imgui created structures
     _mainDeletionQueue.push_function([=]() {
-      vkDestroyDescriptorPool(_device, imguiPool, nullptr);
       ImGui_ImplVulkan_Shutdown();
-    });
+      vkDestroyDescriptorPool(_device, imguiPool, nullptr);
+    }, "");
 }
 
 void VulkanEngine::init_default_data() {
@@ -664,20 +671,27 @@ void VulkanEngine::cleanup() {
 
       //make sure the gpu has stopped doing its things
       vkDeviceWaitIdle(_device);
+      
+      for (std::shared_ptr<MeshAsset> mesh : testMeshes) {
+        destroy_buffer(mesh.get()->meshBuffers.vertexBuffer);
+        destroy_buffer(mesh.get()->meshBuffers.indexBuffer);
+      }
+
       _mainDeletionQueue.flush();
 
-      for (int i = 0; i < FRAME_OVERLAP; i++) {
+      for (FrameData frame : _frames) {
 
         // already written from before
-        vkDestroyCommandPool(_device, _frames[i]._commandPool, nullptr);
+        vkDestroyCommandPool(_device, frame._commandPool, nullptr);
 
         // destroy sync objects
-        vkDestroyFence(_device, _frames[i]._renderFence, nullptr);
-        vkDestroySemaphore(_device, _frames[i]._renderSemaphore, nullptr);
-        vkDestroySemaphore(_device, _frames[i]._swapchainSemaphore, nullptr);
+        vkDestroyFence(_device, frame._renderFence, nullptr);
+        vkDestroySemaphore(_device, frame._renderSemaphore, nullptr);
+        vkDestroySemaphore(_device, frame._swapchainSemaphore, nullptr);
 
-        _frames[i]._deletionQueue.flush();
+        frame._deletionQueue.flush();
       }
+
 
       destroy_swapchain();
       vkDestroySurfaceKHR(_instance, _surface, nullptr);
@@ -722,9 +736,6 @@ void VulkanEngine::draw() {
     // to let vulkan know that
     VkCommandBufferBeginInfo cmdBeginInfo
         = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-
-    _drawExtent.width = _drawImage.imageExtent.width;
-    _drawExtent.height = _drawImage.imageExtent.height;
 
     VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
@@ -790,9 +801,7 @@ void VulkanEngine::draw() {
     //  we want to wait on the _renderSemaphore for that,
     //  as its necessary that drawing commands have finished before the image is displayed to the
     //  user
-    VkPresentInfoKHR presentInfo = {};
-    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    presentInfo.pNext = nullptr;
+    VkPresentInfoKHR presentInfo = vkinit::present_info();
     presentInfo.pSwapchains = &_swapchain;
     presentInfo.swapchainCount = 1;
 
@@ -804,6 +813,7 @@ void VulkanEngine::draw() {
     VkResult presentResult = vkQueuePresentKHR(_graphicsQueue, &presentInfo);
     if (presentResult == VK_ERROR_OUT_OF_DATE_KHR) {
       resize_requested = true;
+      return;
     }
 
     // increase the number of frames drawn
@@ -877,7 +887,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd) {
 
     GPUDrawPushConstants push_constants;
 
-    glm::mat4 view = translate(glm::vec3{0, 0, -5});
+    glm::mat4 view = translate(glm::vec3{0, 0, 5});
     // camera projection
     glm::mat4 projection = glm::perspective(
         glm::radians(70.f), (float)_drawExtent.width / (float)_drawExtent.height, 10000.f, 0.1f);

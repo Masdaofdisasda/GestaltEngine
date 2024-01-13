@@ -12,7 +12,6 @@
 #include <fastgltf/parser.hpp>
 #include <fastgltf/tools.hpp>
 
-
 std::optional<std::vector<std::shared_ptr<MeshAsset>>> loadGltfMeshes(
     VulkanEngine* engine, std::filesystem::path filePath) {
   //> openmesh

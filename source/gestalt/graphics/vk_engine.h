@@ -5,19 +5,24 @@
 
 #include <vk_types.h>
 #include <vk_descriptors.h>
+
+#include <ranges>
 #include "vk_loader.h"
 
 struct DeletionQueue {
-  std::deque<std::function<void()>> deletors;
+  std::deque<std::pair<std::function<void()>, std::string>> deletors;
 
-  void push_function(std::function<void()>&& function) { deletors.push_back(function); }
+  void push_function(std::function<void()>&& function, const std::string& description) {
+    deletors.emplace_back(std::move(function), description);
+  }
 
   void flush() {
-    // reverse iterate the deletion queue to execute all the functions
-    for (auto it = deletors.rbegin(); it != deletors.rend(); it++) {
-      (*it)();  // call functors
+    for (auto& [deletor, description] : std::ranges::reverse_view(deletors)) {
+#if _DEBUG
+      fmt::print("Deleting: {}\n", description);
+#endif
+      deletor();
     }
-
     deletors.clear();
   }
 };

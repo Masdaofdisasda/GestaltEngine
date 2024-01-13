@@ -36,3 +36,4 @@
 /bin/release/*.pdb
 /bin/debug/*.pdb
 bin/debug/imgui.ini
+bin/release/imgui.ini
