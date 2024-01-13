@@ -55,6 +55,12 @@ void VulkanEngine::init()
         _windowExtent.height,
         window_flags);
 
+    mainCamera.velocity = glm::vec3(0.f);
+    mainCamera.position = glm::vec3(0, 0, 5);
+
+    mainCamera.pitch = 0;
+    mainCamera.yaw = 0;
+
     init_vulkan();
     init_swapchain();
     init_commands();
@@ -1129,16 +1135,22 @@ void VulkanEngine::update_scene() {
       loadedNodes["Cube"]->Draw(translation * scale, mainDrawContext);
     }
 
-    sceneData.view = glm::translate(glm::vec3{0, 0, -5});
+    mainCamera.update();
+
+    glm::mat4 view = mainCamera.getViewMatrix();
+
     // camera projection
-    sceneData.proj
+    glm::mat4 projection
         = glm::perspective(glm::radians(70.f),
                            (float)_windowExtent.width / (float)_windowExtent.height, 10000.f, 0.1f);
 
     // invert the Y direction on projection matrix so that we are more similar
     // to opengl and gltf axis
-    sceneData.proj[1][1] *= -1;
-    sceneData.viewproj = sceneData.proj * sceneData.view;
+    projection[1][1] *= -1;
+
+    sceneData.view = view;
+    sceneData.proj = projection;
+    sceneData.viewproj = projection * view;
 
     // some default lighting parameters
     sceneData.ambientColor = glm::vec4(.1f);
@@ -1157,6 +1169,8 @@ void VulkanEngine::run()
       while (SDL_PollEvent(&e) != 0) {
         // close the window when user alt-f4s or clicks the X button
         if (e.type == SDL_QUIT) bQuit = true;
+
+        mainCamera.processSDLEvent(e);
 
         if (e.type == SDL_WINDOWEVENT) {
           if (e.window.event == SDL_WINDOWEVENT_MINIMIZED) {

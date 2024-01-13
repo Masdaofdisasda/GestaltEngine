@@ -11,6 +11,7 @@
 
 #include "vk_descriptors.h"
 #include "vk_loader.h"
+#include "camera.h"
 
 struct DeletionQueue {
   std::deque<std::pair<std::function<void()>, std::string>> deletors;
@@ -236,6 +237,9 @@ public:
   AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
                               bool mipmapped = false);
   void destroy_image(const AllocatedImage& img);
+
+  
+  Camera mainCamera;
 
   bool resize_requested{false};
   bool freeze_rendering{false};
