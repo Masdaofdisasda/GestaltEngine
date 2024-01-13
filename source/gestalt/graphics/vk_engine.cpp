@@ -34,8 +34,6 @@
 
 VulkanEngine* loadedEngine = nullptr;
 
-VulkanEngine& VulkanEngine::Get() { return *loadedEngine; }
-
 constexpr bool bUseValidationLayers = true;
 
 void VulkanEngine::init()
@@ -887,7 +885,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd) {
 
     GPUDrawPushConstants push_constants;
 
-    glm::mat4 view = translate(glm::vec3{0, 0, 5});
+    glm::mat4 view = translate(glm::vec3{0, 0, -5});
     // camera projection
     glm::mat4 projection = glm::perspective(
         glm::radians(70.f), (float)_drawExtent.width / (float)_drawExtent.height, 10000.f, 0.1f);
@@ -925,10 +923,10 @@ void VulkanEngine::run()
 
         if (e.type == SDL_WINDOWEVENT) {
           if (e.window.event == SDL_WINDOWEVENT_MINIMIZED) {
-            stop_rendering = true;
+            freeze_rendering = true;
           }
           if (e.window.event == SDL_WINDOWEVENT_RESTORED) {
-            stop_rendering = false;
+            freeze_rendering = false;
           }
         }
 
@@ -936,15 +934,14 @@ void VulkanEngine::run()
         ImGui_ImplSDL2_ProcessEvent(&e);
       }
 
-      if (resize_requested) {
-        resize_swapchain();
-      }
-
-      // do not draw if we are minimized
-      if (stop_rendering) {
+      if (freeze_rendering) {
         // throttle the speed to avoid the endless spinning
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         continue;
+      }
+
+      if (resize_requested) {
+        resize_swapchain();
       }
 
       // imgui new frame
