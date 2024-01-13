@@ -35,9 +35,6 @@ struct MeshAsset {
   GPUMeshBuffers meshBuffers;
 };
 
-std::optional<std::vector<std::shared_ptr<MeshAsset>>> loadGltfMeshes(
-    VulkanEngine* engine, std::filesystem::path filePath);
-
 struct LoadedGLTF : public IRenderable {
   // storage for all the data on a given glTF file
   std::unordered_map<std::string, std::shared_ptr<MeshAsset>> meshes;

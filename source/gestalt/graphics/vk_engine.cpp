@@ -55,23 +55,24 @@ void VulkanEngine::init()
         _windowExtent.height,
         window_flags);
 
-    mainCamera.velocity = glm::vec3(0.f);
-    mainCamera.position = glm::vec3(30.f, -00.f, -085.f);
-
-    mainCamera.pitch = 0;
-    mainCamera.yaw = 0;
-
     init_vulkan();
     init_swapchain();
     init_commands();
     init_sync_structures();
     init_descriptors();
     init_pipelines();
-    init_imgui();
     init_default_data();
+    init_renderables();
+    init_imgui();
 
     // everything went fine
     _isInitialized = true;
+
+    mainCamera.velocity = glm::vec3(0.f);
+    mainCamera.position = glm::vec3(30.f, -00.f, -085.f);
+
+    mainCamera.pitch = 0;
+    mainCamera.yaw = 0;
 }
 
 void VulkanEngine::init_vulkan() {
@@ -572,6 +573,39 @@ void VulkanEngine::init_imgui() {
 }
 
 void VulkanEngine::init_default_data() {
+    std::array<Vertex, 4> rect_vertices;
+
+    rect_vertices[0].position = {0.5, -0.5, 0};
+    rect_vertices[1].position = {0.5, 0.5, 0};
+    rect_vertices[2].position = {-0.5, -0.5, 0};
+    rect_vertices[3].position = {-0.5, 0.5, 0};
+
+    rect_vertices[0].color = {0, 0, 0, 1};
+    rect_vertices[1].color = {0.5, 0.5, 0.5, 1};
+    rect_vertices[2].color = {1, 0, 0, 1};
+    rect_vertices[3].color = {0, 1, 0, 1};
+
+    rect_vertices[0].uv_x = 1;
+    rect_vertices[0].uv_y = 0;
+    rect_vertices[1].uv_x = 0;
+    rect_vertices[1].uv_y = 0;
+    rect_vertices[2].uv_x = 1;
+    rect_vertices[2].uv_y = 1;
+    rect_vertices[3].uv_x = 0;
+    rect_vertices[3].uv_y = 1;
+
+    std::array<uint32_t, 6> rect_indices;
+
+    rect_indices[0] = 0;
+    rect_indices[1] = 1;
+    rect_indices[2] = 2;
+
+    rect_indices[3] = 2;
+    rect_indices[4] = 1;
+    rect_indices[5] = 3;
+
+    rectangle = uploadMesh(rect_indices, rect_vertices);
+
     // 3 default textures, white, grey, black. 1 pixel each
     uint32_t white = 0xFFFFFFFF;
     _whiteImage = create_image((void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
@@ -606,67 +640,9 @@ void VulkanEngine::init_default_data() {
     sampl.magFilter = VK_FILTER_LINEAR;
     sampl.minFilter = VK_FILTER_LINEAR;
     vkCreateSampler(_device, &sampl, nullptr, &_defaultSamplerLinear);
+}
 
-    _mainDeletionQueue.push_function(
-        [=]() {
-          vkDestroySampler(_device, _defaultSamplerLinear, nullptr);
-          vkDestroySampler(_device, _defaultSamplerNearest, nullptr);
-          destroy_image(_errorCheckerboardImage);
-          destroy_image(_blackImage);
-          destroy_image(_greyImage);
-          destroy_image(_whiteImage);
-        },
-        "");
-
-    GLTFMetallic_Roughness::MaterialResources materialResources;
-    // default the material textures
-    materialResources.colorImage = _whiteImage;
-    materialResources.colorSampler = _defaultSamplerLinear;
-    materialResources.metalRoughImage = _whiteImage;
-    materialResources.metalRoughSampler = _defaultSamplerLinear;
-
-    // set the uniform buffer for the material data
-    AllocatedBuffer materialConstants
-        = create_buffer(sizeof(GLTFMetallic_Roughness::MaterialConstants),
-                        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-    // write the buffer
-    GLTFMetallic_Roughness::MaterialConstants* sceneUniformData
-        = (GLTFMetallic_Roughness::MaterialConstants*)materialConstants.allocation->GetMappedData();
-    sceneUniformData->colorFactors = glm::vec4{1, 1, 1, 1};
-    sceneUniformData->metal_rough_factors = glm::vec4{1, 0.5, 0, 0};
-
-    _mainDeletionQueue.push_function([=, this]() { destroy_buffer(materialConstants); }, "");
-
-    materialResources.dataBuffer = materialConstants.buffer;
-    materialResources.dataBufferOffset = 0;
-
-    defaultData = metalRoughMaterial.write_material(_device, MaterialPass::MainColor,
-                                                    materialResources, globalDescriptorAllocator);
-
-    std::optional<std::vector<std::shared_ptr<MeshAsset>>> assets
-        = loadGltfMeshes(this, R"(..\..\assets\basicmesh.glb)");
-    if (assets.has_value()) {
-      testMeshes = assets.value();
-    } else {
-      fmt::print("Error when loading the gltf mesh");
-      abort();
-    }
-
-    for (auto& m : testMeshes) {
-      std::shared_ptr<MeshNode> newNode = std::make_shared<MeshNode>();
-      newNode->mesh = m;
-
-      newNode->localTransform = glm::mat4{1.f};
-      newNode->worldTransform = glm::mat4{1.f};
-
-      for (auto& s : newNode->mesh->surfaces) {
-        s.material = std::make_shared<GLTFMaterial>(defaultData);
-      }
-
-      loadedNodes[m->name] = std::move(newNode);
-    }
-
+void VulkanEngine::init_renderables() {
     std::string structurePath = {R"(..\..\assets\structure.glb)"};
     auto structureFile = loadGltf(this, structurePath);
 
@@ -793,12 +769,16 @@ AllocatedImage VulkanEngine::create_image(void* data, VkExtent3D size, VkFormat 
       vkCmdCopyBufferToImage(cmd, uploadbuffer.buffer, new_image.image,
                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 
-      vkutil::transition_image(cmd, new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+      if (mipmapped) {
+        vkutil::generate_mipmaps(
+            cmd, new_image.image,
+            VkExtent2D{new_image.imageExtent.width, new_image.imageExtent.height});
+      } else {
+        vkutil::transition_image(cmd, new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+      }
     });
-
     destroy_buffer(uploadbuffer);
-
     return new_image;
 }
 
@@ -908,6 +888,7 @@ void VulkanEngine::cleanup() {
 }
 
 void VulkanEngine::draw_main(VkCommandBuffer cmd) {
+
     ComputeEffect& effect = backgroundEffects[currentBackgroundEffect];
 
     // bind the background compute pipeline
@@ -1127,112 +1108,126 @@ bool is_visible(const RenderObject& obj, const glm::mat4& viewproj) {
 }
 
 void VulkanEngine::draw_geometry(VkCommandBuffer cmd) {
-    {
-      std::vector<uint32_t> opaque_draws;
-      opaque_draws.reserve(mainDrawContext.OpaqueSurfaces.size());
+    // begin clock
+    auto start = std::chrono::system_clock::now();
 
-      for (int i = 0; i < mainDrawContext.OpaqueSurfaces.size(); i++) {
-        if (is_visible(mainDrawContext.OpaqueSurfaces[i], sceneData.viewproj)) {
-          opaque_draws.push_back(i);
-        }
+    std::vector<uint32_t> opaque_draws;
+    opaque_draws.reserve(mainDrawContext.OpaqueSurfaces.size());
+
+    for (int i = 0; i < mainDrawContext.OpaqueSurfaces.size(); i++) {
+      if (is_visible(mainDrawContext.OpaqueSurfaces[i], sceneData.viewproj)) {
+        opaque_draws.push_back(i);
       }
-
-      // sort the opaque surfaces by material and mesh
-      std::sort(opaque_draws.begin(), opaque_draws.end(), [&](const auto& iA, const auto& iB) {
-        const RenderObject& A = mainDrawContext.OpaqueSurfaces[iA];
-        const RenderObject& B = mainDrawContext.OpaqueSurfaces[iB];
-        if (A.material == B.material) {
-          return A.indexBuffer < B.indexBuffer;
-        } else {
-          return A.material < B.material;
-        }
-      });
-
-      // allocate a new uniform buffer for the scene data
-      AllocatedBuffer gpuSceneDataBuffer = create_buffer(
-          sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-      // add it to the deletion queue of this frame so it gets deleted once its been used
-      get_current_frame()._deletionQueue.push_function(
-          [=, this]() { destroy_buffer(gpuSceneDataBuffer); }, "");
-
-      // write the buffer
-      GPUSceneData* sceneUniformData
-          = (GPUSceneData*)gpuSceneDataBuffer.allocation->GetMappedData();
-      *sceneUniformData = sceneData;
-
-      // create a descriptor set that binds that buffer and update it
-      VkDescriptorSet globalDescriptor
-          = get_current_frame()._frameDescriptors.allocate(_device, _gpuSceneDataDescriptorLayout);
-
-      DescriptorWriter writer;
-      writer.write_buffer(0, gpuSceneDataBuffer.buffer, sizeof(GPUSceneData), 0,
-                          VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-      writer.update_set(_device, globalDescriptor);
-
-      MaterialPipeline* lastPipeline = nullptr;
-      MaterialInstance* lastMaterial = nullptr;
-      VkBuffer lastIndexBuffer = VK_NULL_HANDLE;
-
-      auto draw = [&](const RenderObject& r) {
-        if (r.material != lastMaterial) {
-          lastMaterial = r.material;
-          if (r.material->pipeline != lastPipeline) {
-            lastPipeline = r.material->pipeline;
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, r.material->pipeline->pipeline);
-            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    r.material->pipeline->layout, 0, 1, &globalDescriptor, 0,
-                                    nullptr);
-
-            VkViewport viewport = {};
-            viewport.x = 0;
-            viewport.y = 0;
-            viewport.width = (float)_windowExtent.width;
-            viewport.height = (float)_windowExtent.height;
-            viewport.minDepth = 0.f;
-            viewport.maxDepth = 1.f;
-
-            vkCmdSetViewport(cmd, 0, 1, &viewport);
-
-            VkRect2D scissor = {};
-            scissor.offset.x = 0;
-            scissor.offset.y = 0;
-            scissor.extent.width = _windowExtent.width;
-            scissor.extent.height = _windowExtent.height;
-
-            vkCmdSetScissor(cmd, 0, 1, &scissor);
-          }
-
-          vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                  r.material->pipeline->layout, 1, 1, &r.material->materialSet, 0,
-                                  nullptr);
-        }
-        if (r.indexBuffer != lastIndexBuffer) {
-          lastIndexBuffer = r.indexBuffer;
-          vkCmdBindIndexBuffer(cmd, r.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-        }
-        // calculate final mesh matrix
-        GPUDrawPushConstants push_constants;
-        push_constants.worldMatrix = r.transform;
-        push_constants.vertexBuffer = r.vertexBufferAddress;
-
-        vkCmdPushConstants(cmd, r.material->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
-                           sizeof(GPUDrawPushConstants), &push_constants);
-        vkCmdDrawIndexed(cmd, r.indexCount, 1, r.firstIndex, 0, 0);
-      };
-
-      for (auto& r : opaque_draws) {
-        draw(mainDrawContext.OpaqueSurfaces[r]);
-      }
-
-      for (auto& r : mainDrawContext.TransparentSurfaces) {
-        draw(r);
-      }
-
-      // we delete the draw commands now that we processed them
-      mainDrawContext.OpaqueSurfaces.clear();
-      mainDrawContext.TransparentSurfaces.clear();
     }
+
+    // sort the opaque surfaces by material and mesh
+    std::ranges::sort(opaque_draws, [&](const auto& iA, const auto& iB) {
+      const RenderObject& A = mainDrawContext.OpaqueSurfaces[iA];
+      const RenderObject& B = mainDrawContext.OpaqueSurfaces[iB];
+      if (A.material == B.material) {
+        return A.indexBuffer < B.indexBuffer;
+      }
+      return A.material < B.material;
+    });
+
+    // allocate a new uniform buffer for the scene data
+    AllocatedBuffer gpuSceneDataBuffer = create_buffer(
+        sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+    // add it to the deletion queue of this frame so it gets deleted once its been used
+    get_current_frame()._deletionQueue.push_function(
+        [=, this]() { destroy_buffer(gpuSceneDataBuffer); }, "");
+
+    // write the buffer
+    GPUSceneData* sceneUniformData
+        = (GPUSceneData*)gpuSceneDataBuffer.allocation->GetMappedData();
+    *sceneUniformData = sceneData;
+
+    // create a descriptor set that binds that buffer and update it
+    VkDescriptorSet globalDescriptor
+        = get_current_frame()._frameDescriptors.allocate(_device, _gpuSceneDataDescriptorLayout);
+
+    DescriptorWriter writer;
+    writer.write_buffer(0, gpuSceneDataBuffer.buffer, sizeof(GPUSceneData), 0,
+                        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    writer.update_set(_device, globalDescriptor);
+
+    MaterialPipeline* lastPipeline = nullptr;
+    MaterialInstance* lastMaterial = nullptr;
+    VkBuffer lastIndexBuffer = VK_NULL_HANDLE;
+
+    auto draw = [&](const RenderObject& r) {
+      if (r.material != lastMaterial) {
+        lastMaterial = r.material;
+        if (r.material->pipeline != lastPipeline) {
+          lastPipeline = r.material->pipeline;
+          vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, r.material->pipeline->pipeline);
+          vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                  r.material->pipeline->layout, 0, 1, &globalDescriptor, 0,
+                                  nullptr);
+
+          VkViewport viewport = {};
+          viewport.x = 0;
+          viewport.y = 0;
+          viewport.width = (float)_windowExtent.width;
+          viewport.height = (float)_windowExtent.height;
+          viewport.minDepth = 0.f;
+          viewport.maxDepth = 1.f;
+
+          vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+          VkRect2D scissor = {};
+          scissor.offset.x = 0;
+          scissor.offset.y = 0;
+          scissor.extent.width = _windowExtent.width;
+          scissor.extent.height = _windowExtent.height;
+
+          vkCmdSetScissor(cmd, 0, 1, &scissor);
+        }
+
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                r.material->pipeline->layout, 1, 1, &r.material->materialSet, 0,
+                                nullptr);
+      }
+      if (r.indexBuffer != lastIndexBuffer) {
+        lastIndexBuffer = r.indexBuffer;
+        vkCmdBindIndexBuffer(cmd, r.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+      }
+      // calculate final mesh matrix
+      GPUDrawPushConstants push_constants;
+      push_constants.worldMatrix = r.transform;
+      push_constants.vertexBuffer = r.vertexBufferAddress;
+
+      vkCmdPushConstants(cmd, r.material->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
+                         sizeof(GPUDrawPushConstants), &push_constants);
+
+      
+      stats.drawcall_count++;
+      stats.triangle_count += r.indexCount / 3;
+      vkCmdDrawIndexed(cmd, r.indexCount, 1, r.firstIndex, 0, 0);
+    };
+    
+    // reset counters
+    stats.drawcall_count = 0;
+    stats.triangle_count = 0;
+
+    for (auto& r : opaque_draws) {
+      draw(mainDrawContext.OpaqueSurfaces[r]);
+    }
+
+    for (auto& r : mainDrawContext.TransparentSurfaces) {
+      draw(r);
+    }
+
+    auto end = std::chrono::system_clock::now();
+
+    // convert to microseconds (integer), and then come back to miliseconds
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    stats.mesh_draw_time = elapsed.count() / 1000.f;
+
+    // we delete the draw commands now that we processed them
+    mainDrawContext.OpaqueSurfaces.clear();
+    mainDrawContext.TransparentSurfaces.clear();
 }
 
 void VulkanEngine::update_scene() {
@@ -1258,6 +1253,9 @@ void VulkanEngine::update_scene() {
 
 void VulkanEngine::run()
 {
+    //begin clock
+    auto start = std::chrono::system_clock::now();
+
     SDL_Event e;
     bool bQuit = false;
 
@@ -1298,7 +1296,16 @@ void VulkanEngine::run()
       ImGui_ImplSDL2_NewFrame(_window);
       ImGui::NewFrame();
 
-      if (ImGui::Begin("background")) {
+      if (ImGui::Begin("Stats")) {
+        ImGui::Text("frametime %f ms", stats.frametime);
+        ImGui::Text("draw time %f ms", stats.mesh_draw_time);
+        ImGui::Text("update time %f ms", stats.scene_update_time);
+        ImGui::Text("triangles %i", stats.triangle_count);
+        ImGui::Text("draws %i", stats.drawcall_count);
+        ImGui::End();
+      }
+
+      if (ImGui::Begin("Background")) {
 
         ImGui::SliderFloat("Render Scale", &renderScale, 0.3f, 1.f);
 
@@ -1320,6 +1327,13 @@ void VulkanEngine::run()
       // our draw function
       draw();
     }
+
+    // get clock again, compare with start clock
+    auto end = std::chrono::system_clock::now();
+
+    // convert to microseconds (integer), and then come back to miliseconds
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    stats.frametime = elapsed.count() / 1000.f;
 }
 
 void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine) {
@@ -1431,11 +1445,15 @@ void MeshNode::Draw(const glm::mat4& topMatrix, DrawContext& ctx) {
       def.firstIndex = s.startIndex;
       def.indexBuffer = mesh->meshBuffers.indexBuffer.buffer;
       def.material = &s.material->data;
-
+      def.bounds = s.bounds;
       def.transform = nodeMatrix;
       def.vertexBufferAddress = mesh->meshBuffers.vertexBufferAddress;
 
-      ctx.OpaqueSurfaces.push_back(def);
+      if (s.material->data.passType == MaterialPass::Transparent) {
+        ctx.TransparentSurfaces.push_back(def);
+      } else {
+        ctx.OpaqueSurfaces.push_back(def);
+      }
     }
 
     // recurse down

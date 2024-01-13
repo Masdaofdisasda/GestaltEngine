@@ -3,12 +3,12 @@
 
 #pragma once
 
-#include <vk_types.h>
 #include <vector>
 #include <deque>
 #include <functional>
 #include <ranges>
 
+#include "vk_types.h"
 #include "vk_descriptors.h"
 #include "vk_loader.h"
 #include "camera.h"
@@ -42,6 +42,14 @@ struct FrameData {
   DescriptorAllocatorGrowable _frameDescriptors;
 };
 
+struct EngineStats {
+  float frametime;
+  int triangle_count;
+  int drawcall_count;
+  float scene_update_time;
+  float mesh_draw_time;
+};
+
 constexpr unsigned int FRAME_OVERLAP = 2;
 
 struct ComputePushConstants {
@@ -49,15 +57,6 @@ struct ComputePushConstants {
   glm::vec4 data2;
   glm::vec4 data3;
   glm::vec4 data4;
-};
-
-struct GPUSceneData {
-  glm::mat4 view;
-  glm::mat4 proj;
-  glm::mat4 viewproj;
-  glm::vec4 ambientColor;
-  glm::vec4 sunlightDirection;  // w for sun power
-  glm::vec4 sunlightColor;
 };
 
 struct GLTFMetallic_Roughness {
@@ -243,8 +242,9 @@ public:
                               bool mipmapped = false);
   void destroy_image(const AllocatedImage& img);
 
-  
   Camera mainCamera;
+
+  EngineStats stats;
 
   bool resize_requested{false};
   bool freeze_rendering{false};
@@ -271,4 +271,5 @@ private:
   void init_imgui();
 
   void init_default_data();
+  void init_renderables();
 };
