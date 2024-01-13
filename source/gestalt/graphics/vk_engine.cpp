@@ -56,7 +56,7 @@ void VulkanEngine::init()
         window_flags);
 
     mainCamera.velocity = glm::vec3(0.f);
-    mainCamera.position = glm::vec3(0, 0, 5);
+    mainCamera.position = glm::vec3(30.f, -00.f, -085.f);
 
     mainCamera.pitch = 0;
     mainCamera.yaw = 0;
@@ -302,8 +302,11 @@ void VulkanEngine::init_sync_structures() {
 void VulkanEngine::init_descriptors() {
 
     // create a descriptor pool that will hold 10 sets with 1 image each
-    std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes
-        = {{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1}, {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}};
+    std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes = {
+        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3},
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3},
+        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3},
+    };
 
 
     globalDescriptorAllocator.init(_device, 10, sizes);
@@ -663,6 +666,13 @@ void VulkanEngine::init_default_data() {
 
       loadedNodes[m->name] = std::move(newNode);
     }
+
+    std::string structurePath = {R"(..\..\assets\structure.glb)"};
+    auto structureFile = loadGltf(this, structurePath);
+
+    assert(structureFile.has_value());
+
+    loadedScenes["structure"] = *structureFile;
 }
 
 void VulkanEngine::immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function) {
@@ -864,6 +874,8 @@ void VulkanEngine::cleanup() {
 
       //make sure the gpu has stopped doing its things
       vkDeviceWaitIdle(_device);
+
+      loadedScenes.clear();
       
       for (std::shared_ptr<MeshAsset> mesh : testMeshes) {
         destroy_buffer(mesh.get()->meshBuffers.vertexBuffer);
@@ -895,127 +907,159 @@ void VulkanEngine::cleanup() {
     }
 }
 
-void VulkanEngine::draw() {
+void VulkanEngine::draw_main(VkCommandBuffer cmd) {
+    ComputeEffect& effect = backgroundEffects[currentBackgroundEffect];
 
-    update_scene();
+    // bind the background compute pipeline
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, effect.pipeline);
 
-    // wait until the gpu has finished rendering the last frame. Timeout of 1
-    // second
-    VK_CHECK(vkWaitForFences(_device, 1, &get_current_frame()._renderFence, true, 1000000000));
+    // bind the descriptor set containing the draw image for the compute pipeline
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _gradientPipelineLayout, 0, 1,
+                            &_drawImageDescriptors, 0, nullptr);
 
-    get_current_frame()._deletionQueue.flush();
-    get_current_frame()._frameDescriptors.clear_pools(_device);
+    vkCmdPushConstants(cmd, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
+                       sizeof(ComputePushConstants), &effect.data);
+    // execute the compute pipeline dispatch. We are using 16x16 workgroup size so we need to divide
+    // by it
+    vkCmdDispatch(cmd, std::ceil(_windowExtent.width / 16.0),
+                  std::ceil(_windowExtent.height / 16.0), 1);
 
-    // request image from the swapchain
-    uint32_t swapchainImageIndex;
-    VkResult e = vkAcquireNextImageKHR(_device, _swapchain, 1000000000,
-                                       get_current_frame()._swapchainSemaphore, nullptr,
-                                       &swapchainImageIndex);
-    if (e == VK_ERROR_OUT_OF_DATE_KHR) {
-      resize_requested = true;
-      return;
-    }
+    // draw the triangle
 
-    _drawExtent.height
-        = std::min(_swapchainExtent.height, _drawImage.imageExtent.height) * renderScale;
-    _drawExtent.width
-        = std::min(_swapchainExtent.width, _drawImage.imageExtent.width) * renderScale;
+    VkRenderingAttachmentInfo colorAttachment
+        = vkinit::attachment_info(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+    VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
+        _depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-    VK_CHECK(vkResetFences(_device, 1, &get_current_frame()._renderFence));
+    VkRenderingInfo renderInfo
+        = vkinit::rendering_info(_windowExtent, &colorAttachment, &depthAttachment);
 
-    // now that we are sure that the commands finished executing, we can safely
-    // reset the command buffer to begin recording again.
-    VK_CHECK(vkResetCommandBuffer(get_current_frame()._mainCommandBuffer, 0));
-
-    // naming it cmd for shorter writing
-    VkCommandBuffer cmd = get_current_frame()._mainCommandBuffer;
-
-    // begin the command buffer recording. We will use this command buffer exactly once, so we want
-    // to let vulkan know that
-    VkCommandBufferBeginInfo cmdBeginInfo
-        = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-
-    VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
-
-    // transition our main draw image into general layout so we can write into it
-    // we will overwrite it all so we dont care about what was the older layout
-    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED,
-                             VK_IMAGE_LAYOUT_GENERAL);
-
-    draw_background(cmd);
-
-    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL,
-                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    vkutil::transition_image(cmd, _depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED,
-                             VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-
+    vkCmdBeginRendering(cmd, &renderInfo);
+    auto start = std::chrono::system_clock::now();
     draw_geometry(cmd);
 
-    // transition the draw image and the swapchain image into their correct transfer layouts
-    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                             VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-    vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED,
-                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    auto end = std::chrono::system_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
-    // execute a copy from the draw image into the swapchain
-    vkutil::copy_image_to_image(cmd, _drawImage.image, _swapchainImages[swapchainImageIndex],
-                                _drawExtent, _swapchainExtent);
+    vkCmdEndRendering(cmd);
+}
 
-    // set swapchain image layout to Attachment Optimal so we can draw it
-    vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex],
-                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+void VulkanEngine::draw() {
+    {
+      // wait until the gpu has finished rendering the last frame. Timeout of 1 second
+      VK_CHECK(vkWaitForFences(_device, 1, &get_current_frame()._renderFence, true, 1000000000));
 
-    // draw imgui into the swapchain image
-    draw_imgui(cmd, _swapchainImageViews[swapchainImageIndex]);
+      get_current_frame()._deletionQueue.flush();
+      get_current_frame()._frameDescriptors.clear_pools(_device);
+      // request image from the swapchain
+      uint32_t swapchainImageIndex;
 
-    // set swapchain image layout to Present so we can draw it
-    vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex],
-                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                             VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+      VkResult e = vkAcquireNextImageKHR(_device, _swapchain, 1000000000,
+                                         get_current_frame()._swapchainSemaphore, nullptr,
+                                         &swapchainImageIndex);
+      if (e == VK_ERROR_OUT_OF_DATE_KHR) {
+        resize_requested = true;
+        return;
+      }
 
-    // finalize the command buffer (we can no longer add commands, but it can now be executed)
-    VK_CHECK(vkEndCommandBuffer(cmd));
+      VK_CHECK(vkResetFences(_device, 1, &get_current_frame()._renderFence));
 
-    // prepare the submission to the queue.
-    // we want to wait on the _presentSemaphore, as that semaphore is signaled when the swapchain is
-    // ready we will signal the _renderSemaphore, to signal that rendering has finished
-    VkCommandBufferSubmitInfo cmdinfo = vkinit::command_buffer_submit_info(cmd);
+      // now that we are sure that the commands finished executing, we can safely reset the command
+      // buffer to begin recording again.
+      VK_CHECK(vkResetCommandBuffer(get_current_frame()._mainCommandBuffer, 0));
 
-    VkSemaphoreSubmitInfo waitInfo
-        = vkinit::semaphore_submit_info(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR,
-                                        get_current_frame()._swapchainSemaphore);
-    VkSemaphoreSubmitInfo signalInfo = vkinit::semaphore_submit_info(
-        VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, get_current_frame()._renderSemaphore);
+      // naming it cmd for shorter writing
+      VkCommandBuffer cmd = get_current_frame()._mainCommandBuffer;
 
-    VkSubmitInfo2 submit = vkinit::submit_info(&cmdinfo, &signalInfo, &waitInfo);
+      // begin the command buffer recording. We will use this command buffer exactly once, so we
+      // want to let vulkan know that
+      VkCommandBufferBeginInfo cmdBeginInfo
+          = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
-    // submit command buffer to the queue and execute it.
-    //  _renderFence will now block until the graphic commands finish execution
-    VK_CHECK(vkQueueSubmit2(_graphicsQueue, 1, &submit, get_current_frame()._renderFence));
+      //> draw_first
+      VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
-    // prepare present
-    //  this will put the image we just rendered to into the visible window.
-    //  we want to wait on the _renderSemaphore for that,
-    //  as its necessary that drawing commands have finished before the image is displayed to the
-    //  user
-    VkPresentInfoKHR presentInfo = vkinit::present_info();
-    presentInfo.pSwapchains = &_swapchain;
-    presentInfo.swapchainCount = 1;
+      // transition our main draw image into general layout so we can write into it
+      // we will overwrite it all so we dont care about what was the older layout
+      vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED,
+                               VK_IMAGE_LAYOUT_GENERAL);
+      vkutil::transition_image(cmd, _depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED,
+                               VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-    presentInfo.pWaitSemaphores = &get_current_frame()._renderSemaphore;
-    presentInfo.waitSemaphoreCount = 1;
+      draw_main(cmd);
 
-    presentInfo.pImageIndices = &swapchainImageIndex;
+      // transtion the draw image and the swapchain image into their correct transfer layouts
+      vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL,
+                               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+      vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex],
+                               VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-    VkResult presentResult = vkQueuePresentKHR(_graphicsQueue, &presentInfo);
-    if (presentResult == VK_ERROR_OUT_OF_DATE_KHR) {
-      resize_requested = true;
-      return;
+      VkExtent2D extent;
+      extent.height = _windowExtent.height;
+      extent.width = _windowExtent.width;
+      //< draw_first
+      //> imgui_draw
+      // execute a copy from the draw image into the swapchain
+      vkutil::copy_image_to_image(cmd, _drawImage.image, _swapchainImages[swapchainImageIndex],
+                                  extent, extent);
+
+      // set swapchain image layout to Attachment Optimal so we can draw it
+      vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex],
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                               VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+      // draw imgui into the swapchain image
+      draw_imgui(cmd, _swapchainImageViews[swapchainImageIndex]);
+
+      // set swapchain image layout to Present so we can draw it
+      vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex],
+                               VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                               VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+
+      // finalize the command buffer (we can no longer add commands, but it can now be executed)
+      VK_CHECK(vkEndCommandBuffer(cmd));
+
+      // prepare the submission to the queue.
+      // we want to wait on the _presentSemaphore, as that semaphore is signaled when the swapchain
+      // is ready we will signal the _renderSemaphore, to signal that rendering has finished
+
+      VkCommandBufferSubmitInfo cmdinfo = vkinit::command_buffer_submit_info(cmd);
+
+      VkSemaphoreSubmitInfo waitInfo
+          = vkinit::semaphore_submit_info(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR,
+                                          get_current_frame()._swapchainSemaphore);
+      VkSemaphoreSubmitInfo signalInfo = vkinit::semaphore_submit_info(
+          VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, get_current_frame()._renderSemaphore);
+
+      VkSubmitInfo2 submit = vkinit::submit_info(&cmdinfo, &signalInfo, &waitInfo);
+
+      // submit command buffer to the queue and execute it.
+      //  _renderFence will now block until the graphic commands finish execution
+      VK_CHECK(vkQueueSubmit2(_graphicsQueue, 1, &submit, get_current_frame()._renderFence));
+
+      // prepare present
+      //  this will put the image we just rendered to into the visible window.
+      //  we want to wait on the _renderSemaphore for that,
+      //  as its necessary that drawing commands have finished before the image is displayed to the
+      //  user
+      VkPresentInfoKHR presentInfo = vkinit::present_info();
+
+      presentInfo.pSwapchains = &_swapchain;
+      presentInfo.swapchainCount = 1;
+
+      presentInfo.pWaitSemaphores = &get_current_frame()._renderSemaphore;
+      presentInfo.waitSemaphoreCount = 1;
+
+      presentInfo.pImageIndices = &swapchainImageIndex;
+
+      VkResult presentResult = vkQueuePresentKHR(_graphicsQueue, &presentInfo);
+      if (e == VK_ERROR_OUT_OF_DATE_KHR) {
+        resize_requested = true;
+        return;
+      }
+      // increase the number of frames drawn
+      _frameNumber++;
     }
-
-    // increase the number of frames drawn
-    _frameNumber++;
 }
 
 void VulkanEngine::draw_background(VkCommandBuffer cmd) {
@@ -1050,91 +1094,148 @@ void VulkanEngine::draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView) 
     vkCmdEndRendering(cmd);
 }
 
-void VulkanEngine::draw_geometry(VkCommandBuffer cmd) {
+bool is_visible(const RenderObject& obj, const glm::mat4& viewproj) {
+    std::array<glm::vec3, 8> corners{
+        glm::vec3{1, 1, 1},  glm::vec3{1, 1, -1},  glm::vec3{1, -1, 1},  glm::vec3{1, -1, -1},
+        glm::vec3{-1, 1, 1}, glm::vec3{-1, 1, -1}, glm::vec3{-1, -1, 1}, glm::vec3{-1, -1, -1},
+    };
 
-    // begin a render pass  connected to our draw image
-    VkRenderingAttachmentInfo colorAttachment
-        = vkinit::attachment_info(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
-    VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
-        _depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+    glm::mat4 matrix = viewproj * obj.transform;
 
-    VkRenderingInfo renderInfo
-        = vkinit::rendering_info(_windowExtent, &colorAttachment, &depthAttachment);
-    vkCmdBeginRendering(cmd, &renderInfo);
+    glm::vec3 min = {1.5, 1.5, 1.5};
+    glm::vec3 max = {-1.5, -1.5, -1.5};
 
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _meshPipeline);
+    for (int c = 0; c < 8; c++) {
+      // project each corner into clip space
+      glm::vec4 v = matrix * glm::vec4(obj.bounds.origin + (corners[c] * obj.bounds.extents), 1.f);
 
-    // set dynamic viewport and scissor
-    VkViewport viewport = {};
-    viewport.x = 0;
-    viewport.y = 0;
-    viewport.width = _drawExtent.width;
-    viewport.height = _drawExtent.height;
-    viewport.minDepth = 0.f;
-    viewport.maxDepth = 1.f;
+      // perspective correction
+      v.x = v.x / v.w;
+      v.y = v.y / v.w;
+      v.z = v.z / v.w;
 
-    vkCmdSetViewport(cmd, 0, 1, &viewport);
-
-    VkRect2D scissor = {};
-    scissor.offset.x = 0;
-    scissor.offset.y = 0;
-    scissor.extent.width = _drawExtent.width;
-    scissor.extent.height = _drawExtent.height;
-
-    vkCmdSetScissor(cmd, 0, 1, &scissor);
-
-    // allocate a new uniform buffer for the scene data
-    AllocatedBuffer gpuSceneDataBuffer = create_buffer(
-        sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-    // add it to the deletion queue of this frame so it gets deleted once its been used
-    get_current_frame()._deletionQueue.push_function(
-        [=, this]() { destroy_buffer(gpuSceneDataBuffer); }, "");
-
-    // write the buffer
-    GPUSceneData* sceneUniformData = (GPUSceneData*)gpuSceneDataBuffer.allocation->GetMappedData();
-    *sceneUniformData = sceneData;
-
-    // create a descriptor set that binds that buffer and update it
-    VkDescriptorSet globalDescriptor
-        = get_current_frame()._frameDescriptors.allocate(_device, _gpuSceneDataDescriptorLayout);
-
-    DescriptorWriter writer;
-    writer.write_buffer(0, gpuSceneDataBuffer.buffer, sizeof(GPUSceneData), 0,
-                        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    writer.update_set(_device, globalDescriptor);
-
-    for (const RenderObject& draw : mainDrawContext.OpaqueSurfaces) {
-      vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->pipeline);
-      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout,
-                              0, 1, &globalDescriptor, 0, nullptr);
-      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout,
-                              1, 1, &draw.material->materialSet, 0, nullptr);
-
-      vkCmdBindIndexBuffer(cmd, draw.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-      GPUDrawPushConstants pushConstants;
-      pushConstants.vertexBuffer = draw.vertexBufferAddress;
-      pushConstants.worldMatrix = draw.transform;
-      vkCmdPushConstants(cmd, draw.material->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
-                         sizeof(GPUDrawPushConstants), &pushConstants);
-
-      vkCmdDrawIndexed(cmd, draw.indexCount, 1, draw.firstIndex, 0, 0);
+      min = glm::min(glm::vec3{v.x, v.y, v.z}, min);
+      max = glm::max(glm::vec3{v.x, v.y, v.z}, max);
     }
 
-    vkCmdEndRendering(cmd);
+    // check the clip space box is within the view
+    if (min.z > 1.f || max.z < 0.f || min.x > 1.f || max.x < -1.f || min.y > 1.f || max.y < -1.f) {
+      return false;
+    } else {
+      return true;
+    }
+}
+
+void VulkanEngine::draw_geometry(VkCommandBuffer cmd) {
+    {
+      std::vector<uint32_t> opaque_draws;
+      opaque_draws.reserve(mainDrawContext.OpaqueSurfaces.size());
+
+      for (int i = 0; i < mainDrawContext.OpaqueSurfaces.size(); i++) {
+        if (is_visible(mainDrawContext.OpaqueSurfaces[i], sceneData.viewproj)) {
+          opaque_draws.push_back(i);
+        }
+      }
+
+      // sort the opaque surfaces by material and mesh
+      std::sort(opaque_draws.begin(), opaque_draws.end(), [&](const auto& iA, const auto& iB) {
+        const RenderObject& A = mainDrawContext.OpaqueSurfaces[iA];
+        const RenderObject& B = mainDrawContext.OpaqueSurfaces[iB];
+        if (A.material == B.material) {
+          return A.indexBuffer < B.indexBuffer;
+        } else {
+          return A.material < B.material;
+        }
+      });
+
+      // allocate a new uniform buffer for the scene data
+      AllocatedBuffer gpuSceneDataBuffer = create_buffer(
+          sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+      // add it to the deletion queue of this frame so it gets deleted once its been used
+      get_current_frame()._deletionQueue.push_function(
+          [=, this]() { destroy_buffer(gpuSceneDataBuffer); }, "");
+
+      // write the buffer
+      GPUSceneData* sceneUniformData
+          = (GPUSceneData*)gpuSceneDataBuffer.allocation->GetMappedData();
+      *sceneUniformData = sceneData;
+
+      // create a descriptor set that binds that buffer and update it
+      VkDescriptorSet globalDescriptor
+          = get_current_frame()._frameDescriptors.allocate(_device, _gpuSceneDataDescriptorLayout);
+
+      DescriptorWriter writer;
+      writer.write_buffer(0, gpuSceneDataBuffer.buffer, sizeof(GPUSceneData), 0,
+                          VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+      writer.update_set(_device, globalDescriptor);
+
+      MaterialPipeline* lastPipeline = nullptr;
+      MaterialInstance* lastMaterial = nullptr;
+      VkBuffer lastIndexBuffer = VK_NULL_HANDLE;
+
+      auto draw = [&](const RenderObject& r) {
+        if (r.material != lastMaterial) {
+          lastMaterial = r.material;
+          if (r.material->pipeline != lastPipeline) {
+            lastPipeline = r.material->pipeline;
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, r.material->pipeline->pipeline);
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                    r.material->pipeline->layout, 0, 1, &globalDescriptor, 0,
+                                    nullptr);
+
+            VkViewport viewport = {};
+            viewport.x = 0;
+            viewport.y = 0;
+            viewport.width = (float)_windowExtent.width;
+            viewport.height = (float)_windowExtent.height;
+            viewport.minDepth = 0.f;
+            viewport.maxDepth = 1.f;
+
+            vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+            VkRect2D scissor = {};
+            scissor.offset.x = 0;
+            scissor.offset.y = 0;
+            scissor.extent.width = _windowExtent.width;
+            scissor.extent.height = _windowExtent.height;
+
+            vkCmdSetScissor(cmd, 0, 1, &scissor);
+          }
+
+          vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                  r.material->pipeline->layout, 1, 1, &r.material->materialSet, 0,
+                                  nullptr);
+        }
+        if (r.indexBuffer != lastIndexBuffer) {
+          lastIndexBuffer = r.indexBuffer;
+          vkCmdBindIndexBuffer(cmd, r.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+        }
+        // calculate final mesh matrix
+        GPUDrawPushConstants push_constants;
+        push_constants.worldMatrix = r.transform;
+        push_constants.vertexBuffer = r.vertexBufferAddress;
+
+        vkCmdPushConstants(cmd, r.material->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
+                           sizeof(GPUDrawPushConstants), &push_constants);
+        vkCmdDrawIndexed(cmd, r.indexCount, 1, r.firstIndex, 0, 0);
+      };
+
+      for (auto& r : opaque_draws) {
+        draw(mainDrawContext.OpaqueSurfaces[r]);
+      }
+
+      for (auto& r : mainDrawContext.TransparentSurfaces) {
+        draw(r);
+      }
+
+      // we delete the draw commands now that we processed them
+      mainDrawContext.OpaqueSurfaces.clear();
+      mainDrawContext.TransparentSurfaces.clear();
+    }
 }
 
 void VulkanEngine::update_scene() {
-    mainDrawContext.OpaqueSurfaces.clear();
-
-    for (int x = -3; x < 3; x++) {
-      glm::mat4 scale = glm::scale(glm::vec3{0.2});
-      glm::mat4 translation = glm::translate(glm::vec3{x, 1, 0});
-
-      loadedNodes["Cube"]->Draw(translation * scale, mainDrawContext);
-    }
-
     mainCamera.update();
 
     glm::mat4 view = mainCamera.getViewMatrix();
@@ -1152,10 +1253,7 @@ void VulkanEngine::update_scene() {
     sceneData.proj = projection;
     sceneData.viewproj = projection * view;
 
-    // some default lighting parameters
-    sceneData.ambientColor = glm::vec4(.1f);
-    sceneData.sunlightColor = glm::vec4(1.f);
-    sceneData.sunlightDirection = glm::vec4(0, 1, 0.5, 1.f);
+    loadedScenes["structure"]->Draw(glm::mat4{1.f}, mainDrawContext);
 }
 
 void VulkanEngine::run()

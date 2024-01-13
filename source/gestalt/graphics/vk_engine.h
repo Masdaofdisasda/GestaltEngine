@@ -104,13 +104,14 @@ struct RenderObject {
   VkBuffer indexBuffer;
 
   MaterialInstance* material;
-
+  Bounds bounds;
   glm::mat4 transform;
   VkDeviceAddress vertexBufferAddress;
 };
 
 struct DrawContext {
   std::vector<RenderObject> OpaqueSurfaces;
+  std::vector<RenderObject> TransparentSurfaces;
 };
 
 struct ComputeEffect {
@@ -166,6 +167,8 @@ public:
 
   GPUSceneData sceneData;
 
+  std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loadedScenes;
+
   VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;
 
   DeletionQueue _mainDeletionQueue;
@@ -214,6 +217,8 @@ public:
   void draw();
 
   void draw_background(VkCommandBuffer cmd);
+
+  void draw_main(VkCommandBuffer cmd);
 
   void draw_geometry(VkCommandBuffer cmd);
 
