@@ -2,6 +2,8 @@
 // or project specific include files.
 #pragma once
 
+#define SDL_MAIN_HANDLED
+
 #include <memory>
 #include <optional>
 #include <string>

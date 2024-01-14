@@ -1,7 +1,4 @@
-﻿// vulkan_guide.h : Include file for standard system include files,
-// or project specific include files.
-
-#pragma once
+﻿#pragma once
 
 #include <vector>
 #include <deque>
@@ -12,6 +9,8 @@
 #include "vk_descriptors.h"
 #include "vk_loader.h"
 #include "camera.h"
+#include "time_tracker.h"
+#include "input_manager.h"
 
 struct DeletionQueue {
   std::deque<std::pair<std::function<void()>, std::string>> deletors;
@@ -127,7 +126,7 @@ public:
   bool _isInitialized{false};
   int _frameNumber{0};
 
-  VkExtent2D _windowExtent{1700, 900};
+  VkExtent2D _windowExtent{1920, 1080};
 
   struct SDL_Window* _window{nullptr};
 
@@ -138,7 +137,7 @@ public:
 
   FrameData _frames[FRAME_OVERLAP];
 
-  FrameData& get_current_frame() { return _frames[_frameNumber % FRAME_OVERLAP]; };
+  FrameData& get_current_frame() { return _frames[_frameNumber % FRAME_OVERLAP]; }
 
   VkQueue _graphicsQueue;
   uint32_t _graphicsQueueFamily;
@@ -238,7 +237,13 @@ public:
                               bool mipmapped = false);
   void destroy_image(const AllocatedImage& img);
 
-  Camera mainCamera;
+   free_fly_camera free_fly_camera{glm::vec3(-10.0f, 6.0f, 10.0f), glm::vec3(0.0f, 2.0f, 0.0f),
+                                 glm::vec3(0.0f, 1.0f, 0.0f)};
+  camera main_camera{free_fly_camera};
+
+  time_tracker time_tracker;
+
+  input_manager input_manager;
 
   EngineStats stats;
 

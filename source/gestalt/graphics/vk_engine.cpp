@@ -34,49 +34,42 @@
 
 VulkanEngine* loaded_engine = nullptr;
 
-constexpr bool bUseValidationLayers = true;
+constexpr bool bUseValidationLayers = false;
 
-void VulkanEngine::init()
-{
-    // only one engine initialization is allowed with the application.
-    assert(loaded_engine == nullptr);
-    loaded_engine = this;
+void VulkanEngine::init() {
+  // only one engine initialization is allowed with the application.
+  assert(loaded_engine == nullptr);
+  loaded_engine = this;
 
-    // We initialize SDL and create a window with it.
-    SDL_Init(SDL_INIT_VIDEO);
+  // We initialize SDL and create a window with it.
+  SDL_Init(SDL_INIT_VIDEO);
 
-    SDL_WindowFlags window_flags = static_cast<SDL_WindowFlags>(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
+  SDL_WindowFlags window_flags
+      = static_cast<SDL_WindowFlags>(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
 
-    _window = SDL_CreateWindow(
-        "Vulkan Engine",
-        SDL_WINDOWPOS_UNDEFINED,
-        SDL_WINDOWPOS_UNDEFINED,
-        static_cast<int>(_windowExtent.width),
-        static_cast<int>(_windowExtent.height),
-        window_flags);
+  _window = SDL_CreateWindow("Vulkan Engine", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+                             static_cast<int>(_windowExtent.width),
+                             static_cast<int>(_windowExtent.height), window_flags);
 
-    init_vulkan();
-    init_swapchain();
-    init_commands();
-    init_sync_structures();
-    init_descriptors();
-    init_pipelines();
-    init_default_data();
-    init_renderables();
-    init_imgui();
+  input_manager.init();
+  main_camera.init(input_manager);
 
-    // everything went fine
-    _isInitialized = true;
+  init_vulkan();
+  init_swapchain();
+  init_commands();
+  init_sync_structures();
+  init_descriptors();
+  init_pipelines();
+  init_default_data();
+  init_renderables();
+  init_imgui();
 
-    mainCamera.velocity = glm::vec3(0.f);
-    mainCamera.position = glm::vec3(30.f, -00.f, -085.f);
+  // everything went fine
+  _isInitialized = true;
 
-    mainCamera.pitch = 0;
-    mainCamera.yaw = 0;
-
-    sceneData.ambientColor = glm::vec4(0.1f);
-    sceneData.sunlightColor = glm::vec4(1.f);
-    sceneData.sunlightDirection = glm::vec4(0.1, 0.5, 0.1, 10.f);
+  sceneData.ambientColor = glm::vec4(0.1f);
+  sceneData.sunlightColor = glm::vec4(1.f);
+  sceneData.sunlightDirection = glm::vec4(0.1, 0.5, 0.1, 10.f);
 }
 
 void VulkanEngine::init_vulkan() {
@@ -1171,9 +1164,8 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd) {
 }
 
 void VulkanEngine::update_scene() {
-    mainCamera.update();
 
-    glm::mat4 view = mainCamera.getViewMatrix();
+    glm::mat4 view = main_camera.get_view_matrix();
 
     // camera projection
     glm::mat4 projection
@@ -1194,7 +1186,9 @@ void VulkanEngine::update_scene() {
 void VulkanEngine::run()
 {
     //begin clock
-    auto start = std::chrono::system_clock::now();
+    auto start = std::chrono::system_clock::now(); // todo replace with timetracker
+
+    time_tracker.update_timer();
 
     SDL_Event e;
     bool bQuit = false;
@@ -1206,7 +1200,9 @@ void VulkanEngine::run()
         // close the window when user alt-f4s or clicks the X button
         if (e.type == SDL_QUIT) bQuit = true;
 
-        mainCamera.processSDLEvent(e);
+        
+        input_manager.handle_event(e, _windowExtent.width, _windowExtent.height);
+        main_camera.update(time_tracker.get_delta_time());
 
         if (e.type == SDL_WINDOWEVENT) {
           if (e.window.event == SDL_WINDOWEVENT_MINIMIZED) {

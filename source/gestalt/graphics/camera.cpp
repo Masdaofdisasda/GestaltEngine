@@ -1,64 +1,66 @@
 #include "camera.h"
+
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/quaternion.hpp>
 
-void Camera::update() {
-  glm::mat4 cameraRotation = getRotationMatrix();
-  position += glm::vec3(cameraRotation * glm::vec4(velocity * 0.5f, 0.f));
-}
+void free_fly_camera::init(input_manager& input_manager) { input_manager_ = &input_manager; }
 
-void Camera::processSDLEvent(SDL_Event& e) {
-  if (e.type == SDL_KEYDOWN) {
-    if (e.key.keysym.sym == SDLK_w) {
-      velocity.z = -1;
-    }
-    if (e.key.keysym.sym == SDLK_s) {
-      velocity.z = 1;
-    }
-    if (e.key.keysym.sym == SDLK_a) {
-      velocity.x = -1;
-    }
-    if (e.key.keysym.sym == SDLK_d) {
-      velocity.x = 1;
-    }
+
+void free_fly_camera::update(double delta_seconds) {
+
+  if (input_manager_->is_key_pressed(SDL_MOUSEBUTTONDOWN)) {
+    auto mouse_pos = glm::vec2(input_manager_->get_movement().mouse_position_x,
+                               input_manager_->get_movement().mouse_position_y);
+    const glm::vec2 delta = mouse_pos - mouse_pos_;
+    glm::quat deltaQuat = glm::quat(glm::vec3(mouse_speed * delta.y, mouse_speed * delta.x, 0.0f));
+    glm::quat unclamped_rotation = deltaQuat * camera_orientation_;
+    float pitch = glm::pitch(unclamped_rotation);
+    float yaw = glm::yaw(unclamped_rotation);
+
+    if ((std::abs(yaw) >= 0.01 || (std::abs(pitch) <= glm::half_pi<float>())))  // clamp y-rotation
+      camera_orientation_ = unclamped_rotation;
+
+    camera_orientation_ = glm::normalize(camera_orientation_);
+    set_up_vector(up_);
+    mouse_pos_ = mouse_pos;
   }
 
-  if (e.type == SDL_KEYUP) {
-    if (e.key.keysym.sym == SDLK_w) {
-      velocity.z = 0;
-    }
-    if (e.key.keysym.sym == SDLK_s) {
-      velocity.z = 0;
-    }
-    if (e.key.keysym.sym == SDLK_a) {
-      velocity.x = 0;
-    }
-    if (e.key.keysym.sym == SDLK_d) {
-      velocity.x = 0;
-    }
+  // translate camera by adding or subtracting to the orthographic vectors
+  const glm::mat4 v = mat4_cast(camera_orientation_);
+
+  const glm::vec3 forward = -glm::vec3(v[0][2], v[1][2], v[2][2]);
+  const glm::vec3 right = glm::vec3(v[0][0], v[1][0], v[2][0]);
+  const glm::vec3 up = cross(right, forward);
+
+  glm::vec3 accel(0.0f);
+  auto& movement = input_manager_->get_movement();
+  if (movement.forward) accel += forward;
+  if (movement.backward) accel -= forward;
+  if (movement.left) accel -= right;
+  if (movement.right) accel += right;
+  if (movement.up) accel += up;
+  if (movement.down) accel -= up;
+  if (input_manager_->is_key_pressed(SDLK_LCTRL)) accel *= fast_coef;
+
+  if (accel == glm::vec3(0)) {
+    // decelerate naturally according to the damping value
+    move_speed_
+        -= move_speed_ * std::min((1.0f / damping) * static_cast<float>(delta_seconds), 1.0f);
+  } else {
+    // acceleration
+    move_speed_ += accel * acceleration * static_cast<float>(delta_seconds);
+    const float maxSpeed
+        = input_manager_->is_key_pressed(SDLK_LCTRL) ? max_speed * fast_coef : max_speed;
+    if (length(move_speed_) > maxSpeed) move_speed_ = glm::normalize(move_speed_) * maxSpeed;
   }
 
-  if (e.type == SDL_MOUSEMOTION) {
-    yaw += (float)e.motion.xrel / 200.f;
-    pitch -= (float)e.motion.yrel / 200.f;
-  }
+  camera_position_ += move_speed_ * static_cast<float>(delta_seconds);
 }
 
-glm::mat4 Camera::getViewMatrix() {
-  // to create a correct model view, we need to move the world in opposite
-  // direction to the camera
-  //  so we will create the camera model matrix and invert
-  glm::mat4 cameraTranslation = glm::translate(glm::mat4(1.f), position);
-  glm::mat4 cameraRotation = getRotationMatrix();
-  return glm::inverse(cameraTranslation * cameraRotation);
-}
+void free_fly_camera::set_position(const glm::vec3& pos) { camera_position_ = pos; }
 
-glm::mat4 Camera::getRotationMatrix() {
-  // fairly typical FPS style camera. we join the pitch and yaw rotations into
-  // the final rotation matrix
-
-  glm::quat pitchRotation = glm::angleAxis(pitch, glm::vec3{1.f, 0.f, 0.f});
-  glm::quat yawRotation = glm::angleAxis(yaw, glm::vec3{0.f, -1.f, 0.f});
-
-  return glm::toMat4(yawRotation) * glm::toMat4(pitchRotation);
+void free_fly_camera::set_up_vector(const glm::vec3& up) {
+  const glm::mat4 view = get_view_matrix();
+  const glm::vec3 dir = -glm::vec3(view[0][2], view[1][2], view[2][2]);
+  camera_orientation_ = lookAt(camera_position_, camera_position_ + dir, up);
 }

@@ -16,6 +16,9 @@ add_library(graphics
     vk_loader.cpp
     camera.cpp
     camera.h
+    time_tracker.h
+    input_manager.h
+    input_manager.cpp
 )
 
 target_compile_features(graphics PRIVATE cxx_std_20)
