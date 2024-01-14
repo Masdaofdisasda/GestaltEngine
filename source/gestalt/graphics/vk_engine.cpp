@@ -67,6 +67,14 @@ void VulkanEngine::init() {
   sceneData.ambientColor = glm::vec4(0.1f);
   sceneData.sunlightColor = glm::vec4(1.f);
   sceneData.sunlightDirection = glm::vec4(0.1, 0.5, 0.1, 10.f);
+
+  for (auto& cam : camera_positioners) {
+    auto free_fly_camera_ptr = std::make_unique<free_fly_camera>();
+    free_fly_camera_ptr->init(glm::vec3(0, 0, 0), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
+    cam = std::move(free_fly_camera_ptr);
+  }
+  main_camera.init(*camera_positioners.at(current_camera_positioner_index));
+
 }
 
 void VulkanEngine::init_vulkan() {
@@ -1244,6 +1252,21 @@ void VulkanEngine::run()
         ImGui::SliderFloat("Light Z", &sceneData.sunlightDirection.z, -10.f, 10.f);
         ImGui::End();
       }
+
+      if (ImGui::Begin("Cameras")) {
+        for (size_t i = 0; i < camera_positioners.size(); ++i) {
+          // Assuming each camera positioner has a method getName() for simplicity
+          std::string name = "camera_" + std::to_string(i);
+
+          // If the selectable is clicked, set this camera positioner as the active one
+          if (ImGui::Selectable(name.c_str(), current_camera_positioner_index == i)) {
+            current_camera_positioner_index = i;
+            main_camera.set_positioner(camera_positioners.at(i).get());
+          }
+        }
+        ImGui::End();
+      }
+
 
       if (ImGui::Begin("Background")) {
 

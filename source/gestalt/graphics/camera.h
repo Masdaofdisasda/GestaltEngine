@@ -2,7 +2,6 @@
 
 #include "input_manager.h"
 
-#include <glm/fwd.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/transform.hpp>
 
@@ -19,9 +18,12 @@ public:
   virtual void update(double delta_seconds, const movement& movement) = 0;
 };
 
+
 class camera final {
 public:
-  explicit camera(camera_positioner_interface& positioner) : positioner_(&positioner) {}
+  camera() : positioner_(nullptr) {}
+
+  void init(camera_positioner_interface& positioner) { positioner_ = &positioner; }
 
   camera(const camera&) = default;
   camera& operator=(const camera&) = default;
@@ -41,14 +43,12 @@ private:
 class free_fly_camera final : public camera_positioner_interface {
 
 public:
-  float mouse_speed = 4.0f;
-  float acceleration = 15.0f;
-  float damping = 0.2f;    // changes deceleration speed
-  float max_speed = 1.0f;  // clamps movement
-  float fast_coef = 5.0f;  // l-shift mode uses this
 
-  free_fly_camera(const glm::vec3& pos, const glm::vec3& target, const glm::vec3& up)
-      : camera_position_(pos), camera_orientation_(lookAt(pos, target, up)), up_(up) {}
+  void init(const glm::vec3& pos, const glm::vec3& target, const glm::vec3& up) {
+    camera_position_ = pos;
+    camera_orientation_ = quatLookAt(normalize(target - pos), up);
+    up_ = up;
+  }
 
   void update(double delta_seconds, const movement& movement) override;
 
@@ -69,10 +69,15 @@ public:
   glm::quat get_orientation() const override { return camera_orientation_; }
 
 private:
+  float mouse_speed = 4.0f;
+  float acceleration = 15.0f;
+  float damping = 0.2f;    // changes deceleration speed
+  float max_speed = 1.0f;  // clamps movement
+  float fast_coef = 5.0f;  // l-shift mode uses this
 
   glm::vec2 mouse_pos_ = glm::vec2(0);
-  glm::vec3 camera_position_ = glm::vec3(0.0f, 0.0f, 0.0f);
-  glm::quat camera_orientation_ = glm::quat(glm::vec3(0));
+  glm::vec3 camera_position_ = glm::vec3(0.0f, 0.0f, 5.0f);
+  glm::vec3 up_ = glm::vec3(0.0f, 1.0f, 1.0f);
+  glm::quat camera_orientation_ = glm::quat(glm::vec3(0.0f, 0.0f, 0.0f));
   glm::vec3 move_speed_ = glm::vec3(0.0f);
-  glm::vec3 up_ = glm::vec3(0.0f, 0.0f, 1.0f);
 };

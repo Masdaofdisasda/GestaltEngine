@@ -20,8 +20,11 @@ class input_manager {
 
   movement movement_{};
 
+  void handle_mouse_motion(const SDL_Event& e, uint32_t window_size_x, uint32_t window_size_y);
+  void handle_mouse_button(const SDL_Event& e);
+  void handle_keyboard(const SDL_Event& e);
+
 public:
-  void init();
 
   void handle_event(const SDL_Event& e, uint32_t window_size_x, uint32_t window_size_y);
 

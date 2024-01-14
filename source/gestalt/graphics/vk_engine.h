@@ -237,9 +237,9 @@ public:
                               bool mipmapped = false);
   void destroy_image(const AllocatedImage& img);
 
-   free_fly_camera free_fly_camera{glm::vec3(-10.0f, 6.0f, 10.0f), glm::vec3(0.0f, 2.0f, 0.0f),
-                                 glm::vec3(0.0f, 1.0f, 0.0f)};
-  camera main_camera{free_fly_camera};
+  std::vector<std::unique_ptr<camera_positioner_interface>> camera_positioners{3};
+  uint32_t current_camera_positioner_index{0};
+  camera main_camera{};
 
   time_tracker time_tracker;
 

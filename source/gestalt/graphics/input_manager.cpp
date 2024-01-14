@@ -2,70 +2,71 @@
 
 #include <fmt/core.h>
 
+
 void input_manager::handle_event(const SDL_Event& e, uint32_t window_size_x,
                                  uint32_t window_size_y) {
-
-  if (e.type == SDL_MOUSEMOTION) {
-    movement_.mouse_position_x = static_cast<float>(e.motion.x) / window_size_x;
-    movement_.mouse_position_y = static_cast<float>(e.motion.y) / window_size_y;
-  }
-
-  if (e.type == SDL_MOUSEBUTTONDOWN) {
-    if (e.button.button == SDL_BUTTON_LEFT) {
-      movement_.left_mouse_button = true;
-    }
-    if (e.button.button == SDL_BUTTON_RIGHT) {
-      movement_.right_mouse_button = true;
-    }
-  }
-
-  if (e.type == SDL_MOUSEBUTTONUP) {
-    if (e.button.button == SDL_BUTTON_LEFT) {
-      movement_.left_mouse_button = false;
-    }
-    if (e.button.button == SDL_BUTTON_RIGHT) {
-      movement_.right_mouse_button = false;
-    }
-  }
-
-  if (e.type == SDL_KEYDOWN) {
-    if (e.key.keysym.scancode == SDL_SCANCODE_W) {
-      movement_.forward = true;
-    }
-    if (e.key.keysym.scancode == SDL_SCANCODE_S) {
-      movement_.backward = true;
-    }
-    if (e.key.keysym.scancode == SDL_SCANCODE_A) {
-      movement_.left = true;
-    }
-    if (e.key.keysym.scancode == SDL_SCANCODE_D) {
-      movement_.right = true;
-    }
-    if (e.key.keysym.scancode == SDL_SCANCODE_LCTRL) {
-      movement_.run = true;
-    }
-  }
-
-  if (e.type == SDL_KEYUP) {
-    if (e.key.keysym.scancode == SDL_SCANCODE_W) {
-      movement_.forward = false;
-    }
-    if (e.key.keysym.scancode == SDL_SCANCODE_S) {
-      movement_.backward = false;
-    }
-    if (e.key.keysym.scancode == SDL_SCANCODE_A) {
-      movement_.left = false;
-    }
-    if (e.key.keysym.scancode == SDL_SCANCODE_D) {
-      movement_.right = false;
-    }
-    if (e.key.keysym.scancode == SDL_SCANCODE_LCTRL) {
-      movement_.run = false;
-    }
+  switch (e.type) {
+    case SDL_MOUSEMOTION:
+      handle_mouse_motion(e, window_size_x, window_size_y);
+      break;
+    case SDL_MOUSEBUTTONDOWN:
+    case SDL_MOUSEBUTTONUP:
+      handle_mouse_button(e);
+      break;
+    case SDL_KEYDOWN:
+    case SDL_KEYUP:
+      handle_keyboard(e);
+      break;
+    default:
+      break;
   }
 }
 
+void input_manager::handle_mouse_motion(const SDL_Event& e, uint32_t window_size_x,
+                                        uint32_t window_size_y) {
+  movement_.mouse_position_x = static_cast<float>(e.motion.x) / window_size_x;
+  movement_.mouse_position_y = static_cast<float>(e.motion.y) / window_size_y;
+}
 
-void input_manager::init() {
-  
+void input_manager::handle_mouse_button(const SDL_Event& e) {
+  bool pressed = (e.type == SDL_MOUSEBUTTONDOWN);
+  switch (e.button.button) {
+    case SDL_BUTTON_LEFT:
+      movement_.left_mouse_button = pressed;
+      break;
+    case SDL_BUTTON_RIGHT:
+      movement_.right_mouse_button = pressed;
+      break;
+    default:
+      break;
+  }
+}
+
+void input_manager::handle_keyboard(const SDL_Event& e) {
+  bool pressed = (e.type == SDL_KEYDOWN);
+  switch (e.key.keysym.scancode) {
+    case SDL_SCANCODE_W:
+      movement_.forward = pressed;
+      break;
+    case SDL_SCANCODE_S:
+      movement_.backward = pressed;
+      break;
+    case SDL_SCANCODE_A:
+      movement_.left = pressed;
+      break;
+    case SDL_SCANCODE_D:
+      movement_.right = pressed;
+      break;
+    case SDL_SCANCODE_SPACE:
+      movement_.up = pressed;
+      break;
+    case SDL_SCANCODE_LSHIFT:
+      movement_.down = pressed;
+      break;
+    case SDL_SCANCODE_LCTRL:
+      movement_.run = pressed;
+      break;
+    default:
+      break;
+  }
 }
