@@ -8,9 +8,8 @@
 
 void free_fly_camera::update(double delta_seconds, const movement& movement) {
 
+    auto mouse_pos = glm::vec2(movement.mouse_position_x, movement.mouse_position_y);
   if (movement.left_mouse_button) {
-    auto mouse_pos
-        = glm::vec2(movement.mouse_position_x, movement.mouse_position_y);
     const glm::vec2 delta = mouse_pos - mouse_pos_;
     glm::quat deltaQuat = glm::quat(glm::vec3(mouse_speed * delta.y, mouse_speed * delta.x, 0.0f));
     glm::quat unclamped_rotation = deltaQuat * camera_orientation_;
@@ -22,8 +21,8 @@ void free_fly_camera::update(double delta_seconds, const movement& movement) {
 
     camera_orientation_ = glm::normalize(camera_orientation_);
     set_up_vector(up_);
-    mouse_pos_ = mouse_pos;
   }
+  mouse_pos_ = mouse_pos;
 
   // translate camera by adding or subtracting to the orthographic vectors
   const glm::mat4 v = mat4_cast(camera_orientation_);

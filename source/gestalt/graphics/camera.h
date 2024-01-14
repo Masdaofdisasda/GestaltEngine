@@ -9,6 +9,8 @@ class camera_positioner_interface {
 public:
   virtual ~camera_positioner_interface() = default;
 
+  virtual void init(const glm::vec3& pos, const glm::vec3& target, const glm::vec3& up) = 0;
+
   [[nodiscard]] virtual glm::mat4 get_view_matrix() const = 0;
 
   [[nodiscard]] virtual glm::vec3 get_position() const = 0;
@@ -44,7 +46,7 @@ class free_fly_camera final : public camera_positioner_interface {
 
 public:
 
-  void init(const glm::vec3& pos, const glm::vec3& target, const glm::vec3& up) {
+  void init(const glm::vec3& pos, const glm::vec3& target, const glm::vec3& up) override {
     camera_position_ = pos;
     camera_orientation_ = quatLookAt(normalize(target - pos), up);
     up_ = up;

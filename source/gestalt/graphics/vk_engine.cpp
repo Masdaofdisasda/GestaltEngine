@@ -1237,6 +1237,47 @@ void VulkanEngine::run()
       ImGui_ImplSDL2_NewFrame(_window);
       ImGui::NewFrame();
 
+      if (ImGui::BeginMainMenuBar()) {
+        if (ImGui::BeginMenu("File")) {
+          if (ImGui::MenuItem("Exit")) {
+            bQuit = true;
+          }
+          // Add more menu items here if needed
+          ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Edit")) {
+          if (ImGui::BeginMenu("Add Camera")) {
+            if (ImGui::MenuItem("Free Fly Camera")) {
+              auto free_fly_camera_ptr = std::make_unique<free_fly_camera>();
+              free_fly_camera_ptr->init(glm::vec3(0, 0, 0), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
+              camera_positioners.push_back(std::move(free_fly_camera_ptr));
+            }
+            if (ImGui::MenuItem("Orbit Camera")) {
+              // Code to add an Orbit Camera
+            }
+            ImGui::EndMenu();
+          }
+
+          if (ImGui::BeginMenu("Add Light Source")) {
+            if (ImGui::MenuItem("Point Light")) {
+              // Code to add an Orbit Camera
+            }
+            if (ImGui::MenuItem("Directional Light")) {
+              // Code to add an Orbit Camera
+            }
+            if (ImGui::MenuItem("Spot Light")) {
+              // Code to add an Orbit Camera
+            }
+            ImGui::EndMenu();
+          }
+          // Add more menu items here if needed
+          ImGui::EndMenu();
+        }
+        // Add other menus like "Edit", "View", etc. here
+
+        ImGui::EndMainMenuBar();
+      }
+
       if (ImGui::Begin("Stats")) {
         ImGui::Text("frametime %f ms", stats.frametime);
         ImGui::Text("draw time %f ms", stats.mesh_draw_time);
@@ -1255,17 +1296,31 @@ void VulkanEngine::run()
 
       if (ImGui::Begin("Cameras")) {
         for (size_t i = 0; i < camera_positioners.size(); ++i) {
-          // Assuming each camera positioner has a method getName() for simplicity
-          std::string name = "camera_" + std::to_string(i);
+          std::string name = "Camera " + std::to_string(i);
 
-          // If the selectable is clicked, set this camera positioner as the active one
           if (ImGui::Selectable(name.c_str(), current_camera_positioner_index == i)) {
             current_camera_positioner_index = i;
             main_camera.set_positioner(camera_positioners.at(i).get());
           }
+
+          // If this is the currently selected camera, show input fields for position and rotation
+          if (current_camera_positioner_index == i) {
+            // Get the current position and orientation
+            glm::vec3 position = camera_positioners.at(i)->get_position();
+            glm::quat orientation = camera_positioners.at(i)->get_orientation();
+
+            // Convert quaternion to Euler angles for user-friendly rotation input
+            glm::vec3 rotation = glm::eulerAngles(orientation);
+
+            // Display input fields for position
+            if (ImGui::DragFloat3("Position", &position[0])) {
+              camera_positioners.at(i)->init(position, glm::vec3(0.f), glm::vec3(0, 1, 0));
+            }
+          }
         }
         ImGui::End();
       }
+
 
 
       if (ImGui::Begin("Background")) {
