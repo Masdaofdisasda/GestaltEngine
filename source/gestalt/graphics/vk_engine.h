@@ -22,7 +22,7 @@ struct DeletionQueue {
 
   void flush() {
     for (auto& [deletor, description] : std::ranges::reverse_view(deletors)) {
-#if _DEBUG
+#if 0
       fmt::print("Deleting: {}\n", description);
 #endif
       deletor();
@@ -174,11 +174,7 @@ public:
 
   VmaAllocator _allocator;  // vma lib allocator
 
-  VkPipelineLayout _meshPipelineLayout;
-  VkPipeline _meshPipeline;
-
   GPUMeshBuffers rectangle;
-  std::vector<std::shared_ptr<MeshAsset>> testMeshes;
 
   MaterialInstance defaultData;
   GLTFMetallic_Roughness metalRoughMaterial;

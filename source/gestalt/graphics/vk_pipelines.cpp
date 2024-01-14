@@ -67,7 +67,8 @@ VkPipeline PipelineBuilder::build_pipeline(VkDevice device) {
   return newPipeline;
 }
 
-void PipelineBuilder::set_shaders(VkShaderModule vertexShader, VkShaderModule fragmentShader) {
+PipelineBuilder& PipelineBuilder::set_shaders(VkShaderModule vertexShader,
+                                             VkShaderModule fragmentShader) {
   _shaderStages.clear();
 
   _shaderStages.push_back(
@@ -75,26 +76,34 @@ void PipelineBuilder::set_shaders(VkShaderModule vertexShader, VkShaderModule fr
 
   _shaderStages.push_back(
       vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, fragmentShader));
+
+  return *this;
 }
 
-void PipelineBuilder::set_input_topology(VkPrimitiveTopology topology) {
+PipelineBuilder& PipelineBuilder::set_input_topology(VkPrimitiveTopology topology) {
   _inputAssembly.topology = topology;
   // we are not going to use primitive restart on the entire tutorial so leave
   // it on false
   _inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+  return *this;
 }
 
-void PipelineBuilder::set_polygon_mode(VkPolygonMode mode) {
+PipelineBuilder& PipelineBuilder::set_polygon_mode(VkPolygonMode mode) {
   _rasterizer.polygonMode = mode;
   _rasterizer.lineWidth = 1.f;
+
+  return *this;
 }
 
-void PipelineBuilder::set_cull_mode(VkCullModeFlags cullMode, VkFrontFace frontFace) {
+PipelineBuilder& PipelineBuilder::set_cull_mode(VkCullModeFlags cullMode, VkFrontFace frontFace) {
   _rasterizer.cullMode = cullMode;
   _rasterizer.frontFace = frontFace;
+
+  return *this;
 }
 
-void PipelineBuilder::set_multisampling_none() {
+PipelineBuilder& PipelineBuilder::set_multisampling_none() {
   _multisampling.sampleShadingEnable = VK_FALSE;
   // multisampling defaulted to no multisampling (1 sample per pixel)
   _multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -103,17 +112,21 @@ void PipelineBuilder::set_multisampling_none() {
   // no alpha to coverage either
   _multisampling.alphaToCoverageEnable = VK_FALSE;
   _multisampling.alphaToOneEnable = VK_FALSE;
+
+  return *this;
 }
 
-void PipelineBuilder::disable_blending() {
+PipelineBuilder& PipelineBuilder::disable_blending() {
   // default write mask
   _colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
                                          | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
   // no blending
   _colorBlendAttachment.blendEnable = VK_FALSE;
+
+  return *this;
 }
 
-void PipelineBuilder::enable_blending_additive() {
+PipelineBuilder& PipelineBuilder::enable_blending_additive() {
   _colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
                                          | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
   _colorBlendAttachment.blendEnable = VK_TRUE;
@@ -123,9 +136,11 @@ void PipelineBuilder::enable_blending_additive() {
   _colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
   _colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
   _colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+
+  return *this;
 }
 
-void PipelineBuilder::enable_blending_alphablend() {
+PipelineBuilder& PipelineBuilder::enable_blending_alphablend() {
   _colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
                                          | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
   _colorBlendAttachment.blendEnable = VK_TRUE;
@@ -135,20 +150,26 @@ void PipelineBuilder::enable_blending_alphablend() {
   _colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
   _colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
   _colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+
+  return *this;
 }
 
-void PipelineBuilder::set_color_attachment_format(VkFormat format) {
+PipelineBuilder& PipelineBuilder::set_color_attachment_format(VkFormat format) {
   _colorAttachmentformat = format;
   // connect the format to the renderInfo  structure
   _renderInfo.colorAttachmentCount = 1;
   _renderInfo.pColorAttachmentFormats = &_colorAttachmentformat;
+
+  return *this;
 }
 
-void PipelineBuilder::set_depth_format(VkFormat format) {
+PipelineBuilder& PipelineBuilder::set_depth_format(VkFormat format) {
   _renderInfo.depthAttachmentFormat = format;
+
+  return *this;
 }
 
-void PipelineBuilder::disable_depthtest() {
+PipelineBuilder& PipelineBuilder::disable_depthtest() {
   _depthStencil.depthTestEnable = VK_FALSE;
   _depthStencil.depthWriteEnable = VK_FALSE;
   _depthStencil.depthCompareOp = VK_COMPARE_OP_NEVER;
@@ -158,9 +179,11 @@ void PipelineBuilder::disable_depthtest() {
   _depthStencil.back = {};
   _depthStencil.minDepthBounds = 0.f;
   _depthStencil.maxDepthBounds = 1.f;
+
+  return *this;
 }
 
-void PipelineBuilder::enable_depthtest(bool depthWriteEnable, VkCompareOp op) {
+PipelineBuilder& PipelineBuilder::enable_depthtest(bool depthWriteEnable, VkCompareOp op) {
   _depthStencil.depthTestEnable = VK_TRUE;
   _depthStencil.depthWriteEnable = depthWriteEnable;
   _depthStencil.depthCompareOp = op;
@@ -170,6 +193,15 @@ void PipelineBuilder::enable_depthtest(bool depthWriteEnable, VkCompareOp op) {
   _depthStencil.back = {};
   _depthStencil.minDepthBounds = 0.f;
   _depthStencil.maxDepthBounds = 1.f;
+
+  return *this;
+}
+
+
+PipelineBuilder& PipelineBuilder::set_pipeline_layout(VkPipelineLayout layout) {
+  _pipelineLayout = layout;
+
+  return *this;
 }
 
 void PipelineBuilder::clear() {
@@ -192,13 +224,14 @@ void PipelineBuilder::clear() {
   _shaderStages.clear();
 }
 
-bool vkutil::load_shader_module(const char* filePath, VkDevice device,
+void vkutil::load_shader_module(const char* filePath, VkDevice device,
                                 VkShaderModule* outShaderModule) {
   // open the file. With cursor at the end
   std::ifstream file(filePath, std::ios::ate | std::ios::binary);
 
   if (!file.is_open()) {
-    return false;
+    fmt::print("Error: Could not load shader file: {}\n", filePath);
+    abort();
   }
 
   // find what the size of the file is by looking up the location of the cursor
@@ -231,8 +264,8 @@ bool vkutil::load_shader_module(const char* filePath, VkDevice device,
   // check that the creation goes well.
   VkShaderModule shaderModule;
   if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
-    return false;
+    fmt::print("Error: Could not load shader file: {}\n", filePath);
+    abort();
   }
   *outShaderModule = shaderModule;
-  return true;
 }
