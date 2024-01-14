@@ -51,9 +51,6 @@ void VulkanEngine::init() {
                              static_cast<int>(_windowExtent.width),
                              static_cast<int>(_windowExtent.height), window_flags);
 
-  input_manager.init();
-  main_camera.init(input_manager);
-
   init_vulkan();
   init_swapchain();
   init_commands();
@@ -1200,9 +1197,9 @@ void VulkanEngine::run()
         // close the window when user alt-f4s or clicks the X button
         if (e.type == SDL_QUIT) bQuit = true;
 
-        
         input_manager.handle_event(e, _windowExtent.width, _windowExtent.height);
-        main_camera.update(time_tracker.get_delta_time());
+
+        main_camera.update(time_tracker.get_delta_time(), input_manager.get_movement());
 
         if (e.type == SDL_WINDOWEVENT) {
           if (e.window.event == SDL_WINDOWEVENT_MINIMIZED) {

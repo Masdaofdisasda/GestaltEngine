@@ -1,16 +1,16 @@
 #include "camera.h"
 
+#include <fmt/core.h>
+
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/quaternion.hpp>
 
-void free_fly_camera::init(input_manager& input_manager) { input_manager_ = &input_manager; }
 
+void free_fly_camera::update(double delta_seconds, const movement& movement) {
 
-void free_fly_camera::update(double delta_seconds) {
-
-  if (input_manager_->is_key_pressed(SDL_MOUSEBUTTONDOWN)) {
-    auto mouse_pos = glm::vec2(input_manager_->get_movement().mouse_position_x,
-                               input_manager_->get_movement().mouse_position_y);
+  if (movement.left_mouse_button) {
+    auto mouse_pos
+        = glm::vec2(movement.mouse_position_x, movement.mouse_position_y);
     const glm::vec2 delta = mouse_pos - mouse_pos_;
     glm::quat deltaQuat = glm::quat(glm::vec3(mouse_speed * delta.y, mouse_speed * delta.x, 0.0f));
     glm::quat unclamped_rotation = deltaQuat * camera_orientation_;
@@ -33,14 +33,14 @@ void free_fly_camera::update(double delta_seconds) {
   const glm::vec3 up = cross(right, forward);
 
   glm::vec3 accel(0.0f);
-  auto& movement = input_manager_->get_movement();
+
   if (movement.forward) accel += forward;
   if (movement.backward) accel -= forward;
   if (movement.left) accel -= right;
   if (movement.right) accel += right;
   if (movement.up) accel += up;
   if (movement.down) accel -= up;
-  if (input_manager_->is_key_pressed(SDLK_LCTRL)) accel *= fast_coef;
+  if (movement.run) accel *= fast_coef;
 
   if (accel == glm::vec3(0)) {
     // decelerate naturally according to the damping value
@@ -49,8 +49,7 @@ void free_fly_camera::update(double delta_seconds) {
   } else {
     // acceleration
     move_speed_ += accel * acceleration * static_cast<float>(delta_seconds);
-    const float maxSpeed
-        = input_manager_->is_key_pressed(SDLK_LCTRL) ? max_speed * fast_coef : max_speed;
+    const float maxSpeed = movement.run ? max_speed * fast_coef : max_speed;
     if (length(move_speed_) > maxSpeed) move_speed_ = glm::normalize(move_speed_) * maxSpeed;
   }
 
