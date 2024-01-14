@@ -32,15 +32,15 @@
 #include <chrono>
 #include <thread>
 
-VulkanEngine* loadedEngine = nullptr;
+VulkanEngine* loaded_engine = nullptr;
 
 constexpr bool bUseValidationLayers = true;
 
 void VulkanEngine::init()
 {
     // only one engine initialization is allowed with the application.
-    assert(loadedEngine == nullptr);
-    loadedEngine = this;
+    assert(loaded_engine == nullptr);
+    loaded_engine = this;
 
     // We initialize SDL and create a window with it.
     SDL_Init(SDL_INIT_VIDEO);
@@ -51,8 +51,8 @@ void VulkanEngine::init()
         "Vulkan Engine",
         SDL_WINDOWPOS_UNDEFINED,
         SDL_WINDOWPOS_UNDEFINED,
-        _windowExtent.width,
-        _windowExtent.height,
+        static_cast<int>(_windowExtent.width),
+        static_cast<int>(_windowExtent.height),
         window_flags);
 
     init_vulkan();
@@ -73,6 +73,10 @@ void VulkanEngine::init()
 
     mainCamera.pitch = 0;
     mainCamera.yaw = 0;
+
+    sceneData.ambientColor = glm::vec4(0.1f);
+    sceneData.sunlightColor = glm::vec4(1.f);
+    sceneData.sunlightDirection = glm::vec4(0.1, 0.5, 0.1, 10.f);
 }
 
 void VulkanEngine::init_vulkan() {
@@ -169,8 +173,8 @@ void VulkanEngine::destroy_swapchain() {
     vkDestroySwapchainKHR(_device, _swapchain, nullptr);
 
     // destroy swapchain resources
-    for (int i = 0; i < _swapchainImageViews.size(); i++) {
-      vkDestroyImageView(_device, _swapchainImageViews[i], nullptr);
+    for (auto& _swapchainImageView : _swapchainImageViews) {
+      vkDestroyImageView(_device, _swapchainImageView, nullptr);
     }
 }
 
@@ -226,7 +230,7 @@ void VulkanEngine::init_swapchain() {
     VK_CHECK(vkCreateImageView(_device, &dview_info, nullptr, &_depthImage.imageView));
 
     // add to deletion queues
-    _mainDeletionQueue.push_function([=]() {
+    _mainDeletionQueue.push_function([this]() {
       vkDestroyImageView(_device, _drawImage.imageView, nullptr);
       vmaDestroyImage(_allocator, _drawImage.image, _drawImage.allocation);
 
@@ -256,14 +260,14 @@ void VulkanEngine::init_commands() {
     VkCommandPoolCreateInfo commandPoolInfo = vkinit::command_pool_create_info(
         _graphicsQueueFamily, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
-    for (int i = 0; i < FRAME_OVERLAP; i++) {
-      VK_CHECK(vkCreateCommandPool(_device, &commandPoolInfo, nullptr, &_frames[i]._commandPool));
+    for (auto& frame : _frames) {
+      VK_CHECK(vkCreateCommandPool(_device, &commandPoolInfo, nullptr, &frame._commandPool));
 
       // allocate the default command buffer that we will use for rendering
       VkCommandBufferAllocateInfo cmdAllocInfo
-          = vkinit::command_buffer_allocate_info(_frames[i]._commandPool, 1);
+          = vkinit::command_buffer_allocate_info(frame._commandPool, 1);
 
-      VK_CHECK(vkAllocateCommandBuffers(_device, &cmdAllocInfo, &_frames[i]._mainCommandBuffer));
+      VK_CHECK(vkAllocateCommandBuffers(_device, &cmdAllocInfo, &frame._mainCommandBuffer));
     }
 
     VK_CHECK(vkCreateCommandPool(_device, &commandPoolInfo, nullptr, &_immCommandPool));
@@ -275,7 +279,7 @@ void VulkanEngine::init_commands() {
     VK_CHECK(vkAllocateCommandBuffers(_device, &cmdAllocInfo, &_immCommandBuffer));
 
     _mainDeletionQueue.push_function(
-        [=]() { vkDestroyCommandPool(_device, _immCommandPool, nullptr); }, "");
+        [this]() { vkDestroyCommandPool(_device, _immCommandPool, nullptr); }, "");
 }
 
 void VulkanEngine::init_sync_structures() {
@@ -287,17 +291,17 @@ void VulkanEngine::init_sync_structures() {
     VkFenceCreateInfo fenceCreateInfo = vkinit::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
     VkSemaphoreCreateInfo semaphoreCreateInfo = vkinit::semaphore_create_info();
 
-    for (int i = 0; i < FRAME_OVERLAP; i++) {
-      VK_CHECK(vkCreateFence(_device, &fenceCreateInfo, nullptr, &_frames[i]._renderFence));
+    for (auto& frame : _frames) {
+      VK_CHECK(vkCreateFence(_device, &fenceCreateInfo, nullptr, &frame._renderFence));
 
       VK_CHECK(vkCreateSemaphore(_device, &semaphoreCreateInfo, nullptr,
-                                 &_frames[i]._swapchainSemaphore));
+                                 &frame._swapchainSemaphore));
       VK_CHECK(
-          vkCreateSemaphore(_device, &semaphoreCreateInfo, nullptr, &_frames[i]._renderSemaphore));
+          vkCreateSemaphore(_device, &semaphoreCreateInfo, nullptr, &frame._renderSemaphore));
     }
 
     VK_CHECK(vkCreateFence(_device, &fenceCreateInfo, nullptr, &_immFence));
-    _mainDeletionQueue.push_function([=]() { vkDestroyFence(_device, _immFence, nullptr); }, "");
+    _mainDeletionQueue.push_function([this]() { vkDestroyFence(_device, _immFence, nullptr); }, "");
 }
 
 void VulkanEngine::init_descriptors() {
@@ -503,7 +507,7 @@ void VulkanEngine::init_imgui() {
     ImGui_ImplVulkan_DestroyFontsTexture();
 
     // add the destroy the imgui created structures
-    _mainDeletionQueue.push_function([=]() {
+    _mainDeletionQueue.push_function([this, imguiPool]() {
       ImGui_ImplVulkan_Shutdown();
       vkDestroyDescriptorPool(_device, imguiPool, nullptr);
     }, "");
@@ -558,7 +562,8 @@ void VulkanEngine::init_default_data() {
 
     // checkerboard image
     uint32_t magenta = 0xFF00FFFF;
-    std::array<uint32_t, 16 * 16> pixels;  // for 16x16 checkerboard texture
+    constexpr size_t checkerboard_size = 256;
+    std::array<uint32_t, checkerboard_size> pixels;  // for 16x16 checkerboard texture
     for (int x = 0; x < 16; x++) {
       for (int y = 0; y < 16; y++) {
         pixels[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
@@ -588,7 +593,7 @@ void VulkanEngine::init_renderables() {
     loadedScenes["structure"] = *structureFile;
 }
 
-void VulkanEngine::immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function) {
+void VulkanEngine::immediate_submit(std::function<void(VkCommandBuffer cmd)> function) {
     VK_CHECK(vkResetFences(_device, 1, &_immFence));
     VK_CHECK(vkResetCommandBuffer(_immCommandBuffer, 0));
 
@@ -599,7 +604,8 @@ void VulkanEngine::immediate_submit(std::function<void(VkCommandBuffer cmd)>&& f
 
     VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
-    function(cmd);
+    const auto moved_function = std::move(function);
+    moved_function(cmd);
 
     VK_CHECK(vkEndCommandBuffer(cmd));
 
@@ -677,7 +683,7 @@ AllocatedImage VulkanEngine::create_image(VkExtent3D size, VkFormat format, VkIm
 
 AllocatedImage VulkanEngine::create_image(void* data, VkExtent3D size, VkFormat format,
                                           VkImageUsageFlags usage, bool mipmapped) {
-    size_t data_size = size.depth * size.width * size.height * 4;
+    size_t data_size = static_cast<size_t>(size.depth * size.width * size.height) * 4;
     AllocatedBuffer uploadbuffer
         = create_buffer(data_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
@@ -1048,7 +1054,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd) {
     std::vector<uint32_t> opaque_draws;
     opaque_draws.reserve(mainDrawContext.OpaqueSurfaces.size());
 
-    for (int i = 0; i < mainDrawContext.OpaqueSurfaces.size(); i++) {
+    for (size_t i = 0; i < mainDrawContext.OpaqueSurfaces.size(); i++) {
       if (is_visible(mainDrawContext.OpaqueSurfaces[i], sceneData.viewproj)) {
         opaque_draws.push_back(i);
       }
@@ -1070,7 +1076,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd) {
 
     // add it to the deletion queue of this frame so it gets deleted once its been used
     get_current_frame()._deletionQueue.push_function(
-        [=, this]() { destroy_buffer(gpuSceneDataBuffer); }, "");
+        [gpuSceneDataBuffer, this]() { destroy_buffer(gpuSceneDataBuffer); }, "");
 
     // write the buffer
     GPUSceneData* sceneUniformData
@@ -1239,6 +1245,13 @@ void VulkanEngine::run()
         ImGui::End();
       }
 
+      if (ImGui::Begin("Light")) {
+        ImGui::SliderFloat("Light X", &sceneData.sunlightDirection.x, -10.f, 10.f);
+        ImGui::SliderFloat("Light Y", &sceneData.sunlightDirection.y, -10.f, 10.f);
+        ImGui::SliderFloat("Light Z", &sceneData.sunlightDirection.z, -10.f, 10.f);
+        ImGui::End();
+      }
+
       if (ImGui::Begin("Background")) {
 
         ImGui::SliderFloat("Render Scale", &renderScale, 0.3f, 1.f);
@@ -1249,10 +1262,10 @@ void VulkanEngine::run()
 
         ImGui::SliderInt("Effect Index", &currentBackgroundEffect, 0, backgroundEffects.size() - 1);
 
-        ImGui::InputFloat4("data1", (float*)&selected.data.data1);
-        ImGui::InputFloat4("data2", (float*)&selected.data.data2);
-        ImGui::InputFloat4("data3", (float*)&selected.data.data3);
-        ImGui::InputFloat4("data4", (float*)&selected.data.data4);
+        ImGui::InputFloat4("data1", reinterpret_cast<float*>(&selected.data.data1));
+        ImGui::InputFloat4("data2", reinterpret_cast<float*>(&selected.data.data2));
+        ImGui::InputFloat4("data3", reinterpret_cast<float*>(&selected.data.data3));
+        ImGui::InputFloat4("data4", reinterpret_cast<float*>(&selected.data.data4));
 
         ImGui::End();
       }
