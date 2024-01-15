@@ -1,9 +1,9 @@
-#include "input_service.h"
+#include "input_system.h"
 
 #include <fmt/core.h>
 
 
-void input_service::handle_event(const SDL_Event& e, uint32_t window_size_x,
+void input_system::handle_event(const SDL_Event& e, uint32_t window_size_x,
                                  uint32_t window_size_y) {
   switch (e.type) {
     case SDL_MOUSEMOTION:
@@ -22,13 +22,13 @@ void input_service::handle_event(const SDL_Event& e, uint32_t window_size_x,
   }
 }
 
-void input_service::handle_mouse_motion(const SDL_Event& e, uint32_t window_size_x,
+void input_system::handle_mouse_motion(const SDL_Event& e, uint32_t window_size_x,
                                         uint32_t window_size_y) {
   movement_.mouse_position_x = static_cast<float>(e.motion.x) / window_size_x;
   movement_.mouse_position_y = static_cast<float>(e.motion.y) / window_size_y;
 }
 
-void input_service::handle_mouse_button(const SDL_Event& e) {
+void input_system::handle_mouse_button(const SDL_Event& e) {
   bool pressed = (e.type == SDL_MOUSEBUTTONDOWN);
   switch (e.button.button) {
     case SDL_BUTTON_LEFT:
@@ -42,7 +42,7 @@ void input_service::handle_mouse_button(const SDL_Event& e) {
   }
 }
 
-void input_service::handle_keyboard(const SDL_Event& e) {
+void input_system::handle_keyboard(const SDL_Event& e) {
   bool pressed = (e.type == SDL_KEYDOWN);
   switch (e.key.keysym.scancode) {
     case SDL_SCANCODE_W:

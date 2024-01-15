@@ -17,8 +17,10 @@ add_library(graphics
     camera.cpp
     camera.h
     time_tracking_service.h
-    input_service.h
-    input_service.cpp
+    input_system.h
+    input_system.cpp
+    resource_manager.h
+    resource_manager.cpp
     vk_deletion_service.h
 )
 

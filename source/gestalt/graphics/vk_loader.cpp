@@ -140,7 +140,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(vulkan_engine* engine,
 
   //> load_buffer
   // create buffer to hold the material data
-  file.materialDataBuffer = engine->create_buffer(
+  file.materialDataBuffer = engine->get_resource_manager().create_buffer(
       sizeof(GLTFMetallic_Roughness::MaterialConstants) * gltf.materials.size(),
       VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
   int data_index = 0;
@@ -292,7 +292,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(vulkan_engine* engine,
       newmesh->surfaces.push_back(newSurface);
     }
 
-    newmesh->meshBuffers = engine->uploadMesh(indices, vertices);
+    newmesh->meshBuffers = engine->upload_mesh(indices, vertices);
   }
   //> load_nodes
   // load all nodes and their meshes
@@ -365,8 +365,8 @@ void LoadedGLTF::clearAll() {
   VkDevice dv = creator->get_vk_device();
 
   for (auto& [k, v] : meshes) {
-    creator->destroy_buffer(v->meshBuffers.indexBuffer);
-    creator->destroy_buffer(v->meshBuffers.vertexBuffer);
+    creator->get_resource_manager().destroy_buffer(v->meshBuffers.indexBuffer);
+    creator->get_resource_manager().destroy_buffer(v->meshBuffers.vertexBuffer);
   }
 
   for (auto& [k, v] : images) {
@@ -374,7 +374,7 @@ void LoadedGLTF::clearAll() {
       // dont destroy the default images
       continue;
     }
-    creator->destroy_image(v);
+    creator->get_resource_manager().destroy_image(v);
   }
 
   for (auto& sampler : samplers) {
@@ -386,7 +386,7 @@ void LoadedGLTF::clearAll() {
 
   descriptorPool.destroy_pools(dv);
 
-  creator->destroy_buffer(materialBuffer);
+  creator->get_resource_manager().destroy_buffer(materialBuffer);
 }
 
 std::optional<AllocatedImage> load_image(vulkan_engine* engine, fastgltf::Asset& asset,
@@ -411,7 +411,8 @@ std::optional<AllocatedImage> load_image(vulkan_engine* engine, fastgltf::Asset&
                      imagesize.height = height;
                      imagesize.depth = 1;
 
-                     newImage = engine->create_image(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM,
+                     newImage = engine->get_resource_manager().create_image(
+                         data, imagesize, VK_FORMAT_R8G8B8A8_UNORM,
                                                      VK_IMAGE_USAGE_SAMPLED_BIT, true);
 
                      stbi_image_free(data);
@@ -427,7 +428,8 @@ std::optional<AllocatedImage> load_image(vulkan_engine* engine, fastgltf::Asset&
                      imagesize.height = height;
                      imagesize.depth = 1;
 
-                     newImage = engine->create_image(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM,
+                     newImage = engine->get_resource_manager().create_image(
+                         data, imagesize, VK_FORMAT_R8G8B8A8_UNORM,
                                                      VK_IMAGE_USAGE_SAMPLED_BIT, true);
 
                      stbi_image_free(data);
@@ -452,7 +454,9 @@ std::optional<AllocatedImage> load_image(vulkan_engine* engine, fastgltf::Asset&
                                                     imagesize.height = height;
                                                     imagesize.depth = 1;
 
-                                                    newImage = engine->create_image(
+                                                    newImage
+                                                        = engine->get_resource_manager()
+                                                              .create_image(
                                                         data, imagesize, VK_FORMAT_R8G8B8A8_UNORM,
                                                         VK_IMAGE_USAGE_SAMPLED_BIT, true);
 

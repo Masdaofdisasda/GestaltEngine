@@ -10,8 +10,9 @@
 #include "vk_loader.h"
 #include "camera.h"
 #include "time_tracking_service.h"
-#include "input_service.h"
+#include "input_system.h"
 #include "vk_deletion_service.h"
+#include "resource_manager.h"
 
 struct frame_data {
   VkSemaphore swapchain_semaphore, render_semaphore;
@@ -127,17 +128,9 @@ public:
   AllocatedImage& get_draw_image() { return draw_image_; }
   AllocatedImage& get_depth_image() { return depth_image_; }
   VkDescriptorSetLayout& get_gpu_scene_data_layout() { return gpu_scene_data_descriptor_layout_; }
+  resource_manager& get_resource_manager() { return resource_manager_; }
 
-
-  GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
-
-  AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage,
-                                VmaMemoryUsage memoryUsage);
-  void destroy_buffer(const AllocatedBuffer& buffer);
-
-  AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
-                              bool mipmapped = false);
-  void destroy_image(const AllocatedImage& img);
+  GPUMeshBuffers upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
 
 private:
   bool is_initialized_{false};
@@ -226,9 +219,6 @@ private:
 
 
   void immediate_submit(std::function<void(VkCommandBuffer cmd)> function);
-  
-  AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
-                              bool mipmapped = false);
 
   std::vector<std::unique_ptr<camera_positioner_interface>> camera_positioners_{1};
   uint32_t current_camera_positioner_index_{0};
@@ -236,7 +226,9 @@ private:
 
   time_tracking_service time_tracking_service_;
 
-  input_service input_service_;
+  input_system input_system_;
+
+  resource_manager resource_manager_;
 
   engine_stats stats_;
 

@@ -52,6 +52,8 @@ void vulkan_engine::init() {
                              static_cast<int>(window_extent_.height), window_flags);
 
   init_vulkan();
+  resource_manager_.init(device_, allocator_,
+                         [this](auto func) { this->immediate_submit(std::move(func)); });
   init_swapchain();
   init_commands();
   init_sync_structures();
@@ -540,19 +542,22 @@ void vulkan_engine::init_default_data() {
     rect_indices[4] = 1;
     rect_indices[5] = 3;
 
-    rectangle_ = uploadMesh(rect_indices, rect_vertices);
+    rectangle_ = upload_mesh(rect_indices, rect_vertices);
 
     // 3 default textures, white, grey, black. 1 pixel each
     uint32_t white = 0xFFFFFFFF;
-    default_material_.white_image = create_image((void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
+    default_material_.white_image = resource_manager_.create_image(
+        (void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
                                VK_IMAGE_USAGE_SAMPLED_BIT);
 
     uint32_t grey = 0xAAAAAAFF;
-    default_material_.grey_image = create_image((void*)&grey, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
+    default_material_.grey_image = resource_manager_.create_image(
+        (void*)&grey, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
                               VK_IMAGE_USAGE_SAMPLED_BIT);
 
     uint32_t black = 0x000000FF;
-    default_material_.black_image = create_image((void*)&black, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
+    default_material_.black_image = resource_manager_.create_image(
+        (void*)&black, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
                                VK_IMAGE_USAGE_SAMPLED_BIT);
 
     // checkerboard image
@@ -564,7 +569,8 @@ void vulkan_engine::init_default_data() {
         pixels[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
       }
     }
-    default_material_.error_checkerboard_image = create_image(pixels.data(), VkExtent3D{16, 16, 1},
+    default_material_.error_checkerboard_image = resource_manager_.create_image(
+        pixels.data(), VkExtent3D{16, 16, 1},
                                            VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
     VkSamplerCreateInfo sampl = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
@@ -614,118 +620,7 @@ void vulkan_engine::immediate_submit(std::function<void(VkCommandBuffer cmd)> fu
     VK_CHECK(vkWaitForFences(device_, 1, &imgui_fence_, true, 9999999999));
 }
 
-AllocatedBuffer vulkan_engine::create_buffer(size_t allocSize, VkBufferUsageFlags usage,
-                                            VmaMemoryUsage memoryUsage) {
-    // allocate buffer
-    VkBufferCreateInfo bufferInfo = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-    bufferInfo.pNext = nullptr;
-    bufferInfo.size = allocSize;
-
-    bufferInfo.usage = usage;
-
-    VmaAllocationCreateInfo vmaallocInfo = {};
-    vmaallocInfo.usage = memoryUsage;
-    vmaallocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-    AllocatedBuffer newBuffer;
-
-    // allocate the buffer
-    VK_CHECK(vmaCreateBuffer(allocator_, &bufferInfo, &vmaallocInfo, &newBuffer.buffer,
-                             &newBuffer.allocation, &newBuffer.info));
-
-    return newBuffer;
-}
-
-void vulkan_engine::destroy_buffer(const AllocatedBuffer& buffer) {
-    vmaDestroyBuffer(allocator_, buffer.buffer, buffer.allocation);
-}
-AllocatedImage vulkan_engine::create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
-                                          bool mipmapped) {
-    AllocatedImage newImage;
-    newImage.imageFormat = format;
-    newImage.imageExtent = size;
-
-    VkImageCreateInfo img_info = vkinit::image_create_info(format, usage, size);
-    if (mipmapped) {
-    img_info.mipLevels
-        = static_cast<uint32_t>(std::floor(std::log2(std::max(size.width, size.height)))) + 1;
-    }
-
-    // always allocate images on dedicated GPU memory
-    VmaAllocationCreateInfo allocinfo = {};
-    allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-    // allocate and create the image
-    VK_CHECK(vmaCreateImage(allocator_, &img_info, &allocinfo, &newImage.image,
-                            &newImage.allocation, nullptr));
-
-    // if the format is a depth format, we will need to have it use the correct
-    // aspect flag
-    VkImageAspectFlags aspectFlag = VK_IMAGE_ASPECT_COLOR_BIT;
-    if (format == VK_FORMAT_D32_SFLOAT) {
-    aspectFlag = VK_IMAGE_ASPECT_DEPTH_BIT;
-    }
-
-    // build a image-view for the image
-    VkImageViewCreateInfo view_info
-        = vkinit::imageview_create_info(format, newImage.image, aspectFlag);
-    view_info.subresourceRange.levelCount = img_info.mipLevels;
-
-    VK_CHECK(vkCreateImageView(device_, &view_info, nullptr, &newImage.imageView));
-
-    return newImage;
-}
-
-AllocatedImage vulkan_engine::create_image(void* data, VkExtent3D size, VkFormat format,
-                                          VkImageUsageFlags usage, bool mipmapped) {
-    size_t data_size = static_cast<size_t>(size.depth * size.width * size.height) * 4;
-    AllocatedBuffer uploadbuffer
-        = create_buffer(data_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-    memcpy(uploadbuffer.info.pMappedData, data, data_size);
-
-    AllocatedImage new_image = create_image(
-        size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-        mipmapped);
-
-    immediate_submit([&](VkCommandBuffer cmd) {
-      vkutil::transition_image(cmd, new_image.image, VK_IMAGE_LAYOUT_UNDEFINED,
-                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-      VkBufferImageCopy copyRegion = {};
-      copyRegion.bufferOffset = 0;
-      copyRegion.bufferRowLength = 0;
-      copyRegion.bufferImageHeight = 0;
-
-      copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-      copyRegion.imageSubresource.mipLevel = 0;
-      copyRegion.imageSubresource.baseArrayLayer = 0;
-      copyRegion.imageSubresource.layerCount = 1;
-      copyRegion.imageExtent = size;
-
-      // copy the buffer into the image
-      vkCmdCopyBufferToImage(cmd, uploadbuffer.buffer, new_image.image,
-                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
-
-      if (mipmapped) {
-        vkutil::generate_mipmaps(
-            cmd, new_image.image,
-            VkExtent2D{new_image.imageExtent.width, new_image.imageExtent.height});
-      } else {
-        vkutil::transition_image(cmd, new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-      }
-    });
-    destroy_buffer(uploadbuffer);
-    return new_image;
-}
-
-void vulkan_engine::destroy_image(const AllocatedImage& img) {
-        vkDestroyImageView(device_, img.imageView, nullptr);
-        vmaDestroyImage(allocator_, img.image, img.allocation);
-}
-
-GPUMeshBuffers vulkan_engine::uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices) {
+GPUMeshBuffers vulkan_engine::upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices) {
     //> mesh_create_1
     const size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
     const size_t indexBufferSize = indices.size() * sizeof(uint32_t);
@@ -733,8 +628,8 @@ GPUMeshBuffers vulkan_engine::uploadMesh(std::span<uint32_t> indices, std::span<
     GPUMeshBuffers newSurface;
 
     // create vertex buffer
-    newSurface.vertexBuffer
-        = create_buffer(vertexBufferSize,
+    newSurface.vertexBuffer = resource_manager_.create_buffer(
+        vertexBufferSize,
                         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
                             | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                         VMA_MEMORY_USAGE_GPU_ONLY);
@@ -746,15 +641,15 @@ GPUMeshBuffers vulkan_engine::uploadMesh(std::span<uint32_t> indices, std::span<
     newSurface.vertexBufferAddress = vkGetBufferDeviceAddress(device_, &deviceAdressInfo);
 
     // create index buffer
-    newSurface.indexBuffer = create_buffer(
+    newSurface.indexBuffer = resource_manager_.create_buffer(
         indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VMA_MEMORY_USAGE_GPU_ONLY);
 
     //< mesh_create_1
     //
     //> mesh_create_2
-    AllocatedBuffer staging
-        = create_buffer(vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+    AllocatedBuffer staging = resource_manager_.create_buffer(vertexBufferSize + indexBufferSize,
+                                                             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                         VMA_MEMORY_USAGE_CPU_ONLY);
 
     void* data = staging.allocation->GetMappedData();
@@ -780,7 +675,7 @@ GPUMeshBuffers vulkan_engine::uploadMesh(std::span<uint32_t> indices, std::span<
       vkCmdCopyBuffer(cmd, staging.buffer, newSurface.indexBuffer.buffer, 1, &indexCopy);
     });
 
-    destroy_buffer(staging);
+    resource_manager_.destroy_buffer(staging);
 
     return newSurface;
     //< mesh_create_2
@@ -1056,12 +951,12 @@ void vulkan_engine::draw_geometry(VkCommandBuffer cmd) {
     });
 
     // allocate a new uniform buffer for the scene data
-    AllocatedBuffer gpuSceneDataBuffer = create_buffer(
+    AllocatedBuffer gpuSceneDataBuffer = resource_manager_.create_buffer(
         sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
     // add it to the deletion queue of this frame so it gets deleted once its been used
     get_current_frame().deletion_queue.push_function(
-        [gpuSceneDataBuffer, this]() { destroy_buffer(gpuSceneDataBuffer); });
+        [gpuSceneDataBuffer, this]() { resource_manager_.destroy_buffer(gpuSceneDataBuffer); });
 
     // write the buffer
     GPUSceneData* sceneUniformData
@@ -1192,9 +1087,9 @@ void vulkan_engine::run()
         // close the window when user alt-f4s or clicks the X button
         if (e.type == SDL_QUIT) bQuit = true;
 
-        input_service_.handle_event(e, window_extent_.width, window_extent_.height);
+        input_system_.handle_event(e, window_extent_.width, window_extent_.height);
 
-        active_camera_.update(time_tracking_service_.get_delta_time(), input_service_.get_movement());
+        active_camera_.update(time_tracking_service_.get_delta_time(), input_system_.get_movement());
 
         if (e.type == SDL_WINDOWEVENT) {
           if (e.window.event == SDL_WINDOWEVENT_MINIMIZED) {
