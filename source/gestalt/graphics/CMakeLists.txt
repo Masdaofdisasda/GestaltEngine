@@ -19,6 +19,7 @@ add_library(graphics
     time_tracker.h
     input_manager.h
     input_manager.cpp
+    deletion_queue.h
 )
 
 target_compile_features(graphics PRIVATE cxx_std_20)

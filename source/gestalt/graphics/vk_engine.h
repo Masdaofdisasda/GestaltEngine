@@ -11,24 +11,7 @@
 #include "camera.h"
 #include "time_tracker.h"
 #include "input_manager.h"
-
-struct DeletionQueue {
-  std::deque<std::pair<std::function<void()>, std::string>> deletors;
-
-  void push_function(std::function<void()>&& function, const std::string& description) {
-    deletors.emplace_back(std::move(function), description);
-  }
-
-  void flush() {
-    for (auto& [deletor, description] : std::ranges::reverse_view(deletors)) {
-#if 0
-      fmt::print("Deleting: {}\n", description);
-#endif
-      deletor();
-    }
-    deletors.clear();
-  }
-};
+#include "deletion_queue.h"
 
 struct FrameData {
   VkSemaphore _swapchainSemaphore, _renderSemaphore;
@@ -37,7 +20,7 @@ struct FrameData {
   VkCommandPool _commandPool;
   VkCommandBuffer _mainCommandBuffer;
 
-  DeletionQueue _deletionQueue;
+  deletion_queue _deletionQueue;
   DescriptorAllocatorGrowable _frameDescriptors;
 };
 
@@ -169,7 +152,7 @@ public:
 
   VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;
 
-  DeletionQueue _mainDeletionQueue;
+  deletion_queue _mainDeletionQueue;
 
   VmaAllocator _allocator;  // vma lib allocator
 
@@ -237,7 +220,7 @@ public:
                               bool mipmapped = false);
   void destroy_image(const AllocatedImage& img);
 
-  std::vector<std::unique_ptr<camera_positioner_interface>> camera_positioners{3};
+  std::vector<std::unique_ptr<camera_positioner_interface>> camera_positioners{1};
   uint32_t current_camera_positioner_index{0};
   camera main_camera{};
 

@@ -9,7 +9,7 @@
 void free_fly_camera::update(double delta_seconds, const movement& movement) {
 
     auto mouse_pos = glm::vec2(movement.mouse_position_x, movement.mouse_position_y);
-  if (movement.left_mouse_button) {
+  if (movement.right_mouse_button) {
     const glm::vec2 delta = mouse_pos - mouse_pos_;
     glm::quat deltaQuat = glm::quat(glm::vec3(mouse_speed * delta.y, mouse_speed * delta.x, 0.0f));
     glm::quat unclamped_rotation = deltaQuat * camera_orientation_;

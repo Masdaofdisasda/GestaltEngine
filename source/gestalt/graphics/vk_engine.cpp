@@ -4,7 +4,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
 
-#if 0
+#if 1
 #define VMA_DEBUG_INITIALIZE_ALLOCATIONS 1
 #  define VMA_DEBUG_LOG_FORMAT(format, ...)
 #define VMA_DEBUG_LOG_FORMAT(format, ...) do { \
@@ -78,69 +78,69 @@ void VulkanEngine::init() {
 }
 
 void VulkanEngine::init_vulkan() {
+  // create the vulkan instance
+  vkb::InstanceBuilder builder;
 
-    //create the vulkan instance
-    vkb::InstanceBuilder builder;
+  // make the vulkan instance, with basic debug features
+  auto inst_ret = builder.set_app_name("Gestalt Application")
+                      .request_validation_layers(bUseValidationLayers)
+                      .use_default_debug_messenger()
+                      .require_api_version(1, 3, 0)
+                      .build();
 
-    // make the vulkan instance, with basic debug features
-    auto inst_ret = builder.set_app_name("Gestalt Application")
-                        .request_validation_layers(bUseValidationLayers)
-                        .use_default_debug_messenger()
-                        .require_api_version(1, 3, 0)
-                        .build();
+  vkb::Instance vkb_inst = inst_ret.value();
 
-    vkb::Instance vkb_inst = inst_ret.value();
+  // grab the instance
+  _instance = vkb_inst.instance;
+  _debug_messenger = vkb_inst.debug_messenger;
 
-    // grab the instance
-    _instance = vkb_inst.instance;
-    _debug_messenger = vkb_inst.debug_messenger;
+  // create the device
+  SDL_Vulkan_CreateSurface(_window, _instance, &_surface);
 
-    // create the device
-    SDL_Vulkan_CreateSurface(_window, _instance, &_surface);
+  // vulkan 1.3 features
+  VkPhysicalDeviceVulkan13Features features{};
+  features.dynamicRendering = true;
+  features.synchronization2 = true;
 
-    // vulkan 1.3 features
-    VkPhysicalDeviceVulkan13Features features{};
-    features.dynamicRendering = true;
-    features.synchronization2 = true;
+  // vulkan 1.2 features
+  VkPhysicalDeviceVulkan12Features features12{};
+  features12.bufferDeviceAddress = true;
+  features12.descriptorIndexing = true;
 
-    // vulkan 1.2 features
-    VkPhysicalDeviceVulkan12Features features12{};
-    features12.bufferDeviceAddress = true;
-    features12.descriptorIndexing = true;
+  // use vkbootstrap to select a gpu.
+  // We want a gpu that can write to the SDL surface and supports vulkan 1.3 with the correct
+  // features
+  vkb::PhysicalDeviceSelector selector{vkb_inst};
+  vkb::PhysicalDevice physicalDevice = selector.set_minimum_version(1, 3)
+                                           .set_required_features_13(features)
+                                           .set_required_features_12(features12)
+                                           .set_surface(_surface)
+                                           .select()
+                                           .value();
 
-    // use vkbootstrap to select a gpu.
-    // We want a gpu that can write to the SDL surface and supports vulkan 1.3 with the correct
-    // features
-    vkb::PhysicalDeviceSelector selector{vkb_inst};
-    vkb::PhysicalDevice physicalDevice = selector.set_minimum_version(1, 3)
-                                             .set_required_features_13(features)
-                                             .set_required_features_12(features12)
-                                             .set_surface(_surface)
-                                             .select()
-                                             .value();
+  // create the final vulkan device
+  vkb::DeviceBuilder deviceBuilder{physicalDevice};
 
-    // create the final vulkan device
-    vkb::DeviceBuilder deviceBuilder{physicalDevice};
+  vkb::Device vkbDevice = deviceBuilder.build().value();
 
-    vkb::Device vkbDevice = deviceBuilder.build().value();
+  // Get the VkDevice handle used in the rest of a vulkan application
+  _device = vkbDevice.device;
+  _chosenGPU = physicalDevice.physical_device;
 
-    // Get the VkDevice handle used in the rest of a vulkan application
-    _device = vkbDevice.device;
-    _chosenGPU = physicalDevice.physical_device;
+  // use vkbootstrap to get a Graphics queue
+  _graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
+  _graphicsQueueFamily = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
 
-    // use vkbootstrap to get a Graphics queue
-    _graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
-    _graphicsQueueFamily = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
+  // initialize the memory allocator
+  VmaAllocatorCreateInfo allocatorInfo = {};
+  allocatorInfo.physicalDevice = _chosenGPU;
+  allocatorInfo.device = _device;
+  allocatorInfo.instance = _instance;
+  allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+  vmaCreateAllocator(&allocatorInfo, &_allocator);
 
-    // initialize the memory allocator
-    VmaAllocatorCreateInfo allocatorInfo = {};
-    allocatorInfo.physicalDevice = _chosenGPU;
-    allocatorInfo.device = _device;
-    allocatorInfo.instance = _instance;
-    allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
-    vmaCreateAllocator(&allocatorInfo, &_allocator);
-
-    _mainDeletionQueue.push_function([&]() { vmaDestroyAllocator(_allocator); }, "");
+  _mainDeletionQueue.init(_device, _allocator);
+  _mainDeletionQueue.push(_allocator);
 }
 
 void VulkanEngine::create_swapchain(uint32_t width, uint32_t height) {
@@ -228,13 +228,10 @@ void VulkanEngine::init_swapchain() {
     VK_CHECK(vkCreateImageView(_device, &dview_info, nullptr, &_depthImage.imageView));
 
     // add to deletion queues
-    _mainDeletionQueue.push_function([this]() {
-      vkDestroyImageView(_device, _drawImage.imageView, nullptr);
-      vmaDestroyImage(_allocator, _drawImage.image, _drawImage.allocation);
-
-      vkDestroyImageView(_device, _depthImage.imageView, nullptr);
-      vmaDestroyImage(_allocator, _depthImage.image, _depthImage.allocation);
-    }, "");
+    _mainDeletionQueue.push(_drawImage.imageView);
+    _mainDeletionQueue.push(_drawImage.image, _drawImage.allocation);
+    _mainDeletionQueue.push(_depthImage.imageView);
+    _mainDeletionQueue.push(_depthImage.image, _depthImage.allocation);
 }
 
 void VulkanEngine::resize_swapchain() {
@@ -276,8 +273,7 @@ void VulkanEngine::init_commands() {
 
     VK_CHECK(vkAllocateCommandBuffers(_device, &cmdAllocInfo, &_immCommandBuffer));
 
-    _mainDeletionQueue.push_function(
-        [this]() { vkDestroyCommandPool(_device, _immCommandPool, nullptr); }, "");
+    _mainDeletionQueue.push(_immCommandPool);
 }
 
 void VulkanEngine::init_sync_structures() {
@@ -299,18 +295,17 @@ void VulkanEngine::init_sync_structures() {
     }
 
     VK_CHECK(vkCreateFence(_device, &fenceCreateInfo, nullptr, &_immFence));
-    _mainDeletionQueue.push_function([this]() { vkDestroyFence(_device, _immFence, nullptr); }, "");
+
+    _mainDeletionQueue.push(_immFence);
 }
 
 void VulkanEngine::init_descriptors() {
-
     // create a descriptor pool that will hold 10 sets with 1 image each
     std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes = {
         {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3},
         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3},
         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3},
     };
-
 
     globalDescriptorAllocator.init(_device, 10, sizes);
 
@@ -344,7 +339,7 @@ void VulkanEngine::init_descriptors() {
       writer.update_set(_device, _drawImageDescriptors);
     }
 
-  for (int i = 0; i < FRAME_OVERLAP; i++) {
+    for (int i = 0; i < FRAME_OVERLAP; i++) {
       // create a descriptor pool
       std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> frame_sizes = {
           {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3},
@@ -356,8 +351,7 @@ void VulkanEngine::init_descriptors() {
       _frames[i]._frameDescriptors = DescriptorAllocatorGrowable{};
       _frames[i]._frameDescriptors.init(_device, 1000, frame_sizes);
 
-      _mainDeletionQueue.push_function(
-          [&, i]() { _frames[i]._frameDescriptors.destroy_pools(_device); }, "");
+      _mainDeletionQueue.push(_frames[i]._frameDescriptors);
     }
 }
 
@@ -371,7 +365,6 @@ void VulkanEngine::init_pipelines() {
 }
 
 void VulkanEngine::init_background_pipelines() {
-
     VkPipelineLayoutCreateInfo computeLayout{};
     computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     computeLayout.pNext = nullptr;
@@ -440,12 +433,9 @@ void VulkanEngine::init_background_pipelines() {
     vkDestroyShaderModule(_device, gradientShader, nullptr);
     vkDestroyShaderModule(_device, skyShader, nullptr);
 
-    _mainDeletionQueue.push_function([&]() {
-      for (auto&& effect : backgroundEffects) {
-        vkDestroyPipeline(_device, effect.pipeline, nullptr);
-      }
-      vkDestroyPipelineLayout(_device, _gradientPipelineLayout, nullptr);
-    }, "");
+    _mainDeletionQueue.push(gradient.pipeline);
+    _mainDeletionQueue.push(sky.pipeline);
+    _mainDeletionQueue.push(_gradientPipelineLayout);
 }
 
 void VulkanEngine::init_imgui() {
@@ -499,16 +489,14 @@ void VulkanEngine::init_imgui() {
     ImGui_ImplVulkan_Init(&init_info, VK_NULL_HANDLE);
 
     // execute a gpu command to upload imgui font textures
-    immediate_submit([&](VkCommandBuffer cmd) { ImGui_ImplVulkan_CreateFontsTexture(); }); // TODO
+    immediate_submit([&](VkCommandBuffer cmd) { ImGui_ImplVulkan_CreateFontsTexture(); });  // TODO
 
     // clear font textures from cpu data
     ImGui_ImplVulkan_DestroyFontsTexture();
 
     // add the destroy the imgui created structures
-    _mainDeletionQueue.push_function([this, imguiPool]() {
-      ImGui_ImplVulkan_Shutdown();
-      vkDestroyDescriptorPool(_device, imguiPool, nullptr);
-    }, "");
+    _mainDeletionQueue.push_function([this]() { ImGui_ImplVulkan_Shutdown(); });
+    _mainDeletionQueue.push(imguiPool);
 }
 
 void VulkanEngine::init_default_data() {
@@ -813,7 +801,6 @@ void VulkanEngine::cleanup() {
         frame._deletionQueue.flush();
       }
 
-
       destroy_swapchain();
       vkDestroySurfaceKHR(_instance, _surface, nullptr);
       vkDestroyDevice(_device, nullptr);
@@ -1074,7 +1061,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd) {
 
     // add it to the deletion queue of this frame so it gets deleted once its been used
     get_current_frame()._deletionQueue.push_function(
-        [gpuSceneDataBuffer, this]() { destroy_buffer(gpuSceneDataBuffer); }, "");
+        [gpuSceneDataBuffer, this]() { destroy_buffer(gpuSceneDataBuffer); });
 
     // write the buffer
     GPUSceneData* sceneUniformData
@@ -1340,6 +1327,7 @@ void VulkanEngine::run()
 
         ImGui::End();
       }
+
       ImGui::Render();
 
       update_scene();
