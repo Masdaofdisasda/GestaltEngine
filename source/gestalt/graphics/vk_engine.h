@@ -32,6 +32,16 @@ struct engine_stats {
   float mesh_draw_time;
 };
 
+struct default_material {
+  AllocatedImage white_image;
+  AllocatedImage black_image;
+  AllocatedImage grey_image;
+  AllocatedImage error_checkerboard_image;
+
+  VkSampler default_sampler_linear;
+  VkSampler default_sampler_nearest;
+};
+
 constexpr unsigned int FRAME_OVERLAP = 2;
 
 struct compute_push_constants {
@@ -106,6 +116,30 @@ struct compute_effect {
 
 class vulkan_engine {
 public:
+  void init();
+  void cleanup();
+  void draw();
+  void run();
+
+  [[nodiscard]] VkDevice get_vk_device() const { return _device; }
+  GLTFMetallic_Roughness& get_metallic_roughness_material() { return metalRoughMaterial; }
+  default_material& get_default_material() { return default_material_; }
+  AllocatedImage& get_draw_image() { return draw_image_; }
+  AllocatedImage& get_depth_image() { return depth_image_; }
+  VkDescriptorSetLayout& get_gpu_scene_data_layout() { return _gpuSceneDataDescriptorLayout; }
+
+
+  GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
+
+  AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage,
+                                VmaMemoryUsage memoryUsage);
+  void destroy_buffer(const AllocatedBuffer& buffer);
+
+  AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
+                              bool mipmapped = false);
+  void destroy_image(const AllocatedImage& img);
+
+private:
   bool _isInitialized{false};
   int _frameNumber{0};
 
@@ -171,27 +205,14 @@ public:
 
   // draw resources
 
-  AllocatedImage _drawImage;
-  AllocatedImage _depthImage;
-  AllocatedImage _whiteImage;
-  AllocatedImage _blackImage;
-  AllocatedImage _greyImage;
-  AllocatedImage _errorCheckerboardImage;
+  AllocatedImage draw_image_;
+  AllocatedImage depth_image_;
 
-  VkSampler _defaultSamplerLinear;
-  VkSampler _defaultSamplerNearest;
+  default_material default_material_;
 
   std::vector<compute_effect> backgroundEffects;
   int currentBackgroundEffect{0};
 
-  // initializes everything in the engine
-  void init();
-
-  // shuts down the engine
-  void cleanup();
-
-  // draw loop
-  void draw();
 
   void draw_background(VkCommandBuffer cmd);
 
@@ -203,22 +224,11 @@ public:
 
   void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView);
 
-  // run main loop
-  void run();
 
   void immediate_submit(std::function<void(VkCommandBuffer cmd)> function);
-
-  GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
-
-  AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage,
-                                VmaMemoryUsage memoryUsage);
-  void destroy_buffer(const AllocatedBuffer& buffer);
-
+  
   AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
                               bool mipmapped = false);
-  AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
-                              bool mipmapped = false);
-  void destroy_image(const AllocatedImage& img);
 
   std::vector<std::unique_ptr<camera_positioner_interface>> camera_positioners{1};
   uint32_t current_camera_positioner_index{0};
@@ -233,7 +243,6 @@ public:
   bool resize_requested{false};
   bool freeze_rendering{false};
 
-private:
   void init_vulkan();
 
   void init_swapchain();

@@ -4,7 +4,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_vulkan.h>
 
-#if 1
+#if 0
 #define VMA_DEBUG_INITIALIZE_ALLOCATIONS 1
 #  define VMA_DEBUG_LOG_FORMAT(format, ...)
 #define VMA_DEBUG_LOG_FORMAT(format, ...) do { \
@@ -183,8 +183,8 @@ void vulkan_engine::init_swapchain() {
     VkExtent3D drawImageExtent = {_windowExtent.width, _windowExtent.height, 1};
 
     // hardcoding the draw format to 32 bit float
-    _drawImage.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
-    _drawImage.imageExtent = drawImageExtent;
+    draw_image_.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+    draw_image_.imageExtent = drawImageExtent;
 
     VkImageUsageFlags drawImageUsages{};
     drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -192,7 +192,7 @@ void vulkan_engine::init_swapchain() {
     drawImageUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
     VkImageCreateInfo rimg_info
-        = vkinit::image_create_info(_drawImage.imageFormat, drawImageUsages, drawImageExtent);
+        = vkinit::image_create_info(draw_image_.imageFormat, drawImageUsages, drawImageExtent);
 
     // for the draw image, we want to allocate it from gpu local memory
     VmaAllocationCreateInfo rimg_allocinfo = {};
@@ -200,38 +200,38 @@ void vulkan_engine::init_swapchain() {
     rimg_allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
     // allocate and create the image
-    vmaCreateImage(_allocator, &rimg_info, &rimg_allocinfo, &_drawImage.image,
-                   &_drawImage.allocation, nullptr);
+    vmaCreateImage(_allocator, &rimg_info, &rimg_allocinfo, &draw_image_.image,
+                   &draw_image_.allocation, nullptr);
 
     // build a image-view for the draw image to use for rendering
     VkImageViewCreateInfo rview_info = vkinit::imageview_create_info(
-        _drawImage.imageFormat, _drawImage.image, VK_IMAGE_ASPECT_COLOR_BIT);
+        draw_image_.imageFormat, draw_image_.image, VK_IMAGE_ASPECT_COLOR_BIT);
 
-    VK_CHECK(vkCreateImageView(_device, &rview_info, nullptr, &_drawImage.imageView));
+    VK_CHECK(vkCreateImageView(_device, &rview_info, nullptr, &draw_image_.imageView));
 
-    _depthImage.imageFormat = VK_FORMAT_D32_SFLOAT;
-    _depthImage.imageExtent = drawImageExtent;
+    depth_image_.imageFormat = VK_FORMAT_D32_SFLOAT;
+    depth_image_.imageExtent = drawImageExtent;
     VkImageUsageFlags depthImageUsages{};
     depthImageUsages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
     VkImageCreateInfo dimg_info
-        = vkinit::image_create_info(_depthImage.imageFormat, depthImageUsages, drawImageExtent);
+        = vkinit::image_create_info(depth_image_.imageFormat, depthImageUsages, drawImageExtent);
 
     // allocate and create the image
-    vmaCreateImage(_allocator, &dimg_info, &rimg_allocinfo, &_depthImage.image,
-                   &_depthImage.allocation, nullptr);
+    vmaCreateImage(_allocator, &dimg_info, &rimg_allocinfo, &depth_image_.image,
+                   &depth_image_.allocation, nullptr);
 
     // build a image-view for the draw image to use for rendering
     VkImageViewCreateInfo dview_info = vkinit::imageview_create_info(
-        _depthImage.imageFormat, _depthImage.image, VK_IMAGE_ASPECT_DEPTH_BIT);
+        depth_image_.imageFormat, depth_image_.image, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-    VK_CHECK(vkCreateImageView(_device, &dview_info, nullptr, &_depthImage.imageView));
+    VK_CHECK(vkCreateImageView(_device, &dview_info, nullptr, &depth_image_.imageView));
 
     // add to deletion queues
-    main_deletion_queue_.push(_drawImage.imageView);
-    main_deletion_queue_.push(_drawImage.image, _drawImage.allocation);
-    main_deletion_queue_.push(_depthImage.imageView);
-    main_deletion_queue_.push(_depthImage.image, _depthImage.allocation);
+    main_deletion_queue_.push(draw_image_.imageView);
+    main_deletion_queue_.push(draw_image_.image, draw_image_.allocation);
+    main_deletion_queue_.push(depth_image_.imageView);
+    main_deletion_queue_.push(depth_image_.image, depth_image_.allocation);
 }
 
 void vulkan_engine::resize_swapchain() {
@@ -339,7 +339,7 @@ void vulkan_engine::init_descriptors() {
 
     {
       DescriptorWriter writer;
-      writer.write_image(0, _drawImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL,
+      writer.write_image(0, draw_image_.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL,
                          VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
 
       writer.update_set(_device, _drawImageDescriptors);
@@ -544,15 +544,15 @@ void vulkan_engine::init_default_data() {
 
     // 3 default textures, white, grey, black. 1 pixel each
     uint32_t white = 0xFFFFFFFF;
-    _whiteImage = create_image((void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
+    default_material_.white_image = create_image((void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
                                VK_IMAGE_USAGE_SAMPLED_BIT);
 
     uint32_t grey = 0xAAAAAAFF;
-    _greyImage = create_image((void*)&grey, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
+    default_material_.grey_image = create_image((void*)&grey, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
                               VK_IMAGE_USAGE_SAMPLED_BIT);
 
     uint32_t black = 0x000000FF;
-    _blackImage = create_image((void*)&black, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
+    default_material_.black_image = create_image((void*)&black, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
                                VK_IMAGE_USAGE_SAMPLED_BIT);
 
     // checkerboard image
@@ -564,7 +564,7 @@ void vulkan_engine::init_default_data() {
         pixels[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
       }
     }
-    _errorCheckerboardImage = create_image(pixels.data(), VkExtent3D{16, 16, 1},
+    default_material_.error_checkerboard_image = create_image(pixels.data(), VkExtent3D{16, 16, 1},
                                            VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
     VkSamplerCreateInfo sampl = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
@@ -572,11 +572,11 @@ void vulkan_engine::init_default_data() {
     sampl.magFilter = VK_FILTER_NEAREST;
     sampl.minFilter = VK_FILTER_NEAREST;
 
-    vkCreateSampler(_device, &sampl, nullptr, &_defaultSamplerNearest);
+    vkCreateSampler(_device, &sampl, nullptr, &default_material_.default_sampler_nearest);
 
     sampl.magFilter = VK_FILTER_LINEAR;
     sampl.minFilter = VK_FILTER_LINEAR;
-    vkCreateSampler(_device, &sampl, nullptr, &_defaultSamplerLinear);
+    vkCreateSampler(_device, &sampl, nullptr, &default_material_.default_sampler_linear);
 }
 
 void vulkan_engine::init_renderables() {
@@ -831,9 +831,9 @@ void vulkan_engine::draw_main(VkCommandBuffer cmd) {
     // draw the triangle
 
     VkRenderingAttachmentInfo colorAttachment
-        = vkinit::attachment_info(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+        = vkinit::attachment_info(draw_image_.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
     VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
-        _depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+        depth_image_.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
     VkRenderingInfo renderInfo
         = vkinit::rendering_info(_windowExtent, &colorAttachment, &depthAttachment);
@@ -887,15 +887,15 @@ void vulkan_engine::draw() {
 
       // transition our main draw image into general layout so we can write into it
       // we will overwrite it all so we dont care about what was the older layout
-      vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED,
+      vkutil::transition_image(cmd, draw_image_.image, VK_IMAGE_LAYOUT_UNDEFINED,
                                VK_IMAGE_LAYOUT_GENERAL);
-      vkutil::transition_image(cmd, _depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED,
+      vkutil::transition_image(cmd, depth_image_.image, VK_IMAGE_LAYOUT_UNDEFINED,
                                VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
       draw_main(cmd);
 
       // transtion the draw image and the swapchain image into their correct transfer layouts
-      vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL,
+      vkutil::transition_image(cmd, draw_image_.image, VK_IMAGE_LAYOUT_GENERAL,
                                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
       vkutil::transition_image(cmd, _swapchainImages[swapchainImageIndex],
                                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -906,7 +906,7 @@ void vulkan_engine::draw() {
       //< draw_first
       //> imgui_draw
       // execute a copy from the draw image into the swapchain
-      vkutil::copy_image_to_image(cmd, _drawImage.image, _swapchainImages[swapchainImageIndex],
+      vkutil::copy_image_to_image(cmd, draw_image_.image, _swapchainImages[swapchainImageIndex],
                                   extent, extent);
 
       // set swapchain image layout to Attachment Optimal so we can draw it
@@ -1346,10 +1346,10 @@ void vulkan_engine::run()
 
 void GLTFMetallic_Roughness::build_pipelines(vulkan_engine* engine) {
     VkShaderModule meshFragShader;
-    vkutil::load_shader_module("../shaders/mesh.frag.spv", engine->_device, &meshFragShader);
+    vkutil::load_shader_module("../shaders/mesh.frag.spv", engine->get_vk_device(), &meshFragShader);
 
     VkShaderModule meshVertexShader;
-    vkutil::load_shader_module("../shaders/mesh.vert.spv", engine->_device, &meshVertexShader);
+    vkutil::load_shader_module("../shaders/mesh.vert.spv", engine->get_vk_device(), &meshVertexShader);
 
     VkPushConstantRange matrixRange{};
     matrixRange.offset = 0;
@@ -1361,10 +1361,10 @@ void GLTFMetallic_Roughness::build_pipelines(vulkan_engine* engine) {
     layoutBuilder.add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
     layoutBuilder.add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
-    materialLayout = layoutBuilder.build(engine->_device,
+    materialLayout = layoutBuilder.build(engine->get_vk_device(),
                                          VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkDescriptorSetLayout layouts[] = {engine->_gpuSceneDataDescriptorLayout, materialLayout};
+    VkDescriptorSetLayout layouts[] = {engine->get_gpu_scene_data_layout(), materialLayout};
 
     VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
     mesh_layout_info.setLayoutCount = 2;
@@ -1373,7 +1373,7 @@ void GLTFMetallic_Roughness::build_pipelines(vulkan_engine* engine) {
     mesh_layout_info.pushConstantRangeCount = 1;
 
     VkPipelineLayout newLayout;
-    VK_CHECK(vkCreatePipelineLayout(engine->_device, &mesh_layout_info, nullptr, &newLayout));
+    VK_CHECK(vkCreatePipelineLayout(engine->get_vk_device(), &mesh_layout_info, nullptr, &newLayout));
 
     opaquePipeline.layout = newLayout;
     transparentPipeline.layout = newLayout;
@@ -1391,21 +1391,21 @@ void GLTFMetallic_Roughness::build_pipelines(vulkan_engine* engine) {
                                   .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
 
       // render format
-      .set_color_attachment_format(engine->_drawImage.imageFormat)
-      .set_depth_format(engine->_depthImage.imageFormat)
+      .set_color_attachment_format(engine->get_draw_image().imageFormat)
+      .set_depth_format(engine->get_depth_image().imageFormat)
 
       // use the triangle layout we created
       .set_pipeline_layout(newLayout)
-      .build_pipeline(engine->_device);
+      .build_pipeline(engine->get_vk_device());
 
     // create the transparent variant
     transparentPipeline.pipeline = pipelineBuilder
       .enable_blending_additive()
                                        .enable_depthtest(false, VK_COMPARE_OP_LESS_OR_EQUAL)
-      .build_pipeline(engine->_device);
+      .build_pipeline(engine->get_vk_device());
 
-    vkDestroyShaderModule(engine->_device, meshFragShader, nullptr);
-    vkDestroyShaderModule(engine->_device, meshVertexShader, nullptr);
+    vkDestroyShaderModule(engine->get_vk_device(), meshFragShader, nullptr);
+    vkDestroyShaderModule(engine->get_vk_device(), meshVertexShader, nullptr);
 }
 
 MaterialInstance GLTFMetallic_Roughness::write_material(
