@@ -9,9 +9,9 @@
 #include "vk_descriptors.h"
 #include "vk_loader.h"
 #include "camera.h"
-#include "time_tracker.h"
-#include "input_manager.h"
-#include "deletion_queue.h"
+#include "time_tracking_service.h"
+#include "input_service.h"
+#include "vk_deletion_service.h"
 
 struct frame_data {
   VkSemaphore swapchain_semaphore, render_semaphore;
@@ -20,7 +20,7 @@ struct frame_data {
   VkCommandPool command_pool;
   VkCommandBuffer main_command_buffer;
 
-  deletion_queue deletion_queue;
+  vk_deletion_service deletion_queue;
   DescriptorAllocatorGrowable frame_descriptors;
 };
 
@@ -121,12 +121,12 @@ public:
   void draw();
   void run();
 
-  [[nodiscard]] VkDevice get_vk_device() const { return _device; }
-  GLTFMetallic_Roughness& get_metallic_roughness_material() { return metalRoughMaterial; }
+  [[nodiscard]] VkDevice get_vk_device() const { return device_; }
+  GLTFMetallic_Roughness& get_metallic_roughness_material() { return metal_rough_material_; }
   default_material& get_default_material() { return default_material_; }
   AllocatedImage& get_draw_image() { return draw_image_; }
   AllocatedImage& get_depth_image() { return depth_image_; }
-  VkDescriptorSetLayout& get_gpu_scene_data_layout() { return _gpuSceneDataDescriptorLayout; }
+  VkDescriptorSetLayout& get_gpu_scene_data_layout() { return gpu_scene_data_descriptor_layout_; }
 
 
   GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
@@ -140,66 +140,66 @@ public:
   void destroy_image(const AllocatedImage& img);
 
 private:
-  bool _isInitialized{false};
-  int _frameNumber{0};
+  bool is_initialized_{false};
+  int frame_number_{0};
 
-  VkExtent2D _windowExtent{1920, 1080};
+  VkExtent2D window_extent_{1920, 1080};
 
-  SDL_Window* _window{nullptr};
+  SDL_Window* window_{nullptr};
 
-  VkInstance _instance;
-  VkDebugUtilsMessengerEXT _debug_messenger;
-  VkPhysicalDevice _chosenGPU;
-  VkDevice _device;
+  VkInstance instance_;
+  VkDebugUtilsMessengerEXT debug_messenger_;
+  VkPhysicalDevice chosen_gpu_;
+  VkDevice device_;
 
-  frame_data frames[FRAME_OVERLAP];
+  frame_data frames_[FRAME_OVERLAP];
 
-  frame_data& get_current_frame() { return frames[_frameNumber % FRAME_OVERLAP]; }
+  frame_data& get_current_frame() { return frames_[frame_number_ % FRAME_OVERLAP]; }
 
-  VkQueue _graphicsQueue;
-  uint32_t _graphicsQueueFamily;
+  VkQueue graphics_queue_;
+  uint32_t graphics_queue_family_;
 
-  VkSurfaceKHR _surface;
-  VkSwapchainKHR _swapchain;
-  VkFormat _swapchainImageFormat;
-  VkExtent2D _swapchainExtent;
-  VkExtent2D _drawExtent;
-  float renderScale = 1.f;
+  VkSurfaceKHR surface_;
+  VkSwapchainKHR swapchain_;
+  VkFormat swapchain_image_format_;
+  VkExtent2D swapchain_extent_;
+  VkExtent2D draw_extent_;
+  float render_scale_ = 1.f;
 
-  DescriptorAllocatorGrowable globalDescriptorAllocator;
+  DescriptorAllocatorGrowable global_descriptor_allocator_;
 
-  VkPipeline _gradientPipeline;
-  VkPipelineLayout _gradientPipelineLayout;
+  VkPipeline gradient_pipeline_;
+  VkPipelineLayout gradient_pipeline_layout_;
 
-  std::vector<VkFramebuffer> _framebuffers;
-  std::vector<VkImage> _swapchainImages;
-  std::vector<VkImageView> _swapchainImageViews;
+  std::vector<VkFramebuffer> framebuffers_;
+  std::vector<VkImage> swapchain_images_;
+  std::vector<VkImageView> swapchain_image_views_;
 
-  VkDescriptorSet _drawImageDescriptors;
-  VkDescriptorSetLayout _drawImageDescriptorLayout;
+  VkDescriptorSet draw_image_descriptors_;
+  VkDescriptorSetLayout draw_image_descriptor_layout_;
 
-  VkDescriptorSetLayout _singleImageDescriptorLayout;
+  VkDescriptorSetLayout single_image_descriptor_layout_;
 
-  GPUSceneData sceneData;
+  GPUSceneData scene_data_;
 
-  std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loadedScenes;
+  std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loaded_scenes_;
 
-  VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;
+  VkDescriptorSetLayout gpu_scene_data_descriptor_layout_;
 
-  deletion_queue main_deletion_queue_;
+  vk_deletion_service main_deletion_queue_;
 
-  VmaAllocator _allocator;  // vma lib allocator
+  VmaAllocator allocator_;  // vma lib allocator
 
-  GPUMeshBuffers rectangle;
+  GPUMeshBuffers rectangle_;
 
-  MaterialInstance defaultData;
-  GLTFMetallic_Roughness metalRoughMaterial;
+  MaterialInstance default_data_;
+  GLTFMetallic_Roughness metal_rough_material_;
 
-  draw_context mainDrawContext;
-  std::unordered_map<std::string, std::shared_ptr<Node>> loadedNodes;
+  draw_context main_draw_context_;
+  std::unordered_map<std::string, std::shared_ptr<Node>> loaded_nodes_;
 
   // immediate submit structures
-  VkFence _immFence;
+  VkFence imgui_fence_;
   VkCommandBuffer _imguiCommandBuffer;
   VkCommandPool _imguiCommandPool;
 
@@ -210,8 +210,8 @@ private:
 
   default_material default_material_;
 
-  std::vector<compute_effect> backgroundEffects;
-  int currentBackgroundEffect{0};
+  std::vector<compute_effect> background_effects_;
+  int current_background_effect_{0};
 
 
   void draw_background(VkCommandBuffer cmd);
@@ -230,18 +230,18 @@ private:
   AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
                               bool mipmapped = false);
 
-  std::vector<std::unique_ptr<camera_positioner_interface>> camera_positioners{1};
-  uint32_t current_camera_positioner_index{0};
-  camera main_camera{};
+  std::vector<std::unique_ptr<camera_positioner_interface>> camera_positioners_{1};
+  uint32_t current_camera_positioner_index_{0};
+  camera active_camera_{};
 
-  time_tracker time_tracker;
+  time_tracking_service time_tracking_service_;
 
-  input_manager input_manager;
+  input_service input_service_;
 
-  engine_stats stats;
+  engine_stats stats_;
 
-  bool resize_requested{false};
-  bool freeze_rendering{false};
+  bool resize_requested_{false};
+  bool freeze_rendering_{false};
 
   void init_vulkan();
 

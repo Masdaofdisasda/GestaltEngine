@@ -16,7 +16,7 @@ struct movement {
   bool run{false};
 };
 
-class input_manager {
+class input_service {
 
   movement movement_{};
 

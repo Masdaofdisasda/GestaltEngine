@@ -2,9 +2,9 @@
 #include <SDL2/SDL_stdinc.h>
 #include <SDL2/SDL_timer.h>
 
-class time_tracker {
+class time_tracking_service {
 public:
-  time_tracker() {
+  time_tracking_service() {
     reset_timer();
   }
 

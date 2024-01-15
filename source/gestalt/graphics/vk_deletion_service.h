@@ -2,7 +2,7 @@
 
 #pragma once
 
-class deletion_queue {
+class vk_deletion_service {
 
   VkDevice device_;
   VmaAllocator allocator_;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "input_manager.h"
+#include "input_service.h"
 
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/transform.hpp>

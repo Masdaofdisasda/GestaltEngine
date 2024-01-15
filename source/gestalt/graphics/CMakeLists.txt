@@ -16,10 +16,10 @@ add_library(graphics
     vk_loader.cpp
     camera.cpp
     camera.h
-    time_tracker.h
-    input_manager.h
-    input_manager.cpp
-    deletion_queue.h
+    time_tracking_service.h
+    input_service.h
+    input_service.cpp
+    vk_deletion_service.h
 )
 
 target_compile_features(graphics PRIVATE cxx_std_20)
