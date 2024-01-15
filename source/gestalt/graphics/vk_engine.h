@@ -10,6 +10,7 @@
 #include "vk_loader.h"
 #include "sdl_window.h"
 #include "vk_gpu.h"
+#include "vk_swapchain.h"
 #include "camera.h"
 #include "time_tracking_service.h"
 #include "input_system.h"
@@ -143,14 +144,12 @@ private:
 
   vulkan_gpu gpu_;
 
+  vk_swapchain swapchain_;
+
   frame_data frames_[FRAME_OVERLAP];
 
   frame_data& get_current_frame() { return frames_[frame_number_ % FRAME_OVERLAP]; }
 
-  VkSwapchainKHR swapchain_;
-  VkFormat swapchain_image_format_;
-  VkExtent2D swapchain_extent_;
-  VkExtent2D draw_extent_;
   float render_scale_ = 1.f;
 
   DescriptorAllocatorGrowable global_descriptor_allocator_;
@@ -159,8 +158,6 @@ private:
   VkPipelineLayout gradient_pipeline_layout_;
 
   std::vector<VkFramebuffer> framebuffers_;
-  std::vector<VkImage> swapchain_images_;
-  std::vector<VkImageView> swapchain_image_views_;
 
   VkDescriptorSet draw_image_descriptors_;
   VkDescriptorSetLayout draw_image_descriptor_layout_;
@@ -226,11 +223,6 @@ private:
 
   bool resize_requested_{false};
   bool freeze_rendering_{false};
-
-  void init_swapchain();
-  void create_swapchain(uint32_t width, uint32_t height);
-  void destroy_swapchain();
-  void resize_swapchain();
 
   void init_commands();
   void init_background_pipelines();

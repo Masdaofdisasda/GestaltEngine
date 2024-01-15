@@ -26,6 +26,8 @@ add_library(graphics
     vk_deletion_service.h
     vk_gpu.h
     vk_gpu.cpp
+	vk_swapchain.h
+vk_swapchain.cpp
 )
 
 target_compile_features(graphics PRIVATE cxx_std_20)

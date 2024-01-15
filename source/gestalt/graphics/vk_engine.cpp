@@ -47,7 +47,13 @@ void vulkan_engine::init() {
 
   resource_manager_.init(gpu_.device, gpu_.allocator,
                          [this](auto func) { this->immediate_submit(std::move(func)); });
-  init_swapchain();
+
+  swapchain_.init(gpu_, window_, draw_image_, depth_image_);
+  main_deletion_queue_.push(draw_image_.imageView);
+  main_deletion_queue_.push(draw_image_.image, draw_image_.allocation);
+  main_deletion_queue_.push(depth_image_.imageView);
+  main_deletion_queue_.push(depth_image_.image, depth_image_.allocation);
+
   init_commands();
   init_sync_structures();
   init_descriptors();
@@ -70,109 +76,6 @@ void vulkan_engine::init() {
   }
   active_camera_.init(*camera_positioners_.at(current_camera_positioner_index_));
 
-}
-
-void vulkan_engine::create_swapchain(uint32_t width, uint32_t height) {
-  vkb::SwapchainBuilder swapchainBuilder{gpu_.chosen_gpu, gpu_.device, gpu_.surface};
-
-    swapchain_image_format_ = VK_FORMAT_B8G8R8A8_UNORM;
-
-    vkb::Swapchain vkbSwapchain
-        = swapchainBuilder
-              //.use_default_format_selection()
-              .set_desired_format(VkSurfaceFormatKHR{
-                  .format = swapchain_image_format_, .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
-              // use vsync present mode
-              .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
-              .set_desired_extent(width, height)
-              .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
-              .build()
-              .value();
-
-    swapchain_extent_ = vkbSwapchain.extent;
-    // store swapchain and its related images
-    swapchain_ = vkbSwapchain.swapchain;
-    swapchain_images_ = vkbSwapchain.get_images().value();
-    swapchain_image_views_ = vkbSwapchain.get_image_views().value();
-}
-
-void vulkan_engine::destroy_swapchain() {
-    vkDestroySwapchainKHR(gpu_.device, swapchain_, nullptr);
-
-    // destroy swapchain resources
-    for (auto& _swapchainImageView : swapchain_image_views_) {
-    vkDestroyImageView(gpu_.device, _swapchainImageView, nullptr);
-    }
-}
-
-void vulkan_engine::init_swapchain() {
-    create_swapchain(window_.extent.width, window_.extent.height);
-
-    // draw image size will match the window
-    VkExtent3D drawImageExtent = {window_.extent.width, window_.extent.height, 1};
-
-    // hardcoding the draw format to 32 bit float
-    draw_image_.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
-    draw_image_.imageExtent = drawImageExtent;
-
-    VkImageUsageFlags drawImageUsages{};
-    drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    drawImageUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
-    drawImageUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-    VkImageCreateInfo rimg_info
-        = vkinit::image_create_info(draw_image_.imageFormat, drawImageUsages, drawImageExtent);
-
-    // for the draw image, we want to allocate it from gpu local memory
-    VmaAllocationCreateInfo rimg_allocinfo = {};
-    rimg_allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    rimg_allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-    // allocate and create the image
-    vmaCreateImage(gpu_.allocator, &rimg_info, &rimg_allocinfo, &draw_image_.image,
-                   &draw_image_.allocation, nullptr);
-
-    // build a image-view for the draw image to use for rendering
-    VkImageViewCreateInfo rview_info = vkinit::imageview_create_info(
-        draw_image_.imageFormat, draw_image_.image, VK_IMAGE_ASPECT_COLOR_BIT);
-
-    VK_CHECK(vkCreateImageView(gpu_.device, &rview_info, nullptr, &draw_image_.imageView));
-
-    depth_image_.imageFormat = VK_FORMAT_D32_SFLOAT;
-    depth_image_.imageExtent = drawImageExtent;
-    VkImageUsageFlags depthImageUsages{};
-    depthImageUsages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-
-    VkImageCreateInfo dimg_info
-        = vkinit::image_create_info(depth_image_.imageFormat, depthImageUsages, drawImageExtent);
-
-    // allocate and create the image
-    vmaCreateImage(gpu_.allocator, &dimg_info, &rimg_allocinfo, &depth_image_.image,
-                   &depth_image_.allocation, nullptr);
-
-    // build a image-view for the draw image to use for rendering
-    VkImageViewCreateInfo dview_info = vkinit::imageview_create_info(
-        depth_image_.imageFormat, depth_image_.image, VK_IMAGE_ASPECT_DEPTH_BIT);
-
-    VK_CHECK(vkCreateImageView(gpu_.device, &dview_info, nullptr, &depth_image_.imageView));
-
-    // add to deletion queues
-    main_deletion_queue_.push(draw_image_.imageView);
-    main_deletion_queue_.push(draw_image_.image, draw_image_.allocation);
-    main_deletion_queue_.push(depth_image_.imageView);
-    main_deletion_queue_.push(depth_image_.image, depth_image_.allocation);
-}
-
-void vulkan_engine::resize_swapchain() {
-    vkDeviceWaitIdle(gpu_.device);
-
-    destroy_swapchain();
-
-    window_.update_window_size();
-
-    create_swapchain(window_.extent.width, window_.extent.height);
-
-    resize_requested_ = false;
 }
 
 void vulkan_engine::init_commands() {
@@ -418,7 +321,7 @@ void vulkan_engine::init_imgui() {
     init_info.MinImageCount = 3;
     init_info.ImageCount = 3;
     init_info.UseDynamicRendering = true;
-    init_info.ColorAttachmentFormat = swapchain_image_format_;
+    init_info.ColorAttachmentFormat = swapchain_.swapchain_image_format;
 
     init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 
@@ -630,7 +533,7 @@ void vulkan_engine::cleanup() {
 
       main_deletion_queue_.flush();
 
-      destroy_swapchain();
+      swapchain_.destroy_swapchain();
       gpu_.cleanup();
       window_.cleanup();
     }
@@ -687,7 +590,7 @@ void vulkan_engine::draw() {
       // request image from the swapchain
       uint32_t swapchainImageIndex;
 
-      VkResult e = vkAcquireNextImageKHR(gpu_.device, swapchain_, 1000000000,
+      VkResult e = vkAcquireNextImageKHR(gpu_.device, swapchain_.swapchain, 1000000000,
                                          get_current_frame().swapchain_semaphore, nullptr,
                                          &swapchainImageIndex);
       if (e == VK_ERROR_OUT_OF_DATE_KHR) {
@@ -724,7 +627,7 @@ void vulkan_engine::draw() {
       // transtion the draw image and the swapchain image into their correct transfer layouts
       vkutil::transition_image(cmd, draw_image_.image, VK_IMAGE_LAYOUT_GENERAL,
                                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-      vkutil::transition_image(cmd, swapchain_images_[swapchainImageIndex],
+      vkutil::transition_image(cmd, swapchain_.swapchain_images[swapchainImageIndex],
                                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
       VkExtent2D extent;
@@ -733,19 +636,20 @@ void vulkan_engine::draw() {
       //< draw_first
       //> imgui_draw
       // execute a copy from the draw image into the swapchain
-      vkutil::copy_image_to_image(cmd, draw_image_.image, swapchain_images_[swapchainImageIndex],
+      vkutil::copy_image_to_image(cmd, draw_image_.image,
+                                  swapchain_.swapchain_images[swapchainImageIndex],
                                   extent, extent);
 
       // set swapchain image layout to Attachment Optimal so we can draw it
-      vkutil::transition_image(cmd, swapchain_images_[swapchainImageIndex],
+      vkutil::transition_image(cmd, swapchain_.swapchain_images[swapchainImageIndex],
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
       // draw imgui into the swapchain image
-      draw_imgui(cmd, swapchain_image_views_[swapchainImageIndex]);
+      draw_imgui(cmd, swapchain_.swapchain_image_views[swapchainImageIndex]);
 
       // set swapchain image layout to Present so we can draw it
-      vkutil::transition_image(cmd, swapchain_images_[swapchainImageIndex],
+      vkutil::transition_image(cmd, swapchain_.swapchain_images[swapchainImageIndex],
                                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                                VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
@@ -777,7 +681,7 @@ void vulkan_engine::draw() {
       //  user
       VkPresentInfoKHR presentInfo = vkinit::present_info();
 
-      presentInfo.pSwapchains = &swapchain_;
+      presentInfo.pSwapchains = &swapchain_.swapchain;
       presentInfo.swapchainCount = 1;
 
       presentInfo.pWaitSemaphores = &get_current_frame().render_semaphore;
@@ -810,7 +714,8 @@ void vulkan_engine::draw_background(VkCommandBuffer cmd) {
                        sizeof(compute_push_constants), &effect.data);
     // execute the compute pipeline dispatch. We are using 16x16 workgroup size so we need to divide
     // by it
-    vkCmdDispatch(cmd, std::ceil(draw_extent_.width / 16.0), std::ceil(draw_extent_.height / 16.0),
+    vkCmdDispatch(cmd, std::ceil(swapchain_.draw_extent.width / 16.0),
+                  std::ceil(swapchain_.draw_extent.height / 16.0),
                   1);
 }
 
@@ -818,7 +723,7 @@ void vulkan_engine::draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView)
     VkRenderingAttachmentInfo colorAttachment
         = vkinit::attachment_info(targetImageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
     VkRenderingInfo renderInfo
-        = vkinit::rendering_info(swapchain_extent_, &colorAttachment, nullptr);
+        = vkinit::rendering_info(swapchain_.swapchain_extent, &colorAttachment, nullptr);
 
     vkCmdBeginRendering(cmd, &renderInfo);
 
@@ -1043,7 +948,8 @@ void vulkan_engine::run()
       }
 
       if (resize_requested_) {
-        resize_swapchain();
+        swapchain_.resize_swapchain(window_);
+        resize_requested_ = false;
       }
 
       // imgui new frame
