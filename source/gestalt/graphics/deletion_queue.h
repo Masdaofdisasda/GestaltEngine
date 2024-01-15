@@ -1,3 +1,5 @@
+#include <ranges>
+
 #pragma once
 
 class deletion_queue {
@@ -22,66 +24,66 @@ public:
   }
 
   void push(VkImageView imageView) {
-    deletors_.emplace_back([=]() { vkDestroyImageView(device_, imageView, nullptr); });
+    deletors_.emplace_back([this, imageView]() { vkDestroyImageView(device_, imageView, nullptr); });
   }
 
   void push(VkImage image, VmaAllocation allocation) {
-    deletors_.emplace_back([=]() { vmaDestroyImage(allocator_, image, allocation); });
+    deletors_.emplace_back([this, image, allocation]() { vmaDestroyImage(allocator_, image, allocation); });
   }
 
   void push(VkBuffer buffer, VmaAllocation allocation) {
-    deletors_.emplace_back([=]() { vmaDestroyBuffer(allocator_, buffer, allocation); });
+    deletors_.emplace_back([this, buffer, allocation]() { vmaDestroyBuffer(allocator_, buffer, allocation); });
   }
 
   void push(VkPipeline pipeline) {
-    deletors_.emplace_back([=]() { vkDestroyPipeline(device_, pipeline, nullptr); });
+    deletors_.emplace_back([this, pipeline]() { vkDestroyPipeline(device_, pipeline, nullptr); });
   }
 
   void push(VkPipelineLayout pipelineLayout) {
-    deletors_.emplace_back([=]() { vkDestroyPipelineLayout(device_, pipelineLayout, nullptr); });
+    deletors_.emplace_back([this, pipelineLayout]() { vkDestroyPipelineLayout(device_, pipelineLayout, nullptr); });
   }
 
   void push(VkRenderPass renderPass) {
-    deletors_.emplace_back([=]() { vkDestroyRenderPass(device_, renderPass, nullptr); });
+    deletors_.emplace_back([this, renderPass]() { vkDestroyRenderPass(device_, renderPass, nullptr); });
   }
 
   void push(VkFramebuffer framebuffer) {
-    deletors_.emplace_back([=]() { vkDestroyFramebuffer(device_, framebuffer, nullptr); });
+    deletors_.emplace_back([this, framebuffer]() { vkDestroyFramebuffer(device_, framebuffer, nullptr); });
   }
 
   void push(VkDescriptorSetLayout descriptorSetLayout) {
-    deletors_.emplace_back(
-        [=]() { vkDestroyDescriptorSetLayout(device_, descriptorSetLayout, nullptr); });
+    deletors_.emplace_back([this, descriptorSetLayout]() {
+      vkDestroyDescriptorSetLayout(device_, descriptorSetLayout, nullptr);
+    });
   }
 
   void push(VkSampler sampler) {
-    deletors_.emplace_back([=]() { vkDestroySampler(device_, sampler, nullptr); });
+    deletors_.emplace_back([this, sampler]() { vkDestroySampler(device_, sampler, nullptr); });
   }
 
   void push(VkShaderModule shaderModule) {
-    deletors_.emplace_back([=]() { vkDestroyShaderModule(device_, shaderModule, nullptr); });
+    deletors_.emplace_back([this, shaderModule]() { vkDestroyShaderModule(device_, shaderModule, nullptr); });
   }
 
   void push(VkCommandPool commandPool) {
-       deletors_.emplace_back([=]() { vkDestroyCommandPool(device_, commandPool, nullptr); });
+       deletors_.emplace_back([this, commandPool]() { vkDestroyCommandPool(device_, commandPool, nullptr); });
   }
 
   void push(VkFence fence) {
-       deletors_.emplace_back([=]() { vkDestroyFence(device_, fence, nullptr); });
+       deletors_.emplace_back([this, fence]() { vkDestroyFence(device_, fence, nullptr); });
   }
 
-  void push(DescriptorAllocatorGrowable descriptorAllocator) {
-    // review this
-       deletors_.emplace_back([=]() mutable { descriptorAllocator.destroy_pools(device_); });
+  void push(VkSemaphore semaphore) {
+          deletors_.emplace_back([this, semaphore]() { vkDestroySemaphore(device_, semaphore, nullptr); });
   }
 
   void push(VkDescriptorPool descriptorPool) {
-          deletors_.emplace_back([=]() { vkDestroyDescriptorPool(device_, descriptorPool, nullptr); });
+          deletors_.emplace_back([this, descriptorPool]() { vkDestroyDescriptorPool(device_, descriptorPool, nullptr);  });
   }
 
   void flush() {
-    for (auto it = deletors_.rbegin(); it != deletors_.rend(); ++it) {
-      (*it)();
+    for (auto& deletor : std::ranges::reverse_view(deletors_)) {
+      deletor();
     }
     deletors_.clear();
   }

@@ -13,18 +13,18 @@
 #include "input_manager.h"
 #include "deletion_queue.h"
 
-struct FrameData {
-  VkSemaphore _swapchainSemaphore, _renderSemaphore;
-  VkFence _renderFence;
+struct frame_data {
+  VkSemaphore swapchain_semaphore, render_semaphore;
+  VkFence render_fence;
 
-  VkCommandPool _commandPool;
-  VkCommandBuffer _mainCommandBuffer;
+  VkCommandPool command_pool;
+  VkCommandBuffer main_command_buffer;
 
-  deletion_queue _deletionQueue;
-  DescriptorAllocatorGrowable _frameDescriptors;
+  deletion_queue deletion_queue;
+  DescriptorAllocatorGrowable frame_descriptors;
 };
 
-struct EngineStats {
+struct engine_stats {
   float frametime;
   int triangle_count;
   int drawcall_count;
@@ -34,7 +34,7 @@ struct EngineStats {
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 
-struct ComputePushConstants {
+struct compute_push_constants {
   glm::vec4 data1;
   glm::vec4 data2;
   glm::vec4 data3;
@@ -65,7 +65,7 @@ struct GLTFMetallic_Roughness {
 
   DescriptorWriter writer;
 
-  void build_pipelines(VulkanEngine* engine);
+  void build_pipelines(vulkan_engine* engine);
   void clear_resources(VkDevice device);
 
   MaterialInstance write_material(VkDevice device, MaterialPass pass,
@@ -73,54 +73,54 @@ struct GLTFMetallic_Roughness {
                                   DescriptorAllocatorGrowable& descriptorAllocator);
 };
 
-struct MeshNode : Node {
+struct mesh_node : Node {
   std::shared_ptr<MeshAsset> mesh;
 
-  void Draw(const glm::mat4& topMatrix, DrawContext& ctx) override;
+  void Draw(const glm::mat4& topMatrix, draw_context& ctx) override;
 };
 
-struct RenderObject {
-  uint32_t indexCount;
-  uint32_t firstIndex;
-  VkBuffer indexBuffer;
+struct render_object {
+  uint32_t index_count;
+  uint32_t first_index;
+  VkBuffer index_buffer;
 
   MaterialInstance* material;
   Bounds bounds;
   glm::mat4 transform;
-  VkDeviceAddress vertexBufferAddress;
+  VkDeviceAddress vertex_buffer_address;
 };
 
-struct DrawContext {
-  std::vector<RenderObject> OpaqueSurfaces;
-  std::vector<RenderObject> TransparentSurfaces;
+struct draw_context {
+  std::vector<render_object> opaque_surfaces;
+  std::vector<render_object> transparent_surfaces;
 };
 
-struct ComputeEffect {
+struct compute_effect {
   const char* name;
 
   VkPipeline pipeline;
   VkPipelineLayout layout;
 
-  ComputePushConstants data;
+  compute_push_constants data;
 };
 
-class VulkanEngine {
+class vulkan_engine {
 public:
   bool _isInitialized{false};
   int _frameNumber{0};
 
   VkExtent2D _windowExtent{1920, 1080};
 
-  struct SDL_Window* _window{nullptr};
+  SDL_Window* _window{nullptr};
 
   VkInstance _instance;
   VkDebugUtilsMessengerEXT _debug_messenger;
   VkPhysicalDevice _chosenGPU;
   VkDevice _device;
 
-  FrameData _frames[FRAME_OVERLAP];
+  frame_data frames[FRAME_OVERLAP];
 
-  FrameData& get_current_frame() { return _frames[_frameNumber % FRAME_OVERLAP]; }
+  frame_data& get_current_frame() { return frames[_frameNumber % FRAME_OVERLAP]; }
 
   VkQueue _graphicsQueue;
   uint32_t _graphicsQueueFamily;
@@ -152,7 +152,7 @@ public:
 
   VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;
 
-  deletion_queue _mainDeletionQueue;
+  deletion_queue main_deletion_queue_;
 
   VmaAllocator _allocator;  // vma lib allocator
 
@@ -161,13 +161,13 @@ public:
   MaterialInstance defaultData;
   GLTFMetallic_Roughness metalRoughMaterial;
 
-  DrawContext mainDrawContext;
+  draw_context mainDrawContext;
   std::unordered_map<std::string, std::shared_ptr<Node>> loadedNodes;
 
   // immediate submit structures
   VkFence _immFence;
-  VkCommandBuffer _immCommandBuffer;
-  VkCommandPool _immCommandPool;
+  VkCommandBuffer _imguiCommandBuffer;
+  VkCommandPool _imguiCommandPool;
 
   // draw resources
 
@@ -181,7 +181,7 @@ public:
   VkSampler _defaultSamplerLinear;
   VkSampler _defaultSamplerNearest;
 
-  std::vector<ComputeEffect> backgroundEffects;
+  std::vector<compute_effect> backgroundEffects;
   int currentBackgroundEffect{0};
 
   // initializes everything in the engine
@@ -228,7 +228,7 @@ public:
 
   input_manager input_manager;
 
-  EngineStats stats;
+  engine_stats stats;
 
   bool resize_requested{false};
   bool freeze_rendering{false};
@@ -240,20 +240,13 @@ private:
   void create_swapchain(uint32_t width, uint32_t height);
   void destroy_swapchain();
   void resize_swapchain();
+
   void init_commands();
-
   void init_background_pipelines();
-
   void init_pipelines();
-
-  void init_mesh_pipeline();
-
   void init_descriptors();
-
   void init_sync_structures();
-
   void init_imgui();
-
   void init_default_data();
   void init_renderables();
 };

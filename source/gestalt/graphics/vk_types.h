@@ -90,11 +90,11 @@ struct GPUDrawPushConstants {
 //< vbuf_types
 
 //> node_types
-struct DrawContext;
+struct draw_context;
 
 // base class for a renderable dynamic object
 class IRenderable {
-  virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) = 0;
+  virtual void Draw(const glm::mat4& topMatrix, draw_context& ctx) = 0;
 };
 
 // implementation of a drawable scene node.
@@ -115,7 +115,7 @@ struct Node : public IRenderable {
     }
   }
 
-  virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) {
+  virtual void Draw(const glm::mat4& topMatrix, draw_context& ctx) {
     // draw children
     for (auto& c : children) {
       c->Draw(topMatrix, ctx);

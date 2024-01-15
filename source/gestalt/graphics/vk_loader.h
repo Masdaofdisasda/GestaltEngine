@@ -9,7 +9,7 @@
 #include "vk_descriptors.h"
 
 // forward declaration
-class VulkanEngine;
+class vulkan_engine;
 
 struct Bounds {
   glm::vec3 origin;
@@ -51,18 +51,18 @@ struct LoadedGLTF : public IRenderable {
 
   AllocatedBuffer materialDataBuffer;
 
-  VulkanEngine* creator;
+  vulkan_engine* creator;
 
   ~LoadedGLTF() { clearAll(); };
 
-  virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx);
+  virtual void Draw(const glm::mat4& topMatrix, draw_context& ctx);
 
 private:
   void clearAll();
 };
 
-std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,
+std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(vulkan_engine* engine,
                                                     std::string_view filePath);
 
-std::optional<AllocatedImage> load_image(VulkanEngine* engine, fastgltf::Asset& asset,
+std::optional<AllocatedImage> load_image(vulkan_engine* engine, fastgltf::Asset& asset,
                                          fastgltf::Image& image);

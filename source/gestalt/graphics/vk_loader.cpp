@@ -42,7 +42,7 @@ VkSamplerMipmapMode extract_mipmap_mode(fastgltf::Filter filter) {
   }
 }
 
-std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,
+std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(vulkan_engine* engine,
                                                     std::string_view filePath) {
   //> load_1
   fmt::print("Loading GLTF: {}", filePath);
@@ -302,8 +302,8 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,
     // find if the node has a mesh, and if it does hook it to the mesh pointer and allocate it with
     // the meshnode class
     if (node.meshIndex.has_value()) {
-      newNode = std::make_shared<MeshNode>();
-      static_cast<MeshNode*>(newNode.get())->mesh = meshes[*node.meshIndex];
+      newNode = std::make_shared<mesh_node>();
+      static_cast<mesh_node*>(newNode.get())->mesh = meshes[*node.meshIndex];
     } else {
       newNode = std::make_shared<Node>();
     }
@@ -354,7 +354,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,
   //< load_graph
 }
 
-void LoadedGLTF::Draw(const glm::mat4& topMatrix, DrawContext& ctx) {
+void LoadedGLTF::Draw(const glm::mat4& topMatrix, draw_context& ctx) {
   // create renderables from the scenenodes
   for (auto& n : topNodes) {
     n->Draw(topMatrix, ctx);
@@ -389,7 +389,7 @@ void LoadedGLTF::clearAll() {
   creator->destroy_buffer(materialBuffer);
 }
 
-std::optional<AllocatedImage> load_image(VulkanEngine* engine, fastgltf::Asset& asset,
+std::optional<AllocatedImage> load_image(vulkan_engine* engine, fastgltf::Asset& asset,
                                          fastgltf::Image& image) {
   AllocatedImage newImage{};
 
