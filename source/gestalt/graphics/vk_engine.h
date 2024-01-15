@@ -9,6 +9,7 @@
 #include "vk_descriptors.h"
 #include "vk_loader.h"
 #include "sdl_window.h"
+#include "vk_gpu.h"
 #include "camera.h"
 #include "time_tracking_service.h"
 #include "input_system.h"
@@ -123,7 +124,7 @@ public:
   void draw();
   void run();
 
-  [[nodiscard]] VkDevice get_vk_device() const { return device_; }
+  [[nodiscard]] vulkan_gpu get_gpu() const { return gpu_; }
   GLTFMetallic_Roughness& get_metallic_roughness_material() { return metal_rough_material_; }
   default_material& get_default_material() { return default_material_; }
   AllocatedImage& get_draw_image() { return draw_image_; }
@@ -140,19 +141,12 @@ private:
 
   sdl_window window_;
 
-  VkInstance instance_;
-  VkDebugUtilsMessengerEXT debug_messenger_;
-  VkPhysicalDevice chosen_gpu_;
-  VkDevice device_;
+  vulkan_gpu gpu_;
 
   frame_data frames_[FRAME_OVERLAP];
 
   frame_data& get_current_frame() { return frames_[frame_number_ % FRAME_OVERLAP]; }
 
-  VkQueue graphics_queue_;
-  uint32_t graphics_queue_family_;
-
-  VkSurfaceKHR surface_;
   VkSwapchainKHR swapchain_;
   VkFormat swapchain_image_format_;
   VkExtent2D swapchain_extent_;
@@ -180,8 +174,6 @@ private:
   VkDescriptorSetLayout gpu_scene_data_descriptor_layout_;
 
   vk_deletion_service main_deletion_queue_;
-
-  VmaAllocator allocator_;  // vma lib allocator
 
   GPUMeshBuffers rectangle_;
 
@@ -234,8 +226,6 @@ private:
 
   bool resize_requested_{false};
   bool freeze_rendering_{false};
-
-  void init_vulkan();
 
   void init_swapchain();
   void create_swapchain(uint32_t width, uint32_t height);

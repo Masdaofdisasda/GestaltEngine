@@ -11,6 +11,7 @@ public:
   VkExtent2D extent{1920, 1080};
 
   void init(VkExtent2D window_extent);
+  void create_surface(VkInstance instance, VkSurfaceKHR* surface) const;
   void update_window_size();
   void cleanup() const;
 };

@@ -15,6 +15,10 @@ void sdl_window::init(const VkExtent2D window_extent) {
                              static_cast<int>(window_extent.height), window_flags);
   }
 
+void sdl_window::create_surface(const VkInstance instance, VkSurfaceKHR* surface) const {
+  SDL_Vulkan_CreateSurface(handle, instance, surface);
+  }
+
 void sdl_window::update_window_size() {
   SDL_GetWindowSize(handle, reinterpret_cast<int*>(&extent.width),
       					reinterpret_cast<int*>(&extent.height));

@@ -24,6 +24,8 @@ add_library(graphics
     sdl_window.h
     sdl_window.cpp
     vk_deletion_service.h
+    vk_gpu.h
+    vk_gpu.cpp
 )
 
 target_compile_features(graphics PRIVATE cxx_std_20)
