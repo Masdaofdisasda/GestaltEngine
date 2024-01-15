@@ -8,6 +8,7 @@
 #include "vk_types.h"
 #include "vk_descriptors.h"
 #include "vk_loader.h"
+#include "sdl_window.h"
 #include "camera.h"
 #include "time_tracking_service.h"
 #include "input_system.h"
@@ -136,9 +137,8 @@ private:
   bool is_initialized_{false};
   int frame_number_{0};
 
-  VkExtent2D window_extent_{1920, 1080};
 
-  SDL_Window* window_{nullptr};
+  sdl_window window_;
 
   VkInstance instance_;
   VkDebugUtilsMessengerEXT debug_messenger_;

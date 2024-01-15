@@ -1,10 +1,8 @@
 ﻿//> includes
 #include "vk_engine.h"
 
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_vulkan.h>
 
-#if 0
+#if 1
 #define VMA_DEBUG_INITIALIZE_ALLOCATIONS 1
 #  define VMA_DEBUG_LOG_FORMAT(format, ...)
 #define VMA_DEBUG_LOG_FORMAT(format, ...) do { \
@@ -41,15 +39,7 @@ void vulkan_engine::init() {
   assert(loaded_engine == nullptr);
   loaded_engine = this;
 
-  // We initialize SDL and create a window with it.
-  SDL_Init(SDL_INIT_VIDEO);
-
-  SDL_WindowFlags window_flags
-      = static_cast<SDL_WindowFlags>(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
-
-  window_ = SDL_CreateWindow("Vulkan Engine", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                             static_cast<int>(window_extent_.width),
-                             static_cast<int>(window_extent_.height), window_flags);
+  window_.init({1920, 1080}); // todo : get window size from config
 
   init_vulkan();
   resource_manager_.init(device_, allocator_,
@@ -97,7 +87,7 @@ void vulkan_engine::init_vulkan() {
   debug_messenger_ = vkb_inst.debug_messenger;
 
   // create the device
-  SDL_Vulkan_CreateSurface(window_, instance_, &surface_);
+  SDL_Vulkan_CreateSurface(window_.handle, instance_, &surface_);
 
   // vulkan 1.3 features
   VkPhysicalDeviceVulkan13Features features{};
@@ -179,10 +169,10 @@ void vulkan_engine::destroy_swapchain() {
 }
 
 void vulkan_engine::init_swapchain() {
-    create_swapchain(window_extent_.width, window_extent_.height);
+    create_swapchain(window_.extent.width, window_.extent.height);
 
     // draw image size will match the window
-    VkExtent3D drawImageExtent = {window_extent_.width, window_extent_.height, 1};
+    VkExtent3D drawImageExtent = {window_.extent.width, window_.extent.height, 1};
 
     // hardcoding the draw format to 32 bit float
     draw_image_.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
@@ -241,12 +231,9 @@ void vulkan_engine::resize_swapchain() {
 
     destroy_swapchain();
 
-    int w, h;
-    SDL_GetWindowSize(window_, &w, &h);
-    window_extent_.width = w;
-    window_extent_.height = h;
+    window_.update_window_size();
 
-    create_swapchain(window_extent_.width, window_extent_.height);
+    create_swapchain(window_.extent.width, window_.extent.height);
 
     resize_requested_ = false;
 }
@@ -481,7 +468,7 @@ void vulkan_engine::init_imgui() {
     ImGui::CreateContext();
 
     // this initializes imgui for SDL
-    ImGui_ImplSDL2_InitForVulkan(window_);
+    ImGui_ImplSDL2_InitForVulkan(window_.handle);
 
     // this initializes imgui for Vulkan
     ImGui_ImplVulkan_InitInfo init_info = {};
@@ -583,6 +570,15 @@ void vulkan_engine::init_default_data() {
     sampl.magFilter = VK_FILTER_LINEAR;
     sampl.minFilter = VK_FILTER_LINEAR;
     vkCreateSampler(device_, &sampl, nullptr, &default_material_.default_sampler_linear);
+
+    main_deletion_queue_.push_function(
+        [this]() { resource_manager_.destroy_image(default_material_.white_image); });
+    main_deletion_queue_.push_function(
+        [this]() { resource_manager_.destroy_image(default_material_.grey_image); });
+    main_deletion_queue_.push_function(
+        [this]() { resource_manager_.destroy_image(default_material_.error_checkerboard_image); });
+    main_deletion_queue_.push(default_material_.default_sampler_nearest);
+    main_deletion_queue_.push(default_material_.default_sampler_linear);
 }
 
 void vulkan_engine::init_renderables() {
@@ -701,7 +697,7 @@ void vulkan_engine::cleanup() {
       vkDestroyDevice(device_, nullptr);
       vkb::destroy_debug_utils_messenger(instance_, debug_messenger_);
       vkDestroyInstance(instance_, nullptr);
-      SDL_DestroyWindow(window_);
+      window_.cleanup();
     }
 }
 
@@ -720,8 +716,8 @@ void vulkan_engine::draw_main(VkCommandBuffer cmd) {
                        sizeof(compute_push_constants), &effect.data);
     // execute the compute pipeline dispatch. We are using 16x16 workgroup size so we need to divide
     // by it
-    vkCmdDispatch(cmd, std::ceil(window_extent_.width / 16.0),
-                  std::ceil(window_extent_.height / 16.0), 1);
+    vkCmdDispatch(cmd, std::ceil(window_.extent.width / 16.0),
+                  std::ceil(window_.extent.height / 16.0), 1);
 
     // draw the triangle
 
@@ -731,7 +727,7 @@ void vulkan_engine::draw_main(VkCommandBuffer cmd) {
         depth_image_.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
     VkRenderingInfo renderInfo
-        = vkinit::rendering_info(window_extent_, &colorAttachment, &depthAttachment);
+        = vkinit::rendering_info(window_.extent, &colorAttachment, &depthAttachment);
 
     vkCmdBeginRendering(cmd, &renderInfo);
     auto start = std::chrono::system_clock::now();
@@ -796,8 +792,8 @@ void vulkan_engine::draw() {
                                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
       VkExtent2D extent;
-      extent.height = window_extent_.height;
-      extent.width = window_extent_.width;
+      extent.height = window_.extent.height;
+      extent.width = window_.extent.width;
       //< draw_first
       //> imgui_draw
       // execute a copy from the draw image into the swapchain
@@ -989,8 +985,8 @@ void vulkan_engine::draw_geometry(VkCommandBuffer cmd) {
           VkViewport viewport = {};
           viewport.x = 0;
           viewport.y = 0;
-          viewport.width = (float)window_extent_.width;
-          viewport.height = (float)window_extent_.height;
+          viewport.width = (float)window_.extent.width;
+          viewport.height = (float)window_.extent.height;
           viewport.minDepth = 0.f;
           viewport.maxDepth = 1.f;
 
@@ -999,8 +995,8 @@ void vulkan_engine::draw_geometry(VkCommandBuffer cmd) {
           VkRect2D scissor = {};
           scissor.offset.x = 0;
           scissor.offset.y = 0;
-          scissor.extent.width = window_extent_.width;
-          scissor.extent.height = window_extent_.height;
+          scissor.extent.width = window_.extent.width;
+          scissor.extent.height = window_.extent.height;
 
           vkCmdSetScissor(cmd, 0, 1, &scissor);
         }
@@ -1057,7 +1053,7 @@ void vulkan_engine::update_scene() {
     // camera projection
     glm::mat4 projection
         = glm::perspective(glm::radians(70.f),
-                           (float)window_extent_.width / (float)window_extent_.height, 1.f, 1000.f);
+                           (float)window_.extent.width / (float)window_.extent.height, 1.f, 1000.f);
 
     // invert the Y direction on projection matrix so that we are more similar
     // to opengl and gltf axis
@@ -1087,7 +1083,7 @@ void vulkan_engine::run()
         // close the window when user alt-f4s or clicks the X button
         if (e.type == SDL_QUIT) bQuit = true;
 
-        input_system_.handle_event(e, window_extent_.width, window_extent_.height);
+        input_system_.handle_event(e, window_.extent.width, window_.extent.height);
 
         active_camera_.update(time_tracking_service_.get_delta_time(), input_system_.get_movement());
 
@@ -1116,7 +1112,7 @@ void vulkan_engine::run()
 
       // imgui new frame
       ImGui_ImplVulkan_NewFrame();
-      ImGui_ImplSDL2_NewFrame(window_);
+      ImGui_ImplSDL2_NewFrame(window_.handle);
       ImGui::NewFrame();
 
       if (ImGui::BeginMainMenuBar()) {

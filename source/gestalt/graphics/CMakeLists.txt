@@ -21,6 +21,8 @@ add_library(graphics
     input_system.cpp
     resource_manager.h
     resource_manager.cpp
+    sdl_window.h
+    sdl_window.cpp
     vk_deletion_service.h
 )
 
