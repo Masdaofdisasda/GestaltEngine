@@ -4,7 +4,7 @@
 #include "vk_types.h"
 #include "sdl_window.h"
 
-class vulkan_gpu {
+class vk_gpu {
 public:
 
   VkInstance instance;

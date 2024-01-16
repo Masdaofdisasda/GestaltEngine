@@ -11,22 +11,14 @@
 #include "sdl_window.h"
 #include "vk_gpu.h"
 #include "vk_swapchain.h"
+#include "vk_commands.h"
 #include "camera.h"
 #include "time_tracking_service.h"
 #include "input_system.h"
 #include "vk_deletion_service.h"
 #include "resource_manager.h"
 
-struct frame_data {
-  VkSemaphore swapchain_semaphore, render_semaphore;
-  VkFence render_fence;
 
-  VkCommandPool command_pool;
-  VkCommandBuffer main_command_buffer;
-
-  vk_deletion_service deletion_queue;
-  DescriptorAllocatorGrowable frame_descriptors;
-};
 
 struct engine_stats {
   float frametime;
@@ -125,7 +117,7 @@ public:
   void draw();
   void run();
 
-  [[nodiscard]] vulkan_gpu get_gpu() const { return gpu_; }
+  [[nodiscard]] vk_gpu get_gpu() const { return gpu_; }
   GLTFMetallic_Roughness& get_metallic_roughness_material() { return metal_rough_material_; }
   default_material& get_default_material() { return default_material_; }
   AllocatedImage& get_draw_image() { return draw_image_; }
@@ -142,11 +134,13 @@ private:
 
   sdl_window window_;
 
-  vulkan_gpu gpu_;
+  vk_gpu gpu_;
 
   vk_swapchain swapchain_;
 
-  frame_data frames_[FRAME_OVERLAP];
+  vk_command commands_;
+
+  std::vector<frame_data> frames_{FRAME_OVERLAP};
 
   frame_data& get_current_frame() { return frames_[frame_number_ % FRAME_OVERLAP]; }
 
@@ -182,8 +176,6 @@ private:
 
   // immediate submit structures
   VkFence imgui_fence_;
-  VkCommandBuffer _imguiCommandBuffer;
-  VkCommandPool _imguiCommandPool;
 
   // draw resources
 

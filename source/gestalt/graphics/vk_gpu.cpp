@@ -2,7 +2,7 @@
 
 #include <VkBootstrap.h>
 
-void vulkan_gpu::init(bool use_validation_layers, sdl_window& window) {
+void vk_gpu::init(bool use_validation_layers, sdl_window& window) {
   // create the vulkan instance
   vkb::InstanceBuilder builder;
 
@@ -65,7 +65,7 @@ void vulkan_gpu::init(bool use_validation_layers, sdl_window& window) {
   vmaCreateAllocator(&allocatorInfo, &allocator);
 }
 
-void vulkan_gpu::cleanup() {
+void vk_gpu::cleanup() {
   vmaDestroyAllocator(allocator);
   vkDestroyDevice(device, nullptr);
   vkDestroySurfaceKHR(instance, surface, nullptr);

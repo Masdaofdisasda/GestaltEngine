@@ -1,11 +1,14 @@
 ﻿#include "vk_swapchain.h"
 
 #include "VkBootstrap.h"
+#include "vk_deletion_service.h"
 #include "vk_initializers.h"
 
-void vk_swapchain::init(const vulkan_gpu& gpu, const sdl_window& window, AllocatedImage& draw_image,
+void vk_swapchain::init(const vk_gpu& gpu, vk_deletion_service& deletion_service,
+                        const sdl_window& window, AllocatedImage& draw_image,
                         AllocatedImage& depth_image) {
     gpu_ = gpu;
+    deletion_service_ = deletion_service;
 
   create_swapchain(window.extent.width, window.extent.height);
 
@@ -56,6 +59,11 @@ void vk_swapchain::init(const vulkan_gpu& gpu, const sdl_window& window, Allocat
       depth_image.imageFormat, depth_image.image, VK_IMAGE_ASPECT_DEPTH_BIT);
 
   VK_CHECK(vkCreateImageView(gpu_.device, &dview_info, nullptr, &depth_image.imageView));
+
+  deletion_service_.push(draw_image.imageView);
+  deletion_service_.push(draw_image.image, draw_image.allocation);
+  deletion_service_.push(depth_image.imageView);
+  deletion_service_.push(depth_image.image, depth_image.allocation);
 }
 
 void vk_swapchain::create_swapchain(const uint32_t width, const uint32_t height) {

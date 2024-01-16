@@ -28,6 +28,8 @@ add_library(graphics
     vk_gpu.cpp
 	vk_swapchain.h
 vk_swapchain.cpp
+vk_commands.h
+vk_commands.cpp
 )
 
 target_compile_features(graphics PRIVATE cxx_std_20)

@@ -48,13 +48,9 @@ void vulkan_engine::init() {
   resource_manager_.init(gpu_.device, gpu_.allocator,
                          [this](auto func) { this->immediate_submit(std::move(func)); });
 
-  swapchain_.init(gpu_, window_, draw_image_, depth_image_);
-  main_deletion_queue_.push(draw_image_.imageView);
-  main_deletion_queue_.push(draw_image_.image, draw_image_.allocation);
-  main_deletion_queue_.push(depth_image_.imageView);
-  main_deletion_queue_.push(depth_image_.image, depth_image_.allocation);
+  swapchain_.init(gpu_, main_deletion_queue_, window_, draw_image_, depth_image_);
 
-  init_commands();
+  commands_.init(gpu_, main_deletion_queue_, frames_);
   init_sync_structures();
   init_descriptors();
   init_pipelines();
@@ -76,35 +72,6 @@ void vulkan_engine::init() {
   }
   active_camera_.init(*camera_positioners_.at(current_camera_positioner_index_));
 
-}
-
-void vulkan_engine::init_commands() {
-    // create a command pool for commands submitted to the graphics queue.
-    // we also want the pool to allow for resetting of individual command buffers
-    VkCommandPoolCreateInfo commandPoolInfo = vkinit::command_pool_create_info(
-        gpu_.graphics_queue_family, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-
-    for (auto& frame : frames_) {
-    VK_CHECK(vkCreateCommandPool(gpu_.device, &commandPoolInfo, nullptr, &frame.command_pool));
-
-      // allocate the default command buffer that we will use for rendering
-      VkCommandBufferAllocateInfo cmdAllocInfo
-          = vkinit::command_buffer_allocate_info(frame.command_pool, 1);
-
-      VK_CHECK(vkAllocateCommandBuffers(gpu_.device, &cmdAllocInfo, &frame.main_command_buffer));
-
-      main_deletion_queue_.push(frame.command_pool);
-    }
-
-    VK_CHECK(vkCreateCommandPool(gpu_.device, &commandPoolInfo, nullptr, &_imguiCommandPool));
-
-    // allocate the command buffer for immediate submits
-    VkCommandBufferAllocateInfo cmdAllocInfo
-        = vkinit::command_buffer_allocate_info(_imguiCommandPool, 1);
-
-    VK_CHECK(vkAllocateCommandBuffers(gpu_.device, &cmdAllocInfo, &_imguiCommandBuffer));
-
-    main_deletion_queue_.push(_imguiCommandPool);
 }
 
 void vulkan_engine::init_sync_structures() {
@@ -433,9 +400,9 @@ void vulkan_engine::init_renderables() {
 
 void vulkan_engine::immediate_submit(std::function<void(VkCommandBuffer cmd)> function) {
     VK_CHECK(vkResetFences(gpu_.device, 1, &imgui_fence_));
-    VK_CHECK(vkResetCommandBuffer(_imguiCommandBuffer, 0));
+    VK_CHECK(vkResetCommandBuffer(commands_.imgui_command_buffer, 0));
 
-    VkCommandBuffer cmd = _imguiCommandBuffer;
+    VkCommandBuffer cmd = commands_.imgui_command_buffer;
 
     VkCommandBufferBeginInfo cmdBeginInfo
         = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
