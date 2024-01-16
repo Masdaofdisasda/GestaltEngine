@@ -2,10 +2,10 @@
 
 #include "vk_initializers.h"
 
-void vk_command::init(const vk_gpu& gpu, vk_deletion_service& deletion_service,
+void vk_command::init(const vk_gpu& gpu,
                       std::vector<frame_data>& frames) {
   gpu_ = gpu;
-  deletion_service_ = deletion_service;
+  deletion_service_.init(gpu_.device, gpu_.allocator);
 
   // create a command pool for commands submitted to the graphics queue.
   // we also want the pool to allow for resetting of individual command buffers
@@ -21,7 +21,7 @@ void vk_command::init(const vk_gpu& gpu, vk_deletion_service& deletion_service,
 
     VK_CHECK(vkAllocateCommandBuffers(gpu_.device, &cmdAllocInfo, &frame.main_command_buffer));
 
-    deletion_service.push(frame.command_pool);
+    deletion_service_.push(frame.command_pool);
   }
 
   VK_CHECK(vkCreateCommandPool(gpu_.device, &commandPoolInfo, nullptr, &imgui_command_pool));
@@ -32,5 +32,9 @@ void vk_command::init(const vk_gpu& gpu, vk_deletion_service& deletion_service,
 
   VK_CHECK(vkAllocateCommandBuffers(gpu_.device, &cmdAllocInfo, &imgui_command_buffer));
 
-  deletion_service.push(imgui_command_pool);
+  deletion_service_.push(imgui_command_pool);
+}
+
+void vk_command::cleanup() {
+   deletion_service_.flush();
 }

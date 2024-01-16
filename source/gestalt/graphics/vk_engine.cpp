@@ -48,10 +48,10 @@ void vulkan_engine::init() {
   resource_manager_.init(gpu_.device, gpu_.allocator,
                          [this](auto func) { this->immediate_submit(std::move(func)); });
 
-  swapchain_.init(gpu_, main_deletion_queue_, window_, draw_image_, depth_image_);
+  swapchain_.init(gpu_, window_, draw_image_, depth_image_);
 
-  commands_.init(gpu_, main_deletion_queue_, frames_);
-  init_sync_structures();
+  commands_.init(gpu_, frames_);
+  sync_.init(gpu_, frames_);
   init_descriptors();
   init_pipelines();
   init_default_data();
@@ -72,33 +72,6 @@ void vulkan_engine::init() {
   }
   active_camera_.init(*camera_positioners_.at(current_camera_positioner_index_));
 
-}
-
-void vulkan_engine::init_sync_structures() {
-
-    // create synchronization structures
-    // one fence to control when the gpu has finished rendering the frame,
-    // and 2 semaphores to synchronize rendering with swapchain
-    // we want the fence to start signalled, so we can wait on it on the first frame
-    VkFenceCreateInfo fenceCreateInfo = vkinit::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
-    VkSemaphoreCreateInfo semaphoreCreateInfo = vkinit::semaphore_create_info();
-
-    for (auto& frame : frames_) {
-      VK_CHECK(vkCreateFence(gpu_.device, &fenceCreateInfo, nullptr, &frame.render_fence));
-
-      VK_CHECK(vkCreateSemaphore(gpu_.device, &semaphoreCreateInfo, nullptr,
-                                 &frame.swapchain_semaphore));
-      VK_CHECK(
-          vkCreateSemaphore(gpu_.device, &semaphoreCreateInfo, nullptr, &frame.render_semaphore));
-
-      main_deletion_queue_.push(frame.render_fence);
-      main_deletion_queue_.push(frame.render_semaphore);
-      main_deletion_queue_.push(frame.swapchain_semaphore);
-    }
-
-    VK_CHECK(vkCreateFence(gpu_.device, &fenceCreateInfo, nullptr, &imgui_fence_));
-
-    main_deletion_queue_.push(imgui_fence_);
 }
 
 void vulkan_engine::init_descriptors() {
@@ -399,7 +372,7 @@ void vulkan_engine::init_renderables() {
 }
 
 void vulkan_engine::immediate_submit(std::function<void(VkCommandBuffer cmd)> function) {
-    VK_CHECK(vkResetFences(gpu_.device, 1, &imgui_fence_));
+    VK_CHECK(vkResetFences(gpu_.device, 1, &sync_.imgui_fence));
     VK_CHECK(vkResetCommandBuffer(commands_.imgui_command_buffer, 0));
 
     VkCommandBuffer cmd = commands_.imgui_command_buffer;
@@ -419,9 +392,9 @@ void vulkan_engine::immediate_submit(std::function<void(VkCommandBuffer cmd)> fu
 
     // submit command buffer to the queue and execute it.
     //  _renderFence will now block until the graphic commands finish execution
-    VK_CHECK(vkQueueSubmit2(gpu_.graphics_queue, 1, &submit, imgui_fence_));
+    VK_CHECK(vkQueueSubmit2(gpu_.graphics_queue, 1, &submit, sync_.imgui_fence));
 
-    VK_CHECK(vkWaitForFences(gpu_.device, 1, &imgui_fence_, true, 9999999999));
+    VK_CHECK(vkWaitForFences(gpu_.device, 1, &sync_.imgui_fence, true, 9999999999));
 }
 
 GPUMeshBuffers vulkan_engine::upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices) {
@@ -500,6 +473,8 @@ void vulkan_engine::cleanup() {
 
       main_deletion_queue_.flush();
 
+      sync_.cleanup();
+      commands_.cleanup();
       swapchain_.destroy_swapchain();
       gpu_.cleanup();
       window_.cleanup();

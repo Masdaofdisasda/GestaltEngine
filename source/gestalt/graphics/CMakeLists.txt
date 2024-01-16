@@ -30,6 +30,8 @@ add_library(graphics
 vk_swapchain.cpp
 vk_commands.h
 vk_commands.cpp
+vk_sync.h
+vk_sync.cpp
 )
 
 target_compile_features(graphics PRIVATE cxx_std_20)

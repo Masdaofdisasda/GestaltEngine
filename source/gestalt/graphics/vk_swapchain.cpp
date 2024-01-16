@@ -4,11 +4,11 @@
 #include "vk_deletion_service.h"
 #include "vk_initializers.h"
 
-void vk_swapchain::init(const vk_gpu& gpu, vk_deletion_service& deletion_service,
+void vk_swapchain::init(const vk_gpu& gpu,
                         const sdl_window& window, AllocatedImage& draw_image,
                         AllocatedImage& depth_image) {
     gpu_ = gpu;
-    deletion_service_ = deletion_service;
+  deletion_service_.init(gpu_.device, gpu_.allocator);
 
   create_swapchain(window.extent.width, window.extent.height);
 
@@ -102,6 +102,8 @@ void vk_swapchain::resize_swapchain(sdl_window& window) {
 }
 
 void vk_swapchain::destroy_swapchain() {
+  deletion_service_.flush();
+
   vkDestroySwapchainKHR(gpu_.device, swapchain, nullptr);
 
   // destroy swapchain resources

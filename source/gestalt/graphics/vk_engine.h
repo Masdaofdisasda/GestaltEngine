@@ -17,7 +17,7 @@
 #include "input_system.h"
 #include "vk_deletion_service.h"
 #include "resource_manager.h"
-
+#include "vk_sync.h"
 
 
 struct engine_stats {
@@ -140,6 +140,8 @@ private:
 
   vk_command commands_;
 
+  vk_sync sync_;
+
   std::vector<frame_data> frames_{FRAME_OVERLAP};
 
   frame_data& get_current_frame() { return frames_[frame_number_ % FRAME_OVERLAP]; }
@@ -175,7 +177,6 @@ private:
   std::unordered_map<std::string, std::shared_ptr<Node>> loaded_nodes_;
 
   // immediate submit structures
-  VkFence imgui_fence_;
 
   // draw resources
 
@@ -216,11 +217,9 @@ private:
   bool resize_requested_{false};
   bool freeze_rendering_{false};
 
-  void init_commands();
   void init_background_pipelines();
   void init_pipelines();
   void init_descriptors();
-  void init_sync_structures();
   void init_imgui();
   void init_default_data();
   void init_renderables();

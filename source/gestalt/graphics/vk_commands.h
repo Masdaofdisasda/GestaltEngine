@@ -27,5 +27,6 @@ public:
   VkCommandBuffer imgui_command_buffer;
   VkCommandPool imgui_command_pool;
 
-  void init(const vk_gpu& gpu, vk_deletion_service& deletion_service, std::vector<frame_data>& frames);
+  void init(const vk_gpu& gpu, std::vector<frame_data>& frames);
+  void cleanup();
 };

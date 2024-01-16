@@ -21,7 +21,7 @@ public:
   std::vector<VkImage> swapchain_images;
   std::vector<VkImageView> swapchain_image_views;
 
-  void init(const vk_gpu& gpu, vk_deletion_service& deletion_service, const sdl_window& window,
+  void init(const vk_gpu& gpu, const sdl_window& window,
             AllocatedImage& draw_image,
             AllocatedImage& depth_image);
   void create_swapchain(uint32_t width, uint32_t height);
