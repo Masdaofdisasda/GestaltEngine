@@ -11,29 +11,8 @@
 // forward declaration
 class render_engine;
 
-struct Bounds {
-  glm::vec3 origin;
-  float sphereRadius;
-  glm::vec3 extents;
-};
 
-struct GLTFMaterial {
-  MaterialInstance data;
-};
 
-struct GeoSurface {
-  uint32_t startIndex;
-  uint32_t count;
-  Bounds bounds;
-  std::shared_ptr<GLTFMaterial> material;
-};
-
-struct MeshAsset {
-  std::string name;
-
-  std::vector<GeoSurface> surfaces;
-  GPUMeshBuffers meshBuffers;
-};
 
 struct LoadedGLTF : public IRenderable {
   // storage for all the data on a given glTF file

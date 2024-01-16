@@ -44,7 +44,7 @@ struct GPUGLTFMaterial {
 
 static_assert(sizeof(GPUGLTFMaterial) == 256);
 
-struct GPUSceneData {
+struct gpu_scene_data {
   glm::mat4 view;
   glm::mat4 proj;
   glm::mat4 viewproj;
@@ -129,6 +129,62 @@ struct engine_stats {
   int drawcall_count;
   float scene_update_time;
   float mesh_draw_time;
+};
+
+
+struct default_material {
+  AllocatedImage white_image;
+  AllocatedImage black_image;
+  AllocatedImage grey_image;
+  AllocatedImage error_checkerboard_image;
+
+  VkSampler default_sampler_linear;
+  VkSampler default_sampler_nearest;
+};
+
+struct Bounds {
+  glm::vec3 origin;
+  float sphereRadius;
+  glm::vec3 extents;
+};
+
+struct GLTFMaterial {
+  MaterialInstance data;
+};
+
+struct GeoSurface {
+  uint32_t startIndex;
+  uint32_t count;
+  Bounds bounds;
+  std::shared_ptr<GLTFMaterial> material;
+};
+
+struct MeshAsset {
+  std::string name;
+
+  std::vector<GeoSurface> surfaces;
+  GPUMeshBuffers meshBuffers;
+};
+struct mesh_node : Node {
+  std::shared_ptr<MeshAsset> mesh;
+
+  void Draw(const glm::mat4& topMatrix, draw_context& ctx) override;
+};
+
+struct render_object {
+  uint32_t index_count;
+  uint32_t first_index;
+  VkBuffer index_buffer;
+
+  MaterialInstance* material;
+  Bounds bounds;
+  glm::mat4 transform;
+  VkDeviceAddress vertex_buffer_address;
+};
+
+struct draw_context {
+  std::vector<render_object> opaque_surfaces;
+  std::vector<render_object> transparent_surfaces;
 };
 
 #define VK_CHECK(x)                                                     \

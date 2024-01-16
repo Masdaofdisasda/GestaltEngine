@@ -36,6 +36,8 @@ materials.h
 imgui_gui.h
 imgui_gui.cpp
 gui_actions.h
+vk_render_system.h
+vk_render_system.cpp
 )
 
 target_compile_features(graphics PRIVATE cxx_std_20)
