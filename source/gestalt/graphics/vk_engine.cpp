@@ -30,11 +30,11 @@
 #include <chrono>
 #include <thread>
 
-vulkan_engine* loaded_engine = nullptr;
+render_engine* loaded_engine = nullptr;
 
 constexpr bool bUseValidationLayers = true;
 
-void vulkan_engine::init() {
+void render_engine::init() {
   // only one engine initialization is allowed with the application.
   assert(loaded_engine == nullptr);
   loaded_engine = this;
@@ -43,17 +43,18 @@ void vulkan_engine::init() {
 
   gpu_.init(bUseValidationLayers, window_);
 
-  main_deletion_queue_.init(gpu_.device, gpu_.allocator);
+  deletion_service_.init(gpu_.device, gpu_.allocator);
 
   resource_manager_.init(gpu_.device, gpu_.allocator,
                          [this](auto func) { this->immediate_submit(std::move(func)); });
 
   swapchain_.init(gpu_, window_, draw_image_, depth_image_);
-
   commands_.init(gpu_, frames_);
   sync_.init(gpu_, frames_);
   descriptor_manager_.init(gpu_, frames_, draw_image_);
-  init_pipelines();
+  pipeline_manager_.init(gpu_, descriptor_manager_);
+  metal_rough_material_.build_pipelines(this);
+
   init_default_data();
   init_renderables();
   init_imgui();
@@ -74,90 +75,7 @@ void vulkan_engine::init() {
 
 }
 
-void vulkan_engine::init_pipelines() {
-    //COMPUTE PIPELINES
-    init_background_pipelines();
-
-    // GRAPHICS PIPELINES
-    metal_rough_material_.build_pipelines(this);
-}
-
-void vulkan_engine::init_background_pipelines() {
-    VkPipelineLayoutCreateInfo computeLayout{};
-    computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    computeLayout.pNext = nullptr;
-    computeLayout.pSetLayouts = &descriptor_manager_.draw_image_descriptor_layout;
-    computeLayout.setLayoutCount = 1;
-
-    VkPushConstantRange pushConstant{};
-    pushConstant.offset = 0;
-    pushConstant.size = sizeof(compute_push_constants);
-    pushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-    computeLayout.pPushConstantRanges = &pushConstant;
-    computeLayout.pushConstantRangeCount = 1;
-
-    VK_CHECK(
-        vkCreatePipelineLayout(gpu_.device, &computeLayout, nullptr, &gradient_pipeline_layout_));
-
-    VkShaderModule gradientShader;
-    vkutil::load_shader_module("../shaders/gradient_color.comp.spv", gpu_.device, &gradientShader);
-
-    VkShaderModule skyShader;
-    vkutil::load_shader_module("../shaders/sky.comp.spv", gpu_.device, &skyShader);
-
-    VkPipelineShaderStageCreateInfo stageinfo{};
-    stageinfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    stageinfo.pNext = nullptr;
-    stageinfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    stageinfo.module = gradientShader;
-    stageinfo.pName = "main";
-
-    VkComputePipelineCreateInfo computePipelineCreateInfo{};
-    computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-    computePipelineCreateInfo.pNext = nullptr;
-    computePipelineCreateInfo.layout = gradient_pipeline_layout_;
-    computePipelineCreateInfo.stage = stageinfo;
-
-    compute_effect gradient;
-    gradient.layout = gradient_pipeline_layout_;
-    gradient.name = "gradient";
-    gradient.data = {};
-
-    // default colors
-    gradient.data.data1 = glm::vec4(1, 0, 0, 1);
-    gradient.data.data2 = glm::vec4(0, 0, 1, 1);
-
-    VK_CHECK(vkCreateComputePipelines(gpu_.device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo,
-                                      nullptr, &gradient.pipeline));
-
-    // change the shader module only to create the sky shader
-    computePipelineCreateInfo.stage.module = skyShader;
-
-    compute_effect sky;
-    sky.layout = gradient_pipeline_layout_;
-    sky.name = "sky";
-    sky.data = {};
-    // default sky parameters
-    sky.data.data1 = glm::vec4(0.1, 0.2, 0.4, 0.97);
-
-    VK_CHECK(vkCreateComputePipelines(gpu_.device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo,
-                                      nullptr, &sky.pipeline));
-
-    // add the 2 background effects into the array
-    background_effects_.push_back(gradient);
-    background_effects_.push_back(sky);
-
-    // destroy structures properly
-    vkDestroyShaderModule(gpu_.device, gradientShader, nullptr);
-    vkDestroyShaderModule(gpu_.device, skyShader, nullptr);
-
-    main_deletion_queue_.push(gradient.pipeline);
-    main_deletion_queue_.push(sky.pipeline);
-    main_deletion_queue_.push(gradient_pipeline_layout_);
-}
-
-void vulkan_engine::init_imgui() {
+void render_engine::init_imgui() {
     // 1: create descriptor pool for IMGUI
     //  the size of the pool is very oversize, but it's copied from imgui demo
     //  itself.
@@ -215,10 +133,10 @@ void vulkan_engine::init_imgui() {
 
     // add the destroy the imgui created structures
     // NOTE: i think ImGui_ImplVulkan_Shutdown() destroy the imguiPool
-    main_deletion_queue_.push_function([this]() { ImGui_ImplVulkan_Shutdown(); });
+    deletion_service_.push_function([this]() { ImGui_ImplVulkan_Shutdown(); });
 }
 
-void vulkan_engine::init_default_data() {
+void render_engine::init_default_data() {
     std::array<Vertex, 4> rect_vertices;
 
     rect_vertices[0].position = {0.5, -0.5, 0};
@@ -292,17 +210,17 @@ void vulkan_engine::init_default_data() {
     sampl.minFilter = VK_FILTER_LINEAR;
     vkCreateSampler(gpu_.device, &sampl, nullptr, &default_material_.default_sampler_linear);
 
-    main_deletion_queue_.push_function(
+    deletion_service_.push_function(
         [this]() { resource_manager_.destroy_image(default_material_.white_image); });
-    main_deletion_queue_.push_function(
+    deletion_service_.push_function(
         [this]() { resource_manager_.destroy_image(default_material_.grey_image); });
-    main_deletion_queue_.push_function(
+    deletion_service_.push_function(
         [this]() { resource_manager_.destroy_image(default_material_.error_checkerboard_image); });
-    main_deletion_queue_.push(default_material_.default_sampler_nearest);
-    main_deletion_queue_.push(default_material_.default_sampler_linear);
+    deletion_service_.push(default_material_.default_sampler_nearest);
+    deletion_service_.push(default_material_.default_sampler_linear);
 }
 
-void vulkan_engine::init_renderables() {
+void render_engine::init_renderables() {
     std::string structurePath = {R"(..\..\assets\structure.glb)"};
     auto structureFile = loadGltf(this, structurePath);
 
@@ -311,7 +229,7 @@ void vulkan_engine::init_renderables() {
     loaded_scenes_["structure"] = *structureFile;
 }
 
-void vulkan_engine::immediate_submit(std::function<void(VkCommandBuffer cmd)> function) {
+void render_engine::immediate_submit(std::function<void(VkCommandBuffer cmd)> function) {
     VK_CHECK(vkResetFences(gpu_.device, 1, &sync_.imgui_fence));
     VK_CHECK(vkResetCommandBuffer(commands_.imgui_command_buffer, 0));
 
@@ -337,7 +255,7 @@ void vulkan_engine::immediate_submit(std::function<void(VkCommandBuffer cmd)> fu
     VK_CHECK(vkWaitForFences(gpu_.device, 1, &sync_.imgui_fence, true, 9999999999));
 }
 
-GPUMeshBuffers vulkan_engine::upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices) {
+GPUMeshBuffers render_engine::upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices) {
     //> mesh_create_1
     const size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
     const size_t indexBufferSize = indices.size() * sizeof(uint32_t);
@@ -398,7 +316,7 @@ GPUMeshBuffers vulkan_engine::upload_mesh(std::span<uint32_t> indices, std::span
     //< mesh_create_2
 }
 
-void vulkan_engine::cleanup() {
+void render_engine::cleanup() {
 
     if (is_initialized_) {
 
@@ -411,7 +329,7 @@ void vulkan_engine::cleanup() {
         frame.deletion_queue.flush();
       }
 
-      main_deletion_queue_.flush();
+      deletion_service_.flush();
 
       descriptor_manager_.cleanup();
       sync_.cleanup();
@@ -422,18 +340,20 @@ void vulkan_engine::cleanup() {
     }
 }
 
-void vulkan_engine::draw_main(VkCommandBuffer cmd) {
+void render_engine::draw_main(VkCommandBuffer cmd) {
 
-    compute_effect& effect = background_effects_[current_background_effect_];
+    compute_effect& effect = pipeline_manager_.background_effects[current_background_effect_];
 
     // bind the background compute pipeline
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, effect.pipeline);
 
     // bind the descriptor set containing the draw image for the compute pipeline
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, gradient_pipeline_layout_, 0, 1,
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
+                            pipeline_manager_.gradient_pipeline_layout, 0, 1,
                             &descriptor_manager_.draw_image_descriptors, 0, nullptr);
 
-    vkCmdPushConstants(cmd, gradient_pipeline_layout_, VK_SHADER_STAGE_COMPUTE_BIT, 0,
+    vkCmdPushConstants(cmd, pipeline_manager_.gradient_pipeline_layout,
+                       VK_SHADER_STAGE_COMPUTE_BIT, 0,
                        sizeof(compute_push_constants), &effect.data);
     // execute the compute pipeline dispatch. We are using 16x16 workgroup size so we need to divide
     // by it
@@ -462,7 +382,7 @@ void vulkan_engine::draw_main(VkCommandBuffer cmd) {
     vkCmdEndRendering(cmd);
 }
 
-void vulkan_engine::draw() {
+void render_engine::draw() {
     {
       // wait until the gpu has finished rendering the last frame. Timeout of 1 second
       VK_CHECK(
@@ -582,18 +502,20 @@ void vulkan_engine::draw() {
     }
 }
 
-void vulkan_engine::draw_background(VkCommandBuffer cmd) {
+void render_engine::draw_background(VkCommandBuffer cmd) {
 
-    compute_effect& effect = background_effects_[current_background_effect_];
+    compute_effect& effect = pipeline_manager_.background_effects[current_background_effect_];
 
     // bind the background compute pipeline
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, effect.pipeline);
 
     // bind the descriptor set containing the draw image for the compute pipeline
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, gradient_pipeline_layout_, 0, 1,
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
+                            pipeline_manager_.gradient_pipeline_layout, 0, 1,
                             &descriptor_manager_.draw_image_descriptors, 0, nullptr);
 
-    vkCmdPushConstants(cmd, gradient_pipeline_layout_, VK_SHADER_STAGE_COMPUTE_BIT, 0,
+    vkCmdPushConstants(cmd, pipeline_manager_.gradient_pipeline_layout,
+                       VK_SHADER_STAGE_COMPUTE_BIT, 0,
                        sizeof(compute_push_constants), &effect.data);
     // execute the compute pipeline dispatch. We are using 16x16 workgroup size so we need to divide
     // by it
@@ -602,7 +524,7 @@ void vulkan_engine::draw_background(VkCommandBuffer cmd) {
                   1);
 }
 
-void vulkan_engine::draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView) {
+void render_engine::draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView) {
     VkRenderingAttachmentInfo colorAttachment
         = vkinit::attachment_info(targetImageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
     VkRenderingInfo renderInfo
@@ -647,7 +569,7 @@ bool is_visible(const render_object& obj, const glm::mat4& viewproj) {
     }
 }
 
-void vulkan_engine::draw_geometry(VkCommandBuffer cmd) {
+void render_engine::draw_geometry(VkCommandBuffer cmd) {
     // begin clock
     auto start = std::chrono::system_clock::now();
 
@@ -770,7 +692,7 @@ void vulkan_engine::draw_geometry(VkCommandBuffer cmd) {
     main_draw_context_.transparent_surfaces.clear();
 }
 
-void vulkan_engine::update_scene() {
+void render_engine::update_scene() {
 
     glm::mat4 view = active_camera_.get_view_matrix();
 
@@ -790,7 +712,7 @@ void vulkan_engine::update_scene() {
     loaded_scenes_["structure"]->Draw(glm::mat4{1.f}, main_draw_context_);
 }
 
-void vulkan_engine::run()
+void render_engine::run()
 {
     //begin clock
     auto start = std::chrono::system_clock::now(); // todo replace with timetracker
@@ -930,11 +852,13 @@ void vulkan_engine::run()
 
         ImGui::SliderFloat("Render Scale", &render_scale_, 0.3f, 1.f);
 
-        compute_effect& selected = background_effects_[current_background_effect_];
+        compute_effect& selected
+            = pipeline_manager_.background_effects[current_background_effect_];
 
         ImGui::Text("Selected effect: ", selected.name);
 
-        ImGui::SliderInt("Effect Index", &current_background_effect_, 0, background_effects_.size() - 1);
+        ImGui::SliderInt("Effect Index", &current_background_effect_, 0,
+                         pipeline_manager_.background_effects.size() - 1);
 
         ImGui::InputFloat4("data1", reinterpret_cast<float*>(&selected.data.data1));
         ImGui::InputFloat4("data2", reinterpret_cast<float*>(&selected.data.data2));
@@ -960,7 +884,7 @@ void vulkan_engine::run()
     stats_.frametime = elapsed.count() / 1000.f;
 }
 
-void GLTFMetallic_Roughness::build_pipelines(vulkan_engine* engine) {
+void GLTFMetallic_Roughness::build_pipelines(render_engine* engine) {
     VkShaderModule meshFragShader;
     vkutil::load_shader_module("../shaders/mesh.frag.spv", engine->get_gpu().device, &meshFragShader);
 
@@ -972,13 +896,12 @@ void GLTFMetallic_Roughness::build_pipelines(vulkan_engine* engine) {
     matrixRange.size = sizeof(GPUDrawPushConstants);
     matrixRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-    DescriptorLayoutBuilder layoutBuilder;
-    layoutBuilder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    layoutBuilder.add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    layoutBuilder.add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-
-    materialLayout = layoutBuilder.build(engine->get_gpu().device,
-                                         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    DescriptorLayoutBuilder layout_builder;
+    materialLayout = layout_builder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+                         .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+                         .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+                         .build(engine->get_gpu().device,
+                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 
     VkDescriptorSetLayout layouts[] = {engine->get_gpu_scene_data_layout(), materialLayout};
 

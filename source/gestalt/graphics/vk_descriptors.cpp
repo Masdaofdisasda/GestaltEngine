@@ -1,12 +1,15 @@
 ﻿#include <vk_descriptors.h>
 
-void DescriptorLayoutBuilder::add_binding(uint32_t binding, VkDescriptorType type) {
+DescriptorLayoutBuilder& DescriptorLayoutBuilder::add_binding(uint32_t binding,
+                                                           VkDescriptorType type) {
   VkDescriptorSetLayoutBinding newbind{};
   newbind.binding = binding;
   newbind.descriptorCount = 1;
   newbind.descriptorType = type;
 
   bindings.push_back(newbind);
+
+  return *this;
 }
 
 void DescriptorLayoutBuilder::clear() { bindings.clear(); }
@@ -171,25 +174,28 @@ void vk_descriptor_manager::init(const vk_gpu& gpu, std::vector<frame_data>& fra
   // make the descriptor set layout for our compute draw
   {
     DescriptorLayoutBuilder builder;
-    builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-    draw_image_descriptor_layout = builder.build(gpu_.device, VK_SHADER_STAGE_COMPUTE_BIT);
+    draw_image_descriptor_layout = builder
+    .add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
+    .build(gpu_.device, VK_SHADER_STAGE_COMPUTE_BIT);
 
     deletion_service_.push(draw_image_descriptor_layout);
   }
 
   {
     DescriptorLayoutBuilder builder;
-    builder.add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    single_image_descriptor_layout = builder.build(gpu_.device, VK_SHADER_STAGE_FRAGMENT_BIT);
+    single_image_descriptor_layout = builder
+    .add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+    .build(gpu_.device, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     deletion_service_.push(single_image_descriptor_layout);
   }
 
   {
     DescriptorLayoutBuilder builder;
-    builder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    gpu_scene_data_descriptor_layout
-        = builder.build(gpu_.device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    gpu_scene_data_descriptor_layout = builder
+    .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+    .build(gpu_.device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+
     deletion_service_.push(gpu_scene_data_descriptor_layout);
   }
 

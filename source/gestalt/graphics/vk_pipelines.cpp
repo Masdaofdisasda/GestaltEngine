@@ -224,6 +224,91 @@ void PipelineBuilder::clear() {
   _shaderStages.clear();
 }
 
+void vk_pipeline_manager::init(const vk_gpu& gpu, vk_descriptor_manager& descriptor_manager) {
+
+   gpu_ = gpu;
+  descriptor_manager_ = descriptor_manager;
+  deletion_service_ .init(gpu_.device, gpu_.allocator);
+
+  init_background_pipelines();
+}
+
+
+void vk_pipeline_manager::init_background_pipelines() {
+  VkPipelineLayoutCreateInfo computeLayout{};
+  computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+  computeLayout.pNext = nullptr;
+  computeLayout.pSetLayouts = &descriptor_manager_.draw_image_descriptor_layout;
+  computeLayout.setLayoutCount = 1;
+
+  VkPushConstantRange pushConstant{};
+  pushConstant.offset = 0;
+  pushConstant.size = sizeof(compute_push_constants);
+  pushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+  computeLayout.pPushConstantRanges = &pushConstant;
+  computeLayout.pushConstantRangeCount = 1;
+
+  VK_CHECK(
+      vkCreatePipelineLayout(gpu_.device, &computeLayout, nullptr, &gradient_pipeline_layout));
+
+  VkShaderModule gradient_shader;
+  vkutil::load_shader_module("../shaders/gradient_color.comp.spv", gpu_.device, &gradient_shader);
+
+  VkShaderModule sky_shader;
+  vkutil::load_shader_module("../shaders/sky.comp.spv", gpu_.device, &sky_shader);
+
+  VkPipelineShaderStageCreateInfo stageinfo{};
+  stageinfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  stageinfo.pNext = nullptr;
+  stageinfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+  stageinfo.module = gradient_shader;
+  stageinfo.pName = "main";
+
+  VkComputePipelineCreateInfo computePipelineCreateInfo{};
+  computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+  computePipelineCreateInfo.pNext = nullptr;
+  computePipelineCreateInfo.layout = gradient_pipeline_layout;
+  computePipelineCreateInfo.stage = stageinfo;
+
+  compute_effect gradient;
+  gradient.layout = gradient_pipeline_layout;
+  gradient.name = "gradient";
+  gradient.data = {};
+
+  // default colors
+  gradient.data.data1 = glm::vec4(0, 0.3f, 1, 1);
+  gradient.data.data2 = glm::vec4(0, 0.3f, 0, 1);
+
+  VK_CHECK(vkCreateComputePipelines(gpu_.device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo,
+                                    nullptr, &gradient.pipeline));
+
+  // change the shader module only to create the sky shader
+  computePipelineCreateInfo.stage.module = sky_shader;
+
+  compute_effect sky;
+  sky.layout = gradient_pipeline_layout;
+  sky.name = "sky";
+  sky.data = {};
+  // default sky parameters
+  sky.data.data1 = glm::vec4(0.1, 0.2, 0.4, 0.97);
+
+  VK_CHECK(vkCreateComputePipelines(gpu_.device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo,
+                                    nullptr, &sky.pipeline));
+
+  // add the 2 background effects into the array
+  background_effects.push_back(gradient);
+  background_effects.push_back(sky);
+
+  // destroy structures properly
+  vkDestroyShaderModule(gpu_.device, gradient_shader, nullptr);
+  vkDestroyShaderModule(gpu_.device, sky_shader, nullptr);
+
+  deletion_service_.push(gradient.pipeline);
+  deletion_service_.push(sky.pipeline);
+  deletion_service_.push(gradient_pipeline_layout);
+}
+
 void vkutil::load_shader_module(const char* filePath, VkDevice device,
                                 VkShaderModule* outShaderModule) {
   // open the file. With cursor at the end

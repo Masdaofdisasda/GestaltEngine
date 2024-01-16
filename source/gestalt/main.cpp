@@ -1,7 +1,7 @@
 #include "graphics/vk_engine.h"
 
 int main(int argc, char* argv[]) {
-  vulkan_engine engine;
+  render_engine engine;
 
   engine.init();
 

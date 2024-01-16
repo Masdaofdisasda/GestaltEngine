@@ -1,6 +1,10 @@
 ﻿#pragma once 
 #include <vk_types.h>
 
+#include "vk_deletion_service.h"
+#include "vk_descriptors.h"
+#include "vk_gpu.h"
+
 class PipelineBuilder {
 public:
   std::vector<VkPipelineShaderStageCreateInfo> _shaderStages;
@@ -35,6 +39,39 @@ public:
   PipelineBuilder& enable_depthtest(bool depthWriteEnable, VkCompareOp op);
 
   PipelineBuilder& set_pipeline_layout(VkPipelineLayout layout);
+};
+
+struct compute_push_constants {
+  glm::vec4 data1;
+  glm::vec4 data2;
+  glm::vec4 data3;
+  glm::vec4 data4;
+};
+
+struct compute_effect {
+  const char* name;
+
+  VkPipeline pipeline;
+  VkPipelineLayout layout;
+
+  compute_push_constants data;
+};
+
+class vk_pipeline_manager {
+
+  vk_gpu gpu_;
+  vk_descriptor_manager descriptor_manager_;
+  vk_deletion_service deletion_service_;
+
+  void init_background_pipelines();
+
+public:
+  VkPipeline gradient_pipeline;
+  VkPipelineLayout gradient_pipeline_layout;
+
+  std::vector<compute_effect> background_effects;
+
+  void init(const vk_gpu& gpu, vk_descriptor_manager& descriptor_manager);
 };
 
 namespace vkutil {

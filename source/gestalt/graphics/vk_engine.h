@@ -17,6 +17,7 @@
 #include "input_system.h"
 #include "vk_deletion_service.h"
 #include "resource_manager.h"
+#include "vk_pipelines.h"
 #include "vk_sync.h"
 
 
@@ -39,13 +40,6 @@ struct default_material {
 };
 
 constexpr unsigned int FRAME_OVERLAP = 2;
-
-struct compute_push_constants {
-  glm::vec4 data1;
-  glm::vec4 data2;
-  glm::vec4 data3;
-  glm::vec4 data4;
-};
 
 struct GLTFMetallic_Roughness {
   MaterialPipeline opaquePipeline;
@@ -71,7 +65,7 @@ struct GLTFMetallic_Roughness {
 
   DescriptorWriter writer;
 
-  void build_pipelines(vulkan_engine* engine);
+  void build_pipelines(render_engine* engine);
   void clear_resources(VkDevice device);
 
   MaterialInstance write_material(VkDevice device, MaterialPass pass,
@@ -101,16 +95,7 @@ struct draw_context {
   std::vector<render_object> transparent_surfaces;
 };
 
-struct compute_effect {
-  const char* name;
-
-  VkPipeline pipeline;
-  VkPipelineLayout layout;
-
-  compute_push_constants data;
-};
-
-class vulkan_engine {
+class render_engine {
 public:
   void init();
   void cleanup();
@@ -137,6 +122,7 @@ private:
   vk_command commands_;
   vk_sync sync_;
   vk_descriptor_manager descriptor_manager_;
+  vk_pipeline_manager pipeline_manager_;
 
   std::vector<frame_data> frames_{FRAME_OVERLAP};
 
@@ -144,8 +130,6 @@ private:
 
   float render_scale_ = 1.f;
 
-  VkPipeline gradient_pipeline_;
-  VkPipelineLayout gradient_pipeline_layout_;
 
   std::vector<VkFramebuffer> framebuffers_;
 
@@ -153,7 +137,7 @@ private:
 
   std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loaded_scenes_;
 
-  vk_deletion_service main_deletion_queue_;
+  vk_deletion_service deletion_service_;
 
   GPUMeshBuffers rectangle_;
 
@@ -169,7 +153,6 @@ private:
 
   default_material default_material_;
 
-  std::vector<compute_effect> background_effects_;
   int current_background_effect_{0};
 
 
@@ -201,8 +184,6 @@ private:
   bool resize_requested_{false};
   bool freeze_rendering_{false};
 
-  void init_background_pipelines();
-  void init_pipelines();
   void init_imgui();
   void init_default_data();
   void init_renderables();

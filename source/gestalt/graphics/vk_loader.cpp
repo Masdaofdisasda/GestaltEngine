@@ -42,7 +42,7 @@ VkSamplerMipmapMode extract_mipmap_mode(fastgltf::Filter filter) {
   }
 }
 
-std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(vulkan_engine* engine,
+std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(render_engine* engine,
                                                     std::string_view filePath) {
   //> load_1
   fmt::print("Loading GLTF: {}", filePath);
@@ -389,7 +389,7 @@ void LoadedGLTF::clearAll() {
   creator->get_resource_manager().destroy_buffer(materialBuffer);
 }
 
-std::optional<AllocatedImage> load_image(vulkan_engine* engine, fastgltf::Asset& asset,
+std::optional<AllocatedImage> load_image(render_engine* engine, fastgltf::Asset& asset,
                                          fastgltf::Image& image) {
   AllocatedImage newImage{};
 
