@@ -141,11 +141,11 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(render_engine* engine,
   //> load_buffer
   // create buffer to hold the material data
   file.materialDataBuffer = engine->get_resource_manager().create_buffer(
-      sizeof(GLTFMetallic_Roughness::MaterialConstants) * gltf.materials.size(),
+      sizeof(gltf_metallic_roughness::MaterialConstants) * gltf.materials.size(),
       VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
   int data_index = 0;
-  GLTFMetallic_Roughness::MaterialConstants* sceneMaterialConstants
-      = (GLTFMetallic_Roughness::MaterialConstants*)file.materialDataBuffer.info.pMappedData;
+  gltf_metallic_roughness::MaterialConstants* sceneMaterialConstants
+      = (gltf_metallic_roughness::MaterialConstants*)file.materialDataBuffer.info.pMappedData;
   //< load_buffer
   //
   //> load_material
@@ -154,7 +154,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(render_engine* engine,
     materials.push_back(newMat);
     file.materials[mat.name.c_str()] = newMat;
 
-    GLTFMetallic_Roughness::MaterialConstants constants;
+    gltf_metallic_roughness::MaterialConstants constants;
     constants.colorFactors.x = mat.pbrData.baseColorFactor[0];
     constants.colorFactors.y = mat.pbrData.baseColorFactor[1];
     constants.colorFactors.z = mat.pbrData.baseColorFactor[2];
@@ -170,7 +170,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(render_engine* engine,
       passType = MaterialPass::Transparent;
     }
 
-    GLTFMetallic_Roughness::MaterialResources materialResources;
+    gltf_metallic_roughness::MaterialResources materialResources;
     // default the material textures
     materialResources.colorImage = engine->get_default_material().white_image;
     materialResources.colorSampler = engine->get_default_material().default_sampler_linear;
@@ -180,7 +180,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(render_engine* engine,
     // set the uniform buffer for the material data
     materialResources.dataBuffer = file.materialDataBuffer.buffer;
     materialResources.dataBufferOffset
-        = data_index * sizeof(GLTFMetallic_Roughness::MaterialConstants);
+        = data_index * sizeof(gltf_metallic_roughness::MaterialConstants);
     // grab textures from gltf file
     if (mat.pbrData.baseColorTexture.has_value()) {
       size_t img

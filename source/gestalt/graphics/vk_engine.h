@@ -15,6 +15,7 @@
 #include "camera.h"
 #include "time_tracking_service.h"
 #include "input_system.h"
+#include "materials.h"
 #include "vk_deletion_service.h"
 #include "resource_manager.h"
 #include "vk_pipelines.h"
@@ -41,37 +42,6 @@ struct default_material {
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 
-struct GLTFMetallic_Roughness {
-  MaterialPipeline opaquePipeline;
-  MaterialPipeline transparentPipeline;
-
-  VkDescriptorSetLayout materialLayout;
-
-  struct MaterialConstants {
-    glm::vec4 colorFactors;
-    glm::vec4 metal_rough_factors;
-    // padding, we need it anyway for uniform buffers
-    glm::vec4 extra[14];
-  };
-
-  struct MaterialResources {
-    AllocatedImage colorImage;
-    VkSampler colorSampler;
-    AllocatedImage metalRoughImage;
-    VkSampler metalRoughSampler;
-    VkBuffer dataBuffer;
-    uint32_t dataBufferOffset;
-  };
-
-  DescriptorWriter writer;
-
-  void build_pipelines(render_engine* engine);
-  void clear_resources(VkDevice device);
-
-  MaterialInstance write_material(VkDevice device, MaterialPass pass,
-                                  const MaterialResources& resources,
-                                  DescriptorAllocatorGrowable& descriptorAllocator);
-};
 
 struct mesh_node : Node {
   std::shared_ptr<MeshAsset> mesh;
@@ -103,7 +73,7 @@ public:
   void run();
 
   [[nodiscard]] vk_gpu get_gpu() const { return gpu_; }
-  GLTFMetallic_Roughness& get_metallic_roughness_material() { return metal_rough_material_; }
+  gltf_metallic_roughness& get_metallic_roughness_material() { return metal_rough_material_; }
   default_material& get_default_material() { return default_material_; }
   AllocatedImage& get_draw_image() { return draw_image_; }
   AllocatedImage& get_depth_image() { return depth_image_; }
@@ -142,7 +112,7 @@ private:
   GPUMeshBuffers rectangle_;
 
   MaterialInstance default_data_;
-  GLTFMetallic_Roughness metal_rough_material_;
+  gltf_metallic_roughness metal_rough_material_;
 
   draw_context main_draw_context_;
   std::unordered_map<std::string, std::shared_ptr<Node>> loaded_nodes_;

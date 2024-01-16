@@ -1,6 +1,7 @@
 ﻿#pragma once 
 #include <vk_types.h>
 
+#include "materials.h"
 #include "vk_deletion_service.h"
 #include "vk_descriptors.h"
 #include "vk_gpu.h"
@@ -64,6 +65,8 @@ class vk_pipeline_manager {
   vk_deletion_service deletion_service_;
 
   void init_background_pipelines();
+  void build_pipeline(gltf_metallic_roughness& material, AllocatedImage& draw_image,
+                      AllocatedImage& depth_image);
 
 public:
   VkPipeline gradient_pipeline;
@@ -71,7 +74,10 @@ public:
 
   std::vector<compute_effect> background_effects;
 
-  void init(const vk_gpu& gpu, vk_descriptor_manager& descriptor_manager);
+  void init(const vk_gpu& gpu, const vk_descriptor_manager& descriptor_manager,
+            gltf_metallic_roughness& material, AllocatedImage& draw_image,
+            AllocatedImage& depth_image);
+  void cleanup();
 };
 
 namespace vkutil {

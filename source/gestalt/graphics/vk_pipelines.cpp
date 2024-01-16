@@ -224,13 +224,20 @@ void PipelineBuilder::clear() {
   _shaderStages.clear();
 }
 
-void vk_pipeline_manager::init(const vk_gpu& gpu, vk_descriptor_manager& descriptor_manager) {
+void vk_pipeline_manager::init(const vk_gpu& gpu, const vk_descriptor_manager& descriptor_manager,
+                               gltf_metallic_roughness& material, AllocatedImage& draw_image,
+                               AllocatedImage& depth_image) {
 
-   gpu_ = gpu;
+  gpu_ = gpu;
   descriptor_manager_ = descriptor_manager;
   deletion_service_ .init(gpu_.device, gpu_.allocator);
 
   init_background_pipelines();
+  build_pipeline(material, draw_image, depth_image);
+}
+
+void vk_pipeline_manager::cleanup() {
+  deletion_service_.flush();
 }
 
 
@@ -307,6 +314,76 @@ void vk_pipeline_manager::init_background_pipelines() {
   deletion_service_.push(gradient.pipeline);
   deletion_service_.push(sky.pipeline);
   deletion_service_.push(gradient_pipeline_layout);
+}
+
+void vk_pipeline_manager::build_pipeline(gltf_metallic_roughness& material,
+                                         AllocatedImage& draw_image, AllocatedImage& depth_image) {
+  VkShaderModule meshFragShader;
+  vkutil::load_shader_module("../shaders/mesh.frag.spv", gpu_.device, &meshFragShader);
+
+  VkShaderModule meshVertexShader;
+  vkutil::load_shader_module("../shaders/mesh.vert.spv", gpu_.device,
+                             &meshVertexShader);
+
+  VkPushConstantRange matrixRange{};
+  matrixRange.offset = 0;
+  matrixRange.size = sizeof(GPUDrawPushConstants);
+  matrixRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+  DescriptorLayoutBuilder layout_builder;
+  material.materialLayout
+      = layout_builder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+                       .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+                       .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+            .build(gpu_.device,
+                              VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+
+  VkDescriptorSetLayout layouts[]
+      = {descriptor_manager_.gpu_scene_data_descriptor_layout, material.materialLayout};
+
+  VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
+  mesh_layout_info.setLayoutCount = 2;
+  mesh_layout_info.pSetLayouts = layouts;
+  mesh_layout_info.pPushConstantRanges = &matrixRange;
+  mesh_layout_info.pushConstantRangeCount = 1;
+
+  VkPipelineLayout newLayout;
+  VK_CHECK(
+      vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &newLayout));
+
+  material.opaquePipeline.layout = newLayout;
+  material.transparentPipeline.layout = newLayout;
+
+  // build the stage-create-info for both vertex and fragment stages. This lets
+  // the pipeline know the shader modules per stage
+  PipelineBuilder pipelineBuilder;
+  material.opaquePipeline.pipeline = pipelineBuilder.set_shaders(meshVertexShader, meshFragShader)
+                                .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+                                .set_polygon_mode(VK_POLYGON_MODE_FILL)
+                                .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
+                                .set_multisampling_none()
+                                .disable_blending()
+                                .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
+
+                                // render format
+                                .set_color_attachment_format(draw_image.imageFormat)
+                                .set_depth_format(depth_image.imageFormat)
+
+                                // use the triangle layout we created
+                                .set_pipeline_layout(newLayout)
+                                .build_pipeline(gpu_.device);
+
+  // create the transparent variant
+  material.transparentPipeline.pipeline = pipelineBuilder.enable_blending_additive()
+                                     .enable_depthtest(false, VK_COMPARE_OP_LESS_OR_EQUAL)
+                                     .build_pipeline(gpu_.device);
+
+  vkDestroyShaderModule(gpu_.device, meshFragShader, nullptr);
+  vkDestroyShaderModule(gpu_.device, meshVertexShader, nullptr);
+
+  deletion_service_.push(material.opaquePipeline.pipeline);
+  deletion_service_.push(material.transparentPipeline.pipeline);
+  deletion_service_.push(material.materialLayout);
 }
 
 void vkutil::load_shader_module(const char* filePath, VkDevice device,

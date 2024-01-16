@@ -48,12 +48,12 @@ void render_engine::init() {
   resource_manager_.init(gpu_.device, gpu_.allocator,
                          [this](auto func) { this->immediate_submit(std::move(func)); });
 
+  // render system
   swapchain_.init(gpu_, window_, draw_image_, depth_image_);
   commands_.init(gpu_, frames_);
   sync_.init(gpu_, frames_);
   descriptor_manager_.init(gpu_, frames_, draw_image_);
-  pipeline_manager_.init(gpu_, descriptor_manager_);
-  metal_rough_material_.build_pipelines(this);
+  pipeline_manager_.init(gpu_, descriptor_manager_, metal_rough_material_, draw_image_, depth_image_);
 
   init_default_data();
   init_renderables();
@@ -884,70 +884,7 @@ void render_engine::run()
     stats_.frametime = elapsed.count() / 1000.f;
 }
 
-void GLTFMetallic_Roughness::build_pipelines(render_engine* engine) {
-    VkShaderModule meshFragShader;
-    vkutil::load_shader_module("../shaders/mesh.frag.spv", engine->get_gpu().device, &meshFragShader);
-
-    VkShaderModule meshVertexShader;
-    vkutil::load_shader_module("../shaders/mesh.vert.spv", engine->get_gpu().device, &meshVertexShader);
-
-    VkPushConstantRange matrixRange{};
-    matrixRange.offset = 0;
-    matrixRange.size = sizeof(GPUDrawPushConstants);
-    matrixRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-    DescriptorLayoutBuilder layout_builder;
-    materialLayout = layout_builder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-                         .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-                         .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-                         .build(engine->get_gpu().device,
-                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-
-    VkDescriptorSetLayout layouts[] = {engine->get_gpu_scene_data_layout(), materialLayout};
-
-    VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
-    mesh_layout_info.setLayoutCount = 2;
-    mesh_layout_info.pSetLayouts = layouts;
-    mesh_layout_info.pPushConstantRanges = &matrixRange;
-    mesh_layout_info.pushConstantRangeCount = 1;
-
-    VkPipelineLayout newLayout;
-    VK_CHECK(vkCreatePipelineLayout(engine->get_gpu().device, &mesh_layout_info, nullptr, &newLayout));
-
-    opaquePipeline.layout = newLayout;
-    transparentPipeline.layout = newLayout;
-
-    // build the stage-create-info for both vertex and fragment stages. This lets
-    // the pipeline know the shader modules per stage
-    PipelineBuilder pipelineBuilder;
-    opaquePipeline.pipeline = pipelineBuilder
-      .set_shaders(meshVertexShader, meshFragShader)
-      .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
-      .set_polygon_mode(VK_POLYGON_MODE_FILL)
-      .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
-      .set_multisampling_none()
-      .disable_blending()
-                                  .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-
-      // render format
-      .set_color_attachment_format(engine->get_draw_image().imageFormat)
-      .set_depth_format(engine->get_depth_image().imageFormat)
-
-      // use the triangle layout we created
-      .set_pipeline_layout(newLayout)
-      .build_pipeline(engine->get_gpu().device);
-
-    // create the transparent variant
-    transparentPipeline.pipeline = pipelineBuilder
-      .enable_blending_additive()
-                                       .enable_depthtest(false, VK_COMPARE_OP_LESS_OR_EQUAL)
-      .build_pipeline(engine->get_gpu().device);
-
-    vkDestroyShaderModule(engine->get_gpu().device, meshFragShader, nullptr);
-    vkDestroyShaderModule(engine->get_gpu().device, meshVertexShader, nullptr);
-}
-
-MaterialInstance GLTFMetallic_Roughness::write_material(
+MaterialInstance gltf_metallic_roughness::write_material(
     VkDevice device, MaterialPass pass, const MaterialResources& resources,
     DescriptorAllocatorGrowable& descriptorAllocator) {
     MaterialInstance matData;
