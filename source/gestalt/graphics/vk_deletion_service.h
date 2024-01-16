@@ -1,6 +1,6 @@
-#include <ranges>
-
 #pragma once
+
+#include <ranges>
 
 class vk_deletion_service {
 

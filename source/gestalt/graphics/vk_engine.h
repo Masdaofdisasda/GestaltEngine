@@ -20,15 +20,8 @@
 #include "resource_manager.h"
 #include "vk_pipelines.h"
 #include "vk_sync.h"
-
-
-struct engine_stats {
-  float frametime;
-  int triangle_count;
-  int drawcall_count;
-  float scene_update_time;
-  float mesh_draw_time;
-};
+#include "gui_actions.h"
+#include "imgui_gui.h"
 
 struct default_material {
   AllocatedImage white_image;
@@ -84,6 +77,7 @@ public:
 
 private:
   bool is_initialized_{false};
+  bool quit_{false};
   int frame_number_{0};
 
   sdl_window window_;
@@ -93,12 +87,12 @@ private:
   vk_sync sync_;
   vk_descriptor_manager descriptor_manager_;
   vk_pipeline_manager pipeline_manager_;
+  gui_actions gui_actions_;
+  imgui_gui imgui_;
 
   std::vector<frame_data> frames_{FRAME_OVERLAP};
 
   frame_data& get_current_frame() { return frames_[frame_number_ % FRAME_OVERLAP]; }
-
-  float render_scale_ = 1.f;
 
 
   std::vector<VkFramebuffer> framebuffers_;
@@ -134,8 +128,6 @@ private:
 
   void update_scene();
 
-  void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView);
-
   void immediate_submit(std::function<void(VkCommandBuffer cmd)> function);
 
   std::vector<std::unique_ptr<camera_positioner_interface>> camera_positioners_{1};
@@ -154,7 +146,7 @@ private:
   bool resize_requested_{false};
   bool freeze_rendering_{false};
 
-  void init_imgui();
+  void register_gui_actions();
   void init_default_data();
   void init_renderables();
 };

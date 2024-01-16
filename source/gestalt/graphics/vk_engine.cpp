@@ -14,10 +14,6 @@
 #define VMA_VULKAN_VERSION 1003000
 #include <vma/vk_mem_alloc.h>
 
-#include <imgui.h>
-#include <imgui_impl_sdl2.h>
-#include <imgui_impl_vulkan.h>
-
 #include <VkBootstrap.h>
 
 #include <glm/gtx/transform.hpp>
@@ -55,9 +51,13 @@ void render_engine::init() {
   descriptor_manager_.init(gpu_, frames_, draw_image_);
   pipeline_manager_.init(gpu_, descriptor_manager_, metal_rough_material_, draw_image_, depth_image_);
 
+
+  // Scene manager
   init_default_data();
   init_renderables();
-  init_imgui();
+  register_gui_actions();
+  imgui_.init(gpu_, window_, swapchain_, gui_actions_,
+              [this](auto func) { this->immediate_submit(std::move(func)); });
 
   // everything went fine
   is_initialized_ = true;
@@ -75,65 +75,15 @@ void render_engine::init() {
 
 }
 
-void render_engine::init_imgui() {
-    // 1: create descriptor pool for IMGUI
-    //  the size of the pool is very oversize, but it's copied from imgui demo
-    //  itself.
-    VkDescriptorPoolSize pool_sizes[] = {{VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
-                                         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
-                                         {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000},
-                                         {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000},
-                                         {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000},
-                                         {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000},
-                                         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000},
-                                         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000},
-                                         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000},
-                                         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
-                                         {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000}};
-
-    VkDescriptorPoolCreateInfo pool_info = {};
-    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    pool_info.maxSets = 1000;
-    pool_info.poolSizeCount = (uint32_t)std::size(pool_sizes);
-    pool_info.pPoolSizes = pool_sizes;
-
-    VkDescriptorPool imguiPool;
-    VK_CHECK(vkCreateDescriptorPool(gpu_.device, &pool_info, nullptr, &imguiPool));
-
-    // 2: initialize imgui library
-
-    // this initializes the core structures of imgui
-    ImGui::CreateContext();
-
-    // this initializes imgui for SDL
-    ImGui_ImplSDL2_InitForVulkan(window_.handle);
-
-    // this initializes imgui for Vulkan
-    ImGui_ImplVulkan_InitInfo init_info = {};
-    init_info.Instance = gpu_.instance;
-    init_info.PhysicalDevice = gpu_.chosen_gpu;
-    init_info.Device = gpu_.device;
-    init_info.Queue = gpu_.graphics_queue;
-    init_info.DescriptorPool = imguiPool;
-    init_info.MinImageCount = 3;
-    init_info.ImageCount = 3;
-    init_info.UseDynamicRendering = true;
-    init_info.ColorAttachmentFormat = swapchain_.swapchain_image_format;
-
-    init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-
-    ImGui_ImplVulkan_Init(&init_info, VK_NULL_HANDLE);
-
-    // execute a gpu command to upload imgui font textures
-    immediate_submit([&](VkCommandBuffer cmd) { ImGui_ImplVulkan_CreateFontsTexture(); });
-
-    // clear font textures from cpu data
-    ImGui_ImplVulkan_DestroyFontsTexture();
-
-    // add the destroy the imgui created structures
-    // NOTE: i think ImGui_ImplVulkan_Shutdown() destroy the imguiPool
-    deletion_service_.push_function([this]() { ImGui_ImplVulkan_Shutdown(); });
+void render_engine::register_gui_actions() {
+  gui_actions_.exit = [this]() { quit_ = true; };
+  gui_actions_.add_camera = [this]() {
+    auto free_fly_camera_ptr = std::make_unique<free_fly_camera>();
+    free_fly_camera_ptr->init(glm::vec3(0, 0, 0), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
+    camera_positioners_.push_back(std::move(free_fly_camera_ptr));
+  };
+  gui_actions_.get_stats = [this]() -> engine_stats& { return stats_; };
+  gui_actions_.get_scene_data = [this]() -> GPUSceneData& { return scene_data_; };
 }
 
 void render_engine::init_default_data() {
@@ -449,7 +399,7 @@ void render_engine::draw() {
                                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
       // draw imgui into the swapchain image
-      draw_imgui(cmd, swapchain_.swapchain_image_views[swapchainImageIndex]);
+      imgui_.draw(cmd, swapchain_.swapchain_image_views[swapchainImageIndex]);
 
       // set swapchain image layout to Present so we can draw it
       vkutil::transition_image(cmd, swapchain_.swapchain_images[swapchainImageIndex],
@@ -522,19 +472,6 @@ void render_engine::draw_background(VkCommandBuffer cmd) {
     vkCmdDispatch(cmd, std::ceil(swapchain_.draw_extent.width / 16.0),
                   std::ceil(swapchain_.draw_extent.height / 16.0),
                   1);
-}
-
-void render_engine::draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView) {
-    VkRenderingAttachmentInfo colorAttachment
-        = vkinit::attachment_info(targetImageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
-    VkRenderingInfo renderInfo
-        = vkinit::rendering_info(swapchain_.swapchain_extent, &colorAttachment, nullptr);
-
-    vkCmdBeginRendering(cmd, &renderInfo);
-
-    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
-
-    vkCmdEndRendering(cmd);
 }
 
 bool is_visible(const render_object& obj, const glm::mat4& viewproj) {
@@ -720,14 +657,13 @@ void render_engine::run()
     time_tracking_service_.update_timer();
 
     SDL_Event e;
-    bool bQuit = false;
 
     // main loop
-    while (!bQuit) {
+    while (!quit_) {
       // Handle events on queue
       while (SDL_PollEvent(&e) != 0) {
         // close the window when user alt-f4s or clicks the X button
-        if (e.type == SDL_QUIT) bQuit = true;
+        if (e.type == SDL_QUIT) quit_ = true;
 
         input_system_.handle_event(e, window_.extent.width, window_.extent.height);
 
@@ -743,7 +679,7 @@ void render_engine::run()
         }
 
         // send SDL event to imgui for handling
-        ImGui_ImplSDL2_ProcessEvent(&e);
+        imgui_.update(e);
       }
 
       if (freeze_rendering_) {
@@ -757,118 +693,7 @@ void render_engine::run()
         resize_requested_ = false;
       }
 
-      // imgui new frame
-      ImGui_ImplVulkan_NewFrame();
-      ImGui_ImplSDL2_NewFrame(window_.handle);
-      ImGui::NewFrame();
-
-      if (ImGui::BeginMainMenuBar()) {
-        if (ImGui::BeginMenu("File")) {
-          if (ImGui::MenuItem("Exit")) {
-            bQuit = true;
-          }
-          // Add more menu items here if needed
-          ImGui::EndMenu();
-        }
-        if (ImGui::BeginMenu("Edit")) {
-          if (ImGui::BeginMenu("Add Camera")) {
-            if (ImGui::MenuItem("Free Fly Camera")) {
-              auto free_fly_camera_ptr = std::make_unique<free_fly_camera>();
-              free_fly_camera_ptr->init(glm::vec3(0, 0, 0), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
-              camera_positioners_.push_back(std::move(free_fly_camera_ptr));
-            }
-            if (ImGui::MenuItem("Orbit Camera")) {
-              // Code to add an Orbit Camera
-            }
-            ImGui::EndMenu();
-          }
-
-          if (ImGui::BeginMenu("Add Light Source")) {
-            if (ImGui::MenuItem("Point Light")) {
-              // Code to add an Orbit Camera
-            }
-            if (ImGui::MenuItem("Directional Light")) {
-              // Code to add an Orbit Camera
-            }
-            if (ImGui::MenuItem("Spot Light")) {
-              // Code to add an Orbit Camera
-            }
-            ImGui::EndMenu();
-          }
-          // Add more menu items here if needed
-          ImGui::EndMenu();
-        }
-        // Add other menus like "Edit", "View", etc. here
-
-        ImGui::EndMainMenuBar();
-      }
-
-      if (ImGui::Begin("Stats")) {
-        ImGui::Text("frametime %f ms", stats_.frametime);
-        ImGui::Text("draw time %f ms", stats_.mesh_draw_time);
-        ImGui::Text("update time %f ms", stats_.scene_update_time);
-        ImGui::Text("triangles %i", stats_.triangle_count);
-        ImGui::Text("draws %i", stats_.drawcall_count);
-        ImGui::End();
-      }
-
-      if (ImGui::Begin("Light")) {
-        ImGui::SliderFloat("Light X", &scene_data_.sunlightDirection.x, -10.f, 10.f);
-        ImGui::SliderFloat("Light Y", &scene_data_.sunlightDirection.y, -10.f, 10.f);
-        ImGui::SliderFloat("Light Z", &scene_data_.sunlightDirection.z, -10.f, 10.f);
-        ImGui::End();
-      }
-
-      if (ImGui::Begin("Cameras")) {
-        for (size_t i = 0; i < camera_positioners_.size(); ++i) {
-          std::string name = "Camera " + std::to_string(i);
-
-          if (ImGui::Selectable(name.c_str(), current_camera_positioner_index_ == i)) {
-            current_camera_positioner_index_ = i;
-            active_camera_.set_positioner(camera_positioners_.at(i).get());
-          }
-
-          // If this is the currently selected camera, show input fields for position and rotation
-          if (current_camera_positioner_index_ == i) {
-            // Get the current position and orientation
-            glm::vec3 position = camera_positioners_.at(i)->get_position();
-            glm::quat orientation = camera_positioners_.at(i)->get_orientation();
-
-            // Convert quaternion to Euler angles for user-friendly rotation input
-            glm::vec3 rotation = glm::eulerAngles(orientation);
-
-            // Display input fields for position
-            if (ImGui::DragFloat3("Position", &position[0])) {
-              camera_positioners_.at(i)->init(position, glm::vec3(0.f), glm::vec3(0, 1, 0));
-            }
-          }
-        }
-        ImGui::End();
-      }
-
-
-
-      if (ImGui::Begin("Background")) {
-
-        ImGui::SliderFloat("Render Scale", &render_scale_, 0.3f, 1.f);
-
-        compute_effect& selected
-            = pipeline_manager_.background_effects[current_background_effect_];
-
-        ImGui::Text("Selected effect: ", selected.name);
-
-        ImGui::SliderInt("Effect Index", &current_background_effect_, 0,
-                         pipeline_manager_.background_effects.size() - 1);
-
-        ImGui::InputFloat4("data1", reinterpret_cast<float*>(&selected.data.data1));
-        ImGui::InputFloat4("data2", reinterpret_cast<float*>(&selected.data.data2));
-        ImGui::InputFloat4("data3", reinterpret_cast<float*>(&selected.data.data3));
-        ImGui::InputFloat4("data4", reinterpret_cast<float*>(&selected.data.data4));
-
-        ImGui::End();
-      }
-
-      ImGui::Render();
+      imgui_.new_frame(); // TODO
 
       update_scene();
 

@@ -123,6 +123,14 @@ struct Node : public IRenderable {
   }
 };
 
+struct engine_stats {
+  float frametime;
+  int triangle_count;
+  int drawcall_count;
+  float scene_update_time;
+  float mesh_draw_time;
+};
+
 #define VK_CHECK(x)                                                     \
     do {                                                                \
         VkResult err = x;                                               \

@@ -33,6 +33,9 @@ vk_commands.cpp
 vk_sync.h
 vk_sync.cpp
 materials.h
+imgui_gui.h
+imgui_gui.cpp
+gui_actions.h
 )
 
 target_compile_features(graphics PRIVATE cxx_std_20)
