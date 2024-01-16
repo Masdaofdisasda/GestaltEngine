@@ -7,17 +7,6 @@
 #include "vk_deletion_service.h"
 #include "vk_descriptors.h"
 
-struct frame_data {
-  VkSemaphore swapchain_semaphore, render_semaphore;
-  VkFence render_fence;
-
-  VkCommandPool command_pool;
-  VkCommandBuffer main_command_buffer;
-
-  vk_deletion_service deletion_queue;
-  DescriptorAllocatorGrowable frame_descriptors;
-};
-
 class vk_command {
 
   vk_gpu gpu_;

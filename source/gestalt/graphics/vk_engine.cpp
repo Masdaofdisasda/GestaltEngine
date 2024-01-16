@@ -52,7 +52,7 @@ void vulkan_engine::init() {
 
   commands_.init(gpu_, frames_);
   sync_.init(gpu_, frames_);
-  init_descriptors();
+  descriptor_manager_.init(gpu_, frames_, draw_image_);
   init_pipelines();
   init_default_data();
   init_renderables();
@@ -74,66 +74,6 @@ void vulkan_engine::init() {
 
 }
 
-void vulkan_engine::init_descriptors() {
-    // create a descriptor pool that will hold 10 sets with 1 image each
-    std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes = {
-        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3},
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3},
-        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3},
-    };
-
-    global_descriptor_allocator_.init(gpu_.device, 10, sizes);
-
-    // make the descriptor set layout for our compute draw
-    {
-      DescriptorLayoutBuilder builder;
-      builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-      draw_image_descriptor_layout_ = builder.build(gpu_.device, VK_SHADER_STAGE_COMPUTE_BIT);
-    }
-
-    {
-      DescriptorLayoutBuilder builder;
-      builder.add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-      single_image_descriptor_layout_ = builder.build(gpu_.device, VK_SHADER_STAGE_FRAGMENT_BIT);
-    }
-
-    {
-      DescriptorLayoutBuilder builder;
-      builder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-      gpu_scene_data_descriptor_layout_
-          = builder.build(gpu_.device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-    }
-
-    draw_image_descriptors_
-        = global_descriptor_allocator_.allocate(gpu_.device, draw_image_descriptor_layout_);
-
-    {
-      DescriptorWriter writer;
-      writer.write_image(0, draw_image_.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL,
-                         VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-
-      writer.update_set(gpu_.device, draw_image_descriptors_);
-    }
-
-    for (int i = 0; i < FRAME_OVERLAP; i++) {
-      // create a descriptor pool
-      std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> frame_sizes = {
-          {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3},
-          {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3},
-          {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3},
-          {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4},
-      };
-
-      frames_[i].frame_descriptors = DescriptorAllocatorGrowable{};
-      frames_[i].frame_descriptors.init(gpu_.device, 1000, frame_sizes);
-
-
-      main_deletion_queue_.push_function([this, i]() { frames_[i].frame_descriptors.destroy_pools(gpu_.device);
-      });
-    }
-}
-
-
 void vulkan_engine::init_pipelines() {
     //COMPUTE PIPELINES
     init_background_pipelines();
@@ -146,7 +86,7 @@ void vulkan_engine::init_background_pipelines() {
     VkPipelineLayoutCreateInfo computeLayout{};
     computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     computeLayout.pNext = nullptr;
-    computeLayout.pSetLayouts = &draw_image_descriptor_layout_;
+    computeLayout.pSetLayouts = &descriptor_manager_.draw_image_descriptor_layout;
     computeLayout.setLayoutCount = 1;
 
     VkPushConstantRange pushConstant{};
@@ -473,6 +413,7 @@ void vulkan_engine::cleanup() {
 
       main_deletion_queue_.flush();
 
+      descriptor_manager_.cleanup();
       sync_.cleanup();
       commands_.cleanup();
       swapchain_.destroy_swapchain();
@@ -490,7 +431,7 @@ void vulkan_engine::draw_main(VkCommandBuffer cmd) {
 
     // bind the descriptor set containing the draw image for the compute pipeline
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, gradient_pipeline_layout_, 0, 1,
-                            &draw_image_descriptors_, 0, nullptr);
+                            &descriptor_manager_.draw_image_descriptors, 0, nullptr);
 
     vkCmdPushConstants(cmd, gradient_pipeline_layout_, VK_SHADER_STAGE_COMPUTE_BIT, 0,
                        sizeof(compute_push_constants), &effect.data);
@@ -650,7 +591,7 @@ void vulkan_engine::draw_background(VkCommandBuffer cmd) {
 
     // bind the descriptor set containing the draw image for the compute pipeline
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, gradient_pipeline_layout_, 0, 1,
-                            &draw_image_descriptors_, 0, nullptr);
+                            &descriptor_manager_.draw_image_descriptors, 0, nullptr);
 
     vkCmdPushConstants(cmd, gradient_pipeline_layout_, VK_SHADER_STAGE_COMPUTE_BIT, 0,
                        sizeof(compute_push_constants), &effect.data);
@@ -744,7 +685,7 @@ void vulkan_engine::draw_geometry(VkCommandBuffer cmd) {
 
     // create a descriptor set that binds that buffer and update it
     VkDescriptorSet globalDescriptor = get_current_frame().frame_descriptors.allocate(
-        gpu_.device, gpu_scene_data_descriptor_layout_);
+        gpu_.device, descriptor_manager_.gpu_scene_data_descriptor_layout);
 
     DescriptorWriter writer;
     writer.write_buffer(0, gpuSceneDataBuffer.buffer, sizeof(GPUSceneData), 0,

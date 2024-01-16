@@ -122,7 +122,7 @@ public:
   default_material& get_default_material() { return default_material_; }
   AllocatedImage& get_draw_image() { return draw_image_; }
   AllocatedImage& get_depth_image() { return depth_image_; }
-  VkDescriptorSetLayout& get_gpu_scene_data_layout() { return gpu_scene_data_descriptor_layout_; }
+  VkDescriptorSetLayout& get_gpu_scene_data_layout() { return descriptor_manager_.gpu_scene_data_descriptor_layout; }
   resource_manager& get_resource_manager() { return resource_manager_; }
 
   GPUMeshBuffers upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
@@ -131,16 +131,12 @@ private:
   bool is_initialized_{false};
   int frame_number_{0};
 
-
   sdl_window window_;
-
   vk_gpu gpu_;
-
   vk_swapchain swapchain_;
-
   vk_command commands_;
-
   vk_sync sync_;
+  vk_descriptor_manager descriptor_manager_;
 
   std::vector<frame_data> frames_{FRAME_OVERLAP};
 
@@ -148,23 +144,14 @@ private:
 
   float render_scale_ = 1.f;
 
-  DescriptorAllocatorGrowable global_descriptor_allocator_;
-
   VkPipeline gradient_pipeline_;
   VkPipelineLayout gradient_pipeline_layout_;
 
   std::vector<VkFramebuffer> framebuffers_;
 
-  VkDescriptorSet draw_image_descriptors_;
-  VkDescriptorSetLayout draw_image_descriptor_layout_;
-
-  VkDescriptorSetLayout single_image_descriptor_layout_;
-
   GPUSceneData scene_data_;
 
   std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loaded_scenes_;
-
-  VkDescriptorSetLayout gpu_scene_data_descriptor_layout_;
 
   vk_deletion_service main_deletion_queue_;
 
@@ -176,10 +163,7 @@ private:
   draw_context main_draw_context_;
   std::unordered_map<std::string, std::shared_ptr<Node>> loaded_nodes_;
 
-  // immediate submit structures
-
   // draw resources
-
   AllocatedImage draw_image_;
   AllocatedImage depth_image_;
 
@@ -199,13 +183,13 @@ private:
 
   void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView);
 
-
   void immediate_submit(std::function<void(VkCommandBuffer cmd)> function);
 
   std::vector<std::unique_ptr<camera_positioner_interface>> camera_positioners_{1};
   uint32_t current_camera_positioner_index_{0};
   camera active_camera_{};
 
+  // utility services
   time_tracking_service time_tracking_service_;
 
   input_system input_system_;
@@ -219,7 +203,6 @@ private:
 
   void init_background_pipelines();
   void init_pipelines();
-  void init_descriptors();
   void init_imgui();
   void init_default_data();
   void init_renderables();

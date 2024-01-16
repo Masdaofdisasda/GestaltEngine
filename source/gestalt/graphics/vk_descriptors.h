@@ -2,6 +2,9 @@
 
 #include <vk_types.h>
 
+#include "vk_deletion_service.h"
+#include "vk_gpu.h"
+
 struct DescriptorLayoutBuilder {
   std::vector<VkDescriptorSetLayoutBinding> bindings;
 
@@ -60,4 +63,32 @@ private:
   std::vector<VkDescriptorPool> fullPools;
   std::vector<VkDescriptorPool> readyPools;
   uint32_t setsPerPool;
+};
+
+struct frame_data {
+  VkSemaphore swapchain_semaphore, render_semaphore;
+  VkFence render_fence;
+
+  VkCommandPool command_pool;
+  VkCommandBuffer main_command_buffer;
+
+  vk_deletion_service deletion_queue;
+  DescriptorAllocatorGrowable frame_descriptors;
+};
+
+class vk_descriptor_manager {
+  vk_gpu gpu_;
+  vk_deletion_service deletion_service_;
+
+public:
+  DescriptorAllocatorGrowable global_descriptor_allocator;
+
+  VkDescriptorSet draw_image_descriptors;
+  VkDescriptorSetLayout draw_image_descriptor_layout;
+
+  VkDescriptorSetLayout single_image_descriptor_layout;
+  VkDescriptorSetLayout gpu_scene_data_descriptor_layout;
+
+  void init(const vk_gpu& gpu, std::vector<frame_data>& frames, AllocatedImage draw_image);
+  void cleanup();
 };
