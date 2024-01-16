@@ -222,8 +222,10 @@ void vk_render_system::draw_geometry(VkCommandBuffer cmd) {
       sizeof(gpu_scene_data), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
   // add it to the deletion queue of this frame so it gets deleted once its been used
-  get_current_frame().deletion_queue.push_function(
-      [gpu_scene_data_buffer, this]() { resource_manager_.destroy_buffer(gpu_scene_data_buffer); });
+  get_current_frame().deletion_queue.push_function([gpu_scene_data_buffer, this]() {
+    vmaUnmapMemory(gpu_.allocator, gpu_scene_data_buffer.allocation);
+    resource_manager_.destroy_buffer(gpu_scene_data_buffer);
+  });
 
   gpu_scene_data* scene_uniform_data = nullptr;
 
@@ -231,9 +233,11 @@ void vk_render_system::draw_geometry(VkCommandBuffer cmd) {
   VmaAllocation allocation = gpu_scene_data_buffer.allocation;
   VkResult result = vmaMapMemory(gpu_.allocator, allocation, &mappedData);
   if (result == VK_SUCCESS) {
+    scene_uniform_data = static_cast<gpu_scene_data*>(mappedData);
   } else {
        fmt::println("Failed to map memory for scene data buffer");
   }
+  *scene_uniform_data = scene_data;
 
   // create a descriptor set that binds that buffer and update it
   VkDescriptorSet globalDescriptor = get_current_frame().frame_descriptors.allocate(
