@@ -31,7 +31,10 @@
 *.out
 *.app
 
+*.DS_Store
+.idea
 /project
+/cmake-build-debug
 /bin/shaders
 /bin/release/*.pdb
 /bin/debug/*.pdb

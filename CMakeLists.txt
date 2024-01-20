@@ -19,22 +19,78 @@ CPMAddPackage(
 
 find_package(Vulkan REQUIRED)
 message(STATUS "Vulkan found: INCLUDE_DIRS=${Vulkan_INCLUDE_DIRS}, LIBRARIES=${Vulkan_LIBRARIES}")
-find_package(SDL2 CONFIG REQUIRED)
-find_package(fmt CONFIG REQUIRED)
-find_package(imgui CONFIG REQUIRED)
-find_package(Stb REQUIRED)
-find_package(fastgltf CONFIG REQUIRED)
 
-include(FetchContent)
-FetchContent_Declare(
-    fetch_vk_bootstrap
-    GIT_REPOSITORY https://github.com/charles-lunarg/vk-bootstrap
-    GIT_TAG        v1.3.274
+CPMAddPackage(
+  NAME SDL2
+  GITHUB_REPOSITORY libsdl-org/SDL
+  GIT_TAG release-2.0.14  # Replace with the desired version
 )
-FetchContent_MakeAvailable(fetch_vk_bootstrap)
+if(SDL2_ADDED)
+  add_library(SDL2::SDL2 ALIAS SDL2)
+endif()
+
+CPMAddPackage(
+  NAME fmt
+  GITHUB_REPOSITORY fmtlib/fmt
+  GIT_TAG 10.2.1
+)
+
+CPMAddPackage(
+  NAME imgui
+  GITHUB_REPOSITORY ocornut/imgui
+  VERSION 1.79
+  DOWNLOAD_ONLY YES # Prevent CPM from trying to configure imgui as it doesn't have a CMakeLists.txt
+)
+if(imgui_ADDED)
+  # Add imgui as an interface library
+  add_library(imgui INTERFACE)
+  target_include_directories(imgui INTERFACE ${imgui_SOURCE_DIR})
+  # Specify source files to be compiled under the imgui target
+  target_sources(imgui INTERFACE
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    # Add other imgui source files you need
+  )
+  # Alias for the target (optional)
+  add_library(imgui::imgui ALIAS imgui)
+endif()
+
+
+CPMAddPackage(
+  NAME stb
+  GITHUB_REPOSITORY nothings/stb
+  GIT_TAG master
+  DOWNLOAD_ONLY YES
+)
+
+if(stb_ADDED)
+  add_library(stb INTERFACE)
+  target_include_directories(stb INTERFACE ${stb_SOURCE_DIR})
+endif()
+
+CPMAddPackage(
+  NAME fastgltf
+  GITHUB_REPOSITORY spnda/fastgltf
+  VERSION 0.6.1
+  # Additional configuration may be needed depending on the package
+)
+
+CPMAddPackage(
+  NAME vk-bootstrap
+  GITHUB_REPOSITORY charles-lunarg/vk-bootstrap
+  GIT_TAG v1.3.274
+)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+# Check if we are on macOS
+if(APPLE)
+    # Specific settings for macOS/Clang
+    message(STATUS "Configuring for macOS/Clang")
+    # You can add any macOS/Clang specific compile options here
+endif()
 
 if(MSVC)
     add_compile_options(/experimental:module /std:c++latest)
