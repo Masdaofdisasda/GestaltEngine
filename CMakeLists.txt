@@ -25,8 +25,21 @@ CPMAddPackage(
   GITHUB_REPOSITORY libsdl-org/SDL
   GIT_TAG release-2.0.14  # Replace with the desired version
 )
-if(SDL2_ADDED)
-  add_library(SDL2::SDL2 ALIAS SDL2)
+
+CPMAddPackage(
+  NAME glm
+  GITHUB_REPOSITORY g-truc/glm
+  GIT_TAG 0.9.9.8 
+)
+
+CPMAddPackage(
+  NAME VMA
+  GITHUB_REPOSITORY GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
+  GIT_TAG v3.0.1 
+)
+if(VMA_ADDED)
+  add_library(VMA INTERFACE)
+  target_include_directories(VMA INTERFACE ${VMA_SOURCE_DIR})
 endif()
 
 CPMAddPackage(
@@ -52,8 +65,6 @@ if(imgui_ADDED)
     ${imgui_SOURCE_DIR}/imgui_widgets.cpp
     # Add other imgui source files you need
   )
-  # Alias for the target (optional)
-  add_library(imgui::imgui ALIAS imgui)
 endif()
 
 
@@ -63,10 +74,9 @@ CPMAddPackage(
   GIT_TAG master
   DOWNLOAD_ONLY YES
 )
-
 if(stb_ADDED)
-  add_library(stb INTERFACE)
-  target_include_directories(stb INTERFACE ${stb_SOURCE_DIR})
+    add_library(stb INTERFACE)
+    target_include_directories(stb INTERFACE ${stb_SOURCE_DIR})
 endif()
 
 CPMAddPackage(
