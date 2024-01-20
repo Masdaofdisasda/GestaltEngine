@@ -2,7 +2,12 @@
 
 #include <VkBootstrap.h>
 
-void vk_gpu::init(bool use_validation_layers, sdl_window& window) {
+void vk_gpu::init(
+    bool use_validation_layers, sdl_window& window,
+    std::function<void(std::function<void(VkCommandBuffer)>)> immediate_submit_function) {
+
+  immediate_submit = immediate_submit_function;
+
   // create the vulkan instance
   vkb::InstanceBuilder builder;
 

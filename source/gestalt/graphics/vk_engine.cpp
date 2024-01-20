@@ -37,21 +37,19 @@ void render_engine::init() {
 
   window_.init({1920, 1080}); // todo : get window size from config
 
-  gpu_.init(use_validation_layers, window_);
+  gpu_.init(use_validation_layers, window_,
+            [this](auto func) { this->immediate_submit(std::move(func)); });
 
   deletion_service_.init(gpu_.device, gpu_.allocator);
 
-  resource_manager_.init(gpu_.device, gpu_.allocator,
-                         [this](auto func) { this->immediate_submit(std::move(func)); });
+  resource_manager_.init(gpu_);
 
   renderer_.init(gpu_, window_, resource_manager_, resize_requested_, stats_);
-   
-  // Scene manager
   scene_manager_.init(gpu_, resource_manager_, *this);
+  renderer_.scene_manager_ = &scene_manager_;
 
   register_gui_actions();
-  imgui_.init(gpu_, window_, renderer_.swapchain, gui_actions_,
-              [this](auto func) { this->immediate_submit(std::move(func)); });
+  imgui_.init(gpu_, window_, renderer_.swapchain, gui_actions_);
 
 
   renderer_.scene_data.ambientColor = glm::vec4(0.1f);
@@ -106,12 +104,12 @@ void render_engine::immediate_submit(std::function<void(VkCommandBuffer cmd)> fu
     VK_CHECK(vkWaitForFences(gpu_.device, 1, &renderer_.sync.imgui_fence, true, 9999999999));
 }
 
-GPUMeshBuffers render_engine::upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices) {
+gpu_mesh_buffers render_engine::upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices) {
     //> mesh_create_1
     const size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
     const size_t indexBufferSize = indices.size() * sizeof(uint32_t);
 
-    GPUMeshBuffers newSurface;
+    gpu_mesh_buffers newSurface;
 
     // create vertex buffer
     newSurface.vertexBuffer = resource_manager_.create_buffer(

@@ -6,11 +6,17 @@
 #include "vk_engine.h"
 #include "vk_initializers.h"
 #include "vk_types.h"
-#include <glm/gtx/quaternion.hpp>
 
 #include <fastgltf/glm_element_traits.hpp>
 #include <fastgltf/parser.hpp>
 #include <fastgltf/tools.hpp>
+
+#include "camera.h"
+#include "camera.h"
+#include "camera.h"
+#include "camera.h"
+#include "camera.h"
+#include "camera.h"
 
 VkFilter extract_filter(fastgltf::Filter filter) {
   switch (filter) {
@@ -322,9 +328,9 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(render_engine* engine,
                                    glm::vec3 sc(transform.scale[0], transform.scale[1],
                                                 transform.scale[2]);
 
-                                   glm::mat4 tm = glm::translate(glm::mat4(1.f), tl);
-                                   glm::mat4 rm = glm::toMat4(rot);
-                                   glm::mat4 sm = glm::scale(glm::mat4(1.f), sc);
+                                   glm::mat4 tm = translate(glm::mat4(1.f), tl);
+                                   glm::mat4 rm = toMat4(rot);
+                                   glm::mat4 sm = scale(glm::mat4(1.f), sc);
 
                                    newNode->localTransform = tm * rm * sm;
                                  }},
@@ -475,6 +481,73 @@ std::optional<AllocatedImage> load_image(render_engine* engine, fastgltf::Asset&
   } else {
     return newImage;
   }
+}
+
+void vk_scene_manager::load_scene_from_gltf(const std::string& filename) {
+
+  //TODO
+
+  std::vector<Vertex> vertices{4};
+  vertices[0].position = {-1.f, -1.f, 0.f};
+  vertices[0].color = glm::vec4(1.f);
+  vertices[0].normal = {0.f, 0.f, 1.f};
+  vertices[0].uv_x = 0.5f;
+  vertices[0].uv_y = 0.5f;
+  vertices[1].position = {1.f, -1.f, 0.f};
+  vertices[1].color = glm::vec4(1.f);
+  vertices[1].normal = {0.f, 0.f, 1.f};
+  vertices[1].uv_x = 0.5f;
+  vertices[1].uv_y = 0.5f;
+  vertices[2].position = {1.f, 1.f, 0.f};
+  vertices[2].color = glm::vec4(1.f);
+  vertices[2].normal = {0.f, 0.f, 1.f};
+  vertices[2].uv_x = 0.5f;
+  vertices[2].uv_y = 0.5f;
+  vertices[3].position = {-1.f, 1.f, 0.f};
+  vertices[3].color = glm::vec4(1.f);
+  vertices[3].normal = {0.f, 0.f, 1.f};
+  vertices[3].uv_x = 0.5f;
+  vertices[3].uv_y = 0.5f;
+
+  std::vector<uint32_t> indices = {
+      0, 1, 2, 2, 3, 0,
+  };
+
+  entity entity = create_entity(); // todo maybe use builder pattern?
+
+  add_mesh_component(entity, vertices, indices);
+  add_transform_component(entity, glm::vec3(2.f, 0.f, 0.f), glm::quat(0.f, 0.f, 0.f, 0.f));
+
+  //MaterialComponent material{};
+  //material.setBaseColorTexture();
+  // load textures and so on
+
+  // after all meshes are loaded:
+  mesh_buffers_ = resource_manager_.upload_mesh(indices_, vertices_);
+
+}
+
+void vk_scene_manager::add_transform_component(entity entity, const glm::vec3& position,
+                                               const glm::quat& rotation, const glm::vec3& scale) {
+  const transform_component transform{position, rotation, scale};
+  transforms_.push_back(transform);
+  entity_to_transform_[entity] = transforms_.size() - 1;
+}
+
+void vk_scene_manager::add_mesh_component(const entity entity, std::vector<Vertex>& vertices,
+    std::vector<uint32_t>& indices) {
+
+  mesh_component mesh;
+  mesh.vertex_offset_ = vertices_.size();
+  mesh.first_index_ = indices_.size();
+  mesh.vertex_count_ = vertices.size();
+  mesh.index_count_ = indices.size();
+
+  vertices_.insert(vertices_.end(), vertices.begin(), vertices.end());
+  indices_.insert(indices_.end(), indices.begin(), indices.end());
+
+  meshes_.push_back(mesh);
+  entity_to_mesh_[entity] = meshes_.size() - 1;
 }
 
 void vk_scene_manager::set_parent(entity child, entity parent) {

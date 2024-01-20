@@ -18,14 +18,77 @@ AllocatedBuffer resource_manager::create_buffer(size_t allocSize, VkBufferUsageF
   AllocatedBuffer newBuffer;
 
   // allocate the buffer
-  VK_CHECK(vmaCreateBuffer(allocator_, &bufferInfo, &vmaallocInfo, &newBuffer.buffer,
+  VK_CHECK(vmaCreateBuffer(gpu_.allocator, &bufferInfo, &vmaallocInfo, &newBuffer.buffer,
                            &newBuffer.allocation, &newBuffer.info));
 
   return newBuffer;
 }
 
+gpu_mesh_buffers resource_manager::upload_mesh(const std::span<uint32_t> indices, const std::span<Vertex> vertices) {
+  //> mesh_create_1
+  const size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
+  const size_t indexBufferSize = indices.size() * sizeof(uint32_t);
+
+  gpu_mesh_buffers newSurface;
+
+  // create vertex buffer
+  newSurface.vertexBuffer = create_buffer(
+      vertexBufferSize,
+      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+          | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+      VMA_MEMORY_USAGE_GPU_ONLY);
+
+  // find the adress of the vertex buffer
+  VkBufferDeviceAddressInfo deviceAdressInfo{.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+                                             .buffer = newSurface.vertexBuffer.buffer};
+  newSurface.vertexBufferAddress = vkGetBufferDeviceAddress(gpu_.device, &deviceAdressInfo);
+
+  // create index buffer
+  newSurface.indexBuffer = create_buffer(
+      indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+      VMA_MEMORY_USAGE_GPU_ONLY);
+
+  //< mesh_create_1
+  //
+  //> mesh_create_2
+  AllocatedBuffer staging = create_buffer(vertexBufferSize + indexBufferSize,
+                                                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                                            VMA_MEMORY_USAGE_CPU_ONLY);
+
+  void* data;
+  VmaAllocation allocation = staging.allocation;
+  VK_CHECK(vmaMapMemory(gpu_.allocator, allocation, &data));
+
+  // copy vertex buffer
+  memcpy(data, vertices.data(), vertexBufferSize);
+  // copy index buffer
+  memcpy((char*)data + vertexBufferSize, indices.data(), indexBufferSize);
+
+  gpu_.immediate_submit([&](VkCommandBuffer cmd) {
+    VkBufferCopy vertex_copy;
+    vertex_copy.dstOffset = 0;
+    vertex_copy.srcOffset = 0;
+    vertex_copy.size = vertexBufferSize;
+
+    vkCmdCopyBuffer(cmd, staging.buffer, newSurface.vertexBuffer.buffer, 1, &vertex_copy);
+
+    VkBufferCopy index_copy;
+    index_copy.dstOffset = 0;
+    index_copy.srcOffset = vertexBufferSize;
+    index_copy.size = indexBufferSize;
+
+    vkCmdCopyBuffer(cmd, staging.buffer, newSurface.indexBuffer.buffer, 1, &index_copy);
+  });
+
+  vmaUnmapMemory(gpu_.allocator, allocation);
+  destroy_buffer(staging);
+
+  return newSurface;
+  //< mesh_create_2
+}
+
 void resource_manager::destroy_buffer(const AllocatedBuffer& buffer) {
-  vmaDestroyBuffer(allocator_, buffer.buffer, buffer.allocation);
+  vmaDestroyBuffer(gpu_.allocator, buffer.buffer, buffer.allocation);
 }
 
 
@@ -47,7 +110,8 @@ AllocatedImage resource_manager::create_image(VkExtent3D size, VkFormat format,
   allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
   // allocate and create the image
-  VK_CHECK(vmaCreateImage(allocator_, &img_info, &allocinfo, &newImage.image, &newImage.allocation,
+  VK_CHECK(vmaCreateImage(gpu_.allocator, &img_info, &allocinfo, &newImage.image,
+                          &newImage.allocation,
                           nullptr));
 
   // if the format is a depth format, we will need to have it use the correct
@@ -62,7 +126,7 @@ AllocatedImage resource_manager::create_image(VkExtent3D size, VkFormat format,
       = vkinit::imageview_create_info(format, newImage.image, aspectFlag);
   view_info.subresourceRange.levelCount = img_info.mipLevels;
 
-  VK_CHECK(vkCreateImageView(device_, &view_info, nullptr, &newImage.imageView));
+  VK_CHECK(vkCreateImageView(gpu_.device, &view_info, nullptr, &newImage.imageView));
 
   return newImage;
 }
@@ -79,7 +143,7 @@ AllocatedImage resource_manager::create_image(void* data, VkExtent3D size, VkFor
       size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
       mipmapped);
 
-  immediate_submit_function_([&](VkCommandBuffer cmd) {
+  gpu_.immediate_submit([&](VkCommandBuffer cmd) {
     vkutil::transition_image(cmd, new_image.image, VK_IMAGE_LAYOUT_UNDEFINED,
                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
@@ -112,6 +176,6 @@ AllocatedImage resource_manager::create_image(void* data, VkExtent3D size, VkFor
 }
 
 void resource_manager::destroy_image(const AllocatedImage& img) {
-  vkDestroyImageView(device_, img.imageView, nullptr);
-  vmaDestroyImage(allocator_, img.image, img.allocation);
+  vkDestroyImageView(gpu_.device, img.imageView, nullptr);
+  vmaDestroyImage(gpu_.allocator, img.image, img.allocation);
 }

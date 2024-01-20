@@ -37,25 +37,23 @@ public:
   VkDescriptorSetLayout& get_gpu_scene_data_layout() { return renderer_.descriptor_manager.gpu_scene_data_descriptor_layout; }
   resource_manager& get_resource_manager() { return resource_manager_; }
 
-  GPUMeshBuffers upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
+  gpu_mesh_buffers upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices); //soon obsolete
 
 private:
   bool is_initialized_{false};
   bool quit_{false};
 
   sdl_window window_;
-  vk_gpu gpu_;
-  vk_render_system renderer_;
-  vk_scene_manager scene_manager_;
+  vk_gpu gpu_ = {};
+
+  vk_render_system renderer_ = {};
+  vk_scene_manager scene_manager_ = {};
 
   gui_actions gui_actions_;
-  imgui_gui imgui_;
+  imgui_gui imgui_ = {};
 
+  vk_deletion_service deletion_service_ = {};
 
-  vk_deletion_service deletion_service_;
-
-
-  int current_background_effect_{0};
 
   void update_scene();
 
@@ -70,9 +68,9 @@ private:
 
   input_system input_system_;
 
-  resource_manager resource_manager_;
+  resource_manager resource_manager_ = {};
 
-  engine_stats stats_;
+  engine_stats stats_ = {};
 
   bool resize_requested_{false};
   bool freeze_rendering_{false};

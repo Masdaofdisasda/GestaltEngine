@@ -10,8 +10,7 @@
 #include "vk_pipelines.h"
 
 void imgui_gui::init(
-    vk_gpu& gpu, sdl_window& window, vk_swapchain& swapchain, gui_actions& actions,
-    std::function<void(std::function<void(VkCommandBuffer)>)> immediate_submit_function) {
+    vk_gpu& gpu, sdl_window& window, vk_swapchain& swapchain, gui_actions& actions) {
   gpu_ = gpu;
   window_ = window;
   swapchain_ = swapchain;
@@ -68,7 +67,7 @@ void imgui_gui::init(
   ImGui_ImplVulkan_Init(&init_info, VK_NULL_HANDLE);
 
   // execute a gpu command to upload imgui font textures
-  immediate_submit_function([&](VkCommandBuffer cmd) { ImGui_ImplVulkan_CreateFontsTexture(); });
+  gpu_.immediate_submit([&](VkCommandBuffer cmd) { ImGui_ImplVulkan_CreateFontsTexture(); });
 
   // clear font textures from cpu data
   ImGui_ImplVulkan_DestroyFontsTexture();

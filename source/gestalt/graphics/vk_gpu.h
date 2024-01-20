@@ -16,7 +16,10 @@ public:
   VkQueue graphics_queue;
   uint32_t graphics_queue_family;
   VkSurfaceKHR surface;
+  
+  std::function<void(std::function<void(VkCommandBuffer)>)> immediate_submit;
 
-  void init(bool use_validation_layers, sdl_window& window);
+  void init(bool use_validation_layers, sdl_window& window,
+            std::function<void(std::function<void(VkCommandBuffer)>)> immediate_submit_function);
   void cleanup();
 };

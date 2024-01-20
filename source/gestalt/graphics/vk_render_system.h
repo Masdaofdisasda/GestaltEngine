@@ -4,6 +4,7 @@
 #include "resource_manager.h"
 #include "vk_types.h"
 #include "vk_gpu.h"
+#include "vk_loader.h"
 
 #include "vk_pipelines.h"
 #include "vk_swapchain.h"
@@ -19,6 +20,7 @@ class vk_render_system {
   bool resize_requested_{false}; // TODO
 
 public:
+  vk_scene_manager* scene_manager_; //WIP
 
   vk_swapchain swapchain;
   vk_command commands;
@@ -41,7 +43,8 @@ public:
 
   gpu_scene_data scene_data;
 
-  void init(const vk_gpu& gpu, const sdl_window& window, resource_manager& resource_manager, const bool& resize_requested, engine_stats stats
+  void init(const vk_gpu& gpu, const sdl_window& window, resource_manager& resource_manager, const bool& resize_requested,
+            engine_stats stats
       ) {
 
     gpu_ = gpu;

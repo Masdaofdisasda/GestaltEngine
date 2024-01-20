@@ -76,7 +76,7 @@ struct Vertex {
 };
 
 // holds the resources needed for a mesh
-struct GPUMeshBuffers {
+struct gpu_mesh_buffers {
   AllocatedBuffer indexBuffer;
   AllocatedBuffer vertexBuffer;
   VkDeviceAddress vertexBufferAddress;
@@ -163,7 +163,7 @@ struct MeshAsset {
   std::string name;
 
   std::vector<GeoSurface> surfaces;
-  GPUMeshBuffers meshBuffers;
+  gpu_mesh_buffers meshBuffers;
 };
 struct mesh_node : Node {
   std::shared_ptr<MeshAsset> mesh;

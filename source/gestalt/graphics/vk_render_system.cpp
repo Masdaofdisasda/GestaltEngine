@@ -198,13 +198,27 @@ void vk_render_system::draw_geometry(VkCommandBuffer cmd) {
   // begin clock
   auto start = std::chrono::system_clock::now();
 
+  /* test */
+  auto mesh = scene_manager_->get_meshes().at(0);
+  render_object def;
+  def.index_count = mesh.index_count_;
+  def.first_index = mesh.first_index_;
+  def.index_buffer = scene_manager_->mesh_buffers_.indexBuffer.buffer;
+  def.material = main_draw_context_.opaque_surfaces.at(0).material;
+  def.bounds = Bounds{};
+  def.transform = glm::mat4(1.f);
+  def.vertex_buffer_address = scene_manager_->mesh_buffers_.vertexBufferAddress;
+  main_draw_context_.opaque_surfaces.push_back(def);
+
+  /* test */
+
   std::vector<uint32_t> opaque_draws;
   opaque_draws.reserve(main_draw_context_.opaque_surfaces.size());
 
   for (size_t i = 0; i < main_draw_context_.opaque_surfaces.size(); i++) {
-    if (is_visible(main_draw_context_.opaque_surfaces[i], scene_data.viewproj)) {
+    //if (is_visible(main_draw_context_.opaque_surfaces[i], scene_data.viewproj)) {
       opaque_draws.push_back(i);
-    }
+    //}
   }
 
   // sort the opaque surfaces by material and mesh
@@ -227,16 +241,10 @@ void vk_render_system::draw_geometry(VkCommandBuffer cmd) {
     resource_manager_.destroy_buffer(gpu_scene_data_buffer);
   });
 
-  gpu_scene_data* scene_uniform_data = nullptr;
-
-  void* mappedData;
+  void* mapped_data;
   VmaAllocation allocation = gpu_scene_data_buffer.allocation;
-  VkResult result = vmaMapMemory(gpu_.allocator, allocation, &mappedData);
-  if (result == VK_SUCCESS) {
-    scene_uniform_data = static_cast<gpu_scene_data*>(mappedData);
-  } else {
-       fmt::println("Failed to map memory for scene data buffer");
-  }
+  VK_CHECK(vmaMapMemory(gpu_.allocator, allocation, &mapped_data));
+  const auto scene_uniform_data = static_cast<gpu_scene_data*>(mapped_data);
   *scene_uniform_data = scene_data;
 
   // create a descriptor set that binds that buffer and update it
