@@ -33,7 +33,7 @@ public:
 
   [[nodiscard]] vk_gpu get_gpu() const { return gpu_; }
   gltf_metallic_roughness& get_metallic_roughness_material() { return renderer_.metal_rough_material_; }
-  default_material& get_default_material() { return default_material_; }
+  default_material& get_default_material() { return scene_manager_.default_material_; }
   VkDescriptorSetLayout& get_gpu_scene_data_layout() { return renderer_.descriptor_manager.gpu_scene_data_descriptor_layout; }
   resource_manager& get_resource_manager() { return resource_manager_; }
 
@@ -46,21 +46,14 @@ private:
   sdl_window window_;
   vk_gpu gpu_;
   vk_render_system renderer_;
+  vk_scene_manager scene_manager_;
 
   gui_actions gui_actions_;
   imgui_gui imgui_;
 
-  std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loaded_scenes_;
 
   vk_deletion_service deletion_service_;
 
-  GPUMeshBuffers rectangle_;
-
-  MaterialInstance default_data_;
-
-  std::unordered_map<std::string, std::shared_ptr<Node>> loaded_nodes_;
-
-  default_material default_material_;
 
   int current_background_effect_{0};
 
@@ -85,6 +78,4 @@ private:
   bool freeze_rendering_{false};
 
   void register_gui_actions();
-  void init_default_data();
-  void init_renderables();
 };

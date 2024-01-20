@@ -5,14 +5,15 @@
 #include <filesystem>
 #include <unordered_map>
 #include <fastgltf/types.hpp>
+#include <glm/fwd.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/transform.hpp>
 
+#include "resource_manager.h"
 #include "vk_descriptors.h"
 
 // forward declaration
 class render_engine;
-
-
-
 
 struct LoadedGLTF : public IRenderable {
   // storage for all the data on a given glTF file
@@ -45,3 +46,217 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(render_engine* engine,
 
 std::optional<AllocatedImage> load_image(render_engine* engine, fastgltf::Asset& asset,
                                          fastgltf::Image& image);
+
+using entity = uint32_t;
+
+struct entity_data {
+  entity parent;
+  std::vector<entity> children;
+};
+
+class MeshComponent {
+public:
+  // Constructor, getters, setters, and other member functions
+  // Add data members for mesh data, such as vertex buffers, index buffers, etc.
+
+private:
+  // Mesh data members
+};
+
+class CameraComponent {
+public:
+  CameraComponent(const glm::mat4& projectionMatrix);
+
+  // Getters and setters for camera properties
+  const glm::mat4& getProjectionMatrix() const;
+  void setProjectionMatrix(const glm::mat4& projectionMatrix);
+
+private:
+  glm::mat4 projectionMatrix_;
+};
+
+enum class LightType { Directional, Point, Spot };
+
+class LightComponent {
+public:
+  LightComponent(LightType type, const glm::vec3& color, float intensity);
+
+  void setType(LightType type);
+  void setColor(const glm::vec3& color);
+  void setIntensity(float intensity);
+  void setDirection(const glm::vec3& direction);
+  void setSpotProperties(float innerCone, float outerCone);
+
+  LightType getType() const;
+  const glm::vec3& getColor() const;
+  float getIntensity() const;
+  const glm::vec3& getDirection() const;
+  float getInnerCone() const;
+  float getOuterCone() const;
+
+private:
+  LightType type_;
+  glm::vec3 color_;
+  float intensity_;
+  glm::vec3 direction_;  // Used for directional and spot lights
+  float innerCone_;      // Used for spot lights
+  float outerCone_;      // Used for spot lights
+};
+
+class MaterialComponent {
+public:
+  MaterialComponent();
+
+  void setBaseColorTexture(const std::string& texturePath);
+  void setMetallicRoughnessTexture(const std::string& texturePath);
+  void setNormalTexture(const std::string& texturePath);
+  void setEmissiveTexture(const std::string& texturePath);
+  void setOcclusionTexture(const std::string& texturePath);
+
+  void setBaseColorFactor(const glm::vec4& color);
+  void setMetallicFactor(float metallic);
+  void setRoughnessFactor(float roughness);
+
+  const std::string& getBaseColorTexture() const;
+  const std::string& getMetallicRoughnessTexture() const;
+  const std::string& getNormalTexture() const;
+  const std::string& getEmissiveTexture() const;
+  const std::string& getOcclusionTexture() const;
+
+  const glm::vec4& getBaseColorFactor() const;
+  float getMetallicFactor() const;
+  float getRoughnessFactor() const;
+
+private:
+  std::string baseColorTexture_;
+  std::string metallicRoughnessTexture_;
+  std::string normalTexture_;
+  std::string emissiveTexture_;
+  std::string occlusionTexture_;
+
+  glm::vec4 baseColorFactor_;
+  float metallicFactor_;
+  float roughnessFactor_;
+};
+
+class TransformComponent {
+public:
+  TransformComponent(const glm::vec3& position, const glm::quat& rotation, const glm::vec3& scale = glm::vec3(1.f));
+
+  // Getters and setters for position
+  const glm::vec3& getPosition() const { return position_; }
+  void setPosition(const glm::vec3& position) { position_ = position; }
+
+  // Getters and setters for rotation (using quaternions)
+  const glm::quat& getRotation() const { return rotation_; }
+  void setRotation(const glm::quat& rotation) { rotation_ = rotation; }
+
+  // Getters and setters for scale
+  const glm::vec3& getScale() const { return scale_; }
+  void setScale(const glm::vec3& scale) { scale_ = scale; }
+
+  // Function to compute the model matrix
+  glm::mat4 getModelMatrix() const {
+    glm::mat4 translationMatrix = translate(position_);
+    glm::mat4 rotationMatrix = mat4_cast(rotation_);
+    glm::mat4 scaleMatrix = scale(scale_);
+    return translationMatrix * rotationMatrix * scaleMatrix;
+  }
+
+private:
+  glm::vec3 position_;
+  glm::quat rotation_;
+  glm::vec3 scale_;
+};
+
+// Component storage types
+using entity_container = std::vector<entity>;
+using mesh_container = std::vector<MeshComponent>;
+using camera_container = std::vector<CameraComponent>;
+using light_container = std::vector<LightComponent>;
+using material_container = std::vector<MaterialComponent>;
+using transform_container = std::vector<TransformComponent>;
+
+/**
+ * @brief Class responsible for managing scenes, entities, and their components.
+ */
+class vk_scene_manager {
+public:
+
+  MaterialInstance default_data_;
+
+  default_material default_material_;
+
+  std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loaded_scenes_;
+
+  void init(const vk_gpu& gpu, const resource_manager& resource_manager, render_engine& render_engine) {
+    gpu_ = gpu;
+       resource_manager_ = resource_manager;
+    deletion_service_.init(gpu.device, gpu.allocator);
+
+    init_default_data();
+    init_renderables(render_engine);
+  }
+
+  void cleanup() {
+       deletion_service_.flush();
+  }
+
+  void load_scene_from_gltf(const std::string& filename);
+
+  entity create_entity() {
+    const entity new_entity = {next_entity_id_++};
+    entities_.push_back(new_entity);
+    return new_entity;
+  }
+
+  void add_mesh_component(entity entity, const MeshComponent& mesh);
+
+  void add_camera_component(entity entity, const CameraComponent& camera);
+
+  void add_light_component(entity entity, const LightComponent& light);
+
+  void add_material_component(entity entity, const MaterialComponent& material);
+
+  void add_transform_component(entity entity, const TransformComponent& transform);
+
+  const camera_container& get_cameras() const;
+
+  const mesh_container& get_meshes() const;
+
+  const light_container& get_lights() const;
+
+  void set_parent(entity child, entity parent);
+
+  const std::vector<entity>& get_children(entity entity) const;
+
+  entity get_parent(entity entity) const;
+
+  // Add more methods for other operations like updating, rendering, etc.
+
+private:
+  resource_manager resource_manager_;
+  vk_deletion_service deletion_service_;
+
+  vk_gpu gpu_; //TODO remove
+
+  void init_default_data();
+  void init_renderables(render_engine& render_engine);
+  // Component containers
+  entity_container entities_;
+  mesh_container meshes_;
+  camera_container cameras_;
+  light_container lights_;
+  material_container materials_;
+  transform_container transforms_;
+
+  // Entity to component mapping (for example, entity to its mesh component index)
+  std::unordered_map<entity, size_t> entityToMesh_;
+
+  // Add similar mappings for other components
+
+  std::unordered_map<entity, entity_data> entity_hierarchy_;
+
+  // Next available entity ID
+  entity next_entity_id_ = 0;
+};

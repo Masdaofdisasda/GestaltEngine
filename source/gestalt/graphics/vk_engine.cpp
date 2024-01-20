@@ -28,7 +28,7 @@
 
 render_engine* loaded_engine = nullptr;
 
-constexpr bool bUseValidationLayers = true;
+constexpr bool use_validation_layers = true;
 
 void render_engine::init() {
   // only one engine initialization is allowed with the application.
@@ -37,7 +37,7 @@ void render_engine::init() {
 
   window_.init({1920, 1080}); // todo : get window size from config
 
-  gpu_.init(bUseValidationLayers, window_);
+  gpu_.init(use_validation_layers, window_);
 
   deletion_service_.init(gpu_.device, gpu_.allocator);
 
@@ -47,8 +47,7 @@ void render_engine::init() {
   renderer_.init(gpu_, window_, resource_manager_, resize_requested_, stats_);
    
   // Scene manager
-  init_default_data();
-  init_renderables();
+  scene_manager_.init(gpu_, resource_manager_, *this);
 
   register_gui_actions();
   imgui_.init(gpu_, window_, renderer_.swapchain, gui_actions_,
@@ -79,99 +78,6 @@ void render_engine::register_gui_actions() {
   };
   gui_actions_.get_stats = [this]() -> engine_stats& { return stats_; };
   gui_actions_.get_scene_data = [this]() -> gpu_scene_data& { return renderer_.scene_data; };
-}
-
-void render_engine::init_default_data() {
-    std::array<Vertex, 4> rect_vertices;
-
-    rect_vertices[0].position = {0.5, -0.5, 0};
-    rect_vertices[1].position = {0.5, 0.5, 0};
-    rect_vertices[2].position = {-0.5, -0.5, 0};
-    rect_vertices[3].position = {-0.5, 0.5, 0};
-
-    rect_vertices[0].color = {0, 0, 0, 1};
-    rect_vertices[1].color = {0.5, 0.5, 0.5, 1};
-    rect_vertices[2].color = {1, 0, 0, 1};
-    rect_vertices[3].color = {0, 1, 0, 1};
-
-    rect_vertices[0].uv_x = 1;
-    rect_vertices[0].uv_y = 0;
-    rect_vertices[1].uv_x = 0;
-    rect_vertices[1].uv_y = 0;
-    rect_vertices[2].uv_x = 1;
-    rect_vertices[2].uv_y = 1;
-    rect_vertices[3].uv_x = 0;
-    rect_vertices[3].uv_y = 1;
-
-    std::array<uint32_t, 6> rect_indices;
-
-    rect_indices[0] = 0;
-    rect_indices[1] = 1;
-    rect_indices[2] = 2;
-
-    rect_indices[3] = 2;
-    rect_indices[4] = 1;
-    rect_indices[5] = 3;
-
-    rectangle_ = upload_mesh(rect_indices, rect_vertices);
-
-    // 3 default textures, white, grey, black. 1 pixel each
-    uint32_t white = 0xFFFFFFFF;
-    default_material_.white_image = resource_manager_.create_image(
-        (void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
-                               VK_IMAGE_USAGE_SAMPLED_BIT);
-
-    uint32_t grey = 0xAAAAAAFF;
-    default_material_.grey_image = resource_manager_.create_image(
-        (void*)&grey, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
-                              VK_IMAGE_USAGE_SAMPLED_BIT);
-
-    uint32_t black = 0x000000FF;
-    default_material_.black_image = resource_manager_.create_image(
-        (void*)&black, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
-                               VK_IMAGE_USAGE_SAMPLED_BIT);
-
-    // checkerboard image
-    uint32_t magenta = 0xFF00FFFF;
-    constexpr size_t checkerboard_size = 256;
-    std::array<uint32_t, checkerboard_size> pixels;  // for 16x16 checkerboard texture
-    for (int x = 0; x < 16; x++) {
-      for (int y = 0; y < 16; y++) {
-        pixels[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
-      }
-    }
-    default_material_.error_checkerboard_image = resource_manager_.create_image(
-        pixels.data(), VkExtent3D{16, 16, 1},
-                                           VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-
-    VkSamplerCreateInfo sampl = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
-
-    sampl.magFilter = VK_FILTER_NEAREST;
-    sampl.minFilter = VK_FILTER_NEAREST;
-
-    vkCreateSampler(gpu_.device, &sampl, nullptr, &default_material_.default_sampler_nearest);
-
-    sampl.magFilter = VK_FILTER_LINEAR;
-    sampl.minFilter = VK_FILTER_LINEAR;
-    vkCreateSampler(gpu_.device, &sampl, nullptr, &default_material_.default_sampler_linear);
-
-    deletion_service_.push_function(
-        [this]() { resource_manager_.destroy_image(default_material_.white_image); });
-    deletion_service_.push_function(
-        [this]() { resource_manager_.destroy_image(default_material_.grey_image); });
-    deletion_service_.push_function(
-        [this]() { resource_manager_.destroy_image(default_material_.error_checkerboard_image); });
-    deletion_service_.push(default_material_.default_sampler_nearest);
-    deletion_service_.push(default_material_.default_sampler_linear);
-}
-
-void render_engine::init_renderables() {
-    std::string structurePath = {R"(..\..\assets\structure.glb)"};
-    auto structureFile = loadGltf(this, structurePath);
-
-    assert(structureFile.has_value());
-
-    loaded_scenes_["structure"] = *structureFile;
 }
 
 void render_engine::immediate_submit(std::function<void(VkCommandBuffer cmd)> function) {
@@ -267,10 +173,11 @@ void render_engine::cleanup() {
 
       vkDeviceWaitIdle(gpu_.device);
 
-      loaded_scenes_.clear();
+      scene_manager_.loaded_scenes_.clear();
 
       deletion_service_.flush(); // needed?
 
+      scene_manager_.cleanup();
       renderer_.cleanup();
       gpu_.cleanup();
       window_.cleanup();
@@ -294,7 +201,7 @@ void render_engine::update_scene() {
     renderer_.scene_data.proj = projection;
     renderer_.scene_data.viewproj = projection * view;
 
-    loaded_scenes_["structure"]->Draw(glm::mat4{1.f},  renderer_.main_draw_context_);
+    scene_manager_.loaded_scenes_["structure"]->Draw(glm::mat4{1.f}, renderer_.main_draw_context_);
 }
 
 void render_engine::run()

@@ -37,3 +37,4 @@
 /bin/debug/*.pdb
 bin/debug/imgui.ini
 bin/release/imgui.ini
+/assets/models/*

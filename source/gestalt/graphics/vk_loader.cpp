@@ -476,3 +476,81 @@ std::optional<AllocatedImage> load_image(render_engine* engine, fastgltf::Asset&
     return newImage;
   }
 }
+
+void vk_scene_manager::set_parent(entity child, entity parent) {
+  // Remove child from its current parent, if any
+  if (entity_hierarchy_[child].parent != 0) {
+    auto& siblings = entity_hierarchy_[entity_hierarchy_[child].parent].children;
+    siblings.erase(std::remove(siblings.begin(), siblings.end(), child), siblings.end());
+  }
+
+  // Set the new parent
+  entity_hierarchy_[child].parent = parent;
+
+  // Add child to the new parent's children
+  entity_hierarchy_[parent].children.push_back(child);
+}
+
+const std::vector<entity>& vk_scene_manager::get_children(entity entity) const {
+  return entity_hierarchy_.at(entity).children;
+}
+
+entity vk_scene_manager::get_parent(entity entity) const { return entity_hierarchy_.at(entity).parent; }
+
+void vk_scene_manager::init_default_data() {
+
+  // 3 default textures, white, grey, black. 1 pixel each
+  uint32_t white = 0xFFFFFFFF;
+  default_material_.white_image = resource_manager_.create_image(
+      (void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+
+  uint32_t grey = 0xAAAAAAFF;
+  default_material_.grey_image = resource_manager_.create_image(
+      (void*)&grey, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+
+  uint32_t black = 0x000000FF;
+  default_material_.black_image = resource_manager_.create_image(
+      (void*)&black, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+
+  // checkerboard image
+  uint32_t magenta = 0xFF00FFFF;
+  constexpr size_t checkerboard_size = 256;
+  std::array<uint32_t, checkerboard_size> pixels;  // for 16x16 checkerboard texture
+  for (int x = 0; x < 16; x++) {
+    for (int y = 0; y < 16; y++) {
+      pixels[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
+    }
+  }
+  default_material_.error_checkerboard_image = resource_manager_.create_image(
+      pixels.data(), VkExtent3D{16, 16, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+
+  VkSamplerCreateInfo sampl = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+
+  sampl.magFilter = VK_FILTER_NEAREST;
+  sampl.minFilter = VK_FILTER_NEAREST;
+
+  vkCreateSampler(gpu_.device, &sampl, nullptr, &default_material_.default_sampler_nearest);
+
+  sampl.magFilter = VK_FILTER_LINEAR;
+  sampl.minFilter = VK_FILTER_LINEAR;
+  vkCreateSampler(gpu_.device, &sampl, nullptr, &default_material_.default_sampler_linear);
+
+  deletion_service_.push_function(
+      [this]() { resource_manager_.destroy_image(default_material_.white_image); });
+  deletion_service_.push_function(
+      [this]() { resource_manager_.destroy_image(default_material_.grey_image); });
+  deletion_service_.push_function(
+      [this]() { resource_manager_.destroy_image(default_material_.error_checkerboard_image); });
+  deletion_service_.push(default_material_.default_sampler_nearest);
+  deletion_service_.push(default_material_.default_sampler_linear);
+}
+
+void vk_scene_manager::init_renderables(render_engine& render_engine) {
+  std::string structurePath
+      = {R"(..\..\assets\Models\MetalRoughSpheres\glTF-Binary\MetalRoughSpheres.glb)"};
+  auto structureFile = loadGltf(&render_engine, structurePath);
+
+  assert(structureFile.has_value());
+
+  loaded_scenes_["structure"] = *structureFile;
+}
