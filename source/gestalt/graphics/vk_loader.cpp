@@ -479,7 +479,7 @@ std::optional<AllocatedImage> load_image(render_engine* engine, fastgltf::Asset&
 
 void vk_scene_manager::load_scene_from_gltf(const std::string& filename) {
 
-  //TODO
+  //TODO load from file and parse
 
   std::vector<Vertex> vertices{4};
   vertices[0].position = {-1.f, -1.f, 0.f};
@@ -507,16 +507,16 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& filename) {
       0, 1, 2, 2, 3, 0,
   };
 
-  entity entity = create_entity(); // todo maybe use builder pattern?
-
-  add_mesh_component(entity, vertices, indices);
-  add_transform_component(entity, glm::vec3(2.f, 0.f, 0.f), glm::quat(0.f, 0.f, 0.f, 0.f));
-
-  root_.children.push_back(entity);
-
-  //MaterialComponent material{};
-  //material.setBaseColorTexture();
-  // load textures and so on
+  for (int i = 0; i < 10; ++i) {
+    for (int j = 0; j < 10; ++j) {
+      entity entity = create_entity();  // todo maybe use builder pattern?
+      add_mesh_component(entity, vertices, indices);
+      add_transform_component(entity, glm::vec3(i-5.f, j-5.f, 10.f), glm::quat(0.f, 0.f, 0.f, 0.f), glm::vec3(0.4f));
+      root_.children.push_back(entity);
+      add_material_component(entity, default_data_);
+      // load textures and so on
+    }
+  }
 
   // after all meshes are loaded:
   mesh_buffers_ = resource_manager_.upload_mesh(indices_, vertices_);
@@ -566,20 +566,24 @@ const std::vector<entity>& vk_scene_manager::get_children(entity entity) const {
 void vk_scene_manager::update_scene(draw_context& draw_context) {
 
   // get root
-  const auto& entity = root_.children.front();
-  const auto& object = entity_hierarchy_.at(entity);
-  const auto& mesh = meshes_.at(object.mesh);
+  for (const auto& nodes = root_.children; auto& entity : nodes) {
 
-  render_object def;
-  def.index_count = mesh.index_count;
-  def.first_index = mesh.first_index;
-  def.index_buffer = mesh_buffers_.indexBuffer.buffer;
-  def.material = &default_data_;
-  def.bounds = mesh.bounds;
-  def.transform = transforms_.at(object.transform).getModelMatrix();
-  def.vertex_buffer_address = mesh_buffers_.vertexBufferAddress;
+    const auto& object = entity_hierarchy_.at(entity);
+    const auto& mesh = meshes_.at(object.mesh);
+    const auto& transform = transforms_.at(object.transform);
+    auto& material = materials_.at(object.material);
 
-  draw_context.opaque_surfaces.push_back(def);
+    render_object def;
+    def.index_count = mesh.index_count;
+    def.first_index = mesh.first_index;
+    def.index_buffer = mesh_buffers_.indexBuffer.buffer;
+    def.material = &material.data;
+    def.bounds = mesh.bounds;
+    def.transform = transform.getModelMatrix();
+    def.vertex_buffer_address = mesh_buffers_.vertexBufferAddress;
+
+    draw_context.opaque_surfaces.push_back(def);
+  }
   // repeat for all child nodes
 }
 

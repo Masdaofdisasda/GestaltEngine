@@ -99,59 +99,24 @@ private:
   float outerCone_;      // Used for spot lights
 };
 
-class MaterialComponent {
-public:
-  MaterialComponent();
-
-  void setBaseColorTexture(const std::string& texturePath);
-  void setMetallicRoughnessTexture(const std::string& texturePath);
-  void setNormalTexture(const std::string& texturePath);
-  void setEmissiveTexture(const std::string& texturePath);
-  void setOcclusionTexture(const std::string& texturePath);
-
-  void setBaseColorFactor(const glm::vec4& color);
-  void setMetallicFactor(float metallic);
-  void setRoughnessFactor(float roughness);
-
-  const std::string& getBaseColorTexture() const;
-  const std::string& getMetallicRoughnessTexture() const;
-  const std::string& getNormalTexture() const;
-  const std::string& getEmissiveTexture() const;
-  const std::string& getOcclusionTexture() const;
-
-  const glm::vec4& getBaseColorFactor() const;
-  float getMetallicFactor() const;
-  float getRoughnessFactor() const;
-
-
-private:
-  std::string baseColorTexture_;
-  std::string metallicRoughnessTexture_;
-  std::string normalTexture_;
-  std::string emissiveTexture_;
-  std::string occlusionTexture_;
-
-  glm::vec4 baseColorFactor_;
-  float metallicFactor_;
-  float roughnessFactor_;
+struct material_component {
+  MaterialInstance data;
 };
 
 struct transform_component {
   transform_component(const glm::vec3& position, const glm::quat& rotation, const glm::vec3& scale) :
-    position_(position), rotation_(rotation), scale_(scale) {}
+    position(position), rotation(rotation), scale(scale) {}
 
-
-  // Function to compute the model matrix
   glm::mat4 getModelMatrix() const {
-    glm::mat4 translationMatrix = translate(position_);
-    glm::mat4 rotationMatrix = mat4_cast(rotation_);
-    glm::mat4 scaleMatrix = scale(scale_);
+    glm::mat4 translationMatrix = translate(position);
+    glm::mat4 rotationMatrix = mat4_cast(rotation);
+    glm::mat4 scaleMatrix = glm::scale(scale);
     return translationMatrix * rotationMatrix * scaleMatrix;
   }
 
-  glm::vec3 position_;
-  glm::quat rotation_;
-  glm::vec3 scale_;
+  glm::vec3 position;
+  glm::quat rotation;
+  glm::vec3 scale;
 };
 
 struct scene_object {
@@ -171,7 +136,7 @@ using entity_container = std::vector<entity>;
 using mesh_container = std::vector<mesh_component>;
 using camera_container = std::vector<CameraComponent>;
 using light_container = std::vector<LightComponent>;
-using material_container = std::vector<MaterialComponent>;
+using material_container = std::vector<material_component>;
 using transform_container = std::vector<transform_component>;
 
 /**
@@ -230,8 +195,10 @@ public:
     object.camera = lights_.size() - 1;
   }
 
-  void add_material_component(entity entity, const MaterialComponent& material) {
-    materials_.push_back(material);
+  void add_material_component(const entity entity, const MaterialInstance& material) {
+    const material_component material_component = {.data = material};
+    materials_.push_back(material_component);
+
     scene_object& object = entity_hierarchy_[entity];
     object.material = materials_.size() - 1;
   }
