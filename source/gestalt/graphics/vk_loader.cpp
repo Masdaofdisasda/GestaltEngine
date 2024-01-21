@@ -473,9 +473,8 @@ std::optional<AllocatedImage> load_image(render_engine* engine, fastgltf::Asset&
   // so handle is null
   if (newImage.image == VK_NULL_HANDLE) {
     return {};
-  } else {
-    return newImage;
   }
+  return newImage;
 }
 
 void vk_scene_manager::load_scene_from_gltf(const std::string& filename) {
@@ -486,23 +485,23 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& filename) {
   vertices[0].position = {-1.f, -1.f, 0.f};
   vertices[0].color = glm::vec4(1.f);
   vertices[0].normal = {0.f, 0.f, 1.f};
-  vertices[0].uv_x = 0.5f;
-  vertices[0].uv_y = 0.5f;
+  vertices[0].uv_x = 0.f;
+  vertices[0].uv_y = 0.f;
   vertices[1].position = {1.f, -1.f, 0.f};
   vertices[1].color = glm::vec4(1.f);
   vertices[1].normal = {0.f, 0.f, 1.f};
-  vertices[1].uv_x = 0.5f;
-  vertices[1].uv_y = 0.5f;
+  vertices[1].uv_x = 1.f;
+  vertices[1].uv_y = 0.f;
   vertices[2].position = {1.f, 1.f, 0.f};
   vertices[2].color = glm::vec4(1.f);
   vertices[2].normal = {0.f, 0.f, 1.f};
-  vertices[2].uv_x = 0.5f;
-  vertices[2].uv_y = 0.5f;
+  vertices[2].uv_x = 1.f;
+  vertices[2].uv_y = 1.f;
   vertices[3].position = {-1.f, 1.f, 0.f};
   vertices[3].color = glm::vec4(1.f);
   vertices[3].normal = {0.f, 0.f, 1.f};
-  vertices[3].uv_x = 0.5f;
-  vertices[3].uv_y = 0.5f;
+  vertices[3].uv_x = 0.f;
+  vertices[3].uv_y = 1.f;
 
   std::vector<uint32_t> indices = {
       0, 1, 2, 2, 3, 0,
@@ -512,6 +511,8 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& filename) {
 
   add_mesh_component(entity, vertices, indices);
   add_transform_component(entity, glm::vec3(2.f, 0.f, 0.f), glm::quat(0.f, 0.f, 0.f, 0.f));
+
+  root_.children.push_back(entity);
 
   //MaterialComponent material{};
   //material.setBaseColorTexture();
@@ -526,7 +527,8 @@ void vk_scene_manager::add_transform_component(entity entity, const glm::vec3& p
                                                const glm::quat& rotation, const glm::vec3& scale) {
   const transform_component transform{position, rotation, scale};
   transforms_.push_back(transform);
-  entity_to_transform_[entity] = transforms_.size() - 1;
+  scene_object& object = entity_hierarchy_[entity];
+  object.transform = transforms_.size() - 1;
 }
 
 void vk_scene_manager::add_mesh_component(const entity entity, std::vector<Vertex>& vertices,
@@ -553,33 +555,20 @@ void vk_scene_manager::add_mesh_component(const entity entity, std::vector<Verte
   indices_.insert(indices_.end(), indices.begin(), indices.end());
 
   meshes_.push_back(mesh);
-  entity_to_mesh_[entity] = meshes_.size() - 1;
-}
-
-void vk_scene_manager::set_parent(entity child, entity parent) {
-  // Remove child from its current parent, if any
-  if (entity_hierarchy_[child].parent != 0) {
-    auto& siblings = entity_hierarchy_[entity_hierarchy_[child].parent].children;
-    siblings.erase(std::remove(siblings.begin(), siblings.end(), child), siblings.end());
-  }
-
-  // Set the new parent
-  entity_hierarchy_[child].parent = parent;
-
-  // Add child to the new parent's children
-  entity_hierarchy_[parent].children.push_back(child);
+  scene_object& object = entity_hierarchy_[entity];
+  object.mesh = meshes_.size() - 1;
 }
 
 const std::vector<entity>& vk_scene_manager::get_children(entity entity) const {
   return entity_hierarchy_.at(entity).children;
 }
 
-entity vk_scene_manager::get_parent(entity entity) const { return entity_hierarchy_.at(entity).parent; }
-
 void vk_scene_manager::update_scene(draw_context& draw_context) {
 
   // get root
-  const auto& mesh = meshes_.at(0);
+  const auto& entity = root_.children.front();
+  const auto& object = entity_hierarchy_.at(entity);
+  const auto& mesh = meshes_.at(object.mesh);
 
   render_object def;
   def.index_count = mesh.index_count;
@@ -587,7 +576,7 @@ void vk_scene_manager::update_scene(draw_context& draw_context) {
   def.index_buffer = mesh_buffers_.indexBuffer.buffer;
   def.material = &default_data_;
   def.bounds = mesh.bounds;
-  def.transform = glm::mat4(1.f);
+  def.transform = transforms_.at(object.transform).getModelMatrix();
   def.vertex_buffer_address = mesh_buffers_.vertexBufferAddress;
 
   draw_context.opaque_surfaces.push_back(def);
@@ -662,7 +651,7 @@ void vk_scene_manager::init_default_data() {
 
   gltf_metallic_roughness::MaterialResources materialResources;
   // default the material textures
-  materialResources.colorImage = default_material_.white_image;
+  materialResources.colorImage = default_material_.error_checkerboard_image;
   materialResources.colorSampler = default_material_.default_sampler_linear;
   materialResources.metalRoughImage = default_material_.white_image;
   materialResources.metalRoughSampler = default_material_.default_sampler_linear;

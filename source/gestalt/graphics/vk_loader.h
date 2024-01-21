@@ -48,12 +48,8 @@ std::optional<AllocatedImage> load_image(render_engine* engine, fastgltf::Asset&
                                          fastgltf::Image& image);
 
 using entity = uint32_t;
-
-struct entity_data {
-  entity parent;
-  std::string name;
-  std::vector<entity> children;
-};
+constexpr uint32_t invalid_entity = std::numeric_limits<uint32_t>::max();
+constexpr size_t no_component = std::numeric_limits<size_t>::max();
 
 struct mesh_component {
   uint32_t vertex_count;
@@ -140,22 +136,10 @@ private:
   float roughnessFactor_;
 };
 
-class transform_component {
-public:
+struct transform_component {
   transform_component(const glm::vec3& position, const glm::quat& rotation, const glm::vec3& scale) :
     position_(position), rotation_(rotation), scale_(scale) {}
 
-  // Getters and setters for position
-  const glm::vec3& getPosition() const { return position_; }
-  void setPosition(const glm::vec3& position) { position_ = position; }
-
-  // Getters and setters for rotation (using quaternions)
-  const glm::quat& getRotation() const { return rotation_; }
-  void setRotation(const glm::quat& rotation) { rotation_ = rotation; }
-
-  // Getters and setters for scale
-  const glm::vec3& getScale() const { return scale_; }
-  void setScale(const glm::vec3& scale) { scale_ = scale; }
 
   // Function to compute the model matrix
   glm::mat4 getModelMatrix() const {
@@ -165,10 +149,21 @@ public:
     return translationMatrix * rotationMatrix * scaleMatrix;
   }
 
-private:
   glm::vec3 position_;
   glm::quat rotation_;
   glm::vec3 scale_;
+};
+
+struct scene_object {
+  std::string name;
+  std::vector<entity> children;
+
+  entity entity = invalid_entity;
+  size_t mesh = no_component;
+  size_t camera = no_component;
+  size_t light = no_component;
+  size_t material = no_component;
+  size_t transform = no_component;
 };
 
 // Component storage types
@@ -213,7 +208,10 @@ public:
   entity create_entity() {
     const entity new_entity = {next_entity_id_++};
     entities_.push_back(new_entity);
-    entity_to_entity_[new_entity] = entities_.size() - 1;
+
+    const scene_object object = {.entity = new_entity};
+    entity_hierarchy_[new_entity] = object;
+
     return new_entity;
   }
 
@@ -221,18 +219,21 @@ public:
                           std::vector<uint32_t>& indices);
 
   void add_camera_component(entity entity, const CameraComponent& camera) {
-       cameras_.push_back(camera);
-    entity_to_camera_[entity] = cameras_.size() - 1;
+    cameras_.push_back(camera);
+    scene_object& object = entity_hierarchy_[entity];
+    object.camera = cameras_.size() - 1;
   }
 
   void add_light_component(entity entity, const LightComponent& light) {
-             lights_.push_back(light);
-    entity_to_light_[entity] = lights_.size() - 1;
+    lights_.push_back(light);
+    scene_object& object = entity_hierarchy_[entity];
+    object.camera = lights_.size() - 1;
   }
 
   void add_material_component(entity entity, const MaterialComponent& material) {
-          materials_.push_back(material);
-    entity_to_material_[entity] = materials_.size() - 1;
+    materials_.push_back(material);
+    scene_object& object = entity_hierarchy_[entity];
+    object.material = materials_.size() - 1;
   }
 
   void add_transform_component(entity entity, const glm::vec3& position, const glm::quat& rotation,
@@ -277,17 +278,11 @@ private:
   material_container materials_;
   transform_container transforms_;
 
-  // Entity to component mapping (for example, entity to its mesh component index)
-  std::unordered_map<entity, size_t> entity_to_entity_;
-  std::unordered_map<entity, size_t> entity_to_mesh_;
-  std::unordered_map<entity, size_t> entity_to_camera_;
-  std::unordered_map<entity, size_t> entity_to_light_;
-  std::unordered_map<entity, size_t> entity_to_material_;
-  std::unordered_map<entity, size_t> entity_to_transform_;
-
   // Add similar mappings for other components
 
-  std::unordered_map<entity, entity_data> entity_hierarchy_;
+  std::unordered_map<entity, scene_object> entity_hierarchy_;
+
+  scene_object root_ = {"root", {}};
 
   // Next available entity ID
   entity next_entity_id_ = 0;
