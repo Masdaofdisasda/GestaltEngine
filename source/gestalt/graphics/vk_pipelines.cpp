@@ -225,7 +225,8 @@ void PipelineBuilder::clear() {
 }
 
 void vk_pipeline_manager::init(const vk_gpu& gpu, const vk_descriptor_manager& descriptor_manager,
-                               gltf_metallic_roughness& material, AllocatedImage& draw_image,
+                               gltf_metallic_roughness& material, gltf_metallic_roughness& gltf_material,
+                               AllocatedImage& draw_image,
                                AllocatedImage& depth_image) {
 
   gpu_ = gpu;
@@ -234,6 +235,7 @@ void vk_pipeline_manager::init(const vk_gpu& gpu, const vk_descriptor_manager& d
 
   init_background_pipelines();
   build_pipeline(material, draw_image, depth_image);
+  build_pipeline(gltf_material, draw_image, depth_image); //TODO: remove this
 }
 
 void vk_pipeline_manager::cleanup() {

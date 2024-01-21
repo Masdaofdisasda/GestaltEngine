@@ -8,6 +8,7 @@
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/transform.hpp>
 
+#include "materials.h"
 #include "resource_manager.h"
 #include "vk_descriptors.h"
 
@@ -50,15 +51,16 @@ using entity = uint32_t;
 
 struct entity_data {
   entity parent;
+  std::string name;
   std::vector<entity> children;
 };
 
-
 struct mesh_component {
-    uint32_t vertex_count_;
-   uint32_t index_count_;
-   uint32_t first_index_;
-   uint32_t vertex_offset_;
+  uint32_t vertex_count;
+  uint32_t index_count;
+  uint32_t first_index;
+  uint32_t vertex_offset;
+  Bounds bounds;
 };
 
 class CameraComponent {
@@ -125,6 +127,7 @@ public:
   float getMetallicFactor() const;
   float getRoughnessFactor() const;
 
+
 private:
   std::string baseColorTexture_;
   std::string metallicRoughnessTexture_;
@@ -186,16 +189,18 @@ public:
 
   default_material default_material_;
   gpu_mesh_buffers mesh_buffers_;
+  DescriptorAllocatorGrowable descriptorPool;
 
   std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loaded_scenes_;
 
-  void init(const vk_gpu& gpu, const resource_manager& resource_manager, render_engine& render_engine) {
+  void init(const vk_gpu& gpu, const resource_manager& resource_manager, render_engine& render_engine, gltf_metallic_roughness& material) {
     gpu_ = gpu;
     resource_manager_ = resource_manager;
     deletion_service_.init(gpu.device, gpu.allocator);
+    gltf_material_ = material;
 
-    load_scene_from_gltf("");
     init_default_data();
+    load_scene_from_gltf("");
     init_renderables(render_engine);
   }
 
@@ -237,6 +242,8 @@ public:
 
   const mesh_container& get_meshes() { return meshes_; }
 
+  const transform_container& get_transforms() { return transforms_; }
+
   const light_container& get_lights() const;
 
   void set_parent(entity child, entity parent);
@@ -245,11 +252,14 @@ public:
 
   entity get_parent(entity entity) const;
 
+  void update_scene(draw_context& draw_context);
+
   // Add more methods for other operations like updating, rendering, etc.
 
 private:
   resource_manager resource_manager_;
   vk_deletion_service deletion_service_;
+  gltf_metallic_roughness gltf_material_;
 
   vk_gpu gpu_; //TODO remove
 

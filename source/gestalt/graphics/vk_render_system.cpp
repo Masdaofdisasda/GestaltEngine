@@ -198,20 +198,6 @@ void vk_render_system::draw_geometry(VkCommandBuffer cmd) {
   // begin clock
   auto start = std::chrono::system_clock::now();
 
-  /* test */
-  auto mesh = scene_manager_->get_meshes().at(0);
-  render_object def;
-  def.index_count = mesh.index_count_;
-  def.first_index = mesh.first_index_;
-  def.index_buffer = scene_manager_->mesh_buffers_.indexBuffer.buffer;
-  def.material = main_draw_context_.opaque_surfaces.at(0).material;
-  def.bounds = Bounds{};
-  def.transform = glm::mat4(1.f);
-  def.vertex_buffer_address = scene_manager_->mesh_buffers_.vertexBufferAddress;
-  main_draw_context_.opaque_surfaces.push_back(def);
-
-  /* test */
-
   std::vector<uint32_t> opaque_draws;
   opaque_draws.reserve(main_draw_context_.opaque_surfaces.size());
 

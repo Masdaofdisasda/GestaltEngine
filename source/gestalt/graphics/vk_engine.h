@@ -33,6 +33,7 @@ public:
 
   [[nodiscard]] vk_gpu get_gpu() const { return gpu_; }
   gltf_metallic_roughness& get_metallic_roughness_material() { return renderer_.metal_rough_material_; }
+  gltf_metallic_roughness& get_gltf_material() { return renderer_.gltf_material; }
   default_material& get_default_material() { return scene_manager_.default_material_; }
   VkDescriptorSetLayout& get_gpu_scene_data_layout() { return renderer_.descriptor_manager.gpu_scene_data_descriptor_layout; }
   resource_manager& get_resource_manager() { return resource_manager_; }

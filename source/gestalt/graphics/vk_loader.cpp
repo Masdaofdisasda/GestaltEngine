@@ -12,11 +12,6 @@
 #include <fastgltf/tools.hpp>
 
 #include "camera.h"
-#include "camera.h"
-#include "camera.h"
-#include "camera.h"
-#include "camera.h"
-#include "camera.h"
 
 VkFilter extract_filter(fastgltf::Filter filter) {
   switch (filter) {
@@ -538,10 +533,21 @@ void vk_scene_manager::add_mesh_component(const entity entity, std::vector<Verte
     std::vector<uint32_t>& indices) {
 
   mesh_component mesh;
-  mesh.vertex_offset_ = vertices_.size();
-  mesh.first_index_ = indices_.size();
-  mesh.vertex_count_ = vertices.size();
-  mesh.index_count_ = indices.size();
+  mesh.vertex_offset = vertices_.size();
+  mesh.first_index = indices_.size();
+  mesh.vertex_count = vertices.size();
+  mesh.index_count = indices.size();
+
+  glm::vec3 minpos = vertices[0].position;
+  glm::vec3 maxpos = vertices[0].position;
+  for (auto& vertice : vertices) {
+    minpos = min(minpos, vertice.position);
+    maxpos = max(maxpos, vertice.position);
+  }
+
+  mesh.bounds.origin = (maxpos + minpos) / 2.f;
+  mesh.bounds.extents = (maxpos - minpos) / 2.f;
+  mesh.bounds.sphereRadius = length(mesh.bounds.extents);
 
   vertices_.insert(vertices_.end(), vertices.begin(), vertices.end());
   indices_.insert(indices_.end(), indices.begin(), indices.end());
@@ -569,6 +575,25 @@ const std::vector<entity>& vk_scene_manager::get_children(entity entity) const {
 }
 
 entity vk_scene_manager::get_parent(entity entity) const { return entity_hierarchy_.at(entity).parent; }
+
+void vk_scene_manager::update_scene(draw_context& draw_context) {
+
+  // get root
+  const auto& mesh = meshes_.at(0);
+
+  render_object def;
+  def.index_count = mesh.index_count;
+  def.first_index = mesh.first_index;
+  def.index_buffer = mesh_buffers_.indexBuffer.buffer;
+  def.material = &default_data_;
+  def.bounds = mesh.bounds;
+  def.transform = glm::mat4(1.f);
+  def.vertex_buffer_address = mesh_buffers_.vertexBufferAddress;
+
+  draw_context.opaque_surfaces.push_back(def);
+  // repeat for all child nodes
+}
+
 
 void vk_scene_manager::init_default_data() {
 
@@ -607,6 +632,49 @@ void vk_scene_manager::init_default_data() {
   sampl.magFilter = VK_FILTER_LINEAR;
   sampl.minFilter = VK_FILTER_LINEAR;
   vkCreateSampler(gpu_.device, &sampl, nullptr, &default_material_.default_sampler_linear);
+
+  // create default material
+  std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes
+      = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3},
+         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3},
+         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}};
+
+  descriptorPool.init(gpu_.device, 1, sizes);
+  AllocatedBuffer materialDataBuffer = resource_manager_.create_buffer(
+      sizeof(gltf_metallic_roughness::MaterialConstants),
+      VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+  int data_index = 0;
+  gltf_metallic_roughness::MaterialConstants* sceneMaterialConstants
+      = (gltf_metallic_roughness::MaterialConstants*)materialDataBuffer.info.pMappedData;
+
+  gltf_metallic_roughness::MaterialConstants constants;
+  constants.colorFactors.x = 1.f;
+  constants.colorFactors.y = 1.f;
+  constants.colorFactors.z = 1.f;
+  constants.colorFactors.w = 1.f;
+
+  constants.metal_rough_factors.x = 0.f;
+  constants.metal_rough_factors.y = 0.f;
+  // write material parameters to buffer
+  sceneMaterialConstants[data_index] = constants;
+
+  MaterialPass passType = MaterialPass::MainColor;
+
+  gltf_metallic_roughness::MaterialResources materialResources;
+  // default the material textures
+  materialResources.colorImage = default_material_.white_image;
+  materialResources.colorSampler = default_material_.default_sampler_linear;
+  materialResources.metalRoughImage = default_material_.white_image;
+  materialResources.metalRoughSampler = default_material_.default_sampler_linear;
+
+  // set the uniform buffer for the material data
+  materialResources.dataBuffer = materialDataBuffer.buffer;
+  materialResources.dataBufferOffset
+      = data_index * sizeof(gltf_metallic_roughness::MaterialConstants);
+
+  // build material
+  default_data_ = gltf_material_.write_material(
+      gpu_.device, passType, materialResources, descriptorPool);
 
   deletion_service_.push_function(
       [this]() { resource_manager_.destroy_image(default_material_.white_image); });

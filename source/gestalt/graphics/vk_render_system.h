@@ -36,6 +36,7 @@ public:
   AllocatedImage draw_image_;
   AllocatedImage depth_image_;
   gltf_metallic_roughness metal_rough_material_;
+  gltf_metallic_roughness gltf_material;
 
   draw_context main_draw_context_;
 
@@ -57,8 +58,8 @@ public:
     commands.init(gpu_, frames_);
     sync.init(gpu_, frames_);
     descriptor_manager.init(gpu_, frames_, draw_image_);
-    pipeline_manager.init(gpu_, descriptor_manager, metal_rough_material_, draw_image_,
-                           depth_image_);
+    pipeline_manager.init(gpu_, descriptor_manager, metal_rough_material_, gltf_material,
+                          draw_image_, depth_image_);
   }
 
   void draw(imgui_gui& imgui);

@@ -45,7 +45,7 @@ void render_engine::init() {
   resource_manager_.init(gpu_);
 
   renderer_.init(gpu_, window_, resource_manager_, resize_requested_, stats_);
-  scene_manager_.init(gpu_, resource_manager_, *this);
+  scene_manager_.init(gpu_, resource_manager_, *this, renderer_.gltf_material);
   renderer_.scene_manager_ = &scene_manager_;
 
   register_gui_actions();
@@ -199,6 +199,7 @@ void render_engine::update_scene() {
     renderer_.scene_data.proj = projection;
     renderer_.scene_data.viewproj = projection * view;
 
+    scene_manager_.update_scene(renderer_.main_draw_context_);
     scene_manager_.loaded_scenes_["structure"]->Draw(glm::mat4{1.f}, renderer_.main_draw_context_);
 }
 
