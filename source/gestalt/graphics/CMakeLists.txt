@@ -12,8 +12,8 @@ add_library(graphics
     vk_pipelines.cpp
     vk_engine.h
     vk_engine.cpp
-    vk_loader.h
-    vk_loader.cpp
+    vk_scene_manager.h
+    vk_scene_manager.cpp
     camera.cpp
     camera.h
     time_tracking_service.h

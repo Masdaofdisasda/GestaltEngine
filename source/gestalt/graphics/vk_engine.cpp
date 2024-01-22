@@ -40,8 +40,6 @@ void render_engine::init() {
   gpu_.init(use_validation_layers, window_,
             [this](auto func) { this->immediate_submit(std::move(func)); });
 
-  deletion_service_.init(gpu_.device, gpu_.allocator);
-
   resource_manager_.init(gpu_);
 
   renderer_.init(gpu_, window_, resource_manager_, resize_requested_, stats_);
@@ -104,74 +102,11 @@ void render_engine::immediate_submit(std::function<void(VkCommandBuffer cmd)> fu
     VK_CHECK(vkWaitForFences(gpu_.device, 1, &renderer_.sync.imgui_fence, true, 9999999999));
 }
 
-gpu_mesh_buffers render_engine::upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices) {
-    //> mesh_create_1
-    const size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
-    const size_t indexBufferSize = indices.size() * sizeof(uint32_t);
-
-    gpu_mesh_buffers newSurface;
-
-    // create vertex buffer
-    newSurface.vertexBuffer = resource_manager_.create_buffer(
-        vertexBufferSize,
-                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
-                            | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                        VMA_MEMORY_USAGE_GPU_ONLY);
-
-    // find the adress of the vertex buffer
-    VkBufferDeviceAddressInfo deviceAdressInfo{
-        .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-        .buffer = newSurface.vertexBuffer.buffer};
-    newSurface.vertexBufferAddress = vkGetBufferDeviceAddress(gpu_.device, &deviceAdressInfo);
-
-    // create index buffer
-    newSurface.indexBuffer = resource_manager_.create_buffer(
-        indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VMA_MEMORY_USAGE_GPU_ONLY);
-
-    //< mesh_create_1
-    //
-    //> mesh_create_2
-    AllocatedBuffer staging = resource_manager_.create_buffer(vertexBufferSize + indexBufferSize,
-                                                             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                        VMA_MEMORY_USAGE_CPU_ONLY);
-
-    void* data = staging.allocation->GetMappedData();
-
-    // copy vertex buffer
-    memcpy(data, vertices.data(), vertexBufferSize);
-    // copy index buffer
-    memcpy((char*)data + vertexBufferSize, indices.data(), indexBufferSize);
-
-    immediate_submit([&](VkCommandBuffer cmd) {
-      VkBufferCopy vertexCopy{0};
-      vertexCopy.dstOffset = 0;
-      vertexCopy.srcOffset = 0;
-      vertexCopy.size = vertexBufferSize;
-
-      vkCmdCopyBuffer(cmd, staging.buffer, newSurface.vertexBuffer.buffer, 1, &vertexCopy);
-
-      VkBufferCopy indexCopy{0};
-      indexCopy.dstOffset = 0;
-      indexCopy.srcOffset = vertexBufferSize;
-      indexCopy.size = indexBufferSize;
-
-      vkCmdCopyBuffer(cmd, staging.buffer, newSurface.indexBuffer.buffer, 1, &indexCopy);
-    });
-
-    resource_manager_.destroy_buffer(staging);
-
-    return newSurface;
-    //< mesh_create_2
-}
-
 void render_engine::cleanup() {
 
     if (is_initialized_) {
 
       vkDeviceWaitIdle(gpu_.device);
-
-      deletion_service_.flush(); // needed?
 
       scene_manager_.cleanup();
       renderer_.cleanup();
@@ -249,7 +184,6 @@ void render_engine::run()
 
       update_scene();
 
-      // our draw function
       draw();
     }
 

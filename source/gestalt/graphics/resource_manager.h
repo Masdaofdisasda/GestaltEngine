@@ -1,9 +1,11 @@
 #pragma once
+#include <fastgltf/types.hpp>
+
 #include "vk_gpu.h"
 #include "vk_types.h"
 
 class resource_manager {
-  vk_gpu gpu_;
+  vk_gpu gpu_ = {};
 
 public:
   void init(const vk_gpu& gpu) {
@@ -18,6 +20,7 @@ public:
 
   AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
                               bool mipmapped = false);
+  std::optional<AllocatedImage> load_image(fastgltf::Asset& asset, fastgltf::Image& image);
   AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
                               bool mipmapped = false);
   void destroy_image(const AllocatedImage& img);

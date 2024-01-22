@@ -4,7 +4,6 @@
 
 #include <filesystem>
 #include <unordered_map>
-#include <fastgltf/types.hpp>
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/transform.hpp>
 
@@ -14,9 +13,6 @@
 
 // forward declaration
 class render_engine;
-
-std::optional<AllocatedImage> load_image(render_engine* engine, fastgltf::Asset& asset,
-                                         fastgltf::Image& image);
 
 using entity = uint32_t;
 constexpr uint32_t invalid_entity = std::numeric_limits<uint32_t>::max();
@@ -189,11 +185,9 @@ public:
 
   const light_container& get_lights() const;
 
-  void set_parent(entity child, entity parent);
 
   const std::vector<entity>& get_children(entity entity) const;
 
-  entity get_parent(entity entity) const;
 
   void update_scene(draw_context& draw_context);
 

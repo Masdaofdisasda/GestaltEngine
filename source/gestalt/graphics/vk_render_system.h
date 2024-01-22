@@ -4,7 +4,7 @@
 #include "resource_manager.h"
 #include "vk_types.h"
 #include "vk_gpu.h"
-#include "vk_loader.h"
+#include "vk_scene_manager.h"
 
 #include "vk_pipelines.h"
 #include "vk_swapchain.h"

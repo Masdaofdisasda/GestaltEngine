@@ -1,15 +1,11 @@
 ﻿
-#include <stb_image.h>
-#include <iostream>
-#include <vk_loader.h>
+#include <vk_scene_manager.h>
 
 #include "vk_engine.h"
-#include "vk_initializers.h"
 #include "vk_types.h"
 
 #include <fastgltf/glm_element_traits.hpp>
 #include <fastgltf/parser.hpp>
-#include <fastgltf/tools.hpp>
 
 #include "camera.h"
 
@@ -41,93 +37,6 @@ VkSamplerMipmapMode extract_mipmap_mode(fastgltf::Filter filter) {
     default:
       return VK_SAMPLER_MIPMAP_MODE_LINEAR;
   }
-}
-
-std::optional<AllocatedImage> load_image(render_engine* engine, fastgltf::Asset& asset,
-                                         fastgltf::Image& image) {
-  AllocatedImage newImage{};
-
-  int width, height, nrChannels;
-
-  std::visit(fastgltf::visitor{
-                 [](auto& arg) {},
-                 [&](fastgltf::sources::URI& filePath) {
-                   assert(filePath.fileByteOffset == 0);  // We don't support offsets with stbi.
-                   assert(filePath.uri.isLocalPath());    // We're only capable of loading
-                                                          // local files.
-
-                   const std::string path(filePath.uri.path().begin(),
-                                          filePath.uri.path().end());  // Thanks C++.
-                   unsigned char* data = stbi_load(path.c_str(), &width, &height, &nrChannels, 4);
-                   if (data) {
-                     VkExtent3D imagesize;
-                     imagesize.width = width;
-                     imagesize.height = height;
-                     imagesize.depth = 1;
-
-                     newImage = engine->get_resource_manager().create_image(
-                         data, imagesize, VK_FORMAT_R8G8B8A8_UNORM,
-                                                     VK_IMAGE_USAGE_SAMPLED_BIT, true);
-
-                     stbi_image_free(data);
-                   }
-                 },
-                 [&](fastgltf::sources::Vector& vector) {
-                   unsigned char* data = stbi_load_from_memory(
-                       vector.bytes.data(), static_cast<int>(vector.bytes.size()), &width, &height,
-                       &nrChannels, 4);
-                   if (data) {
-                     VkExtent3D imagesize;
-                     imagesize.width = width;
-                     imagesize.height = height;
-                     imagesize.depth = 1;
-
-                     newImage = engine->get_resource_manager().create_image(
-                         data, imagesize, VK_FORMAT_R8G8B8A8_UNORM,
-                                                     VK_IMAGE_USAGE_SAMPLED_BIT, true);
-
-                     stbi_image_free(data);
-                   }
-                 },
-                 [&](fastgltf::sources::BufferView& view) {
-                   auto& bufferView = asset.bufferViews[view.bufferViewIndex];
-                   auto& buffer = asset.buffers[bufferView.bufferIndex];
-
-                   std::visit(fastgltf::visitor{// We only care about VectorWithMime here, because
-                                                // we specify LoadExternalBuffers, meaning all
-                                                // buffers are already loaded into a vector.
-                                                [](auto& arg) {},
-                                                [&](fastgltf::sources::Vector& vector) {
-                                                  unsigned char* data = stbi_load_from_memory(
-                                                      vector.bytes.data() + bufferView.byteOffset,
-                                                      static_cast<int>(bufferView.byteLength),
-                                                      &width, &height, &nrChannels, 4);
-                                                  if (data) {
-                                                    VkExtent3D imagesize;
-                                                    imagesize.width = width;
-                                                    imagesize.height = height;
-                                                    imagesize.depth = 1;
-
-                                                    newImage
-                                                        = engine->get_resource_manager()
-                                                              .create_image(
-                                                        data, imagesize, VK_FORMAT_R8G8B8A8_UNORM,
-                                                        VK_IMAGE_USAGE_SAMPLED_BIT, true);
-
-                                                    stbi_image_free(data);
-                                                  }
-                                                }},
-                              buffer.data);
-                 },
-             },
-             image.data);
-
-  // if any of the attempts to load the data failed, we havent written the image
-  // so handle is null
-  if (newImage.image == VK_NULL_HANDLE) {
-    return {};
-  }
-  return newImage;
 }
 
 void vk_scene_manager::load_scene_from_gltf(const std::string& filename) {
