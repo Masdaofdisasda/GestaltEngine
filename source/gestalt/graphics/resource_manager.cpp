@@ -25,7 +25,6 @@ AllocatedBuffer resource_manager::create_buffer(size_t allocSize, VkBufferUsageF
   // allocate the buffer
   VK_CHECK(vmaCreateBuffer(gpu_.allocator, &bufferInfo, &vmaallocInfo, &newBuffer.buffer,
                            &newBuffer.allocation, &newBuffer.info));
-
   return newBuffer;
 }
 
@@ -255,7 +254,7 @@ std::optional<AllocatedImage> resource_manager::load_image(fastgltf::Asset& asse
       },
       image.data);
 
-  // if any of the attempts to load the data failed, we havent written the image
+  // if any of the attempts to load the data failed, we haven't written the image
   // so handle is null
   if (newImage.image == VK_NULL_HANDLE) {
     return {};

@@ -13,7 +13,7 @@
 #include "resource_manager.h"
 #include "gui_actions.h"
 #include "imgui_gui.h"
-#include "vk_render_system.h"
+#include "vk_renderer.h"
 
 class render_engine {
 public:
@@ -32,7 +32,7 @@ private:
   vk_gpu gpu_ = {};
   void immediate_submit(std::function<void(VkCommandBuffer cmd)> function);
 
-  vk_render_system renderer_ = {};
+  vk_renderer renderer_ = {};
   vk_scene_manager scene_manager_ = {};
 
   gui_actions gui_actions_;

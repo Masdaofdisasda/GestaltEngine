@@ -22,8 +22,8 @@ void vk_sync::init(const vk_gpu& gpu, std::vector<frame_data>& frames) {
         vkCreateSemaphore(gpu_.device, &semaphoreCreateInfo, nullptr, &frame.render_semaphore));
 
     deletion_service_.push(frame.render_fence);
-    deletion_service_.push(frame.render_semaphore);
     deletion_service_.push(frame.swapchain_semaphore);
+    deletion_service_.push(frame.render_semaphore);
   }
 
   VK_CHECK(vkCreateFence(gpu_.device, &fenceCreateInfo, nullptr, &imgui_fence));

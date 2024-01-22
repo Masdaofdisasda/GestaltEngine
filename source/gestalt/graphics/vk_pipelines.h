@@ -75,7 +75,6 @@ public:
   std::vector<compute_effect> background_effects;
 
   void init(const vk_gpu& gpu, const vk_descriptor_manager& descriptor_manager,
-            gltf_metallic_roughness& material,
             gltf_metallic_roughness& gltf_material, AllocatedImage& draw_image,
             AllocatedImage& depth_image);
   void cleanup();

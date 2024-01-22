@@ -116,89 +116,40 @@ public:
   gpu_mesh_buffers mesh_buffers_;
   DescriptorAllocatorGrowable descriptorPool;
 
-  void init(const vk_gpu& gpu, const resource_manager& resource_manager, gltf_metallic_roughness& material) {
-    gpu_ = gpu;
-    resource_manager_ = resource_manager;
-    deletion_service_.init(gpu.device, gpu.allocator);
-    gltf_material_ = material;
-
-    init_default_data();
-    load_scene_from_gltf("");
-  }
-
-  void cleanup() {
-       deletion_service_.flush();
-  }
+  void init(const vk_gpu& gpu, const resource_manager& resource_manager,
+            const gltf_metallic_roughness& material);
+  void cleanup();
 
   void load_scene_from_gltf(const std::string& filename);
+  void update_scene(draw_context& draw_context);
 
-  entity create_entity() {
-    const entity new_entity = {next_entity_id_++};
-    entities_.push_back(new_entity);
-
-    const scene_object object = {.entity = new_entity};
-    entity_hierarchy_[new_entity] = object;
-
-    return new_entity;
-  }
-
-  void add_mesh_component(const entity entity, std::vector<Vertex>& vertices,
+  entity create_entity();
+  void add_mesh_component(entity entity, std::vector<Vertex>& vertices,
                           std::vector<uint32_t>& indices);
-
-  void add_camera_component(entity entity, const CameraComponent& camera) {
-    cameras_.push_back(camera);
-    scene_object& object = entity_hierarchy_[entity];
-    object.camera = cameras_.size() - 1;
-  }
-
-  void add_light_component(entity entity, const LightComponent& light) {
-    lights_.push_back(light);
-    scene_object& object = entity_hierarchy_[entity];
-    object.camera = lights_.size() - 1;
-  }
-
+  void add_camera_component(entity entity, const CameraComponent& camera);
+  void add_light_component(entity entity, const LightComponent& light);
   void add_material(MaterialPass pass_type,
                     const gltf_metallic_roughness::MaterialResources& resources,
-                    const std::string& name = "") {
-
-    materials_.emplace_back(material_component{
-        .name = name,
-        .data = gltf_material_.write_material(gpu_.device, pass_type, resources, descriptorPool)});
-    std::string key = name.empty() ? "material_" + std::to_string(materials_.size()) : name;
-    material_map_[key] = materials_.size() - 1;
-  }
-
-  void add_material_component(const entity entity, const std::string& name) {
-    scene_object& object = entity_hierarchy_[entity];
-    size_t material_index = material_map_[name];
-    object.material = material_index;
-  }
-
+                    const std::string& name = "");
+  void add_material_component(const entity entity, const std::string& name);
   void add_transform_component(entity entity, const glm::vec3& position, const glm::quat& rotation,
                                const glm::vec3& scale = glm::vec3(1.f));
 
-  const camera_container& get_cameras() const;
-
+  const camera_container& get_cameras() { return cameras_; }
   const mesh_container& get_meshes() { return meshes_; }
-
   const transform_container& get_transforms() { return transforms_; }
-
-  const light_container& get_lights() const;
-
+  const light_container& get_lights() { return lights_; }
 
   const std::vector<entity>& get_children(entity entity) const;
 
 
-  void update_scene(draw_context& draw_context);
-
-  // Add more methods for other operations like updating, rendering, etc.
 
 private:
   resource_manager resource_manager_;
-  vk_deletion_service deletion_service_;
-  gltf_metallic_roughness gltf_material_;
+  vk_deletion_service deletion_service_ = {};
+  gltf_metallic_roughness gltf_material_ = {};
 
-  vk_gpu gpu_; //TODO remove
+  vk_gpu gpu_ = {}; //TODO remove
 
   void init_default_data();
 
@@ -214,10 +165,7 @@ private:
   std::unordered_map<std::string, size_t> material_map_;
   transform_container transforms_;
 
-  // Add similar mappings for other components
-
   std::unordered_map<entity, scene_object> entity_hierarchy_;
-
   scene_object root_ = {"root", {}};
 
   std::string default_material_name_ = "default_material";

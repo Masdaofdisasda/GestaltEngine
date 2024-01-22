@@ -224,18 +224,16 @@ void PipelineBuilder::clear() {
   _shaderStages.clear();
 }
 
-void vk_pipeline_manager::init(const vk_gpu& gpu, const vk_descriptor_manager& descriptor_manager,
-                               gltf_metallic_roughness& material, gltf_metallic_roughness& gltf_material,
+void vk_pipeline_manager::init(const vk_gpu& gpu, const vk_descriptor_manager& descriptor_manager, gltf_metallic_roughness& gltf_material,
                                AllocatedImage& draw_image,
                                AllocatedImage& depth_image) {
 
   gpu_ = gpu;
   descriptor_manager_ = descriptor_manager;
-  deletion_service_ .init(gpu_.device, gpu_.allocator);
+  deletion_service_.init(gpu_.device, gpu_.allocator);
 
   init_background_pipelines();
-  build_pipeline(material, draw_image, depth_image);
-  build_pipeline(gltf_material, draw_image, depth_image); //TODO: remove this
+  build_pipeline(gltf_material, draw_image, depth_image);
 }
 
 void vk_pipeline_manager::cleanup() {

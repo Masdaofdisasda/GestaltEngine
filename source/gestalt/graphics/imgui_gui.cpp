@@ -74,7 +74,13 @@ void imgui_gui::init(
 
   // add the destroy the imgui created structures
   // NOTE: i think ImGui_ImplVulkan_Shutdown() destroy the imguiPool
+  deletion_service_.push(imguiPool);
+  deletion_service_.push_function([this]() { ImGui::DestroyContext(); });
   deletion_service_.push_function([this]() { ImGui_ImplVulkan_Shutdown(); });
+}
+
+void imgui_gui::cleanup() {
+  deletion_service_.flush();
 }
 
 void imgui_gui::draw(VkCommandBuffer cmd, VkImageView target_image_view) {

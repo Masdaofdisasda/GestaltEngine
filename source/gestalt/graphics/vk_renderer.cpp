@@ -1,4 +1,4 @@
-﻿#include "vk_render_system.h"
+﻿#include "vk_renderer.h"
 
 #include <algorithm>
 #include <chrono>
@@ -7,7 +7,7 @@
 #include "vk_images.h"
 #include "vk_initializers.h"
 
-void vk_render_system::draw(imgui_gui& imgui) {
+void vk_renderer::draw(imgui_gui& imgui) {
   // wait until the gpu has finished rendering the last frame. Timeout of 1 second
   VK_CHECK(vkWaitForFences(gpu_.device, 1, &get_current_frame().render_fence, true, 1000000000));
 
@@ -122,8 +122,8 @@ void vk_render_system::draw(imgui_gui& imgui) {
   frame_number_++;
 }
 
-void vk_render_system::draw_main(VkCommandBuffer cmd) {
-  compute_effect& effect = pipeline_manager.background_effects[0]; // todo hook this to GUI
+void vk_renderer::draw_main(VkCommandBuffer cmd) {
+  compute_effect& effect = pipeline_manager.background_effects[0]; //todo replace with skybox
 
   // bind the background compute pipeline
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, effect.pipeline);
@@ -194,7 +194,7 @@ bool is_visible(const render_object& obj, const glm::mat4& viewproj) {
   }
 }
 
-void vk_render_system::draw_geometry(VkCommandBuffer cmd) {
+void vk_renderer::draw_geometry(VkCommandBuffer cmd) {
   // begin clock
   auto start = std::chrono::system_clock::now();
 

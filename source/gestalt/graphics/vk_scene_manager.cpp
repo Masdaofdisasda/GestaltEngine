@@ -39,6 +39,21 @@ VkSamplerMipmapMode extract_mipmap_mode(fastgltf::Filter filter) {
   }
 }
 
+void vk_scene_manager::init(const vk_gpu& gpu, const resource_manager& resource_manager,
+                            const gltf_metallic_roughness& material) {
+  gpu_ = gpu;
+  resource_manager_ = resource_manager;
+  deletion_service_.init(gpu.device, gpu.allocator);
+  gltf_material_ = material;
+
+  init_default_data();
+  load_scene_from_gltf("");
+}
+
+void vk_scene_manager::cleanup() {
+  deletion_service_.flush();
+}
+
 void vk_scene_manager::load_scene_from_gltf(const std::string& filename) {
 
   //TODO load from file and parse
@@ -180,6 +195,27 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& filename) {
 
           resources.dataBuffer = materialDataBuffer.buffer;
           resources.dataBufferOffset = 0;  // Assuming only one material constants struct
+
+          deletion_service_.push_function([this, default_material]() {
+            resource_manager_.destroy_image(default_material.color_image);
+          });
+          deletion_service_.push_function([this, default_material]() {
+            resource_manager_.destroy_image(default_material.metallic_roughness_image);
+          });
+          deletion_service_.push_function([this, default_material]() {
+            resource_manager_.destroy_image(default_material.normal_image);
+          });
+          deletion_service_.push_function([this, default_material]() {
+            resource_manager_.destroy_image(default_material.emissive_image);
+          });
+          deletion_service_.push_function([this, default_material]() {
+            resource_manager_.destroy_image(default_material.occlusion_image);
+          });
+          deletion_service_.push(default_material.default_sampler_nearest);
+          deletion_service_.push(default_material.default_sampler_linear);
+          deletion_service_.push_function([this, materialDataBuffer]() {
+            resource_manager_.destroy_buffer(materialDataBuffer);
+          });
         }
         // load textures and so on
         add_material(MaterialPass::MainColor, resources,
@@ -191,7 +227,19 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& filename) {
 
   // after all meshes are loaded:
   mesh_buffers_ = resource_manager_.upload_mesh(indices_, vertices_);
+  deletion_service_.push_function([this]() { resource_manager_.destroy_buffer(mesh_buffers_.indexBuffer); });
+  deletion_service_.push_function([this]() { resource_manager_.destroy_buffer(mesh_buffers_.vertexBuffer); });
 
+}
+
+entity vk_scene_manager::create_entity() {
+  const entity new_entity = {next_entity_id_++};
+  entities_.push_back(new_entity);
+
+  const scene_object object = {.entity = new_entity};
+  entity_hierarchy_[new_entity] = object;
+
+  return new_entity;
 }
 
 void vk_scene_manager::add_transform_component(entity entity, const glm::vec3& position,
@@ -228,6 +276,34 @@ void vk_scene_manager::add_mesh_component(const entity entity, std::vector<Verte
   meshes_.push_back(mesh);
   scene_object& object = entity_hierarchy_[entity];
   object.mesh = meshes_.size() - 1;
+}
+
+void vk_scene_manager::add_camera_component(entity entity, const CameraComponent& camera) {
+  cameras_.push_back(camera);
+  scene_object& object = entity_hierarchy_[entity];
+  object.camera = cameras_.size() - 1;
+}
+
+void vk_scene_manager::add_light_component(entity entity, const LightComponent& light) {
+  lights_.push_back(light);
+  scene_object& object = entity_hierarchy_[entity];
+  object.camera = lights_.size() - 1;
+}
+
+void vk_scene_manager::add_material(MaterialPass pass_type,
+                                    const gltf_metallic_roughness::MaterialResources& resources,
+                                    const std::string& name) {
+  materials_.emplace_back(material_component{
+      .name = name,
+      .data = gltf_material_.write_material(gpu_.device, pass_type, resources, descriptorPool)});
+  const std::string key = name.empty() ? "material_" + std::to_string(materials_.size()) : name;
+  material_map_[key] = materials_.size() - 1;
+}
+
+void vk_scene_manager::add_material_component(const entity entity, const std::string& name) {
+  scene_object& object = entity_hierarchy_[entity];
+  size_t material_index = material_map_[name];
+  object.material = material_index;
 }
 
 const std::vector<entity>& vk_scene_manager::get_children(entity entity) const {
@@ -378,6 +454,13 @@ auto pass_type = MaterialPass::MainColor;
       [this, default_material]() { resource_manager_.destroy_image(default_material.emissive_image); }); 
   deletion_service_.push_function(
       [this, default_material]() { resource_manager_.destroy_image(default_material.occlusion_image); }); 
+  deletion_service_.push_function(
+      [this, default_material]() { resource_manager_.destroy_image(default_material.error_checkerboard_image); }); 
   deletion_service_.push(default_material.default_sampler_nearest);
   deletion_service_.push(default_material.default_sampler_linear);
+  deletion_service_.push_function([this, materialDataBuffer]() {
+       resource_manager_.destroy_buffer(materialDataBuffer);
+  });
+  deletion_service_.push_function([this]() { descriptorPool.destroy_pools(gpu_.device); });
+  deletion_service_.push(materials_.back().data.pipeline->layout);
 }

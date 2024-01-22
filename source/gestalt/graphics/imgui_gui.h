@@ -18,6 +18,8 @@ public:
 
   void init(vk_gpu& gpu, sdl_window& window, vk_swapchain& swapchain, gui_actions& actions);
 
+  void cleanup();
+
   void draw(VkCommandBuffer cmd, VkImageView target_image_view);
 
   void update(const SDL_Event& e);
