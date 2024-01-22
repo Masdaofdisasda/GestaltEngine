@@ -335,10 +335,12 @@ void vk_pipeline_manager::build_pipeline(gltf_metallic_roughness& material,
   DescriptorLayoutBuilder layout_builder;
   material.materialLayout
       = layout_builder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-                       .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-                       .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-            .build(gpu_.device,
-                              VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+            .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+            .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+            .add_binding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+            .add_binding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+            .add_binding(5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+            .build(gpu_.device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 
   VkDescriptorSetLayout layouts[]
       = {descriptor_manager_.gpu_scene_data_descriptor_layout, material.materialLayout};

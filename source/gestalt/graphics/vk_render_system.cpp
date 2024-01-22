@@ -258,8 +258,8 @@ void vk_render_system::draw_geometry(VkCommandBuffer cmd) {
         VkViewport viewport = {};
         viewport.x = 0;
         viewport.y = 0;
-        viewport.width = (float)window_.extent.width;
-        viewport.height = (float)window_.extent.height;
+        viewport.width = static_cast<float>(window_.extent.width);
+        viewport.height = static_cast<float>(window_.extent.height);
         viewport.minDepth = 0.f;
         viewport.maxDepth = 1.f;
 

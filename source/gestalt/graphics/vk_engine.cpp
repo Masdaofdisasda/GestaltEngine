@@ -189,7 +189,7 @@ void render_engine::update_scene() {
     // camera projection
     glm::mat4 projection
         = glm::perspective(glm::radians(70.f),
-                           (float)window_.extent.width / (float)window_.extent.height, 1.f, 1000.f);
+                           (float)window_.extent.width / (float)window_.extent.height, .1f, 1000.f);
 
     // invert the Y direction on projection matrix so that we are more similar
     // to opengl and gltf axis
@@ -200,7 +200,7 @@ void render_engine::update_scene() {
     renderer_.scene_data.viewproj = projection * view;
 
     scene_manager_.update_scene(renderer_.main_draw_context_);
-    scene_manager_.loaded_scenes_["structure"]->Draw(glm::mat4{1.f}, renderer_.main_draw_context_);
+    //scene_manager_.loaded_scenes_["structure"]->Draw(glm::mat4{1.f}, renderer_.main_draw_context_);
 }
 
 void render_engine::run()
@@ -279,10 +279,20 @@ MaterialInstance gltf_metallic_roughness::write_material(
     writer.clear();
     writer.write_buffer(0, resources.dataBuffer, sizeof(MaterialConstants),
                         resources.dataBufferOffset, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+
     writer.write_image(1, resources.colorImage.imageView, resources.colorSampler,
                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
     writer.write_image(2, resources.metalRoughImage.imageView, resources.metalRoughSampler,
+                       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                       VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    writer.write_image(3, resources.normalImage.imageView, resources.normalSampler,
+                       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                       VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    writer.write_image(4, resources.emissiveImage.imageView, resources.emissiveSampler,
+                       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                       VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    writer.write_image(5, resources.occlusionImage.imageView, resources.occlusionSampler,
                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 

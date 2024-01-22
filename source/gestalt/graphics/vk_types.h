@@ -133,9 +133,12 @@ struct engine_stats {
 
 
 struct default_material {
-  AllocatedImage white_image;
-  AllocatedImage black_image;
-  AllocatedImage grey_image;
+  AllocatedImage color_image;
+  AllocatedImage metallic_roughness_image;
+  AllocatedImage normal_image;
+  AllocatedImage emissive_image;
+  AllocatedImage occlusion_image;
+
   AllocatedImage error_checkerboard_image;
 
   VkSampler default_sampler_linear;

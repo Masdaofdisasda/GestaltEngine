@@ -161,7 +161,7 @@ public:
 
     init_default_data();
     load_scene_from_gltf("");
-    init_renderables(render_engine);
+    //init_renderables(render_engine);
   }
 
   void cleanup() {

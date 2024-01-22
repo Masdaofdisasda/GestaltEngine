@@ -173,9 +173,9 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(render_engine* engine,
 
     gltf_metallic_roughness::MaterialResources materialResources;
     // default the material textures
-    materialResources.colorImage = engine->get_default_material().white_image;
+    materialResources.colorImage = engine->get_default_material().color_image;
     materialResources.colorSampler = engine->get_default_material().default_sampler_linear;
-    materialResources.metalRoughImage = engine->get_default_material().white_image;
+    materialResources.metalRoughImage = engine->get_default_material().color_image;
     materialResources.metalRoughSampler = engine->get_default_material().default_sampler_linear;
 
     // set the uniform buffer for the material data
@@ -589,22 +589,31 @@ void vk_scene_manager::update_scene(draw_context& draw_context) {
 
 
 void vk_scene_manager::init_default_data() {
+  
+  uint32_t white = 0xFFFFFFFF;                            // White color for color and occlusion
+  uint32_t default_metallic_roughness = 0xFF00FF00;     // Green color representing metallic-roughness
+  uint32_t flat_normal = 0xFFFF8080;                    // Flat normal
+  uint32_t black = 0xFF000000;                          // Black color for emissive
 
-  // 3 default textures, white, grey, black. 1 pixel each
-  uint32_t white = 0xFFFFFFFF;
-  default_material_.white_image = resource_manager_.create_image(
+  default_material_.color_image = resource_manager_.create_image(
       (void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
-  uint32_t grey = 0xAAAAAAFF;
-  default_material_.grey_image = resource_manager_.create_image(
-      (void*)&grey, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+  default_material_.metallic_roughness_image
+      = resource_manager_.create_image((void*)&default_metallic_roughness, VkExtent3D{1, 1, 1},
+                                       VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
-  uint32_t black = 0x000000FF;
-  default_material_.black_image = resource_manager_.create_image(
+  default_material_.normal_image
+      = resource_manager_.create_image((void*)&flat_normal, VkExtent3D{1, 1, 1},
+                                       VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+
+  default_material_.emissive_image = resource_manager_.create_image(
       (void*)&black, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
-  // checkerboard image
-  uint32_t magenta = 0xFF00FFFF;
+  default_material_.occlusion_image = resource_manager_.create_image(
+      (void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+
+  // checkerboard image for error textures and testing
+  uint32_t magenta = 0xFFFF00FF;
   constexpr size_t checkerboard_size = 256;
   std::array<uint32_t, checkerboard_size> pixels;  // for 16x16 checkerboard texture
   for (int x = 0; x < 16; x++) {
@@ -651,14 +660,20 @@ void vk_scene_manager::init_default_data() {
   // write material parameters to buffer
   sceneMaterialConstants[data_index] = constants;
 
-  MaterialPass passType = MaterialPass::MainColor;
+auto passType = MaterialPass::MainColor;
 
   gltf_metallic_roughness::MaterialResources materialResources;
   // default the material textures
-  materialResources.colorImage = default_material_.error_checkerboard_image;
+  materialResources.colorImage = default_material_.color_image;
   materialResources.colorSampler = default_material_.default_sampler_linear;
-  materialResources.metalRoughImage = default_material_.white_image;
+  materialResources.metalRoughImage = default_material_.metallic_roughness_image;
   materialResources.metalRoughSampler = default_material_.default_sampler_linear;
+  materialResources.normalImage = default_material_.normal_image;
+  materialResources.normalSampler = default_material_.default_sampler_linear;
+  materialResources.emissiveImage = default_material_.emissive_image;
+  materialResources.emissiveSampler = default_material_.default_sampler_linear;
+  materialResources.occlusionImage = default_material_.emissive_image;
+  materialResources.occlusionSampler = default_material_.default_sampler_nearest;
 
   // set the uniform buffer for the material data
   materialResources.dataBuffer = materialDataBuffer.buffer;
@@ -670,11 +685,15 @@ void vk_scene_manager::init_default_data() {
       gpu_.device, passType, materialResources, descriptorPool);
 
   deletion_service_.push_function(
-      [this]() { resource_manager_.destroy_image(default_material_.white_image); });
+      [this]() { resource_manager_.destroy_image(default_material_.color_image); }); 
   deletion_service_.push_function(
-      [this]() { resource_manager_.destroy_image(default_material_.grey_image); });
+      [this]() { resource_manager_.destroy_image(default_material_.metallic_roughness_image); }); 
   deletion_service_.push_function(
-      [this]() { resource_manager_.destroy_image(default_material_.error_checkerboard_image); });
+      [this]() { resource_manager_.destroy_image(default_material_.normal_image); }); 
+  deletion_service_.push_function(
+      [this]() { resource_manager_.destroy_image(default_material_.emissive_image); }); 
+  deletion_service_.push_function(
+      [this]() { resource_manager_.destroy_image(default_material_.occlusion_image); }); 
   deletion_service_.push(default_material_.default_sampler_nearest);
   deletion_service_.push(default_material_.default_sampler_linear);
 }
