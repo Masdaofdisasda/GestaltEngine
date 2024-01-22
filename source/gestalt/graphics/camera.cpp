@@ -43,6 +43,9 @@ void free_fly_camera::update(double delta_seconds, const movement& movement) {
 
   if (accel == glm::vec3(0)) {
     // decelerate naturally according to the damping value
+    fmt::print("delta:{} damping:{}\n", static_cast<float>(delta_seconds),
+               (1.0f / damping) * static_cast<float>(delta_seconds));
+
     move_speed_
         -= move_speed_ * std::min((1.0f / damping) * static_cast<float>(delta_seconds), 1.0f);
   } else {

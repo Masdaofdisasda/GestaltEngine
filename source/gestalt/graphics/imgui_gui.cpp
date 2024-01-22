@@ -155,6 +155,7 @@ void imgui_gui::new_frame() {
     ImGui::SliderFloat("Light X", &scene_data.sunlightDirection.x, -10.f, 10.f);
     ImGui::SliderFloat("Light Y", &scene_data.sunlightDirection.y, -10.f, 10.f);
     ImGui::SliderFloat("Light Z", &scene_data.sunlightDirection.z, -10.f, 10.f);
+    ImGui::SliderFloat("Light intensity", &scene_data.sunlightDirection.w, 0.f, 100.f);
     ImGui::End();
   }
 

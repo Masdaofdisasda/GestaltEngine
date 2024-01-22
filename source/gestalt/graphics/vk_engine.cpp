@@ -45,7 +45,7 @@ void render_engine::init() {
   resource_manager_.init(gpu_);
 
   renderer_.init(gpu_, window_, resource_manager_, resize_requested_, stats_);
-  scene_manager_.init(gpu_, resource_manager_, *this, renderer_.gltf_material);
+  scene_manager_.init(gpu_, resource_manager_, renderer_.gltf_material);
   renderer_.scene_manager_ = &scene_manager_;
 
   register_gui_actions();
@@ -58,7 +58,7 @@ void render_engine::init() {
 
   for (auto& cam : camera_positioners_) {
     auto free_fly_camera_ptr = std::make_unique<free_fly_camera>();
-    free_fly_camera_ptr->init(glm::vec3(0, 0, 0), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
+    free_fly_camera_ptr->init(glm::vec3(0, 0,-15), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
     cam = std::move(free_fly_camera_ptr);
   }
   active_camera_.init(*camera_positioners_.at(current_camera_positioner_index_));
@@ -171,8 +171,6 @@ void render_engine::cleanup() {
 
       vkDeviceWaitIdle(gpu_.device);
 
-      scene_manager_.loaded_scenes_.clear();
-
       deletion_service_.flush(); // needed?
 
       scene_manager_.cleanup();
@@ -221,8 +219,6 @@ void render_engine::run()
 
         input_system_.handle_event(e, window_.extent.width, window_.extent.height);
 
-        active_camera_.update(time_tracking_service_.get_delta_time(), input_system_.get_movement());
-
         if (e.type == SDL_WINDOWEVENT) {
           if (e.window.event == SDL_WINDOWEVENT_MINIMIZED) {
             freeze_rendering_ = true;
@@ -235,6 +231,8 @@ void render_engine::run()
         // send SDL event to imgui for handling
         imgui_.update(e);
       }
+
+      active_camera_.update(time_tracking_service_.get_delta_time(), input_system_.get_movement());
 
       if (freeze_rendering_) {
         // throttle the speed to avoid the endless spinning

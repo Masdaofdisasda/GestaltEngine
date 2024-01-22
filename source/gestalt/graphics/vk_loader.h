@@ -15,35 +15,6 @@
 // forward declaration
 class render_engine;
 
-struct LoadedGLTF : IRenderable {
-  // storage for all the data on a given glTF file
-  std::unordered_map<std::string, std::shared_ptr<MeshAsset>> meshes;
-  std::unordered_map<std::string, std::shared_ptr<Node>> nodes;
-  std::unordered_map<std::string, AllocatedImage> images;
-  std::unordered_map<std::string, std::shared_ptr<GLTFMaterial>> materials;
-
-  // nodes that dont have a parent, for iterating through the file in tree order
-  std::vector<std::shared_ptr<Node>> topNodes;
-
-  std::vector<VkSampler> samplers;
-
-  DescriptorAllocatorGrowable descriptorPool;
-
-  AllocatedBuffer materialDataBuffer;
-
-  render_engine* creator;
-
-  ~LoadedGLTF() { clearAll(); };
-
-  virtual void Draw(const glm::mat4& topMatrix, draw_context& ctx);
-
-private:
-  void clearAll();
-};
-
-std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(render_engine* engine,
-                                                    std::string_view filePath);
-
 std::optional<AllocatedImage> load_image(render_engine* engine, fastgltf::Asset& asset,
                                          fastgltf::Image& image);
 
@@ -100,6 +71,7 @@ private:
 };
 
 struct material_component {
+  std::string name;
   MaterialInstance data;
 };
 
@@ -145,15 +117,10 @@ using transform_container = std::vector<transform_component>;
 class vk_scene_manager {
 public:
 
-  MaterialInstance default_data_;
-
-  default_material default_material_;
   gpu_mesh_buffers mesh_buffers_;
   DescriptorAllocatorGrowable descriptorPool;
 
-  std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loaded_scenes_;
-
-  void init(const vk_gpu& gpu, const resource_manager& resource_manager, render_engine& render_engine, gltf_metallic_roughness& material) {
+  void init(const vk_gpu& gpu, const resource_manager& resource_manager, gltf_metallic_roughness& material) {
     gpu_ = gpu;
     resource_manager_ = resource_manager;
     deletion_service_.init(gpu.device, gpu.allocator);
@@ -161,7 +128,6 @@ public:
 
     init_default_data();
     load_scene_from_gltf("");
-    //init_renderables(render_engine);
   }
 
   void cleanup() {
@@ -195,12 +161,21 @@ public:
     object.camera = lights_.size() - 1;
   }
 
-  void add_material_component(const entity entity, const MaterialInstance& material) {
-    const material_component material_component = {.data = material};
-    materials_.push_back(material_component);
+  void add_material(MaterialPass pass_type,
+                    const gltf_metallic_roughness::MaterialResources& resources,
+                    const std::string& name = "") {
 
+    materials_.emplace_back(material_component{
+        .name = name,
+        .data = gltf_material_.write_material(gpu_.device, pass_type, resources, descriptorPool)});
+    std::string key = name.empty() ? "material_" + std::to_string(materials_.size()) : name;
+    material_map_[key] = materials_.size() - 1;
+  }
+
+  void add_material_component(const entity entity, const std::string& name) {
     scene_object& object = entity_hierarchy_[entity];
-    object.material = materials_.size() - 1;
+    size_t material_index = material_map_[name];
+    object.material = material_index;
   }
 
   void add_transform_component(entity entity, const glm::vec3& position, const glm::quat& rotation,
@@ -232,7 +207,6 @@ private:
   vk_gpu gpu_; //TODO remove
 
   void init_default_data();
-  void init_renderables(render_engine& render_engine);
 
   std::vector<Vertex> vertices_;
   std::vector<uint32_t> indices_;
@@ -243,6 +217,7 @@ private:
   camera_container cameras_;
   light_container lights_;
   material_container materials_;
+  std::unordered_map<std::string, size_t> material_map_;
   transform_container transforms_;
 
   // Add similar mappings for other components
@@ -250,6 +225,8 @@ private:
   std::unordered_map<entity, scene_object> entity_hierarchy_;
 
   scene_object root_ = {"root", {}};
+
+  std::string default_material_name_ = "default_material";
 
   // Next available entity ID
   entity next_entity_id_ = 0;

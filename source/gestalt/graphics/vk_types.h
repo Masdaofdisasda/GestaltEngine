@@ -131,20 +131,6 @@ struct engine_stats {
   float mesh_draw_time;
 };
 
-
-struct default_material {
-  AllocatedImage color_image;
-  AllocatedImage metallic_roughness_image;
-  AllocatedImage normal_image;
-  AllocatedImage emissive_image;
-  AllocatedImage occlusion_image;
-
-  AllocatedImage error_checkerboard_image;
-
-  VkSampler default_sampler_linear;
-  VkSampler default_sampler_nearest;
-};
-
 struct Bounds {
   glm::vec3 origin;
   float sphereRadius;

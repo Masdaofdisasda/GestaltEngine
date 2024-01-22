@@ -158,6 +158,42 @@ vec3 calculatePBRLightContributionDir( inout PBRInfo pbrInputs)
 	return color;
 }
 
+vec3 calculatePBRLightContributionPoint( inout PBRInfo pbrInputs)
+{
+	vec3 lightPos = vec3(0.0, 0.0, 0.0);
+
+	vec3 n = pbrInputs.n;
+	vec3 v = pbrInputs.v;
+	vec3 l = normalize(lightPos - inPosition);	// Vector from surface point to light
+	vec3 h = normalize(l+v);							// Half vector between both l and v
+
+	float NdotV = pbrInputs.NdotV;
+	float NdotL = clamp(dot(n, l), 0.001, 1.0);
+	float NdotH = clamp(dot(n, h), 0.0, 1.0);
+	float LdotH = clamp(dot(l, h), 0.0, 1.0);
+	float VdotH = clamp(dot(v, h), 0.0, 1.0);
+
+	pbrInputs.NdotL = NdotL;
+	pbrInputs.NdotH = NdotH;
+	pbrInputs.LdotH = LdotH;
+	pbrInputs.VdotH = VdotH;
+
+	// Calculate the shading terms for the microfacet specular shading model
+	vec3 F = specularReflection(pbrInputs);
+	float G = geometricOcclusion(pbrInputs);
+	float D = microfacetDistribution(pbrInputs);
+
+	// Calculation of analytical lighting contribution
+	vec3 diffuseContrib = (1.0 - F) * diffuseBurley(pbrInputs);
+	vec3 specContrib = F * G * D / (4.0 * NdotL * NdotV);
+	// Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
+    float distance = length(vec3(lightPos) - inPosition);
+    float attenuation = 1.0 / (distance * distance);
+	vec3 color = NdotL * sceneData.sunlightDirection.w * attenuation * (diffuseContrib + specContrib);
+
+	return color;
+}
+
 // http://www.thetenthplanet.de/archives/1180
 mat3 cotangentFrame( vec3 N, vec3 p, vec2 uv )
 {
@@ -216,8 +252,14 @@ void main() {
 	// directional light contribution
 	color *= calculatePBRLightContributionDir(pbrInputs);
 
+	
+  	color += calculatePBRLightContributionPoint(pbrInputs);
+
 	color = color * (Kao.r < 0.01 ? 1.0 : Kao);
 	color = pow(Ke.rgb + color, vec3(1.0/2.2) ) ;
+
+	color = color / (color + vec3(1.0));
+	color = pow(color, vec3(1.0/2.2)); // gamma correction
 
     outFragColor = vec4(color, 1.0);
 }

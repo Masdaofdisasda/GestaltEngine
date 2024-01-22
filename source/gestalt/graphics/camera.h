@@ -71,11 +71,11 @@ public:
   glm::quat get_orientation() const override { return camera_orientation_; }
 
 private:
-  float mouse_speed = 4.0f;
-  float acceleration = 15.0f;
-  float damping = 0.2f;    // changes deceleration speed
-  float max_speed = 1.0f;  // clamps movement
-  float fast_coef = 5.0f;  // l-shift mode uses this
+  float mouse_speed = 4.5f;
+  float acceleration = .01f;
+  float damping = 15.f;    // changes deceleration speed
+  float max_speed = .05f;  // clamps movement
+  float fast_coef = .1f;  // l-shift mode uses this, NOTE control is reversed somehow, slows down when pressed???
 
   glm::vec2 mouse_pos_ = glm::vec2(0);
   glm::vec3 camera_position_ = glm::vec3(0.0f, 0.0f, 5.0f);
