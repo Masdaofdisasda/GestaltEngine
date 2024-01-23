@@ -47,8 +47,8 @@ void vk_scene_manager::init(const vk_gpu& gpu, const resource_manager& resource_
   gltf_material_ = material;
 
   init_default_data();
-  load_scene_from_gltf(R"(..\..\assets\Models\MetalRoughSpheres\glTF-Binary\MetalRoughSpheres.glb)");
-  //load_scene_from_gltf(R"(..\..\assets\Models\Sponza\glTF\Sponza.gltf)");
+  //load_scene_from_gltf(R"(..\..\assets\Models\MetalRoughSpheres\glTF-Binary\MetalRoughSpheres.glb)");
+  load_scene_from_gltf(R"(..\..\assets\sponza_pestana.glb)");
   //load_scene_from_gltf(R"(..\..\assets\structure.glb)");
 }
 
