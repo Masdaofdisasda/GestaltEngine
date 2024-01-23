@@ -75,7 +75,7 @@ private:
   float acceleration = .01f;
   float damping = 15.f;    // changes deceleration speed
   float max_speed = .05f;  // clamps movement
-  float fast_coef = .1f;  // l-shift mode uses this, NOTE control is reversed somehow, slows down when pressed???
+  float fast_coef = 5.f;  // l-shift mode uses this, NOTE control is reversed somehow, slows down when pressed???
 
   glm::vec2 mouse_pos_ = glm::vec2(0);
   glm::vec3 camera_position_ = glm::vec3(0.0f, 0.0f, 5.0f);

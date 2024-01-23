@@ -192,9 +192,10 @@ std::optional<AllocatedImage> resource_manager::load_image(fastgltf::Asset& asse
             assert(filePath.uri.isLocalPath());    // We're only capable of loading
                                                    // local files.
 
-            const std::string path(filePath.uri.path().begin(),
-                                   filePath.uri.path().end());  // Thanks C++.
-            unsigned char* data = stbi_load(path.c_str(), &width, &height, &nrChannels, 4);
+            const std::string filename(filePath.uri.path().begin(),
+                                   filePath.uri.path().end());  // todo get filenames relative for .gtlf
+            //const std::string path = "../../assets/Models/Sponza/glTF/" + filename;
+            unsigned char* data = stbi_load(filename.c_str(), &width, &height, &nrChannels, 4);
             if (data) {
               VkExtent3D imagesize;
               imagesize.width = width;

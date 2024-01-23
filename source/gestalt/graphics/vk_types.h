@@ -133,8 +133,8 @@ struct engine_stats {
 
 struct Bounds {
   glm::vec3 origin;
-  float sphereRadius;
   glm::vec3 extents;
+  float sphereRadius;
 };
 
 struct GLTFMaterial {

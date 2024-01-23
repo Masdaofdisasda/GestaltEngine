@@ -245,7 +245,7 @@ void main() {
 	vec4 MeR = texture(metalRoughTex, UV);
 
 	PBRInfo pbrInputs;
-	
+
 	// IBL contribution
 	vec3 color = calculatePBRInputsMetallicRoughness(Kd, n, viewPos.xyz, inPosition, MeR, pbrInputs);
 

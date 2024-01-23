@@ -244,7 +244,8 @@ void vk_renderer::draw_geometry(VkCommandBuffer cmd) {
 
   MaterialPipeline* lastPipeline = nullptr;
   MaterialInstance* lastMaterial = nullptr;
-  VkBuffer lastIndexBuffer = VK_NULL_HANDLE;
+  const auto& buffer_index = main_draw_context_.opaque_surfaces[0].index_buffer;
+  vkCmdBindIndexBuffer(cmd, buffer_index, 0, VK_INDEX_TYPE_UINT32);
 
   auto draw = [&](const render_object& r) {
     if (r.material != lastMaterial) {
@@ -277,10 +278,7 @@ void vk_renderer::draw_geometry(VkCommandBuffer cmd) {
       vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, r.material->pipeline->layout, 1,
                               1, &r.material->materialSet, 0, nullptr);
     }
-    if (r.index_buffer != lastIndexBuffer) {
-      lastIndexBuffer = r.index_buffer;
-      vkCmdBindIndexBuffer(cmd, r.index_buffer, 0, VK_INDEX_TYPE_UINT32);
-    }
+
     // calculate final mesh matrix
     GPUDrawPushConstants push_constants;
     push_constants.worldMatrix = r.transform;

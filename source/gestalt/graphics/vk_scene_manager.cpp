@@ -9,8 +9,6 @@
 
 #include <glm/gtx/matrix_decompose.hpp>
 
-#include "camera.h"
-
 VkFilter extract_filter(fastgltf::Filter filter) {
   switch (filter) {
     // nearest samplers
@@ -50,24 +48,29 @@ void vk_scene_manager::init(const vk_gpu& gpu, const resource_manager& resource_
 
   init_default_data();
   load_scene_from_gltf(R"(..\..\assets\Models\MetalRoughSpheres\glTF-Binary\MetalRoughSpheres.glb)");
-  //load_scene_from_gltf();
+  //load_scene_from_gltf(R"(..\..\assets\Models\Sponza\glTF\Sponza.gltf)");
+  //load_scene_from_gltf(R"(..\..\assets\structure.glb)");
 }
 
 void vk_scene_manager::cleanup() {
+  for (auto img : images_) {
+    resource_manager_.destroy_image(img);
+  }
+
   deletion_service_.flush();
 }
 
 void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
 
-  fmt::print("Loading GLTF: {}", file_path);
+  fmt::print("Loading GLTF: {}\n", file_path);
 
   fastgltf::Parser parser{};
 
-  constexpr auto gltf_options = fastgltf::Options::DontRequireValidAssetMember
-                               | fastgltf::Options::AllowDouble | fastgltf::Options::LoadGLBBuffers
-                               | fastgltf::Options::LoadExternalBuffers;
+  constexpr auto gltf_options
+      = fastgltf::Options::DontRequireValidAssetMember | fastgltf::Options::AllowDouble
+        | fastgltf::Options::LoadGLBBuffers | fastgltf::Options::LoadExternalBuffers
+        | fastgltf::Options::DecomposeNodeMatrices | fastgltf::Options::None;
   // fastgltf::Options::LoadExternalImages;
-  // Options::DecomposeNodeMatrices.
 
   fastgltf::GltfDataBuffer data;
   data.loadFromFile(file_path);
@@ -112,29 +115,38 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
 
     sampl.mipmapMode = extract_mipmap_mode(sampler.minFilter.value_or(fastgltf::Filter::Nearest));
 
-    VkSampler newSampler;
-    vkCreateSampler(gpu_.device, &sampl, nullptr, &newSampler);
+    VkSampler new_sampler;
+    vkCreateSampler(gpu_.device, &sampl, nullptr, &new_sampler);
 
-    samplers_.push_back(newSampler);
+    samplers_.push_back(new_sampler);
+    deletion_service_.push(new_sampler);
   }
 
   for (fastgltf::Image& image : gltf.images) {
     std::optional<AllocatedImage> img = resource_manager_.load_image(gltf, image);
 
     if (img.has_value()) {
-      images_.push_back(*img);
+      images_.push_back(img.value());
     } else {
       fmt::print("gltf failed to load texture {}\n", image.name);
+      images_.push_back(default_material_.error_checkerboard_image);
     }
   }
 
   // load buffer and materials
+  size_t material_offset = materials_.size();
   material_data_buffer_ = resource_manager_.create_buffer(
       sizeof(gltf_metallic_roughness::MaterialConstants) * gltf.materials.size(),
       VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
   int data_index = 0;
+  gltf_metallic_roughness::MaterialConstants* sceneMaterialConstants
+      = (gltf_metallic_roughness::MaterialConstants*)material_data_buffer_.info.pMappedData;
+  //< l
+
   for (fastgltf::Material& mat : gltf.materials) {
 
+
+    material_component material_component{};
     gltf_metallic_roughness::MaterialConstants constants;
     constants.colorFactors.x = mat.pbrData.baseColorFactor[0];
     constants.colorFactors.y = mat.pbrData.baseColorFactor[1];
@@ -144,7 +156,7 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
     constants.metal_rough_factors.x = mat.pbrData.metallicFactor;
     constants.metal_rough_factors.y = mat.pbrData.roughnessFactor;
     // write material parameters to buffer
-    //sceneMaterialConstants[data_index] = constants; //TODO
+    sceneMaterialConstants[data_index] = constants;
 
     auto pass_type = MaterialPass::MainColor;
     if (mat.alphaMode == fastgltf::AlphaMode::Blend) {
@@ -176,6 +188,7 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
 
       materialResources.colorImage = images_[img];
       materialResources.colorSampler = samplers_[sampler];
+      material_component.albedo_tex = true;
     }
     if (mat.pbrData.metallicRoughnessTexture) {
       size_t img = gltf.textures[mat.pbrData.metallicRoughnessTexture.value().textureIndex]
@@ -185,6 +198,7 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
 
       materialResources.metalRoughImage = images_[img];
       materialResources.metalRoughSampler = samplers_[sampler];
+      material_component.metal_rough_tex = true;
     }
     if (mat.normalTexture.has_value()) {
       size_t img = gltf.textures[mat.normalTexture.value().textureIndex]
@@ -194,6 +208,7 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
 
       materialResources.normalImage = images_[img];
       materialResources.normalSampler = samplers_[sampler];
+      material_component.normal_tex = true;
     }
     if (mat.emissiveTexture.has_value()) {
       size_t img = gltf.textures[mat.emissiveTexture.value().textureIndex]
@@ -203,6 +218,7 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
 
       materialResources.emissiveImage = images_[img];
       materialResources.emissiveSampler = samplers_[sampler];
+      material_component.emissive_tex = true;
     }
     if (mat.occlusionTexture.has_value()) {
       size_t img = gltf.textures[mat.occlusionTexture.value().textureIndex].imageIndex.value();
@@ -211,40 +227,40 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
 
       materialResources.occlusionImage = images_[img];
       materialResources.occlusionSampler = samplers_[sampler];
+      material_component.occlusion_tex = true;
     }
     // build material
-    add_material(pass_type, materialResources, std::string(mat.name));
+    create_material(pass_type, materialResources, material_component, std::string(mat.name));
     data_index++;
   }
 
 
   // load meshes
-  std::vector<uint32_t> indices;
-  std::vector<Vertex> vertices;
-  size_t node_offset = entity_hierarchy_.size() + 1; // for root
-  size_t mesh_offset = meshes_.size();
+  std::vector<size_t> surfaces;
 
   for (fastgltf::Mesh& mesh : gltf.meshes) {
-
-    // clear the mesh arrays each mesh, we dont want to merge them by error
-    indices.clear();
-    vertices.clear();
+    surfaces.clear();
 
     for (auto&& primitive : mesh.primitives) {
-      size_t initial_vtx = vertices.size();
+
+      size_t initial_index = vertices_.size();
+      std::vector<uint32_t> indices;
+      std::vector<Vertex> vertices;
 
       // load indexes
       {
         fastgltf::Accessor& indexaccessor = gltf.accessors[primitive.indicesAccessor.value()];
         indices.reserve(indices.size() + indexaccessor.count);
 
-        fastgltf::iterateAccessor<std::uint32_t>(
-            gltf, indexaccessor, [&](std::uint32_t idx) { indices.push_back(idx + initial_vtx); });
+        fastgltf::iterateAccessor<std::uint32_t>(gltf, indexaccessor, [&](std::uint32_t idx) {
+          indices.push_back(idx + initial_index);
+        });
       }
 
       // load vertex positions
       {
-        fastgltf::Accessor& posAccessor = gltf.accessors[primitive.findAttribute("POSITION")->second];
+        fastgltf::Accessor& posAccessor
+            = gltf.accessors[primitive.findAttribute("POSITION")->second];
         vertices.resize(vertices.size() + posAccessor.count);
 
         fastgltf::iterateAccessorWithIndex<glm::vec3>(gltf, posAccessor,
@@ -255,7 +271,7 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
                                                         newvtx.color = glm::vec4{1.f};
                                                         newvtx.uv_x = 0;
                                                         newvtx.uv_y = 0;
-                                                        vertices[initial_vtx + index] = newvtx;
+                                                        vertices[index] = newvtx;
                                                       });
       }
 
@@ -264,7 +280,7 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
       if (normals != primitive.attributes.end()) {
         fastgltf::iterateAccessorWithIndex<glm::vec3>(
             gltf, gltf.accessors[(*normals).second],
-            [&](glm::vec3 v, size_t index) { vertices[initial_vtx + index].normal = v; });
+            [&](glm::vec3 v, size_t index) { vertices[index].normal = v; });
       }
 
       // load UVs
@@ -272,8 +288,8 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
       if (uv != primitive.attributes.end()) {
         fastgltf::iterateAccessorWithIndex<glm::vec2>(gltf, gltf.accessors[(*uv).second],
                                                       [&](glm::vec2 v, size_t index) {
-                                                        vertices[initial_vtx + index].uv_x = v.x;
-                                                        vertices[initial_vtx + index].uv_y = v.y;
+                                                        vertices[index].uv_x = v.x;
+                                                        vertices[index].uv_y = v.y;
                                                       });
       }
 
@@ -282,265 +298,60 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
       if (colors != primitive.attributes.end()) {
         fastgltf::iterateAccessorWithIndex<glm::vec4>(
             gltf, gltf.accessors[(*colors).second],
-            [&](glm::vec4 v, size_t index) { vertices[initial_vtx + index].color = v; });
+            [&](glm::vec4 v, size_t index) { vertices[index].color = v; });
       }
 
-      entity new_entity = create_entity();
-      add_mesh_component(new_entity, vertices, indices, std::string(mesh.name));
-
+      size_t surface_index = create_surface(vertices, indices);
       if (primitive.materialIndex.has_value()) {
-        auto material_name = gltf.materials[primitive.materialIndex.value()].name;
-        add_material_component(new_entity, std::string(material_name));
+        add_material_component(surface_index, material_offset + primitive.materialIndex.value());
 
       } else {
-        add_material_component(new_entity, default_material_name_);
+        add_material_component(surface_index, default_material);
       }
-
-      glm::vec3 minpos = vertices[initial_vtx].position;
-      glm::vec3 maxpos = vertices[initial_vtx].position;
-      for (int i = initial_vtx; i < vertices.size(); i++) {
-        minpos = min(minpos, vertices[i].position);
-        maxpos = max(maxpos, vertices[i].position);
-      }
+      surfaces.push_back(surface_index);
     }
+    create_mesh(surfaces, std::string(mesh.name));
   }
   mesh_buffers_ = resource_manager_.upload_mesh(indices_, vertices_);
 
   // hierachy
   for (fastgltf::Node& node : gltf.nodes) {
-    scene_object new_node;
+    scene_object& new_node = get_scene_object_by_entity(create_entity()).value().get();
 
     if (node.meshIndex.has_value()) {
-      new_node = find_scene_object_by_mesh(mesh_offset + *node.meshIndex).get();
-      new_node.name = node.name;
-    } else {
-      entity entity = create_entity();
-      new_node = find_scene_object_by_entity(entity).get();
-      new_node.name = node.name;
+      add_mesh_component(new_node.entity, *node.meshIndex);
     }
 
+    if (std::holds_alternative<fastgltf::Node::TRS>(node.transform)) {
+      const auto& trs = std::get<fastgltf::Node::TRS>(node.transform);
+      glm::vec3 translation(trs.translation[0], trs.translation[1], trs.translation[2]);
+      glm::quat rotation(trs.rotation[3], trs.rotation[0], trs.rotation[1], trs.rotation[2]);
+      glm::vec3 scale(trs.scale[0], trs.scale[1], trs.scale[2]);
 
-    std::visit(fastgltf::visitor{
-                   [&](fastgltf::Node::TransformMatrix matrix) {
-                     glm::mat4 transformation;
-                     memcpy(&transformation, matrix.data(), sizeof(matrix));
-                     glm::vec3 scale;
-                     glm::quat rotation;
-                     glm::vec3 translation;
-                     glm::vec3 skew;
-                     glm::vec4 perspective;
-                     decompose(transformation, scale, rotation, translation, skew, perspective);
-                     set_transform_component(new_node.entity, translation, rotation, scale);
-                   },
-                   [&](fastgltf::Node::TRS transform) {
-                     glm::vec3 translation(transform.translation[0], transform.translation[1],
-                                           transform.translation[2]);
-                     glm::quat rotation(transform.rotation[3], transform.rotation[0],
-                                        transform.rotation[1], transform.rotation[2]);
-                     glm::vec3 scale(transform.scale[0], transform.scale[1], transform.scale[2]);
-
-                     set_transform_component(new_node.entity, translation, rotation, scale);
-                   }},
-               node.transform);
+      set_transform_component(new_node.entity, translation, rotation, scale);
+    }
   }
+
+  assert(gltf.nodes.size() >= entities_.size());
+  assert(gltf.nodes.size() == scene_hierarchy_.size());
 
   for (int i = 0; i < gltf.nodes.size(); i++) {
     fastgltf::Node& node = gltf.nodes[i];
-    auto& scene_object = find_scene_object_by_entity(node_offset + i).get();
+    auto& scene_object = get_scene_object_by_entity(i).value().get();
 
     for (auto& c : node.children) {
-      auto child = find_scene_object_by_entity(node_offset + c).get();
+      auto child = get_scene_object_by_entity(c).value().get();
       scene_object.children.push_back(child.entity);
       child.parent = scene_object.entity;
     }
   }
 
   // find the top nodes, with no parents
-  for (auto& node : entity_hierarchy_) {
+  for (auto& node : scene_hierarchy_) {
     if (node.second.parent == invalid_entity) {
       root_.children.push_back(node.first);
-      node.second.parent = root_.entity;
     }
   }
-}
-
-void vk_scene_manager::load_scene_from_gltf() {
-
-  //TODO load from file and parse
-
-  std::vector<Vertex> vertices{4};
-  vertices[0].position = {-1.f, -1.f, 0.f};
-  vertices[0].color = glm::vec4(1.f);
-  vertices[0].normal = {0.f, 0.f, 1.f};
-  vertices[0].uv_x = 0.f;
-  vertices[0].uv_y = 0.f;
-  vertices[1].position = {1.f, -1.f, 0.f};
-  vertices[1].color = glm::vec4(1.f);
-  vertices[1].normal = {0.f, 0.f, 1.f};
-  vertices[1].uv_x = 1.f;
-  vertices[1].uv_y = 0.f;
-  vertices[2].position = {1.f, 1.f, 0.f};
-  vertices[2].color = glm::vec4(1.f);
-  vertices[2].normal = {0.f, 0.f, 1.f};
-  vertices[2].uv_x = 1.f;
-  vertices[2].uv_y = 1.f;
-  vertices[3].position = {-1.f, 1.f, 0.f};
-  vertices[3].color = glm::vec4(1.f);
-  vertices[3].normal = {0.f, 0.f, 1.f};
-  vertices[3].uv_x = 0.f;
-  vertices[3].uv_y = 1.f;
-
-  std::vector<uint32_t> indices = {
-      0, 1, 2, 2, 3, 0,
-  };
-
-  constexpr int steps = 10;
-  std::array<uint32_t, steps * steps> pixels;
-  std::array<uint32_t, steps * steps * steps> albedo;
-
-  for (int i = 0; i < steps; ++i) {
-    for (int j = 0; j < steps; ++j) {
-      int metallicValue = (i * 255) / 9;
-      int roughnessValue = (j * 255) / 9;
-      pixels[i * steps + j] = (255 << 24) | (roughnessValue << 8) | metallicValue;
-      for (int k = 0; k < steps; ++k) {
-               albedo[i * steps * steps + j * steps + k] = (255 << 24) | (i * 255 / 9 << 16)
-                                                    | (j * 255 / 9 << 8) | (k * 255 / 9);
-      }
-    }
-  }
-
-  for (int i = 0; i < 10; ++i) {
-    for (int j = 0; j < 10; ++j) {
-      for (int k = 0; k < 10; ++k) {
-        entity entity = create_entity();  // todo maybe use builder pattern?
-               add_mesh_component(entity, vertices, indices,
-            "mesh_" + std::to_string(i) + "_" + std::to_string(j) + "_" + std::to_string(k));
-        set_transform_component(entity, glm::vec3(i - 5.f, j - 5.f, k -5.f),
-                                glm::quat(0.f, 0.f, 0.f, 0.f), glm::vec3(0.4f));
-        root_.children.push_back(entity);
-
-        gltf_metallic_roughness::MaterialResources resources;
-        {
-          struct material {
-            AllocatedImage color_image;
-            AllocatedImage metallic_roughness_image;
-            AllocatedImage normal_image;
-            AllocatedImage emissive_image;
-            AllocatedImage occlusion_image;
-
-            AllocatedImage error_checkerboard_image;
-
-            VkSampler default_sampler_linear;
-            VkSampler default_sampler_nearest;
-          } default_material;
-
-          uint32_t white = albedo[i * steps * steps + j * steps + k];
-          uint32_t occlusion = 0xFFFFFFFF;  // White color for color and occlusion
-
-          uint32_t default_metallic_roughness = pixels[i * steps + j];
-          uint32_t flat_normal = 0xFFFF8080;  // Flat normal
-          uint32_t black = 0xFF000000;        // Black color for emissive
-
-          default_material.color_image = resource_manager_.create_image(
-              (void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
-              VK_IMAGE_USAGE_SAMPLED_BIT);
-
-          default_material.metallic_roughness_image = resource_manager_.create_image(
-              (void*)&default_metallic_roughness, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
-              VK_IMAGE_USAGE_SAMPLED_BIT);
-
-          default_material.normal_image = resource_manager_.create_image(
-              (void*)&flat_normal, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
-              VK_IMAGE_USAGE_SAMPLED_BIT);
-
-          default_material.emissive_image = resource_manager_.create_image(
-              (void*)&black, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
-              VK_IMAGE_USAGE_SAMPLED_BIT);
-
-          default_material.occlusion_image = resource_manager_.create_image(
-              (void*)&occlusion, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
-              VK_IMAGE_USAGE_SAMPLED_BIT);
-
-          VkSamplerCreateInfo sampl = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
-
-          sampl.magFilter = VK_FILTER_NEAREST;
-          sampl.minFilter = VK_FILTER_NEAREST;
-
-          vkCreateSampler(gpu_.device, &sampl, nullptr, &default_material.default_sampler_nearest);
-
-          sampl.magFilter = VK_FILTER_LINEAR;
-          sampl.minFilter = VK_FILTER_LINEAR;
-          vkCreateSampler(gpu_.device, &sampl, nullptr, &default_material.default_sampler_linear);
-
-          // Create buffer for material data
-          AllocatedBuffer materialDataBuffer = resource_manager_.create_buffer(
-              sizeof(gltf_metallic_roughness::MaterialConstants),
-              VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-          gltf_metallic_roughness::MaterialConstants constants;
-          constants.colorFactors.x = 1.f;
-          constants.colorFactors.y = 1.f;
-          constants.colorFactors.z = 1.f;
-          constants.colorFactors.w = 1.f;
-
-          constants.metal_rough_factors.x = 0.f;
-          constants.metal_rough_factors.y = 0.f;
-          // Map and write material parameters to buffer
-          gltf_metallic_roughness::MaterialConstants* sceneMaterialConstants
-              = (gltf_metallic_roughness::MaterialConstants*)materialDataBuffer.info.pMappedData;
-          *sceneMaterialConstants = constants;
-
-          // Create material resources
-
-          resources.colorImage = default_material.color_image;
-          resources.colorSampler = default_material.default_sampler_linear;
-          resources.metalRoughImage = default_material.metallic_roughness_image;
-          resources.metalRoughSampler = default_material.default_sampler_linear;
-          resources.normalImage = default_material.normal_image;
-          resources.normalSampler = default_material.default_sampler_linear;
-          resources.emissiveImage = default_material.emissive_image;
-          resources.emissiveSampler = default_material.default_sampler_linear;
-          resources.occlusionImage = default_material.occlusion_image;
-          resources.occlusionSampler = default_material.default_sampler_nearest;
-
-          resources.dataBuffer = materialDataBuffer.buffer;
-          resources.dataBufferOffset = 0;  // Assuming only one material constants struct
-
-          deletion_service_.push_function([this, default_material]() {
-            resource_manager_.destroy_image(default_material.color_image);
-          });
-          deletion_service_.push_function([this, default_material]() {
-            resource_manager_.destroy_image(default_material.metallic_roughness_image);
-          });
-          deletion_service_.push_function([this, default_material]() {
-            resource_manager_.destroy_image(default_material.normal_image);
-          });
-          deletion_service_.push_function([this, default_material]() {
-            resource_manager_.destroy_image(default_material.emissive_image);
-          });
-          deletion_service_.push_function([this, default_material]() {
-            resource_manager_.destroy_image(default_material.occlusion_image);
-          });
-          deletion_service_.push(default_material.default_sampler_nearest);
-          deletion_service_.push(default_material.default_sampler_linear);
-          deletion_service_.push_function([this, materialDataBuffer]() {
-            resource_manager_.destroy_buffer(materialDataBuffer);
-          });
-        }
-        // load textures and so on
-        add_material(MaterialPass::MainColor, resources,
-                     "mat_" + std::to_string(i) + "_" + std::to_string(j));
-        add_material_component(entity, "mat_" + std::to_string(i) + "_" + std::to_string(j));
-      }
-    }
-  }
-
-  // after all meshes are loaded:
-  mesh_buffers_ = resource_manager_.upload_mesh(indices_, vertices_);
-  deletion_service_.push_function([this]() { resource_manager_.destroy_buffer(mesh_buffers_.indexBuffer); });
-  deletion_service_.push_function([this]() { resource_manager_.destroy_buffer(mesh_buffers_.vertexBuffer); });
-
 }
 
 entity vk_scene_manager::create_entity() {
@@ -548,7 +359,7 @@ entity vk_scene_manager::create_entity() {
   entities_.push_back(new_entity);
 
   const scene_object object = {.entity = new_entity};
-  entity_hierarchy_[new_entity] = object;
+  scene_hierarchy_.insert({new_entity, object});
 
   set_transform_component(new_entity, glm::vec3(0));
 
@@ -557,152 +368,172 @@ entity vk_scene_manager::create_entity() {
 
 void vk_scene_manager::set_transform_component(entity entity, const glm::vec3& position,
                                                const glm::quat& rotation, const glm::vec3& scale) {
+  assert(entity != invalid_entity);
+  auto& scene_object = get_scene_object_by_entity(entity).value().get();
 
-  auto& scene_object = find_scene_object_by_entity(entity).get();
-
-  if (scene_object.transform == no_component) {
-    const transform_component transform{position, rotation, scale};
-    transforms_.push_back(transform);
-    scene_object.transform = transforms_.size() - 1;
-  } else {
-    auto& transform = transforms_[scene_object.transform];
-    transform = {position, rotation, scale};
-  }
+  auto& transform = transforms_[scene_object.transform];
+  transform = {position, rotation, scale};
 }
 
-void vk_scene_manager::add_mesh_component(const entity entity, std::vector<Vertex>& vertices,
-    std::vector<uint32_t>& indices, const std::string& name) {
+size_t vk_scene_manager::create_surface(std::vector<Vertex>& vertices,
+    std::vector<uint32_t>& indices) {
+  assert(!vertices.empty() && !indices.empty());
 
-  mesh_component mesh;
-  mesh.vertex_offset = vertices_.size();
-  mesh.first_index = indices_.size();
-  mesh.vertex_count = vertices.size();
-  mesh.index_count = indices.size();
-
-  glm::vec3 minpos = vertices[0].position;
-  glm::vec3 maxpos = vertices[0].position;
-  for (auto& vertice : vertices) {
+  glm::vec3 minpos = vertices.empty() ? glm::vec3(0) : vertices[0].position;
+  glm::vec3 maxpos = minpos;
+  for (const auto& vertice : vertices) {
     minpos = min(minpos, vertice.position);
     maxpos = max(maxpos, vertice.position);
   }
+  glm::vec3 extents = (maxpos - minpos) / 2.f;
+  Bounds bounds{
+      .origin = (maxpos + minpos) / 2.f,
+      .extents = extents,
+      .sphereRadius = length(extents),
+  };
 
-  mesh.bounds.origin = (maxpos + minpos) / 2.f;
-  mesh.bounds.extents = (maxpos - minpos) / 2.f;
-  mesh.bounds.sphereRadius = length(mesh.bounds.extents);
+  const surface surface{
+      .vertex_count = static_cast<uint32_t>(vertices.size()),
+      .index_count = static_cast<uint32_t>(indices.size()),
+      .first_index = static_cast<uint32_t>(indices_.size()),
+      .vertex_offset = static_cast<uint32_t>(vertices_.size()),
+      .bounds = bounds,
+  };
 
   vertices_.insert(vertices_.end(), vertices.begin(), vertices.end());
+  uint32_t highest_index = *std::max_element(indices.begin(), indices.end());
+  assert(highest_index <= vertices_.size());
   indices_.insert(indices_.end(), indices.begin(), indices.end());
 
-  meshes_.push_back(mesh);
-  mesh_map_[name] = meshes_.size() - 1;
-  scene_object& object = entity_hierarchy_[entity];
-  object.mesh = meshes_.size() - 1;
+  surfaces_.push_back(surface);
+
+  return surfaces_.size() - 1;
+}
+
+size_t vk_scene_manager::create_mesh(std::vector<size_t> surfaces, const std::string& name) {
+
+  meshes_.emplace_back(mesh_component{surfaces});
+  const std::string key = name.empty() ? "mesh_" + std::to_string(meshes_.size()) : name;
+  mesh_map_[key] = meshes_.size() - 1;
+
+  return meshes_.size() - 1;
+}
+
+void vk_scene_manager::add_mesh_component(const entity entity, size_t mesh_index) {
+  assert(entity != invalid_entity);
+
+  scene_object& object = get_scene_object_by_entity(entity).value().get();
+  object.mesh = mesh_index;
 }
 
 void vk_scene_manager::add_camera_component(entity entity, const CameraComponent& camera) {
   cameras_.push_back(camera);
-  scene_object& object = entity_hierarchy_[entity];
+  scene_object& object = get_scene_object_by_entity(entity).value().get();
   object.camera = cameras_.size() - 1;
 }
 
 void vk_scene_manager::add_light_component(entity entity, const LightComponent& light) {
   lights_.push_back(light);
-  scene_object& object = entity_hierarchy_[entity];
+  scene_object& object = get_scene_object_by_entity(entity).value().get();
   object.camera = lights_.size() - 1;
 }
 
-void vk_scene_manager::add_material(MaterialPass pass_type,
-                                    const gltf_metallic_roughness::MaterialResources& resources,
-                                    const std::string& name) {
+size_t vk_scene_manager::create_material(
+    MaterialPass pass_type, const gltf_metallic_roughness::MaterialResources& resources,
+    material_component material, const std::string& name) {
   materials_.emplace_back(material_component{
       .name = name,
-      .data = gltf_material_.write_material(gpu_.device, pass_type, resources, descriptorPool)});
+      .data = gltf_material_.write_material(gpu_.device, pass_type, resources, descriptorPool),
+      .albedo_factor = material.albedo_factor,
+      .albedo_tex = material.albedo_tex,
+      .metal_rough_factor = material.metal_rough_factor,
+      .metal_rough_tex = material.metal_rough_tex,
+      .normal_tex = material.normal_tex,
+      .emissive_factor = material.emissive_factor,
+      .emissive_tex = material.emissive_tex,
+      .occlusion_tex = material.occlusion_tex,
+  });
   const std::string key = name.empty() ? "material_" + std::to_string(materials_.size()) : name;
   material_map_[key] = materials_.size() - 1;
+
+  return materials_.size() - 1;
 }
 
-void vk_scene_manager::add_material_component(const entity entity, const std::string& name) {
-  scene_object& object = entity_hierarchy_[entity];
-  size_t material_index = material_map_[name];
-  object.material = material_index;
+void vk_scene_manager::add_material_component(const size_t surface, const size_t material) {
+  assert(material != no_component);
+  assert(material <= materials_.size());
+  assert(surface <= surfaces_.size());
+  assert(surfaces_[surface].material == default_material);
+  surfaces_[surface].material = material;
 }
 
-const std::vector<entity>& vk_scene_manager::get_children(entity entity) const {
-  return entity_hierarchy_.at(entity).children;
+const std::vector<entity>& vk_scene_manager::get_children(entity entity) {
+  assert(entity != invalid_entity);
+  return get_scene_object_by_entity(entity).value().get().children;
 }
 
-std::reference_wrapper<scene_object> vk_scene_manager::find_scene_object_by_mesh(size_t mesh_id) {
-  auto it = std::ranges::find_if(
-      entity_hierarchy_, [mesh_id](const auto& pair) { return pair.second.mesh == mesh_id; });
+ std::optional<std::reference_wrapper<scene_object>> vk_scene_manager::get_scene_object_by_entity(entity entity) {
+  assert(entity != invalid_entity);
 
-  if (it != entity_hierarchy_.end()) {
+  auto it = scene_hierarchy_.find(entity);
+  if (it != scene_hierarchy_.end()) {
     return it->second;
+  } else {
+    fmt::print("could not find scene object for entity {}", entity);
+    return std::nullopt;
   }
-  fmt::print("could not find scene object for mesh {}", mesh_id);
 }
 
-std::reference_wrapper<scene_object> vk_scene_manager::
-find_scene_object_by_entity(entity entity) {
-  if (entity == invalid_entity) {
-    fmt::print("entity is not valid: {}", entity);
-  }
-  auto it = entity_hierarchy_.find(entity);
-  if (it != entity_hierarchy_.end()) {
-    return it->second;
-  }
-  fmt::print("could not find scene object for entity {}", entity);
-}
-
-std::reference_wrapper<scene_object> vk_scene_manager::find_scene_object_by_name(
-    std::string name) {
-  auto it = std::ranges::find_if(entity_hierarchy_,
-                                 [&name](const auto& pair) { return pair.second.name == name; });
-
-  if (it != entity_hierarchy_.end()) {
-    return it->second;
-  }
-  fmt::print("could not find scene object for name {}", name);
-}
 
 void vk_scene_manager::update_scene(draw_context& draw_context) {
 
-  // Start the traversal from the root nodes
-  for (const auto& rootNodeEntity : root_.children) {
-    traverse_scene(rootNodeEntity, draw_context);
+  glm::mat4 identity = glm::mat4(1.0f);
+  for (const auto& root_node_entity : root_.children) {
+    traverse_scene(root_node_entity, identity, draw_context);
   }
 }
 
+void vk_scene_manager::traverse_scene(const entity entity, const glm::mat4& parent_transform,
+                                      draw_context& draw_context) {
+  assert(entity != invalid_entity);
+  const auto& object = get_scene_object_by_entity(entity).value().get();
+  const auto& transform = transforms_.at(object.transform);
+  const glm::mat4 world_transform = parent_transform * transform.getModelMatrix();
 
-void vk_scene_manager::traverse_scene(entity nodeEntity, draw_context& draw_context) {
-  const auto& object = entity_hierarchy_.at(nodeEntity);
-  if (object.entity != invalid_entity && object.mesh != no_component
-      && object.material != no_component) {
+  if (object.is_valid() && object.has_mesh()) {
     const auto& mesh = meshes_.at(object.mesh);
-    const auto& transform = transforms_.at(object.transform);
-    auto& material = materials_.at(object.material);
 
-    render_object def;
-    def.index_count = mesh.index_count;
-    def.first_index = mesh.first_index;
-    def.index_buffer = mesh_buffers_.indexBuffer.buffer;
-    def.material = &material.data;
-    def.bounds = mesh.bounds;
-    def.transform = transform.getModelMatrix();
-    def.vertex_buffer_address = mesh_buffers_.vertexBufferAddress;
+    for (const auto surface_index : mesh.surfaces) {
+      const auto& surface = surfaces_.at(surface_index);
+      auto& material = materials_.at(surface.material);
 
-    draw_context.opaque_surfaces.push_back(def);
+      render_object def;
+      def.index_count = surface.index_count;
+      def.first_index = surface.first_index;
+      def.index_buffer = mesh_buffers_.indexBuffer.buffer;
+      def.material = &material.data;
+      def.bounds = surface.bounds;
+      def.transform = world_transform;
+      def.vertex_buffer_address = mesh_buffers_.vertexBufferAddress;
+
+      if (material.data.passType == MaterialPass::MainColor) {
+        draw_context.opaque_surfaces.push_back(def);
+      } else {
+        draw_context.transparent_surfaces.push_back(def);
+      }
+    }
   }
 
-  // Process child nodes recursively
+  // Process child nodes recursively, passing the current world transform
   for (const auto& childEntity : object.children) {
-    traverse_scene(childEntity, draw_context);
+    traverse_scene(childEntity, world_transform, draw_context);
   }
-};
+}
 
 void vk_scene_manager::init_default_data() {
 
   
-  uint32_t white = 0xFFFFFFFF;                            // White color for color and occlusion
+  uint32_t white = 0xFFFFFFFF;                          // White color for color and occlusion
   uint32_t default_metallic_roughness = 0xFF00FF00;     // Green color representing metallic-roughness
   uint32_t flat_normal = 0xFFFF8080;                    // Flat normal
   uint32_t black = 0xFF000000;                          // Black color for emissive
@@ -791,9 +622,9 @@ auto pass_type = MaterialPass::MainColor;
   material_resources.dataBuffer = materialDataBuffer.buffer;
   material_resources.dataBufferOffset
       = data_index * sizeof(gltf_metallic_roughness::MaterialConstants);
-
+  material_component material_component{};
   // build material
-  add_material(pass_type, material_resources, default_material_name_);
+  create_material(pass_type, material_resources, material_component, "default_material");
 
   deletion_service_.push_function([this]() {
     resource_manager_.destroy_image(default_material_.color_image);
