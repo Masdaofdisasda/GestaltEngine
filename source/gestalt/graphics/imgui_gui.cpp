@@ -165,5 +165,85 @@ void imgui_gui::new_frame() {
     ImGui::End();
   }
 
+  show_scene_hierarchy_window();
+
   ImGui::Render();
+}
+
+
+void imgui_gui::display_scene_hierarchy(const scene_object& node) {
+  if (node.is_valid()) {
+
+    ImGuiTreeNodeFlags node_flags = ImGuiTreeNodeFlags_OpenOnArrow;
+
+    // If the node has no children, make it a leaf node
+    if (node.children.empty()) {
+      node_flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+    }
+
+    // Check if the node is the selected node
+    if (node.entity == selected_node_.entity) {
+      node_flags |= ImGuiTreeNodeFlags_Selected;
+    }
+
+    bool node_open = ImGui::TreeNodeEx(node.name.c_str(), node_flags);
+
+    // Check for item selection
+    if (ImGui::IsItemClicked()) {
+        selected_node_ = node;
+    }
+
+    // Recursively display children if the node is open
+    if (node_open && !node.children.empty()) {
+      for (const auto child_entity : node.children) {
+        display_scene_hierarchy(actions_.get_scene_object(child_entity));
+      }
+      ImGui::TreePop();
+    }
+  }
+}
+
+void imgui_gui::show_scene_hierarchy_window() {
+  if (ImGui::Begin("Scene Hierarchy")) {
+    const scene_object& root = actions_.get_scene_root();
+    for (const auto child_entity : root.children) {
+      display_scene_hierarchy(actions_.get_scene_object(child_entity));
+    }
+
+    if (selected_node_.is_valid()) {
+      ImGui::SeparatorText(selected_node_.name.c_str());
+
+      if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_None)) {
+        auto& transform = actions_.get_transform_component(selected_node_.transform);
+        ImGui::DragFloat3("Position", &transform.position.x, 0.1f);
+        glm::vec3 euler = eulerAngles(transform.rotation);
+        if (ImGui::DragFloat3("Rotation", &euler.x, 0.1f)) {
+          transform.rotation = glm::quat(euler);
+        }
+        ImGui::DragFloat3("Scale", &transform.scale.x, 0.1f);
+      }
+      if (selected_node_.has_mesh()) {
+        if (ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_None)) {
+          auto& mesh = actions_.get_mesh_component(selected_node_.mesh);
+          for (auto surface_index : mesh.surfaces) {
+            auto& surface = actions_.get_surface(surface_index);
+            auto& material = actions_.get_material(surface.material);
+            if (ImGui::TreeNode(material.name.c_str())) {
+              ImGui::DragFloat4("Albedo Factor", &material.albedo_factor.x, 0.5f);
+              ImGui::Checkbox("Albedo Texture", &material.albedo_tex);
+              ImGui::DragFloat2("Metallic-Roughness Factor", &material.metal_rough_factor.x, 0.5f);
+              ImGui::Checkbox("Metallic-Roughness Texture", &material.metal_rough_tex);
+              ImGui::Checkbox("Normal Texture", &material.normal_tex);
+              ImGui::DragFloat3("Emissive Factor", &material.emissive_factor.x, 0.5f);
+              ImGui::Checkbox("Emissive Texture", &material.emissive_tex);
+              ImGui::Checkbox("Occlusion Texture", &material.occlusion_tex);
+
+              ImGui::TreePop();
+            }
+          }
+        }
+      }
+    }
+  }
+  ImGui::End();
 }

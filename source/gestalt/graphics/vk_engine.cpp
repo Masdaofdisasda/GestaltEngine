@@ -73,6 +73,21 @@ void render_engine::register_gui_actions() {
   };
   gui_actions_.get_stats = [this]() -> engine_stats& { return stats_; };
   gui_actions_.get_scene_data = [this]() -> gpu_scene_data& { return renderer_.scene_data; };
+  gui_actions_.get_scene_root = [this]() -> const scene_object& { return scene_manager_.get_root(); };
+  gui_actions_.get_scene_object = [this](const entity entity) -> scene_object& {
+       return scene_manager_.get_scene_object_by_entity(entity).value();
+  };
+  gui_actions_.get_transform_component = [this](const size_t transform) -> transform_component& {
+    return scene_manager_.get_transform(transform);
+  };
+  gui_actions_.get_mesh_component
+      = [this](const size_t mesh) -> mesh_component& { return scene_manager_.get_mesh(mesh); };
+  gui_actions_.get_surface = [this](const size_t surface) -> mesh_surface& {
+    return scene_manager_.get_surface(surface);
+  };
+  gui_actions_.get_material = [this](const size_t material) -> material_component& {
+       return scene_manager_.get_material(material);
+  };
 }
 
 void render_engine::immediate_submit(std::function<void(VkCommandBuffer cmd)> function) {

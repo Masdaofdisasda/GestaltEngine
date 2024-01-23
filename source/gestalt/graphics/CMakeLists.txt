@@ -38,6 +38,7 @@ imgui_gui.cpp
 gui_actions.h
 vk_renderer.h
 vk_renderer.cpp
+scene_components.h
 )
 
 target_compile_features(graphics PRIVATE cxx_std_20)

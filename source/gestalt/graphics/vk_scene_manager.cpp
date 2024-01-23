@@ -48,8 +48,8 @@ void vk_scene_manager::init(const vk_gpu& gpu, const resource_manager& resource_
 
   init_default_data();
   //load_scene_from_gltf(R"(..\..\assets\Models\MetalRoughSpheres\glTF-Binary\MetalRoughSpheres.glb)");
-  load_scene_from_gltf(R"(..\..\assets\sponza_pestana.glb)");
-  //load_scene_from_gltf(R"(..\..\assets\structure.glb)");
+  //load_scene_from_gltf(R"(..\..\assets\sponza_pestana.glb)");
+  load_scene_from_gltf(R"(..\..\assets\structure.glb)");
 }
 
 void vk_scene_manager::cleanup() {
@@ -188,6 +188,9 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
 
       materialResources.colorImage = images_[img];
       materialResources.colorSampler = samplers_[sampler];
+      material_component.albedo_factor
+          = glm::vec4(mat.pbrData.baseColorFactor.at(0), mat.pbrData.baseColorFactor.at(1),
+                      mat.pbrData.baseColorFactor.at(2), mat.pbrData.baseColorFactor.at(3));
       material_component.albedo_tex = true;
     }
     if (mat.pbrData.metallicRoughnessTexture) {
@@ -199,6 +202,8 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
       materialResources.metalRoughImage = images_[img];
       materialResources.metalRoughSampler = samplers_[sampler];
       material_component.metal_rough_tex = true;
+      material_component.metal_rough_factor
+          = glm::vec2(mat.pbrData.metallicFactor, mat.pbrData.roughnessFactor);
     }
     if (mat.normalTexture.has_value()) {
       size_t img = gltf.textures[mat.normalTexture.value().textureIndex]
@@ -219,6 +224,8 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
       materialResources.emissiveImage = images_[img];
       materialResources.emissiveSampler = samplers_[sampler];
       material_component.emissive_tex = true;
+      material_component.emissive_factor
+          = glm::vec3(mat.emissiveFactor.at(0), mat.emissiveFactor.at(1), mat.emissiveFactor.at(2));
     }
     if (mat.occlusionTexture.has_value()) {
       size_t img = gltf.textures[mat.occlusionTexture.value().textureIndex].imageIndex.value();
@@ -358,7 +365,10 @@ entity vk_scene_manager::create_entity() {
   const entity new_entity = {next_entity_id_++};
   entities_.push_back(new_entity);
 
-  const scene_object object = {.entity = new_entity};
+  const scene_object object = {
+    .name = "entity_" + std::to_string(new_entity),
+    .entity = new_entity,
+  };
   scene_hierarchy_.insert({new_entity, object});
 
   set_transform_component(new_entity, glm::vec3(0));
@@ -392,7 +402,7 @@ size_t vk_scene_manager::create_surface(std::vector<Vertex>& vertices,
       .sphereRadius = length(extents),
   };
 
-  const surface surface{
+  const mesh_surface surface{
       .vertex_count = static_cast<uint32_t>(vertices.size()),
       .index_count = static_cast<uint32_t>(indices.size()),
       .first_index = static_cast<uint32_t>(indices_.size()),
@@ -441,8 +451,11 @@ void vk_scene_manager::add_light_component(entity entity, const LightComponent& 
 size_t vk_scene_manager::create_material(
     MaterialPass pass_type, const gltf_metallic_roughness::MaterialResources& resources,
     material_component material, const std::string& name) {
+
+  const std::string key = name.empty() ? "material_" + std::to_string(materials_.size()) : name;
+
   materials_.emplace_back(material_component{
-      .name = name,
+      .name = key,
       .data = gltf_material_.write_material(gpu_.device, pass_type, resources, descriptorPool),
       .albedo_factor = material.albedo_factor,
       .albedo_tex = material.albedo_tex,
@@ -453,7 +466,6 @@ size_t vk_scene_manager::create_material(
       .emissive_tex = material.emissive_tex,
       .occlusion_tex = material.occlusion_tex,
   });
-  const std::string key = name.empty() ? "material_" + std::to_string(materials_.size()) : name;
   material_map_[key] = materials_.size() - 1;
 
   return materials_.size() - 1;

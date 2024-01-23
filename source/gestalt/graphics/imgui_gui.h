@@ -5,6 +5,7 @@
 #include "vk_gpu.h"
 #include "vk_swapchain.h"
 #include "gui_actions.h"
+#include "vk_scene_manager.h"
 
 class imgui_gui {
   vk_gpu gpu_;
@@ -13,6 +14,7 @@ class imgui_gui {
   gui_actions actions_;
   vk_deletion_service deletion_service_;
 
+  scene_object selected_node_;
 
 public:
 
@@ -25,4 +27,6 @@ public:
   void update(const SDL_Event& e);
 
   void new_frame();
+  void display_scene_hierarchy(const scene_object& node);
+  void show_scene_hierarchy_window();
 };

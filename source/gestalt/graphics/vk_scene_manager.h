@@ -1,11 +1,9 @@
 ﻿#pragma once
 
-#include <vk_types.h>
-
 #include <filesystem>
 #include <unordered_map>
-#include <glm/gtx/quaternion.hpp>
-#include <glm/gtx/transform.hpp>
+
+#include "scene_components.h"
 
 #include "materials.h"
 #include "resource_manager.h"
@@ -14,115 +12,6 @@
 // forward declaration
 class render_engine;
 
-using entity = uint32_t;
-constexpr uint32_t invalid_entity = std::numeric_limits<uint32_t>::max();
-constexpr size_t no_component = std::numeric_limits<size_t>::max();
-constexpr size_t default_material = 0;
-constexpr size_t identity_transform = 0;
-
-
-struct surface {
-  uint32_t vertex_count;
-  uint32_t index_count;
-  uint32_t first_index;
-  uint32_t vertex_offset;
-  Bounds bounds;
-
-  size_t material = default_material;
-};
-
-struct mesh_component {
-  std::vector <size_t> surfaces;
-};
-
-class CameraComponent {
-public:
-  CameraComponent(const glm::mat4& projectionMatrix);
-
-  // Getters and setters for camera properties
-  const glm::mat4& getProjectionMatrix() const;
-  void setProjectionMatrix(const glm::mat4& projectionMatrix);
-
-private:
-  glm::mat4 projectionMatrix_;
-};
-
-enum class LightType { Directional, Point, Spot };
-
-class LightComponent {
-public:
-  LightComponent(LightType type, const glm::vec3& color, float intensity);
-
-  void setType(LightType type);
-  void setColor(const glm::vec3& color);
-  void setIntensity(float intensity);
-  void setDirection(const glm::vec3& direction);
-  void setSpotProperties(float innerCone, float outerCone);
-
-  LightType getType() const;
-  const glm::vec3& getColor() const;
-  float getIntensity() const;
-  const glm::vec3& getDirection() const;
-  float getInnerCone() const;
-  float getOuterCone() const;
-
-private:
-  LightType type_;
-  glm::vec3 color_;
-  float intensity_;
-  glm::vec3 direction_;  // Used for directional and spot lights
-  float innerCone_;      // Used for spot lights
-  float outerCone_;      // Used for spot lights
-};
-
-struct material_component {
-  std::string name;
-  MaterialInstance data;
-
-  bool albedo_factor{false};
-  bool albedo_tex{false};
-  bool metal_rough_factor{false};
-  bool metal_rough_tex{false};
-  bool normal_tex{false};
-  bool emissive_factor{false};
-  bool emissive_tex{false};
-  bool occlusion_tex{false};
-};
-
-struct transform_component {
-  transform_component(const glm::vec3& position,
-                      const glm::quat& rotation = glm::quat(0.f, 0.f, 0.f, 0.f),
-                      const glm::vec3& scale = glm::vec3(1.f))
-      :
-    position(position), rotation(rotation), scale(scale) {}
-
-  glm::mat4 getModelMatrix() const {
-    glm::mat4 translationMatrix = translate(position);
-    glm::mat4 rotationMatrix = mat4_cast(rotation);
-    glm::mat4 scaleMatrix = glm::scale(scale);
-    return translationMatrix * rotationMatrix * scaleMatrix;
-  }
-
-  glm::vec3 position;
-  glm::quat rotation;
-  glm::vec3 scale;
-};
-
-struct scene_object {
-  std::string name;
-  entity parent = invalid_entity;
-  std::vector<entity> children;
-
-  entity entity = invalid_entity; //Todo group
-  size_t transform = identity_transform;
-
-  size_t mesh = no_component;
-  size_t camera = no_component;
-  size_t light = no_component;
-
-  bool is_valid() const { return entity != invalid_entity; }
-  bool has_mesh() const { return mesh != no_component; }
-};
 
 // Component storage types
 using entity_container = std::vector<entity>;
@@ -167,10 +56,13 @@ public:
                                const glm::vec3& scale = glm::vec3(1.f));
 
   const camera_container& get_cameras() { return cameras_; }
-  const mesh_container& get_meshes() { return meshes_; }
-  const transform_container& get_transforms() { return transforms_; }
+  material_component& get_material(const size_t material) { return materials_[material]; }
+  mesh_surface& get_surface(const size_t surface) { return surfaces_[surface]; }
+  mesh_component& get_mesh(const size_t mesh) { return meshes_[mesh]; }
+  transform_component& get_transform(const size_t transform) { return transforms_[transform]; }
   const light_container& get_lights() { return lights_; }
 
+  const scene_object& get_root() { return root_; }
   const std::vector<entity>& get_children(entity entity);
   std::optional<std::reference_wrapper<scene_object>> get_scene_object_by_entity(entity entity);
 
@@ -186,7 +78,7 @@ private:
 
   std::vector<Vertex> vertices_;
   std::vector<uint32_t> indices_;
-  std::vector<surface> surfaces_;
+  std::vector<mesh_surface> surfaces_;
 
   // Component containers
   entity_container entities_;
@@ -212,7 +104,7 @@ private:
   } default_material_ = {};
 
   std::vector<AllocatedImage> images_;
-  std::vector<VkSampler> samplers_;  // TODO
+  std::vector<VkSampler> samplers_;
 
   std::unordered_map<entity, scene_object> scene_hierarchy_;
   scene_object root_ = {"root", invalid_entity, {}, invalid_entity};
