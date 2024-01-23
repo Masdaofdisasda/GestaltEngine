@@ -89,6 +89,7 @@ struct transform_component {
 
 struct scene_object {
   std::string name;
+  entity parent = invalid_entity;
   std::vector<entity> children;
 
   entity entity = invalid_entity;
@@ -114,25 +115,29 @@ class vk_scene_manager {
 public:
 
   gpu_mesh_buffers mesh_buffers_;
+  AllocatedBuffer material_data_buffer_;
   DescriptorAllocatorGrowable descriptorPool;
 
   void init(const vk_gpu& gpu, const resource_manager& resource_manager,
             const gltf_metallic_roughness& material);
   void cleanup();
 
-  void load_scene_from_gltf(const std::string& filename);
+  void load_scene_from_gltf(const std::string& file_path);
+  void load_scene_from_gltf();
   void update_scene(draw_context& draw_context);
+  void traverse_scene(entity nodeEntity, draw_context& draw_context);
 
   entity create_entity();
   void add_mesh_component(entity entity, std::vector<Vertex>& vertices,
-                          std::vector<uint32_t>& indices);
+                          std::vector<uint32_t>& indices, const std::string& name);
   void add_camera_component(entity entity, const CameraComponent& camera);
   void add_light_component(entity entity, const LightComponent& light);
   void add_material(MaterialPass pass_type,
                     const gltf_metallic_roughness::MaterialResources& resources,
                     const std::string& name = "");
   void add_material_component(const entity entity, const std::string& name);
-  void add_transform_component(entity entity, const glm::vec3& position, const glm::quat& rotation,
+  void set_transform_component(entity entity, const glm::vec3& position,
+                               const glm::quat& rotation = glm::quat(0.f, 0.f, 0.f, 0.f),
                                const glm::vec3& scale = glm::vec3(1.f));
 
   const camera_container& get_cameras() { return cameras_; }
@@ -141,7 +146,9 @@ public:
   const light_container& get_lights() { return lights_; }
 
   const std::vector<entity>& get_children(entity entity) const;
-
+  std::reference_wrapper<scene_object> find_scene_object_by_mesh(size_t mesh_id);
+  std::reference_wrapper<scene_object> find_scene_object_by_entity(entity entity);
+  std::reference_wrapper<scene_object> find_scene_object_by_name(std::string name);
 
 
 private:
@@ -159,11 +166,28 @@ private:
   // Component containers
   entity_container entities_;
   mesh_container meshes_;
+  std::unordered_map<std::string, size_t> mesh_map_;
   camera_container cameras_;
   light_container lights_;
   material_container materials_;
   std::unordered_map<std::string, size_t> material_map_;
   transform_container transforms_;
+
+  struct material {
+    AllocatedImage color_image;
+    AllocatedImage metallic_roughness_image;
+    AllocatedImage normal_image;
+    AllocatedImage emissive_image;
+    AllocatedImage occlusion_image;
+
+    AllocatedImage error_checkerboard_image;
+
+    VkSampler default_sampler_linear;
+    VkSampler default_sampler_nearest;
+  } default_material_;
+
+  std::vector<AllocatedImage> images_;
+  std::vector<VkSampler> samplers_;  // TODO
 
   std::unordered_map<entity, scene_object> entity_hierarchy_;
   scene_object root_ = {"root", {}};
@@ -171,5 +195,5 @@ private:
   std::string default_material_name_ = "default_material";
 
   // Next available entity ID
-  entity next_entity_id_ = 0;
+  entity next_entity_id_ = 1;
 };
