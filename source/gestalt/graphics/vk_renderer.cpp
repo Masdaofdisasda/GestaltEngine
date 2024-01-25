@@ -202,9 +202,9 @@ void vk_renderer::draw_geometry(VkCommandBuffer cmd) {
   opaque_draws.reserve(main_draw_context_.opaque_surfaces.size());
 
   for (size_t i = 0; i < main_draw_context_.opaque_surfaces.size(); i++) {
-    //if (is_visible(main_draw_context_.opaque_surfaces[i], scene_data.viewproj)) {
+    if (is_visible(main_draw_context_.opaque_surfaces[i], scene_data.viewproj)) {
       opaque_draws.push_back(i);
-    //}
+    }
   }
 
   // sort the opaque surfaces by material and mesh

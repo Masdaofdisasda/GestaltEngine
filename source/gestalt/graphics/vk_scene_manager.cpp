@@ -339,7 +339,7 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
     }
   }
 
-  assert(gltf.nodes.size() >= entities_.size());
+  assert(gltf.nodes.size() == entities_.size());
   assert(gltf.nodes.size() == scene_hierarchy_.size());
 
   for (int i = 0; i < gltf.nodes.size(); i++) {
@@ -379,10 +379,12 @@ entity vk_scene_manager::create_entity() {
 void vk_scene_manager::set_transform_component(entity entity, const glm::vec3& position,
                                                const glm::quat& rotation, const glm::vec3& scale) {
   assert(entity != invalid_entity);
-  auto& scene_object = get_scene_object_by_entity(entity).value().get();
+  const auto& transform = transforms_.emplace_back(position, rotation, scale);
+  matrices_.push_back(transform.get_model_matrix());
+  transform.is_dirty = false;
 
-  auto& transform = transforms_[scene_object.transform];
-  transform = {position, rotation, scale};
+  auto& scene_object = get_scene_object_by_entity(entity).value().get();
+  scene_object.transform = transforms_.size() - 1;
 }
 
 size_t vk_scene_manager::create_surface(std::vector<Vertex>& vertices,
@@ -424,7 +426,6 @@ size_t vk_scene_manager::create_mesh(std::vector<size_t> surfaces, const std::st
 
   meshes_.emplace_back(mesh_component{surfaces});
   const std::string key = name.empty() ? "mesh_" + std::to_string(meshes_.size()) : name;
-  mesh_map_[key] = meshes_.size() - 1;
 
   return meshes_.size() - 1;
 }
@@ -466,7 +467,6 @@ size_t vk_scene_manager::create_material(
       .emissive_tex = material.emissive_tex,
       .occlusion_tex = material.occlusion_tex,
   });
-  material_map_[key] = materials_.size() - 1;
 
   return materials_.size() - 1;
 }
@@ -510,7 +510,11 @@ void vk_scene_manager::traverse_scene(const entity entity, const glm::mat4& pare
   assert(entity != invalid_entity);
   const auto& object = get_scene_object_by_entity(entity).value().get();
   const auto& transform = transforms_.at(object.transform);
-  const glm::mat4 world_transform = parent_transform * transform.getModelMatrix();
+  if (transform.is_dirty) {
+    matrices_.at(object.transform) = transform.get_model_matrix();
+    transform.is_dirty = false;
+  }
+  const glm::mat4 world_transform = parent_transform * matrices_.at(object.transform);
 
   if (object.is_valid() && object.has_mesh()) {
     const auto& mesh = meshes_.at(object.mesh);

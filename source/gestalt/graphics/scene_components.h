@@ -9,7 +9,6 @@ using entity = uint32_t;
 constexpr uint32_t invalid_entity = std::numeric_limits<uint32_t>::max();
 constexpr size_t no_component = std::numeric_limits<size_t>::max();
 constexpr size_t default_material = 0;
-constexpr size_t identity_transform = 0;
 
 struct mesh_surface {
   uint32_t vertex_count;
@@ -80,21 +79,19 @@ struct material_component {
 };
 
 struct transform_component {
-  transform_component(const glm::vec3& position,
-                      const glm::quat& rotation = glm::quat(0.f, 0.f, 0.f, 0.f),
-                      const glm::vec3& scale = glm::vec3(1.f))
+  explicit transform_component(const glm::vec3& position,
+                               const glm::quat& rotation = glm::quat(0.f, 0.f, 0.f, 0.f),
+                               const glm::vec3& scale = glm::vec3(1.f))
       : position(position), rotation(rotation), scale(scale) {}
 
-  glm::mat4 getModelMatrix() const {
-    glm::mat4 translationMatrix = translate(position);
-    glm::mat4 rotationMatrix = mat4_cast(rotation);
-    glm::mat4 scaleMatrix = glm::scale(scale);
-    return translationMatrix * rotationMatrix * scaleMatrix;
+  glm::mat4 get_model_matrix() const {
+    return translate(position) * mat4_cast(rotation) * glm::scale(scale);
   }
 
   glm::vec3 position;
   glm::quat rotation;
   glm::vec3 scale;
+  mutable bool is_dirty = true;
 };
 
 struct scene_object {
@@ -103,7 +100,7 @@ struct scene_object {
   std::vector<entity> children;
 
   entity entity = invalid_entity;  // Todo group
-  size_t transform = identity_transform;
+  size_t transform = invalid_entity;
 
   size_t mesh = no_component;
   size_t camera = no_component;

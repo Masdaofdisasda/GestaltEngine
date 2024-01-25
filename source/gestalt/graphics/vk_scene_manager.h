@@ -79,16 +79,15 @@ private:
   std::vector<Vertex> vertices_;
   std::vector<uint32_t> indices_;
   std::vector<mesh_surface> surfaces_;
+  std::vector<glm::mat4> matrices_;
 
   // Component containers
   entity_container entities_;
   mesh_container meshes_;
-  std::unordered_map<std::string, size_t> mesh_map_;
   camera_container cameras_;
   light_container lights_;
   material_container materials_;
-  std::unordered_map<std::string, size_t> material_map_;
-  transform_container transforms_{transform_component{glm::vec3(0)}};
+  transform_container transforms_;
 
   struct material {
     AllocatedImage color_image;
