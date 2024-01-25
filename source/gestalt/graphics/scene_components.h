@@ -64,18 +64,41 @@ private:
   float outerCone_;      // Used for spot lights
 };
 
+struct pbr_config {
+  glm::vec4 albedo_factor{0.f};
+  bool use_albedo_tex{false};
+  size_t albedo_tex{no_component};
+  std::string albedo_uri;
+
+  glm::vec2 metal_rough_factor{0.f};
+  bool use_metal_rough_tex{false};
+  size_t metal_rough_tex{no_component};
+  std::string metal_rough_uri;
+
+  float normal_scale = 1.f;
+  bool use_normal_tex{false};
+  size_t normal_tex{no_component};
+  std::string normal_uri;
+
+  glm::vec3 emissive_factor{0.f};
+  bool use_emissive_tex{false};
+  size_t emissive_tex{no_component};
+  std::string emissive_uri;
+
+  float occlusion_strength = 1.f;
+  bool use_occlusion_tex{false};
+  size_t occlusion_tex{no_component};
+  std::string occlusion_uri;
+
+  float alpha_cutoff = 0.5f;
+  bool double_sided = false;
+};
+
 struct material_component {
   std::string name;
   MaterialInstance data;
 
-  glm::vec4 albedo_factor{0.f};
-  bool albedo_tex{false};
-  glm::vec2 metal_rough_factor{0.f};
-  bool metal_rough_tex{false};
-  bool normal_tex{false};
-  glm::vec3 emissive_factor{0.f};
-  bool emissive_tex{false};
-  bool occlusion_tex{false};
+  pbr_config config;
 };
 
 struct transform_component {
@@ -94,13 +117,13 @@ struct transform_component {
   mutable bool is_dirty = true;
 };
 
-struct scene_object {
+struct entity_component {
   std::string name;
   entity parent = invalid_entity;
   std::vector<entity> children;
 
-  entity entity = invalid_entity;  // Todo group
-  size_t transform = invalid_entity;
+  entity entity = invalid_entity;
+  size_t transform = no_component;
 
   size_t mesh = no_component;
   size_t camera = no_component;

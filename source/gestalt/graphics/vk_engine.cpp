@@ -73,8 +73,8 @@ void render_engine::register_gui_actions() {
   };
   gui_actions_.get_stats = [this]() -> engine_stats& { return stats_; };
   gui_actions_.get_scene_data = [this]() -> gpu_scene_data& { return renderer_.scene_data; };
-  gui_actions_.get_scene_root = [this]() -> const scene_object& { return scene_manager_.get_root(); };
-  gui_actions_.get_scene_object = [this](const entity entity) -> scene_object& {
+  gui_actions_.get_scene_root = [this]() -> const entity_component& { return scene_manager_.get_root(); };
+  gui_actions_.get_scene_object = [this](const entity entity) -> entity_component& {
        return scene_manager_.get_scene_object_by_entity(entity).value();
   };
   gui_actions_.get_transform_component = [this](const size_t transform) -> transform_component& {

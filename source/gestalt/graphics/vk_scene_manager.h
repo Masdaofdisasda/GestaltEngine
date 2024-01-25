@@ -40,7 +40,7 @@ public:
   void update_scene(draw_context& draw_context);
   void traverse_scene(entity entity, const glm::mat4& parent_transform, draw_context& draw_context);
 
-  entity create_entity();
+  entity_component& create_entity();
   size_t create_surface(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices);
   size_t create_mesh(std::vector<size_t> surfaces, const std::string& name);
   void add_mesh_component(entity entity, size_t mesh_index);
@@ -48,7 +48,7 @@ public:
   void add_light_component(entity entity, const LightComponent& light);
   size_t create_material(MaterialPass pass_type,
                     const gltf_metallic_roughness::MaterialResources& resources,
-                    material_component material = material_component{},
+                    const pbr_config& config = pbr_config{},
                     const std::string& name = "");
   void add_material_component(size_t surface, size_t material);
   void set_transform_component(entity entity, const glm::vec3& position,
@@ -62,9 +62,9 @@ public:
   transform_component& get_transform(const size_t transform) { return transforms_[transform]; }
   const light_container& get_lights() { return lights_; }
 
-  const scene_object& get_root() { return root_; }
+  const entity_component& get_root() { return root_; }
   const std::vector<entity>& get_children(entity entity);
-  std::optional<std::reference_wrapper<scene_object>> get_scene_object_by_entity(entity entity);
+  std::optional<std::reference_wrapper<entity_component>> get_scene_object_by_entity(entity entity);
 
 
 private:
@@ -76,13 +76,15 @@ private:
 
   void init_default_data();
 
+  // Data containers
   std::vector<Vertex> vertices_;
   std::vector<uint32_t> indices_;
   std::vector<mesh_surface> surfaces_;
   std::vector<glm::mat4> matrices_;
+  std::vector<AllocatedImage> images_;
+  std::vector<VkSampler> samplers_;
 
   // Component containers
-  entity_container entities_;
   mesh_container meshes_;
   camera_container cameras_;
   light_container lights_;
@@ -102,11 +104,8 @@ private:
     VkSampler default_sampler_nearest;
   } default_material_ = {};
 
-  std::vector<AllocatedImage> images_;
-  std::vector<VkSampler> samplers_;
-
-  std::unordered_map<entity, scene_object> scene_hierarchy_;
-  scene_object root_ = {"root", invalid_entity, {}, invalid_entity};
+  std::vector<entity_component> scene_graph_;
+  entity_component root_ = {"root", invalid_entity, {}, invalid_entity};
 
   // Next available entity ID
   entity next_entity_id_ = 0;

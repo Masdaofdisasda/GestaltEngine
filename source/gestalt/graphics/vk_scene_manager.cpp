@@ -146,7 +146,7 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
   for (fastgltf::Material& mat : gltf.materials) {
 
 
-    material_component material_component{};
+    pbr_config pbr_config{};
     gltf_metallic_roughness::MaterialConstants constants;
     constants.colorFactors.x = mat.pbrData.baseColorFactor[0];
     constants.colorFactors.y = mat.pbrData.baseColorFactor[1];
@@ -188,10 +188,11 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
 
       materialResources.colorImage = images_[img];
       materialResources.colorSampler = samplers_[sampler];
-      material_component.albedo_factor
+      pbr_config.albedo_factor
           = glm::vec4(mat.pbrData.baseColorFactor.at(0), mat.pbrData.baseColorFactor.at(1),
                       mat.pbrData.baseColorFactor.at(2), mat.pbrData.baseColorFactor.at(3));
-      material_component.albedo_tex = true;
+      pbr_config.use_albedo_tex = true;
+      pbr_config.albedo_tex = img;
     }
     if (mat.pbrData.metallicRoughnessTexture) {
       size_t img = gltf.textures[mat.pbrData.metallicRoughnessTexture.value().textureIndex]
@@ -201,9 +202,11 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
 
       materialResources.metalRoughImage = images_[img];
       materialResources.metalRoughSampler = samplers_[sampler];
-      material_component.metal_rough_tex = true;
-      material_component.metal_rough_factor
+      pbr_config.metal_rough_tex = true;
+      pbr_config.metal_rough_factor
           = glm::vec2(mat.pbrData.metallicFactor, mat.pbrData.roughnessFactor);
+      pbr_config.metal_rough_tex = img;
+
     }
     if (mat.normalTexture.has_value()) {
       size_t img = gltf.textures[mat.normalTexture.value().textureIndex]
@@ -213,7 +216,9 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
 
       materialResources.normalImage = images_[img];
       materialResources.normalSampler = samplers_[sampler];
-      material_component.normal_tex = true;
+      pbr_config.use_normal_tex = true;
+      pbr_config.normal_scale = 1.f; //TODO
+      pbr_config.normal_tex = img;
     }
     if (mat.emissiveTexture.has_value()) {
       size_t img = gltf.textures[mat.emissiveTexture.value().textureIndex]
@@ -223,9 +228,12 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
 
       materialResources.emissiveImage = images_[img];
       materialResources.emissiveSampler = samplers_[sampler];
-      material_component.emissive_tex = true;
-      material_component.emissive_factor
+      pbr_config.use_emissive_tex = true;
+      pbr_config.emissive_factor
           = glm::vec3(mat.emissiveFactor.at(0), mat.emissiveFactor.at(1), mat.emissiveFactor.at(2));
+      pbr_config.emissive_tex = img;
+      pbr_config.emissive_factor; //TODO
+
     }
     if (mat.occlusionTexture.has_value()) {
       size_t img = gltf.textures[mat.occlusionTexture.value().textureIndex].imageIndex.value();
@@ -234,10 +242,12 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
 
       materialResources.occlusionImage = images_[img];
       materialResources.occlusionSampler = samplers_[sampler];
-      material_component.occlusion_tex = true;
+      pbr_config.use_occlusion_tex = true;
+      pbr_config.occlusion_tex = img;
+      pbr_config.occlusion_strength = 1.f; //TODO
     }
     // build material
-    create_material(pass_type, materialResources, material_component, std::string(mat.name));
+    create_material(pass_type, materialResources, pbr_config, std::string(mat.name));
     data_index++;
   }
 
@@ -323,7 +333,7 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
 
   // hierachy
   for (fastgltf::Node& node : gltf.nodes) {
-    scene_object& new_node = get_scene_object_by_entity(create_entity()).value().get();
+    entity_component& new_node = create_entity();
 
     if (node.meshIndex.has_value()) {
       add_mesh_component(new_node.entity, *node.meshIndex);
@@ -339,8 +349,7 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
     }
   }
 
-  assert(gltf.nodes.size() == entities_.size());
-  assert(gltf.nodes.size() == scene_hierarchy_.size());
+  assert(gltf.nodes.size() == scene_graph_.size());
 
   for (int i = 0; i < gltf.nodes.size(); i++) {
     fastgltf::Node& node = gltf.nodes[i];
@@ -354,26 +363,25 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
   }
 
   // find the top nodes, with no parents
-  for (auto& node : scene_hierarchy_) {
-    if (node.second.parent == invalid_entity) {
-      root_.children.push_back(node.first);
+  for (auto& node : scene_graph_) {
+    if (node.parent == invalid_entity) {
+      root_.children.push_back(node.entity);
     }
   }
 }
 
-entity vk_scene_manager::create_entity() {
+entity_component& vk_scene_manager::create_entity() {
   const entity new_entity = {next_entity_id_++};
-  entities_.push_back(new_entity);
 
-  const scene_object object = {
+  const entity_component object = {
     .name = "entity_" + std::to_string(new_entity),
     .entity = new_entity,
   };
-  scene_hierarchy_.insert({new_entity, object});
+  scene_graph_.push_back(object);
 
   set_transform_component(new_entity, glm::vec3(0));
 
-  return new_entity;
+  return scene_graph_.at(new_entity);
 }
 
 void vk_scene_manager::set_transform_component(entity entity, const glm::vec3& position,
@@ -433,39 +441,32 @@ size_t vk_scene_manager::create_mesh(std::vector<size_t> surfaces, const std::st
 void vk_scene_manager::add_mesh_component(const entity entity, size_t mesh_index) {
   assert(entity != invalid_entity);
 
-  scene_object& object = get_scene_object_by_entity(entity).value().get();
+  entity_component& object = get_scene_object_by_entity(entity).value().get();
   object.mesh = mesh_index;
 }
 
 void vk_scene_manager::add_camera_component(entity entity, const CameraComponent& camera) {
   cameras_.push_back(camera);
-  scene_object& object = get_scene_object_by_entity(entity).value().get();
+  entity_component& object = get_scene_object_by_entity(entity).value().get();
   object.camera = cameras_.size() - 1;
 }
 
 void vk_scene_manager::add_light_component(entity entity, const LightComponent& light) {
   lights_.push_back(light);
-  scene_object& object = get_scene_object_by_entity(entity).value().get();
+  entity_component& object = get_scene_object_by_entity(entity).value().get();
   object.camera = lights_.size() - 1;
 }
 
 size_t vk_scene_manager::create_material(
     MaterialPass pass_type, const gltf_metallic_roughness::MaterialResources& resources,
-    material_component material, const std::string& name) {
+    const pbr_config& config, const std::string& name) {
 
   const std::string key = name.empty() ? "material_" + std::to_string(materials_.size()) : name;
 
   materials_.emplace_back(material_component{
       .name = key,
       .data = gltf_material_.write_material(gpu_.device, pass_type, resources, descriptorPool),
-      .albedo_factor = material.albedo_factor,
-      .albedo_tex = material.albedo_tex,
-      .metal_rough_factor = material.metal_rough_factor,
-      .metal_rough_tex = material.metal_rough_tex,
-      .normal_tex = material.normal_tex,
-      .emissive_factor = material.emissive_factor,
-      .emissive_tex = material.emissive_tex,
-      .occlusion_tex = material.occlusion_tex,
+      .config = config
   });
 
   return materials_.size() - 1;
@@ -484,17 +485,16 @@ const std::vector<entity>& vk_scene_manager::get_children(entity entity) {
   return get_scene_object_by_entity(entity).value().get().children;
 }
 
- std::optional<std::reference_wrapper<scene_object>> vk_scene_manager::get_scene_object_by_entity(entity entity) {
+ std::optional<std::reference_wrapper<entity_component>> vk_scene_manager::get_scene_object_by_entity(entity entity) {
   assert(entity != invalid_entity);
 
-  auto it = scene_hierarchy_.find(entity);
-  if (it != scene_hierarchy_.end()) {
-    return it->second;
-  } else {
-    fmt::print("could not find scene object for entity {}", entity);
-    return std::nullopt;
+  if (scene_graph_.size() >= entity) {
+    return scene_graph_.at(entity);
   }
-}
+
+  fmt::print("could not find scene object for entity {}", entity);
+  return std::nullopt;
+ }
 
 
 void vk_scene_manager::update_scene(draw_context& draw_context) {
@@ -638,9 +638,9 @@ auto pass_type = MaterialPass::MainColor;
   material_resources.dataBuffer = materialDataBuffer.buffer;
   material_resources.dataBufferOffset
       = data_index * sizeof(gltf_metallic_roughness::MaterialConstants);
-  material_component material_component{};
+  pbr_config config{};
   // build material
-  create_material(pass_type, material_resources, material_component, "default_material");
+  create_material(pass_type, material_resources, config, "default_material");
 
   deletion_service_.push_function([this]() {
     resource_manager_.destroy_image(default_material_.color_image);
