@@ -156,58 +156,23 @@ VkDescriptorPool DescriptorAllocatorGrowable::create_pool(VkDevice device, uint3
   return newPool;
 }
 
-void vk_descriptor_manager::init(const vk_gpu& gpu, std::vector<frame_data>& frames,
-                                 AllocatedImage draw_image) {
+void vk_descriptor_manager::init(const vk_gpu& gpu, std::vector<frame_data>& frames) {
   gpu_ = gpu;
   deletion_service_.init(gpu_.device, gpu_.allocator);
 
-  
-    // create a descriptor pool that will hold 10 sets with 1 image each
   std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes = {
       {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3},
       {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3},
       {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3},
   };
 
-  global_descriptor_allocator.init(gpu_.device, 10, sizes);
-
-  // make the descriptor set layout for our compute draw
   {
     DescriptorLayoutBuilder builder;
-    draw_image_descriptor_layout = builder
-    .add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
-    .build(gpu_.device, VK_SHADER_STAGE_COMPUTE_BIT);
-
-    deletion_service_.push(draw_image_descriptor_layout);
-  }
-
-  {
-    DescriptorLayoutBuilder builder;
-    single_image_descriptor_layout = builder
-    .add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-    .build(gpu_.device, VK_SHADER_STAGE_FRAGMENT_BIT);
-
-    deletion_service_.push(single_image_descriptor_layout);
-  }
-
-  {
-    DescriptorLayoutBuilder builder;
-    gpu_scene_data_descriptor_layout = builder
-    .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-    .build(gpu_.device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    gpu_scene_data_descriptor_layout
+        = builder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+              .build(gpu_.device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 
     deletion_service_.push(gpu_scene_data_descriptor_layout);
-  }
-
-  draw_image_descriptors
-      = global_descriptor_allocator.allocate(gpu_.device, draw_image_descriptor_layout);
-
-  {
-    DescriptorWriter writer;
-    writer.write_image(0, draw_image.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL,
-                       VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-
-    writer.update_set(gpu_.device, draw_image_descriptors);
   }
 
   for (auto& frame : frames) {
@@ -229,7 +194,6 @@ void vk_descriptor_manager::init(const vk_gpu& gpu, std::vector<frame_data>& fra
 }
 
 void vk_descriptor_manager::cleanup() {
-  global_descriptor_allocator.destroy_pools(gpu_.device);
   deletion_service_.flush();
 }
 

@@ -81,14 +81,8 @@ class vk_descriptor_manager {
   vk_deletion_service deletion_service_;
 
 public:
-  DescriptorAllocatorGrowable global_descriptor_allocator;
-
-  VkDescriptorSet draw_image_descriptors;
-  VkDescriptorSetLayout draw_image_descriptor_layout;
-
-  VkDescriptorSetLayout single_image_descriptor_layout;
   VkDescriptorSetLayout gpu_scene_data_descriptor_layout;
 
-  void init(const vk_gpu& gpu, std::vector<frame_data>& frames, AllocatedImage draw_image);
+  void init(const vk_gpu& gpu, std::vector<frame_data>& frames);
   void cleanup();
 };

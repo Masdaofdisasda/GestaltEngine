@@ -123,22 +123,8 @@ void vk_renderer::draw(imgui_gui& imgui) {
 }
 
 void vk_renderer::draw_main(VkCommandBuffer cmd) {
-  compute_effect& effect = pipeline_manager.background_effects[0]; //todo replace with skybox
 
-  // bind the background compute pipeline
-  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, effect.pipeline);
-
-  // bind the descriptor set containing the draw image for the compute pipeline
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
-                          pipeline_manager.gradient_pipeline_layout, 0, 1,
-                          &descriptor_manager.draw_image_descriptors, 0, nullptr);
-
-  vkCmdPushConstants(cmd, pipeline_manager.gradient_pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT,
-                     0, sizeof(compute_push_constants), &effect.data);
-  // execute the compute pipeline dispatch. We are using 16x16 workgroup size so we need to divide
-  // by it
-  vkCmdDispatch(cmd, std::ceil(window_.extent.width / 16.0),
-                std::ceil(window_.extent.height / 16.0), 1);
+  skybox_pass_.execute(cmd, window_);
 
   // draw the triangle
 
@@ -189,9 +175,9 @@ bool is_visible(const render_object& obj, const glm::mat4& viewproj) {
   // check the clip space box is within the view
   if (min.z > 1.f || max.z < 0.f || min.x > 1.f || max.x < -1.f || min.y > 1.f || max.y < -1.f) {
     return false;
-  } else {
-    return true;
   }
+
+  return true;
 }
 
 void vk_renderer::draw_geometry(VkCommandBuffer cmd) {
