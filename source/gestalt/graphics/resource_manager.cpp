@@ -97,12 +97,18 @@ void resource_manager::destroy_buffer(const AllocatedBuffer& buffer) {
 
 
 AllocatedImage resource_manager::create_image(VkExtent3D size, VkFormat format,
-                                           VkImageUsageFlags usage, bool mipmapped) {
+                                           VkImageUsageFlags usage, bool mipmapped, bool cubemap) {
   AllocatedImage newImage;
   newImage.imageFormat = format;
   newImage.imageExtent = size;
 
-  VkImageCreateInfo img_info = vkinit::image_create_info(format, usage, size);
+  VkImageCreateInfo img_info;
+  if (cubemap) {
+   img_info =  vkinit::cubemap_create_info(format, usage, size);
+  } else {
+  img_info = vkinit::image_create_info(format, usage, size);
+  }
+
   if (mipmapped) {
     img_info.mipLevels
         = static_cast<uint32_t>(std::floor(std::log2(std::max(size.width, size.height)))) + 1;
@@ -125,6 +131,19 @@ AllocatedImage resource_manager::create_image(VkExtent3D size, VkFormat format,
     aspectFlag = VK_IMAGE_ASPECT_DEPTH_BIT;
   }
 
+  if (cubemap) {
+    // Build an image-view for the image
+    VkImageViewCreateInfo view_info
+        = vkinit::imageview_create_info(format, newImage.image, aspectFlag);
+    view_info.viewType = VK_IMAGE_VIEW_TYPE_CUBE;  // View type for cubemap
+    view_info.subresourceRange.levelCount = img_info.mipLevels;
+    view_info.subresourceRange.layerCount = 6;  // Layer count for cubemap
+
+    VK_CHECK(vkCreateImageView(gpu_.device, &view_info, nullptr, &newImage.imageView));
+
+    return newImage;
+  }
+
   // build a image-view for the image
   VkImageViewCreateInfo view_info
       = vkinit::imageview_create_info(format, newImage.image, aspectFlag);
@@ -144,7 +163,8 @@ AllocatedImage resource_manager::create_image(void* data, VkExtent3D size, VkFor
   memcpy(uploadbuffer.info.pMappedData, data, data_size);
 
   AllocatedImage new_image = create_image(
-      size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+      size, format,
+      usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
       mipmapped);
 
   gpu_.immediate_submit([&](VkCommandBuffer cmd) {
@@ -178,6 +198,63 @@ AllocatedImage resource_manager::create_image(void* data, VkExtent3D size, VkFor
   destroy_buffer(uploadbuffer);
   return new_image;
 }
+
+AllocatedImage resource_manager::create_cubemap(std::array<void*, 6> face_data, VkExtent3D size,
+                                                VkFormat format, VkImageUsageFlags usage,
+                                                bool mipmapped) {
+  // Calculate the size of data for each face
+  size_t face_data_size = static_cast<size_t>(size.width * size.height) * 4;
+
+  // Create a buffer large enough to hold all faces
+  AllocatedBuffer uploadbuffer = create_buffer(face_data_size * 6, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                               VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+  // Copy each face data into the buffer
+  for (int i = 0; i < 6; ++i) {
+    memcpy(static_cast<char*>(uploadbuffer.info.pMappedData) + face_data_size * i, face_data[i],
+           face_data_size);
+  }
+
+  // Create the image with VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT flag for cubemaps
+  AllocatedImage new_image = create_image(
+      size, format,
+      usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+      mipmapped, true);
+
+  gpu_.immediate_submit([&](VkCommandBuffer cmd) {
+    vkutil::transition_image(cmd, new_image.image, VK_IMAGE_LAYOUT_UNDEFINED,
+                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    // Copy each face from the buffer to the image
+    for (int i = 0; i < 6; ++i) {
+      VkBufferImageCopy copyRegion = {};
+      copyRegion.bufferOffset = face_data_size * i;
+      copyRegion.bufferRowLength = 0;
+      copyRegion.bufferImageHeight = 0;
+
+      copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+      copyRegion.imageSubresource.mipLevel = 0;
+      copyRegion.imageSubresource.baseArrayLayer = i;  // Specify the face index
+      copyRegion.imageSubresource.layerCount = 1;
+      copyRegion.imageExtent = size;
+
+      vkCmdCopyBufferToImage(cmd, uploadbuffer.buffer, new_image.image,
+                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+    }
+
+    if (mipmapped) {
+      //vkutil::generate_mipmaps( TODO
+          //cmd, new_image.image,
+          //VkExtent2D{new_image.imageExtent.width, new_image.imageExtent.height});
+    } else {
+      vkutil::transition_image(cmd, new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    }
+  });
+  destroy_buffer(uploadbuffer);
+  return new_image;
+}
+
 
 std::optional<AllocatedImage> resource_manager::load_image(fastgltf::Asset& asset, fastgltf::Image& image) {
   AllocatedImage newImage{};

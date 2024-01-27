@@ -36,6 +36,11 @@ struct AllocatedBuffer {
   VmaAllocationInfo info;
 };
 
+struct frame_buffer {
+  AllocatedImage color_image;
+  AllocatedImage depth_image;
+};
+
 struct GPUGLTFMaterial {
   glm::vec4 colorFactors;
   glm::vec4 metal_rough_factors;

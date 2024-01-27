@@ -20,8 +20,11 @@ public:
 
   AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
                               bool mipmapped = false);
+  AllocatedImage create_cubemap(std::array<void*, 6> face_data, VkExtent3D size,
+                                                  VkFormat format, VkImageUsageFlags usage,
+                                                  bool mipmapped);
   std::optional<AllocatedImage> load_image(fastgltf::Asset& asset, fastgltf::Image& image);
   AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
-                              bool mipmapped = false);
+                              bool mipmapped = false, bool cubemap = false);
   void destroy_image(const AllocatedImage& img);
 };

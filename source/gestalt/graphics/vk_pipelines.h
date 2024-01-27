@@ -42,20 +42,11 @@ public:
   PipelineBuilder& set_pipeline_layout(VkPipelineLayout layout);
 };
 
-struct compute_push_constants {
-  glm::vec4 data1;
-  glm::vec4 data2;
-  glm::vec4 data3;
-  glm::vec4 data4;
-};
-
 struct compute_effect {
   const char* name;
 
   VkPipeline pipeline;
   VkPipelineLayout layout;
-
-  compute_push_constants data;
 };
 
 class vk_pipeline_manager {
@@ -64,14 +55,12 @@ class vk_pipeline_manager {
   vk_descriptor_manager descriptor_manager_;
   vk_deletion_service deletion_service_;
 
-  void build_pipeline(gltf_metallic_roughness& material, AllocatedImage& draw_image,
-                      AllocatedImage& depth_image);
+  void build_pipeline(gltf_metallic_roughness& material, frame_buffer& frame_buffer);
 
 public:
 
   void init(const vk_gpu& gpu, const vk_descriptor_manager& descriptor_manager,
-            gltf_metallic_roughness& gltf_material, AllocatedImage& draw_image,
-            AllocatedImage& depth_image);
+            gltf_metallic_roughness& gltf_material, frame_buffer& frame_buffer);
   void cleanup();
 };
 

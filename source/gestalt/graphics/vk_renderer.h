@@ -15,9 +15,11 @@ public:
   virtual ~render_pass() = default;
 
   // Initialize the render pass with Vulkan context
-  virtual void init(vk_gpu& gpu, AllocatedImage draw_image) = 0;
+  virtual void init(vk_gpu& gpu, resource_manager& resource_manager, frame_buffer& frame_buffer) = 0;
 
   virtual void cleanup(vk_gpu& gpu) = 0;
+
+  virtual void bind_resources() = 0;
 
   // Execute the rendering logic
   virtual void execute(VkCommandBuffer cmd, sdl_window& window) = 0;
@@ -25,143 +27,135 @@ public:
 
 class skybox_pass final : public render_pass {
   public:
-  void init(vk_gpu& gpu, AllocatedImage draw_image) override {
+  void init(vk_gpu& gpu, resource_manager& resource_manager, frame_buffer& frame_buffer) override {
+    gpu_ = gpu;
+    resource_manager_ = resource_manager;
+    frame_buffer_ = frame_buffer;
 
-    // create a descriptor pool that will hold 10 sets with 1 image each
     std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes = {
-        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3},
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3},
-        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3},
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2},
+        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1},
     };
 
-    global_descriptor_allocator.init(gpu.device, 10, sizes);
-
-    // make the descriptor set layout for our compute draw
-    {
-      DescriptorLayoutBuilder builder;
-      draw_image_descriptor_layout = builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
-                                         .build(gpu.device, VK_SHADER_STAGE_COMPUTE_BIT);
-
-    }
+    descriptor_allocator_.init(gpu.device, 3, sizes);
 
     {
-      DescriptorLayoutBuilder builder;
-      single_image_descriptor_layout
-          = builder.add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-                .build(gpu.device, VK_SHADER_STAGE_FRAGMENT_BIT);
-
+      descriptor_layout_
+          = descriptor_layout_builder()
+                .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
+                .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                             VK_SHADER_STAGE_FRAGMENT_BIT)
+                .build(gpu.device);
     }
 
-    {
-      DescriptorLayoutBuilder builder;
-      gpu_scene_data_descriptor_layout
-          = builder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-                .build(gpu.device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkPipelineLayoutCreateInfo computeLayout{};
+    computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    computeLayout.pNext = nullptr;
+    computeLayout.pSetLayouts = &descriptor_layout_;
+    computeLayout.setLayoutCount = 1;
 
-    }
+    VK_CHECK(vkCreatePipelineLayout(gpu.device, &computeLayout, nullptr, &pipeline_layout_));
 
-    draw_image_descriptors
-        = global_descriptor_allocator.allocate(gpu.device, draw_image_descriptor_layout);
+    VkShaderModule vertex_shader;
+    vkutil::load_shader_module("../shaders/skybox.vert.spv", gpu.device, &vertex_shader);
+    VkShaderModule fragment_shader;
+    vkutil::load_shader_module("../shaders/skybox.frag.spv", gpu.device, &fragment_shader);
 
-    {
-      DescriptorWriter writer;
-      writer.write_image(0, draw_image.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL,
-                         VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+    pipeline_ = PipelineBuilder()
+                    .set_shaders(vertex_shader, fragment_shader)
+                    .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+                    .set_polygon_mode(VK_POLYGON_MODE_FILL)
+                    .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
+                    .set_multisampling_none()
+                    .disable_blending()
+                    .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
 
-      writer.update_set(gpu.device, draw_image_descriptors);
-    }
+                    .set_color_attachment_format(frame_buffer.color_image.imageFormat)
+                    .set_depth_format(frame_buffer.depth_image.imageFormat)
 
+                    .set_pipeline_layout(pipeline_layout_)
+                    .build_pipeline(gpu.device);
 
-      VkPipelineLayoutCreateInfo computeLayout{};
-      computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-      computeLayout.pNext = nullptr;
-      computeLayout.pSetLayouts = &draw_image_descriptor_layout;
-      computeLayout.setLayoutCount = 1;
+    // Clean up shader modules after pipeline creation
+    vkDestroyShaderModule(gpu.device, vertex_shader, nullptr);
+    vkDestroyShaderModule(gpu.device, fragment_shader, nullptr);
 
-      VkPushConstantRange pushConstant{};
-      pushConstant.offset = 0;
-      pushConstant.size = sizeof(compute_push_constants);
-      pushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    VkSamplerCreateInfo sampl = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO, .pNext = nullptr};
+    sampl.maxLod = VK_LOD_CLAMP_NONE;
+    sampl.minLod = 0;
+    sampl.magFilter = VK_FILTER_LINEAR;
+    sampl.minFilter = VK_FILTER_LINEAR;
+    sampl.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    vkCreateSampler(gpu_.device, &sampl, nullptr, &cube_map_sampler);
 
-      computeLayout.pPushConstantRanges = &pushConstant;
-      computeLayout.pushConstantRangeCount = 1;
+    
+  uint32_t white = 0xFFFFFFFF;  // White color for color and occlusion
+    std::vector white_data(6, white);
 
-      VK_CHECK(
-          vkCreatePipelineLayout(gpu.device, &computeLayout, nullptr, &pipeline_layout));
-
-      VkShaderModule gradient_shader;
-      vkutil::load_shader_module("../shaders/gradient_color.comp.spv", gpu.device,
-                                 &gradient_shader);
-
-      VkPipelineShaderStageCreateInfo stageinfo{};
-      stageinfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-      stageinfo.pNext = nullptr;
-      stageinfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-      stageinfo.module = gradient_shader;
-      stageinfo.pName = "main";
-
-      VkComputePipelineCreateInfo computePipelineCreateInfo{};
-      computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-      computePipelineCreateInfo.pNext = nullptr;
-      computePipelineCreateInfo.layout = pipeline_layout;
-      computePipelineCreateInfo.stage = stageinfo;
-
-      sky_gradient_.layout = pipeline_layout;
-      sky_gradient_.name = "gradient";
-      sky_gradient_.data = {};
-
-      // default colors
-      sky_gradient_.data.data1 = glm::vec4(0, 0.3f, 1, 1);
-      sky_gradient_.data.data2 = glm::vec4(0, 0.3f, 0, 1);
-
-      VK_CHECK(vkCreateComputePipelines(gpu.device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo,
-                                        nullptr, &sky_gradient_.pipeline));
-
-      // destroy structures properly
-      vkDestroyShaderModule(gpu.device, gradient_shader, nullptr);
+    cube_map_image = resource_manager_.create_image((void*)&white_data, VkExtent3D{1, 1, 1},
+                                         VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
   }
 
   void cleanup(vk_gpu& gpu) override {
-      global_descriptor_allocator.destroy_pools(gpu.device);
+      descriptor_allocator_.destroy_pools(gpu.device);
 
-      vkDestroyPipelineLayout(gpu.device, pipeline_layout, nullptr);
-      vkDestroyPipeline(gpu.device, sky_gradient_.pipeline, nullptr);
+      vkDestroyPipelineLayout(gpu.device, pipeline_layout_, nullptr);
+      vkDestroyPipeline(gpu.device, pipeline_, nullptr);
 
-      vkDestroyDescriptorSetLayout(gpu.device, draw_image_descriptor_layout, nullptr);
-      vkDestroyDescriptorSetLayout(gpu.device, gpu_scene_data_descriptor_layout, nullptr);
-      vkDestroyDescriptorSetLayout(gpu.device, single_image_descriptor_layout, nullptr);
+      vkDestroyDescriptorSetLayout(gpu.device, descriptor_layout_, nullptr);
+  }
+
+  
+  void bind_resources() override {
+      cubemap_descriptor_set_ = descriptor_allocator_.allocate(gpu_.device, descriptor_layout_);
+
+      writer.clear();
+      writer.write_image(1, cube_map_image.imageView, cube_map_sampler, VK_IMAGE_LAYOUT_GENERAL,
+                         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   }
 
   void execute(const VkCommandBuffer cmd, sdl_window& window) override {
 
-    // bind the background compute pipeline
-      vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, sky_gradient_.pipeline);
+      writer.update_set(gpu_.device, cubemap_descriptor_set_);
+      vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
+      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
+                              &cubemap_descriptor_set_, 0, nullptr);
+      VkViewport viewport = {};
+      viewport.x = 0;
+      viewport.y = 0;
+      viewport.width = static_cast<float>(window.extent.width);
+      viewport.height = static_cast<float>(window.extent.height);
+      viewport.minDepth = 0.f;
+      viewport.maxDepth = 1.f;
 
-    // bind the descriptor set containing the draw image for the compute pipeline
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
-                            pipeline_layout, 0, 1,
-                            &draw_image_descriptors, 0, nullptr);
+      vkCmdSetViewport(cmd, 0, 1, &viewport);
 
-    vkCmdPushConstants(cmd, pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
-                       sizeof(compute_push_constants), &sky_gradient_.data);
-    // execute the compute pipeline dispatch. We are using 16x16 workgroup size so we need to divide
-    // by it
-    vkCmdDispatch(cmd, std::ceil(window.extent.width / 16.0),
-                  std::ceil(window.extent.height / 16.0), 1);
+      VkRect2D scissor = {};
+      scissor.offset.x = 0;
+      scissor.offset.y = 0;
+      scissor.extent.width = window.extent.width;
+      scissor.extent.height = window.extent.height;
+
+      vkCmdSetScissor(cmd, 0, 1, &scissor);
+      vkCmdDraw(cmd, 36, 1, 0, 0);  // 36 vertices for the cube
+    
   }
 
+  descriptor_writer writer;
+
 private:
-  VkPipeline gradient_pipeline;
-  VkPipelineLayout pipeline_layout;
+  vk_gpu gpu_ = {};
+  resource_manager resource_manager_;
+  frame_buffer frame_buffer_ = {};
 
- compute_effect sky_gradient_;
-  DescriptorAllocatorGrowable global_descriptor_allocator;
+  VkSampler cube_map_sampler;
+  AllocatedImage cube_map_image;
 
-  VkDescriptorSet draw_image_descriptors;
-  VkDescriptorSetLayout draw_image_descriptor_layout;
-
-  VkDescriptorSetLayout single_image_descriptor_layout;
-  VkDescriptorSetLayout gpu_scene_data_descriptor_layout;
+  VkPipeline pipeline_;
+  VkPipelineLayout pipeline_layout_;
+  VkDescriptorSetLayout descriptor_layout_;
+  VkDescriptorSet cubemap_descriptor_set_;
+  DescriptorAllocatorGrowable descriptor_allocator_;
 };
 
 constexpr unsigned int FRAME_OVERLAP = 2;
@@ -189,8 +183,7 @@ public:
   frame_data& get_current_frame() { return frames_[frame_number_ % FRAME_OVERLAP]; }
 
   // draw resources
-  AllocatedImage draw_image_;
-  AllocatedImage depth_image_;
+  frame_buffer frame_buffer_;
   gltf_metallic_roughness gltf_material;
 
   draw_context main_draw_context_;
@@ -198,6 +191,7 @@ public:
   engine_stats stats_;
 
   gpu_scene_data scene_data;
+  AllocatedBuffer gpu_scene_data_buffer;
 
   void init(const vk_gpu& gpu, const sdl_window& window, resource_manager& resource_manager, const bool& resize_requested,
             engine_stats stats
@@ -209,14 +203,15 @@ public:
     resize_requested_ = resize_requested;
     stats_ = stats;
 
-    swapchain.init(gpu_, window_, draw_image_, depth_image_);
+    swapchain.init(gpu_, window_, frame_buffer_);
     commands.init(gpu_, frames_);
     sync.init(gpu_, frames_);
     descriptor_manager.init(gpu_, frames_);
-    pipeline_manager.init(gpu_, descriptor_manager, gltf_material,
-                          draw_image_, depth_image_);
+    pipeline_manager.init(gpu_, descriptor_manager, gltf_material, frame_buffer_);
 
-    skybox_pass_.init(gpu_, draw_image_);
+    gpu_scene_data_buffer = resource_manager_.create_buffer(
+        sizeof(gpu_scene_data), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    skybox_pass_.init(gpu_, resource_manager_, frame_buffer_);
   }
 
   void draw(imgui_gui& imgui);
@@ -227,6 +222,8 @@ public:
     for (auto frame : frames_) {
       frame.deletion_queue.flush();
     }
+
+    resource_manager_.destroy_buffer(gpu_scene_data_buffer);
 
     pipeline_manager.cleanup();
     descriptor_manager.cleanup();

@@ -225,14 +225,13 @@ void PipelineBuilder::clear() {
 }
 
 void vk_pipeline_manager::init(const vk_gpu& gpu, const vk_descriptor_manager& descriptor_manager, gltf_metallic_roughness& gltf_material,
-                               AllocatedImage& draw_image,
-                               AllocatedImage& depth_image) {
+                               frame_buffer& frame_buffer) {
 
   gpu_ = gpu;
   descriptor_manager_ = descriptor_manager;
   deletion_service_.init(gpu_.device, gpu_.allocator);
 
-  build_pipeline(gltf_material, draw_image, depth_image);
+  build_pipeline(gltf_material, frame_buffer);
 }
 
 void vk_pipeline_manager::cleanup() {
@@ -241,7 +240,7 @@ void vk_pipeline_manager::cleanup() {
 
 
 void vk_pipeline_manager::build_pipeline(gltf_metallic_roughness& material,
-                                         AllocatedImage& draw_image, AllocatedImage& depth_image) {
+                                         frame_buffer& frame_buffer) {
   VkShaderModule meshFragShader;
   vkutil::load_shader_module("../shaders/mesh.frag.spv", gpu_.device, &meshFragShader);
 
@@ -249,20 +248,21 @@ void vk_pipeline_manager::build_pipeline(gltf_metallic_roughness& material,
   vkutil::load_shader_module("../shaders/mesh.vert.spv", gpu_.device,
                              &meshVertexShader);
 
-  VkPushConstantRange matrixRange{};
-  matrixRange.offset = 0;
-  matrixRange.size = sizeof(GPUDrawPushConstants);
-  matrixRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+  VkPushConstantRange matrix_range{};
+  matrix_range.offset = 0;
+  matrix_range.size = sizeof(GPUDrawPushConstants);
+  matrix_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-  DescriptorLayoutBuilder layout_builder;
+  auto shader_stages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
   material.materialLayout
-      = layout_builder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-            .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-            .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-            .add_binding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-            .add_binding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-            .add_binding(5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-            .build(gpu_.device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+      = descriptor_layout_builder()
+            .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, shader_stages)
+            .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, shader_stages)
+            .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, shader_stages)
+            .add_binding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, shader_stages)
+            .add_binding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, shader_stages)
+            .add_binding(5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, shader_stages)
+            .build(gpu_.device);
 
   VkDescriptorSetLayout layouts[]
       = {descriptor_manager_.gpu_scene_data_descriptor_layout, material.materialLayout};
@@ -270,7 +270,7 @@ void vk_pipeline_manager::build_pipeline(gltf_metallic_roughness& material,
   VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
   mesh_layout_info.setLayoutCount = 2;
   mesh_layout_info.pSetLayouts = layouts;
-  mesh_layout_info.pPushConstantRanges = &matrixRange;
+  mesh_layout_info.pPushConstantRanges = &matrix_range;
   mesh_layout_info.pushConstantRangeCount = 1;
 
   VkPipelineLayout newLayout;
@@ -292,8 +292,8 @@ void vk_pipeline_manager::build_pipeline(gltf_metallic_roughness& material,
                                 .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
 
                                 // render format
-                                .set_color_attachment_format(draw_image.imageFormat)
-                                .set_depth_format(depth_image.imageFormat)
+                                .set_color_attachment_format(frame_buffer.color_image.imageFormat)
+            .set_depth_format(frame_buffer.depth_image.imageFormat)
 
                                 // use the triangle layout we created
                                 .set_pipeline_layout(newLayout)

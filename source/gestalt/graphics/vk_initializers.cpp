@@ -285,6 +285,33 @@ VkImageCreateInfo vkinit::image_create_info(VkFormat format, VkImageUsageFlags u
     return info;
 }
 
+VkImageCreateInfo vkinit::cubemap_create_info(VkFormat format, VkImageUsageFlags usageFlags, VkExtent3D extent)
+{
+    VkImageCreateInfo info = {};
+    info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    info.pNext = nullptr;
+
+    info.imageType = VK_IMAGE_TYPE_2D;
+
+    info.format = format;
+    info.extent = extent; 
+
+    info.mipLevels = 1; 
+    info.arrayLayers = 6; 
+
+    // For MSAA. Default to 1 sample per pixel if MSAA is not used.
+    info.samples = VK_SAMPLE_COUNT_1_BIT;
+
+    // Optimal tiling for GPU-specific format
+    info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    info.usage = usageFlags;
+
+    // Add the cube compatible flag
+    info.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+
+    return info;
+}
+
 VkImageViewCreateInfo vkinit::imageview_create_info(VkFormat format, VkImage image, VkImageAspectFlags aspectFlags)
 {
     // build a image-view for the depth image to use for rendering

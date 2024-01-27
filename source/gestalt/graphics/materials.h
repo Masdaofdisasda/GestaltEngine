@@ -35,7 +35,7 @@ struct gltf_metallic_roughness {
   };
 
 
-  DescriptorWriter writer;
+  descriptor_writer writer;
 
   void clear_resources(VkDevice device);
 

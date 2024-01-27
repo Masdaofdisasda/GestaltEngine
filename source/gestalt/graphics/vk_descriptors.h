@@ -5,15 +5,16 @@
 #include "vk_deletion_service.h"
 #include "vk_gpu.h"
 
-struct DescriptorLayoutBuilder {
+struct descriptor_layout_builder {
   std::vector<VkDescriptorSetLayoutBinding> bindings;
 
-  DescriptorLayoutBuilder& add_binding(uint32_t binding, VkDescriptorType type);
+  descriptor_layout_builder& add_binding(uint32_t binding, VkDescriptorType type,
+                                       VkShaderStageFlags shader_stages);
   void clear();
-  VkDescriptorSetLayout build(VkDevice device, VkShaderStageFlags shaderStages);
+  VkDescriptorSetLayout build(VkDevice device);
 };
 
-struct DescriptorWriter {
+struct descriptor_writer {
   std::deque<VkDescriptorImageInfo> imageInfos;
   std::deque<VkDescriptorBufferInfo> bufferInfos;
   std::vector<VkWriteDescriptorSet> writes;
@@ -27,15 +28,15 @@ struct DescriptorWriter {
   void update_set(VkDevice device, VkDescriptorSet set);
 };
 
-struct DescriptorAllocator {
-  struct PoolSizeRatio {
+struct descriptor_allocator {
+  struct pool_size_ratio {
     VkDescriptorType type;
     float ratio;
   };
 
   VkDescriptorPool pool;
 
-  void init_pool(VkDevice device, uint32_t maxSets, std::span<PoolSizeRatio> poolRatios);
+  void init_pool(VkDevice device, uint32_t maxSets, std::span<pool_size_ratio> poolRatios);
   void clear_descriptors(VkDevice device);
   void destroy_pool(VkDevice device);
 

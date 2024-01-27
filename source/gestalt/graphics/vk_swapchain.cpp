@@ -4,9 +4,7 @@
 #include "vk_deletion_service.h"
 #include "vk_initializers.h"
 
-void vk_swapchain::init(const vk_gpu& gpu,
-                        const sdl_window& window, AllocatedImage& draw_image,
-                        AllocatedImage& depth_image) {
+void vk_swapchain::init(const vk_gpu& gpu, const sdl_window& window, frame_buffer& frame_buffer) {
     gpu_ = gpu;
   deletion_service_.init(gpu_.device, gpu_.allocator);
 
@@ -15,9 +13,12 @@ void vk_swapchain::init(const vk_gpu& gpu,
   // draw image size will match the window
   VkExtent3D drawImageExtent = {window.extent.width, window.extent.height, 1};
 
+  AllocatedImage& color_image = frame_buffer.color_image;
+  AllocatedImage& depth_image = frame_buffer.depth_image;
+
   // hardcoding the draw format to 32 bit float
-  draw_image.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
-  draw_image.imageExtent = drawImageExtent;
+  color_image.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+  color_image.imageExtent = drawImageExtent;
 
   VkImageUsageFlags drawImageUsages{};
   drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -25,7 +26,7 @@ void vk_swapchain::init(const vk_gpu& gpu,
   drawImageUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
   VkImageCreateInfo rimg_info
-      = vkinit::image_create_info(draw_image.imageFormat, drawImageUsages, drawImageExtent);
+      = vkinit::image_create_info(color_image.imageFormat, drawImageUsages, drawImageExtent);
 
   // for the draw image, we want to allocate it from gpu local memory
   VmaAllocationCreateInfo rimg_allocinfo = {};
@@ -33,14 +34,14 @@ void vk_swapchain::init(const vk_gpu& gpu,
   rimg_allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
   // allocate and create the image
-  vmaCreateImage(gpu_.allocator, &rimg_info, &rimg_allocinfo, &draw_image.image,
-                 &draw_image.allocation, nullptr);
+  vmaCreateImage(gpu_.allocator, &rimg_info, &rimg_allocinfo, &color_image.image,
+                 &color_image.allocation, nullptr);
 
   // build a image-view for the draw image to use for rendering
   VkImageViewCreateInfo rview_info = vkinit::imageview_create_info(
-      draw_image.imageFormat, draw_image.image, VK_IMAGE_ASPECT_COLOR_BIT);
+      color_image.imageFormat, color_image.image, VK_IMAGE_ASPECT_COLOR_BIT);
 
-  VK_CHECK(vkCreateImageView(gpu_.device, &rview_info, nullptr, &draw_image.imageView));
+  VK_CHECK(vkCreateImageView(gpu_.device, &rview_info, nullptr, &color_image.imageView));
 
   depth_image.imageFormat = VK_FORMAT_D32_SFLOAT;
   depth_image.imageExtent = drawImageExtent;
@@ -60,8 +61,8 @@ void vk_swapchain::init(const vk_gpu& gpu,
 
   VK_CHECK(vkCreateImageView(gpu_.device, &dview_info, nullptr, &depth_image.imageView));
 
-  deletion_service_.push(draw_image.imageView);
-  deletion_service_.push(draw_image.image, draw_image.allocation);
+  deletion_service_.push(color_image.imageView);
+  deletion_service_.push(color_image.image, color_image.allocation);
   deletion_service_.push(depth_image.imageView);
   deletion_service_.push(depth_image.image, depth_image.allocation);
 }

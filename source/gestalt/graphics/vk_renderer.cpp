@@ -43,15 +43,15 @@ void vk_renderer::draw(imgui_gui& imgui) {
 
   // transition our main draw image into general layout so we can write into it
   // we will overwrite it all so we dont care about what was the older layout
-  vkutil::transition_image(cmd, draw_image_.image, VK_IMAGE_LAYOUT_UNDEFINED,
+  vkutil::transition_image(cmd, frame_buffer_.color_image.image, VK_IMAGE_LAYOUT_UNDEFINED,
                            VK_IMAGE_LAYOUT_GENERAL);
-  vkutil::transition_image(cmd, depth_image_.image, VK_IMAGE_LAYOUT_UNDEFINED,
+  vkutil::transition_image(cmd, frame_buffer_.depth_image.image, VK_IMAGE_LAYOUT_UNDEFINED,
                            VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
   draw_main(cmd);
 
   // transtion the draw image and the swapchain image into their correct transfer layouts
-  vkutil::transition_image(cmd, draw_image_.image, VK_IMAGE_LAYOUT_GENERAL,
+  vkutil::transition_image(cmd, frame_buffer_.color_image.image, VK_IMAGE_LAYOUT_GENERAL,
                            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   vkutil::transition_image(cmd, swapchain.swapchain_images[swapchainImageIndex],
                            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -62,7 +62,7 @@ void vk_renderer::draw(imgui_gui& imgui) {
   //< draw_first
   //> imgui_draw
   // execute a copy from the draw image into the swapchain
-  vkutil::copy_image_to_image(cmd, draw_image_.image,
+  vkutil::copy_image_to_image(cmd, frame_buffer_.color_image.image,
                               swapchain.swapchain_images[swapchainImageIndex], extent, extent);
 
   // set swapchain image layout to Attachment Optimal so we can draw it
@@ -124,21 +124,32 @@ void vk_renderer::draw(imgui_gui& imgui) {
 
 void vk_renderer::draw_main(VkCommandBuffer cmd) {
 
-  skybox_pass_.execute(cmd, window_);
-
-  // draw the triangle
 
   VkRenderingAttachmentInfo colorAttachment
-      = vkinit::attachment_info(draw_image_.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+      = vkinit::attachment_info(frame_buffer_.color_image.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
   VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
-      depth_image_.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+      frame_buffer_.depth_image.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
   VkRenderingInfo renderInfo
       = vkinit::rendering_info(window_.extent, &colorAttachment, &depthAttachment);
 
   vkCmdBeginRendering(cmd, &renderInfo);
+
+  void* mapped_data;
+  VmaAllocation allocation = gpu_scene_data_buffer.allocation;
+  VK_CHECK(vmaMapMemory(gpu_.allocator, allocation, &mapped_data));
+  const auto scene_uniform_data = static_cast<gpu_scene_data*>(mapped_data);
+  *scene_uniform_data = scene_data;
+
+  skybox_pass_.bind_resources();
+  skybox_pass_.writer.write_buffer(0, gpu_scene_data_buffer.buffer, sizeof(gpu_scene_data), 0,
+                                   VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+  skybox_pass_.execute(cmd, window_);
+
   auto start = std::chrono::system_clock::now();
   draw_geometry(cmd);
+
+  vmaUnmapMemory(gpu_.allocator, gpu_scene_data_buffer.allocation);
 
   auto end = std::chrono::system_clock::now();
   auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
@@ -203,27 +214,11 @@ void vk_renderer::draw_geometry(VkCommandBuffer cmd) {
     return A.material < B.material;
   });
 
-  // allocate a new uniform buffer for the scene data
-  AllocatedBuffer gpu_scene_data_buffer = resource_manager_.create_buffer(
-      sizeof(gpu_scene_data), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-  // add it to the deletion queue of this frame so it gets deleted once its been used
-  get_current_frame().deletion_queue.push_function([gpu_scene_data_buffer, this]() {
-    vmaUnmapMemory(gpu_.allocator, gpu_scene_data_buffer.allocation);
-    resource_manager_.destroy_buffer(gpu_scene_data_buffer);
-  });
-
-  void* mapped_data;
-  VmaAllocation allocation = gpu_scene_data_buffer.allocation;
-  VK_CHECK(vmaMapMemory(gpu_.allocator, allocation, &mapped_data));
-  const auto scene_uniform_data = static_cast<gpu_scene_data*>(mapped_data);
-  *scene_uniform_data = scene_data;
-
   // create a descriptor set that binds that buffer and update it
   VkDescriptorSet globalDescriptor = get_current_frame().frame_descriptors.allocate(
       gpu_.device, descriptor_manager.gpu_scene_data_descriptor_layout);
 
-  DescriptorWriter writer;
+  descriptor_writer writer;
   writer.write_buffer(0, gpu_scene_data_buffer.buffer, sizeof(gpu_scene_data), 0,
                       VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
   writer.update_set(gpu_.device, globalDescriptor);

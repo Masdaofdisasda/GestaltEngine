@@ -8,11 +8,11 @@
 #include "vk_scene_manager.h"
 
 class imgui_gui {
-  vk_gpu gpu_;
+  vk_gpu gpu_ = {};
   sdl_window window_;
-  vk_swapchain swapchain_;
+  vk_swapchain swapchain_ = {};
   gui_actions actions_;
-  vk_deletion_service deletion_service_;
+  vk_deletion_service deletion_service_ = {};
 
   entity_component selected_node_;
 
