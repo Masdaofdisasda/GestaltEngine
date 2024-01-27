@@ -49,21 +49,6 @@ struct compute_effect {
   VkPipelineLayout layout;
 };
 
-class vk_pipeline_manager {
-
-  vk_gpu gpu_;
-  vk_descriptor_manager descriptor_manager_;
-  vk_deletion_service deletion_service_;
-
-  void build_pipeline(gltf_metallic_roughness& material, frame_buffer& frame_buffer);
-
-public:
-
-  void init(const vk_gpu& gpu, const vk_descriptor_manager& descriptor_manager,
-            gltf_metallic_roughness& gltf_material, frame_buffer& frame_buffer);
-  void cleanup();
-};
-
 namespace vkutil {
 
   void load_shader_module(const char* filePath, VkDevice device,

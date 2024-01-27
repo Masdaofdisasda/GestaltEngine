@@ -73,17 +73,5 @@ struct frame_data {
   VkCommandPool command_pool;
   VkCommandBuffer main_command_buffer;
 
-  vk_deletion_service deletion_queue;
   DescriptorAllocatorGrowable frame_descriptors;
-};
-
-class vk_descriptor_manager {
-  vk_gpu gpu_;
-  vk_deletion_service deletion_service_;
-
-public:
-  VkDescriptorSetLayout gpu_scene_data_descriptor_layout;
-
-  void init(const vk_gpu& gpu, std::vector<frame_data>& frames);
-  void cleanup();
 };

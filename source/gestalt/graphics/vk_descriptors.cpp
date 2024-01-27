@@ -154,49 +154,6 @@ VkDescriptorPool DescriptorAllocatorGrowable::create_pool(VkDevice device, uint3
   return newPool;
 }
 
-void vk_descriptor_manager::init(const vk_gpu& gpu, std::vector<frame_data>& frames) {
-  gpu_ = gpu;
-  deletion_service_.init(gpu_.device, gpu_.allocator);
-
-  std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes = {
-      {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3},
-      {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3},
-      {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3},
-  };
-
-  {
-    descriptor_layout_builder builder;
-    gpu_scene_data_descriptor_layout
-        = builder
-              .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
-              .build(gpu_.device);
-
-    deletion_service_.push(gpu_scene_data_descriptor_layout);
-  }
-
-  for (auto& frame : frames) {
-    // create a descriptor pool
-    std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> frame_sizes = {
-        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3},
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3},
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3},
-        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4},
-    };
-
-    frame.frame_descriptors = DescriptorAllocatorGrowable{};
-    frame.frame_descriptors.init(gpu_.device, 1000, frame_sizes);
-
-    auto& frame_descriptor = frame.frame_descriptors;
-    deletion_service_.push_function(
-        [this, &frame_descriptor]() { frame_descriptor.destroy_pools(gpu_.device); });
-  }
-}
-
-void vk_descriptor_manager::cleanup() {
-  deletion_service_.flush();
-}
-
 VkDescriptorSet DescriptorAllocatorGrowable::allocate(VkDevice device,
                                                       VkDescriptorSetLayout layout) {
   // get or create a pool to allocate from

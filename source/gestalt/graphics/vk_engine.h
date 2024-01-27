@@ -19,7 +19,6 @@ class render_engine {
 public:
   void init();
   void cleanup();
-  void draw() { renderer_.draw(imgui_); }
   void run();
 
 private:

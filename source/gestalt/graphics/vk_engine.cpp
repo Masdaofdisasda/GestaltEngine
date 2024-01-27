@@ -47,6 +47,7 @@ void render_engine::init() {
 
   register_gui_actions();
   imgui_.init(gpu_, window_, renderer_.swapchain, gui_actions_);
+  renderer_.imgui_ = &imgui_;
 
 
   renderer_.scene_data.ambientColor = glm::vec4(0.1f);
@@ -199,7 +200,7 @@ void render_engine::run()
 
       update_scene();
 
-      draw();
+      renderer_.draw(); 
     }
 
     // get clock again, compare with start clock
