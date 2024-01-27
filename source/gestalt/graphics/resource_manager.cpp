@@ -248,7 +248,7 @@ AllocatedImage resource_manager::create_cubemap(std::array<void*, 6> face_data, 
           //VkExtent2D{new_image.imageExtent.width, new_image.imageExtent.height});
     } else {
       vkutil::transition_image(cmd, new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                               VK_IMAGE_LAYOUT_GENERAL);
     }
   });
   destroy_buffer(uploadbuffer);

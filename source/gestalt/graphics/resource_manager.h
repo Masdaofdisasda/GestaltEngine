@@ -22,7 +22,7 @@ public:
                               bool mipmapped = false);
   AllocatedImage create_cubemap(std::array<void*, 6> face_data, VkExtent3D size,
                                                   VkFormat format, VkImageUsageFlags usage,
-                                                  bool mipmapped);
+                                                  bool mipmapped = false);
   std::optional<AllocatedImage> load_image(fastgltf::Asset& asset, fastgltf::Image& image);
   AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
                               bool mipmapped = false, bool cubemap = false);

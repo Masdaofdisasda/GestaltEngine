@@ -88,12 +88,18 @@ class skybox_pass final : public render_pass {
     sampl.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
     vkCreateSampler(gpu_.device, &sampl, nullptr, &cube_map_sampler);
 
-    
-  uint32_t white = 0xFFFFFFFF;  // White color for color and occlusion
-    std::vector white_data(6, white);
+    uint32_t white = 0xFFFFFFFF;    // White
+    uint32_t red = 0xFFFF0000;      // Red
+    uint32_t green = 0xFF00FF00;    // Green
+    uint32_t blue = 0xFF0000FF;     // Blue
+    uint32_t yellow = 0xFFFFFF00;   // Yellow
+    uint32_t magenta = 0xFFFF00FF;  // Magenta
 
-    cube_map_image = resource_manager_.create_image((void*)&white_data, VkExtent3D{1, 1, 1},
-                                         VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    // Prepare array with one color for each face of the cube
+    std::array<void*, 6> cube_colors = {&white, &red, &green, &blue, &yellow, &magenta};
+
+    cube_map_image = resource_manager_.create_cubemap(
+        cube_colors, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
   }
 
   void cleanup(vk_gpu& gpu) override {
