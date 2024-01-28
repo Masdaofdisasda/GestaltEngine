@@ -245,9 +245,11 @@ void main() {
 	vec4 MeR = texture(metalRoughTex, UV);
 
 	PBRInfo pbrInputs;
+	
+	vec3 color = vec3(0.0);
 
 	// IBL contribution
-	vec3 color = calculatePBRInputsMetallicRoughness(Kd, n, viewPos.xyz, inPosition, MeR, pbrInputs);
+	color = calculatePBRInputsMetallicRoughness(Kd, n, viewPos.xyz, inPosition, MeR, pbrInputs);
 
 	// directional light contribution
 	color *= calculatePBRLightContributionDir(pbrInputs);

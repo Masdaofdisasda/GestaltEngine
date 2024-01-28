@@ -7,15 +7,21 @@
 class resource_manager {
   vk_gpu gpu_ = {};
 
+  gpu_mesh_buffers scene_buffers_;
+
 public:
   void init(const vk_gpu& gpu) {
     gpu_ = gpu;
   }
 
+  gpu_mesh_buffers& get_scene_buffers() {
+       return scene_buffers_;
+  }
+
   AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage,
                                 VmaMemoryUsage memoryUsage);
 
-  gpu_mesh_buffers upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
+  void upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
   void destroy_buffer(const AllocatedBuffer& buffer);
 
   AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage,

@@ -216,11 +216,6 @@ MaterialInstance gltf_metallic_roughness::write_material(
     DescriptorAllocatorGrowable& descriptorAllocator) {
     MaterialInstance matData;
     matData.passType = pass;
-    if (pass == MaterialPass::Transparent) {
-      matData.pipeline = &transparentPipeline;
-    } else {
-      matData.pipeline = &opaquePipeline;
-    }
 
     matData.materialSet = descriptorAllocator.allocate(device, materialLayout);
 
@@ -247,28 +242,4 @@ MaterialInstance gltf_metallic_roughness::write_material(
     writer.update_set(device, matData.materialSet);
 
     return matData;
-}
-
-void mesh_node::Draw(const glm::mat4& topMatrix, draw_context& ctx) {
-    glm::mat4 nodeMatrix = topMatrix * worldTransform;
-
-    for (auto& s : mesh->surfaces) {
-      render_object def;
-      def.index_count = s.count;
-      def.first_index = s.startIndex;
-      def.index_buffer = mesh->meshBuffers.indexBuffer.buffer;
-      def.material = &s.material->data;
-      def.bounds = s.bounds;
-      def.transform = nodeMatrix;
-      def.vertex_buffer_address = mesh->meshBuffers.vertexBufferAddress;
-
-      if (s.material->data.passType == MaterialPass::Transparent) {
-        ctx.transparent_surfaces.push_back(def);
-      } else {
-        ctx.opaque_surfaces.push_back(def);
-      }
-    }
-
-    // recurse down
-    Node::Draw(topMatrix, ctx);
 }

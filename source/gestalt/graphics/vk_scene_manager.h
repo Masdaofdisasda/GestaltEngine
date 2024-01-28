@@ -27,8 +27,6 @@ using transform_container = std::vector<transform_component>;
 class vk_scene_manager { //TODO split into data base and importer/loader
 public:
 
-  //TODO create container for per scene data in the future
-  gpu_mesh_buffers mesh_buffers_;
   AllocatedBuffer material_data_buffer_;
   DescriptorAllocatorGrowable descriptorPool;
 

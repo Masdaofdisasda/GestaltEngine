@@ -329,7 +329,7 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
     }
     create_mesh(surfaces, std::string(mesh.name));
   }
-  mesh_buffers_ = resource_manager_.upload_mesh(indices_, vertices_);
+  resource_manager_.upload_mesh(indices_, vertices_);
 
   // hierachy
   for (fastgltf::Node& node : gltf.nodes) {
@@ -526,11 +526,11 @@ void vk_scene_manager::traverse_scene(const entity entity, const glm::mat4& pare
       render_object def;
       def.index_count = surface.index_count;
       def.first_index = surface.first_index;
-      def.index_buffer = mesh_buffers_.indexBuffer.buffer;
+      def.index_buffer = resource_manager_.get_scene_buffers().indexBuffer.buffer;
       def.material = &material.data;
       def.bounds = surface.bounds;
       def.transform = world_transform;
-      def.vertex_buffer_address = mesh_buffers_.vertexBufferAddress;
+      def.vertex_buffer_address = resource_manager_.get_scene_buffers().vertexBufferAddress;
 
       if (material.data.passType == MaterialPass::MainColor) {
         draw_context.opaque_surfaces.push_back(def);
@@ -666,5 +666,4 @@ auto pass_type = MaterialPass::MainColor;
        resource_manager_.destroy_buffer(materialDataBuffer);
   });
   deletion_service_.push_function([this]() { descriptorPool.destroy_pools(gpu_.device); });
-  deletion_service_.push(materials_.back().data.pipeline->layout);
 }

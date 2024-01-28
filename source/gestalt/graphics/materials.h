@@ -4,8 +4,6 @@
 #include "vk_types.h"
 
 struct gltf_metallic_roughness {
-  MaterialPipeline opaquePipeline;
-  MaterialPipeline transparentPipeline;
 
   VkDescriptorSetLayout materialLayout;
 

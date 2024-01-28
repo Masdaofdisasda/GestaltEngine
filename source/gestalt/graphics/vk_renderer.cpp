@@ -126,11 +126,11 @@ void skybox_pass::execute(const VkCommandBuffer cmd) {
 }
 
 void pbr_pass::init(vk_renderer& renderer) {
-    gpu_ = renderer.gpu_;
+  gpu_ = renderer.gpu_;
   resource_manager_ = renderer.resource_manager_;
   frame_buffer_ = renderer.frame_buffer_;
   renderer_ = &renderer;
-  
+
   std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes = {
       {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3},
       {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3},
@@ -139,9 +139,9 @@ void pbr_pass::init(vk_renderer& renderer) {
 
   {
     descriptor_layout_ = descriptor_layout_builder()
-              .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
-              .build(gpu_.device);
+                             .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                                          VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
+                             .build(gpu_.device);
   }
 
   for (auto& frame : renderer_->frames_) {
@@ -160,14 +160,14 @@ void pbr_pass::init(vk_renderer& renderer) {
   }
 
   VkPipelineLayoutCreateInfo pipeline_layout_create_info{
-  	  .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-  	  .pNext = nullptr,
-  	  .setLayoutCount = 1,
-  	  .pSetLayouts = &descriptor_layout_,
-   };
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+      .pNext = nullptr,
+      .setLayoutCount = 1,
+      .pSetLayouts = &descriptor_layout_,
+  };
 
   VK_CHECK(vkCreatePipelineLayout(gpu_.device, &pipeline_layout_create_info, nullptr,
-      								  &pipeline_layout_));
+                                  &pipeline_layout_));
 
   VkShaderModule meshFragShader;
   vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &meshFragShader);
@@ -203,11 +203,11 @@ void pbr_pass::init(vk_renderer& renderer) {
   VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &newLayout));
 
   PipelineBuilder pipelineBuilder;
-  renderer_->gltf_material.opaquePipeline.layout = newLayout;
-  renderer_->gltf_material.transparentPipeline.layout = newLayout;
-  renderer_->gltf_material.opaquePipeline.pipeline
-      = pipelineBuilder
-            .set_shaders(meshVertexShader, meshFragShader)
+  opaquePipelineLayout = newLayout;
+  transparentPipelineLayout = newLayout;
+
+  opaquePipeline
+      = pipelineBuilder.set_shaders(meshVertexShader, meshFragShader)
             .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
             .set_polygon_mode(VK_POLYGON_MODE_FILL)
             .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
@@ -224,10 +224,9 @@ void pbr_pass::init(vk_renderer& renderer) {
             .build_pipeline(gpu_.device);
 
   // create the transparent variant
-  renderer_->gltf_material.transparentPipeline.pipeline
-      = pipelineBuilder.enable_blending_additive()
-                                              .enable_depthtest(false, VK_COMPARE_OP_LESS_OR_EQUAL)
-                                              .build_pipeline(gpu_.device);
+  transparentPipeline = pipelineBuilder.enable_blending_additive()
+                            .enable_depthtest(false, VK_COMPARE_OP_LESS_OR_EQUAL)
+                            .build_pipeline(gpu_.device);
 
   vkDestroyShaderModule(gpu_.device, meshFragShader, nullptr);
   vkDestroyShaderModule(gpu_.device, meshVertexShader, nullptr);
@@ -235,8 +234,8 @@ void pbr_pass::init(vk_renderer& renderer) {
 
 void pbr_pass::cleanup() {
   vkDestroyDescriptorSetLayout(gpu_.device, renderer_->gltf_material.materialLayout, nullptr);
-  vkDestroyPipeline(gpu_.device, renderer_->gltf_material.transparentPipeline.pipeline, nullptr);
-  vkDestroyPipeline(gpu_.device, renderer_->gltf_material.opaquePipeline.pipeline, nullptr);
+  vkDestroyPipeline(gpu_.device, transparentPipeline, nullptr);
+  vkDestroyPipeline(gpu_.device, opaquePipeline, nullptr);
 
   vkDestroyPipelineLayout(gpu_.device, pipeline_layout_, nullptr);
   for (auto frame : renderer_->frames_) {
@@ -277,40 +276,37 @@ void pbr_pass::execute(VkCommandBuffer cmd) {
   bind_resources();
   writer.update_set(gpu_.device, descriptor_set_);
 
-  MaterialPipeline* lastPipeline = nullptr;
   MaterialInstance* lastMaterial = nullptr;
   const auto& buffer_index = renderer_->main_draw_context_.opaque_surfaces[0].index_buffer;
   vkCmdBindIndexBuffer(cmd, buffer_index, 0, VK_INDEX_TYPE_UINT32);
 
-  auto draw = [&](const render_object& r) {
+  auto draw = [&](const render_object& r, VkPipeline pipeline, VkPipelineLayout pipeline_layout) {
     if (r.material != lastMaterial) {
       lastMaterial = r.material;
-      if (r.material->pipeline != lastPipeline) {
-        lastPipeline = r.material->pipeline;
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, r.material->pipeline->pipeline);
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, r.material->pipeline->layout,
-                                0, 1, &descriptor_set_, 0, nullptr);
 
-        VkViewport viewport = {};
-        viewport.x = 0;
-        viewport.y = 0;
-        viewport.width = static_cast<float>(renderer_->window_.extent.width);
-        viewport.height = static_cast<float>(renderer_->window_.extent.height);
-        viewport.minDepth = 0.f;
-        viewport.maxDepth = 1.f;
+      vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0,
+                              1, &descriptor_set_, 0, nullptr);
 
-        vkCmdSetViewport(cmd, 0, 1, &viewport);
+      VkViewport viewport = {};
+      viewport.x = 0;
+      viewport.y = 0;
+      viewport.width = static_cast<float>(renderer_->window_.extent.width);
+      viewport.height = static_cast<float>(renderer_->window_.extent.height);
+      viewport.minDepth = 0.f;
+      viewport.maxDepth = 1.f;
 
-        VkRect2D scissor = {};
-        scissor.offset.x = 0;
-        scissor.offset.y = 0;
-        scissor.extent.width = renderer_->window_.extent.width;
-        scissor.extent.height = renderer_->window_.extent.height;
+      vkCmdSetViewport(cmd, 0, 1, &viewport);
 
-        vkCmdSetScissor(cmd, 0, 1, &scissor);
-      }
+      VkRect2D scissor = {};
+      scissor.offset.x = 0;
+      scissor.offset.y = 0;
+      scissor.extent.width = renderer_->window_.extent.width;
+      scissor.extent.height = renderer_->window_.extent.height;
 
-      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, r.material->pipeline->layout, 1,
+      vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 1,
                               1, &r.material->materialSet, 0, nullptr);
     }
 
@@ -318,7 +314,7 @@ void pbr_pass::execute(VkCommandBuffer cmd) {
     push_constants.worldMatrix = r.transform;
     push_constants.vertexBuffer = r.vertex_buffer_address;
 
-    vkCmdPushConstants(cmd, r.material->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
+    vkCmdPushConstants(cmd, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
                        sizeof(GPUDrawPushConstants), &push_constants);
 
     renderer_->stats_.drawcall_count++;
@@ -331,11 +327,11 @@ void pbr_pass::execute(VkCommandBuffer cmd) {
   renderer_->stats_.triangle_count = 0;
 
   for (auto& r : opaque_draws) {
-      draw(renderer_->main_draw_context_.opaque_surfaces[r]);
+      draw(renderer_->main_draw_context_.opaque_surfaces[r], opaquePipeline, opaquePipelineLayout);
   }
 
   for (auto& r : renderer_->main_draw_context_.transparent_surfaces) {
-    draw(r);
+    draw(r, transparentPipeline, transparentPipelineLayout);
   }
 }
 

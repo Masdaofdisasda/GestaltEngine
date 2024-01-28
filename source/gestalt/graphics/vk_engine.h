@@ -50,6 +50,4 @@ private:
   resource_manager resource_manager_ = {};
 
   engine_stats stats_ = {};
-
-
 };

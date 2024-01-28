@@ -28,34 +28,33 @@ AllocatedBuffer resource_manager::create_buffer(size_t allocSize, VkBufferUsageF
   return newBuffer;
 }
 
-gpu_mesh_buffers resource_manager::upload_mesh(const std::span<uint32_t> indices, const std::span<Vertex> vertices) {
+// TODO : make this work with multiple meshes/scenes by resizing the buffers
+void resource_manager::upload_mesh(const std::span<uint32_t> indices, const std::span<Vertex> vertices) {
   //> mesh_create_1
-  const size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
-  const size_t indexBufferSize = indices.size() * sizeof(uint32_t);
-
-  gpu_mesh_buffers newSurface;
+  const size_t vertex_buffer_size = vertices.size() * sizeof(Vertex);
+  const size_t index_buffer_size = indices.size() * sizeof(uint32_t);
 
   // create vertex buffer
-  newSurface.vertexBuffer = create_buffer(
-      vertexBufferSize,
+  scene_buffers_.vertexBuffer = create_buffer(
+      vertex_buffer_size,
       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
           | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
       VMA_MEMORY_USAGE_GPU_ONLY);
 
   // find the adress of the vertex buffer
   VkBufferDeviceAddressInfo deviceAdressInfo{.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-                                             .buffer = newSurface.vertexBuffer.buffer};
-  newSurface.vertexBufferAddress = vkGetBufferDeviceAddress(gpu_.device, &deviceAdressInfo);
+                                             .buffer = scene_buffers_.vertexBuffer.buffer};
+  scene_buffers_.vertexBufferAddress = vkGetBufferDeviceAddress(gpu_.device, &deviceAdressInfo);
 
   // create index buffer
-  newSurface.indexBuffer = create_buffer(
-      indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+  scene_buffers_.indexBuffer = create_buffer(
+      index_buffer_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
       VMA_MEMORY_USAGE_GPU_ONLY);
 
   //< mesh_create_1
   //
   //> mesh_create_2
-  AllocatedBuffer staging = create_buffer(vertexBufferSize + indexBufferSize,
+  AllocatedBuffer staging = create_buffer(vertex_buffer_size + index_buffer_size,
                                                             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                                             VMA_MEMORY_USAGE_CPU_ONLY);
 
@@ -64,30 +63,28 @@ gpu_mesh_buffers resource_manager::upload_mesh(const std::span<uint32_t> indices
   VK_CHECK(vmaMapMemory(gpu_.allocator, allocation, &data));
 
   // copy vertex buffer
-  memcpy(data, vertices.data(), vertexBufferSize);
+  memcpy(data, vertices.data(), vertex_buffer_size);
   // copy index buffer
-  memcpy((char*)data + vertexBufferSize, indices.data(), indexBufferSize);
+  memcpy((char*)data + vertex_buffer_size, indices.data(), index_buffer_size);
 
   gpu_.immediate_submit([&](VkCommandBuffer cmd) {
     VkBufferCopy vertex_copy;
     vertex_copy.dstOffset = 0;
     vertex_copy.srcOffset = 0;
-    vertex_copy.size = vertexBufferSize;
+    vertex_copy.size = vertex_buffer_size;
 
-    vkCmdCopyBuffer(cmd, staging.buffer, newSurface.vertexBuffer.buffer, 1, &vertex_copy);
+    vkCmdCopyBuffer(cmd, staging.buffer, scene_buffers_.vertexBuffer.buffer, 1, &vertex_copy);
 
     VkBufferCopy index_copy;
     index_copy.dstOffset = 0;
-    index_copy.srcOffset = vertexBufferSize;
-    index_copy.size = indexBufferSize;
+    index_copy.srcOffset = vertex_buffer_size;
+    index_copy.size = index_buffer_size;
 
-    vkCmdCopyBuffer(cmd, staging.buffer, newSurface.indexBuffer.buffer, 1, &index_copy);
+    vkCmdCopyBuffer(cmd, staging.buffer, scene_buffers_.indexBuffer.buffer, 1, &index_copy);
   });
 
   vmaUnmapMemory(gpu_.allocator, allocation);
   destroy_buffer(staging);
-
-  return newSurface;
   //< mesh_create_2
 }
 
