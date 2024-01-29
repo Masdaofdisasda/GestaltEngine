@@ -59,7 +59,6 @@ void vk_scene_manager::cleanup() {
 }
 
 void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
-
   fmt::print("Loading GLTF: {}\n", file_path);
 
   fastgltf::Parser parser{};
@@ -128,13 +127,8 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
   // load buffer and materials
   size_t material_offset = materials_.size();
   int data_index = material_offset;
-  gltf_material::MaterialConstants* sceneMaterialConstants
-      = (gltf_material::MaterialConstants*)
-            resource_manager_.material_data_buffer_.info.pMappedData;
 
   for (fastgltf::Material& mat : gltf.materials) {
-
-
     pbr_config pbr_config{};
     gltf_material::MaterialConstants constants;
     constants.colorFactors.x = mat.pbrData.baseColorFactor[0];
@@ -144,8 +138,6 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
 
     constants.metal_rough_factors.x = mat.pbrData.metallicFactor;
     constants.metal_rough_factors.y = mat.pbrData.roughnessFactor;
-    // write material parameters to buffer
-    sceneMaterialConstants[data_index] = constants;
 
     if (mat.alphaMode == fastgltf::AlphaMode::Blend) {
       pbr_config.transparent = true;
@@ -163,9 +155,6 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
            .occlusionImage = default_material_.occlusion_image,
            .occlusionSampler = default_material_.default_sampler_nearest};
 
-    // set the uniform buffer for the material data
-    materialResources.dataBuffer = resource_manager_.material_data_buffer_.buffer;
-    materialResources.dataBufferOffset = data_index * sizeof(gltf_material::MaterialConstants);
     // grab textures from gltf file
     if (mat.pbrData.baseColorTexture.has_value()) {
       size_t img
@@ -193,25 +182,20 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
       pbr_config.metal_rough_factor
           = glm::vec2(mat.pbrData.metallicFactor, mat.pbrData.roughnessFactor);
       pbr_config.metal_rough_tex = img;
-
     }
     if (mat.normalTexture.has_value()) {
-      size_t img = gltf.textures[mat.normalTexture.value().textureIndex]
-                       .imageIndex.value();
-      size_t sampler = gltf.textures[mat.normalTexture.value().textureIndex]
-                           .samplerIndex.value();
+      size_t img = gltf.textures[mat.normalTexture.value().textureIndex].imageIndex.value();
+      size_t sampler = gltf.textures[mat.normalTexture.value().textureIndex].samplerIndex.value();
 
       materialResources.normalImage = images_[img];
       materialResources.normalSampler = samplers_[sampler];
       pbr_config.use_normal_tex = true;
-      pbr_config.normal_scale = 1.f; //TODO
+      pbr_config.normal_scale = 1.f;  // TODO
       pbr_config.normal_tex = img;
     }
     if (mat.emissiveTexture.has_value()) {
-      size_t img = gltf.textures[mat.emissiveTexture.value().textureIndex]
-                       .imageIndex.value();
-      size_t sampler = gltf.textures[mat.emissiveTexture.value().textureIndex]
-                           .samplerIndex.value();
+      size_t img = gltf.textures[mat.emissiveTexture.value().textureIndex].imageIndex.value();
+      size_t sampler = gltf.textures[mat.emissiveTexture.value().textureIndex].samplerIndex.value();
 
       materialResources.emissiveImage = images_[img];
       materialResources.emissiveSampler = samplers_[sampler];
@@ -219,8 +203,7 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
       pbr_config.emissive_factor
           = glm::vec3(mat.emissiveFactor.at(0), mat.emissiveFactor.at(1), mat.emissiveFactor.at(2));
       pbr_config.emissive_tex = img;
-      pbr_config.emissive_factor; //TODO
-
+      pbr_config.emissive_factor;  // TODO
     }
     if (mat.occlusionTexture.has_value()) {
       size_t img = gltf.textures[mat.occlusionTexture.value().textureIndex].imageIndex.value();
@@ -231,13 +214,12 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
       materialResources.occlusionSampler = samplers_[sampler];
       pbr_config.use_occlusion_tex = true;
       pbr_config.occlusion_tex = img;
-      pbr_config.occlusion_strength = 1.f; //TODO
+      pbr_config.occlusion_strength = 1.f;  // TODO
     }
     // build material
-    create_material(materialResources, pbr_config, std::string(mat.name));
+    create_material({constants, materialResources}, pbr_config, std::string(mat.name));
     data_index++;
   }
-
 
   // load meshes
   std::vector<size_t> surfaces;
@@ -246,7 +228,6 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
     surfaces.clear();
 
     for (auto&& primitive : mesh.primitives) {
-
       size_t initial_index = vertices_.size();
       std::vector<uint32_t> indices;
       std::vector<Vertex> vertices;
@@ -444,12 +425,12 @@ void vk_scene_manager::add_light_component(entity entity, const LightComponent& 
   object.camera = lights_.size() - 1;
 }
 
-size_t vk_scene_manager::create_material(const gltf_material::MaterialResources& resources,
+size_t vk_scene_manager::create_material(const gltf_material& material,
     const pbr_config& config, const std::string& name) {
 
   const size_t material_id = materials_.size();
   const std::string key = name.empty() ? "material_" + std::to_string(material_id) : name;
-  resource_manager_.write_material(resources, material_id);
+  resource_manager_.write_material(material, material_id);
 
   materials_.emplace_back(material_component{
       .name = key,
@@ -534,12 +515,10 @@ void vk_scene_manager::traverse_scene(const entity entity, const glm::mat4& pare
 }
 
 void vk_scene_manager::init_default_data() {
-
-  
-  uint32_t white = 0xFFFFFFFF;                          // White color for color and occlusion
-  uint32_t default_metallic_roughness = 0xFF00FF00;     // Green color representing metallic-roughness
-  uint32_t flat_normal = 0xFFFF8080;                    // Flat normal
-  uint32_t black = 0xFF000000;                          // Black color for emissive
+  uint32_t white = 0xFFFFFFFF;                       // White color for color and occlusion
+  uint32_t default_metallic_roughness = 0xFF00FF00;  // Green color representing metallic-roughness
+  uint32_t flat_normal = 0xFFFF8080;                 // Flat normal
+  uint32_t black = 0xFF000000;                       // Black color for emissive
 
   default_material_.color_image = resource_manager_.create_image(
       (void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
@@ -581,14 +560,6 @@ void vk_scene_manager::init_default_data() {
   sampl.minFilter = VK_FILTER_LINEAR;
   vkCreateSampler(gpu_.device, &sampl, nullptr, &default_material_.default_sampler_linear);
 
-  
-  resource_manager_.material_data_buffer_ = resource_manager_.create_buffer(
-      sizeof(gltf_material::MaterialConstants) * 250, //TODO decide on material count dynamically
-      VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-  int data_index = 0;
-  gltf_material::MaterialConstants* sceneMaterialConstants
-      = (gltf_material::MaterialConstants*)resource_manager_.material_data_buffer_.info.pMappedData;
-
   gltf_material::MaterialConstants constants;
   constants.colorFactors.x = 1.f;
   constants.colorFactors.y = 1.f;
@@ -598,7 +569,6 @@ void vk_scene_manager::init_default_data() {
   constants.metal_rough_factors.x = 0.f;
   constants.metal_rough_factors.y = 0.f;
   // write material parameters to buffer
-  sceneMaterialConstants[data_index] = constants;
 
   gltf_material::MaterialResources material_resources;
   // default the material textures
@@ -613,31 +583,27 @@ void vk_scene_manager::init_default_data() {
   material_resources.occlusionImage = default_material_.occlusion_image;
   material_resources.occlusionSampler = default_material_.default_sampler_nearest;
 
-  // set the uniform buffer for the material data
-  material_resources.dataBuffer = resource_manager_.material_data_buffer_.buffer;
-  material_resources.dataBufferOffset = data_index * sizeof(gltf_material::MaterialConstants);
   pbr_config config{};
   // build material
-  create_material(material_resources, config, "default_material");
+  create_material(
+      {
+          constants,
+          material_resources,
+      },
+      config, "default_material");
 
-  deletion_service_.push_function([this]() {
-    resource_manager_.destroy_image(default_material_.color_image);
-  }); 
-  deletion_service_.push_function([this]() {
-    resource_manager_.destroy_image(default_material_.metallic_roughness_image);
-  }); 
-  deletion_service_.push_function([this]() {
-    resource_manager_.destroy_image(default_material_.normal_image);
-  }); 
-  deletion_service_.push_function([this]() {
-    resource_manager_.destroy_image(default_material_.emissive_image);
-  }); 
-  deletion_service_.push_function([this]() {
-    resource_manager_.destroy_image(default_material_.occlusion_image);
-  }); 
-  deletion_service_.push_function([this]() {
-    resource_manager_.destroy_image(default_material_.error_checkerboard_image);
-  }); 
+  deletion_service_.push_function(
+      [this]() { resource_manager_.destroy_image(default_material_.color_image); });
+  deletion_service_.push_function(
+      [this]() { resource_manager_.destroy_image(default_material_.metallic_roughness_image); });
+  deletion_service_.push_function(
+      [this]() { resource_manager_.destroy_image(default_material_.normal_image); });
+  deletion_service_.push_function(
+      [this]() { resource_manager_.destroy_image(default_material_.emissive_image); });
+  deletion_service_.push_function(
+      [this]() { resource_manager_.destroy_image(default_material_.occlusion_image); });
+  deletion_service_.push_function(
+      [this]() { resource_manager_.destroy_image(default_material_.error_checkerboard_image); });
   deletion_service_.push(default_material_.default_sampler_nearest);
   deletion_service_.push(default_material_.default_sampler_linear);
 }

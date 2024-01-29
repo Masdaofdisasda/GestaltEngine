@@ -141,7 +141,7 @@ void pbr_pass::init(vk_renderer& renderer) {
   for (auto& frame : renderer_->frames_) {
     // create a descriptor pool
     std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> frame_sizes = {
-        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 250},
+        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3},
         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3},
         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3},
         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4},
@@ -162,10 +162,10 @@ void pbr_pass::init(vk_renderer& renderer) {
   matrix_range.size = sizeof(GPUDrawPushConstants);
   matrix_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-  VkDescriptorSetLayout layouts[] = {descriptor_layout_, resource_manager_.materialLayout};
+  VkDescriptorSetLayout layouts[] = {descriptor_layout_, resource_manager_.materialLayout, resource_manager_.materialConstantsLayout};
 
   VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
-  mesh_layout_info.setLayoutCount = 2;
+  mesh_layout_info.setLayoutCount = 3;
   mesh_layout_info.pSetLayouts = layouts;
   mesh_layout_info.pPushConstantRanges = &matrix_range;
   mesh_layout_info.pushConstantRangeCount = 1;
@@ -185,12 +185,8 @@ void pbr_pass::init(vk_renderer& renderer) {
             .set_multisampling_none()
             .disable_blending()
             .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-
-            // render format
             .set_color_attachment_format(renderer_->frame_buffer_.color_image.imageFormat)
             .set_depth_format(renderer_->frame_buffer_.depth_image.imageFormat)
-
-            // use the triangle layout we created
             .set_pipeline_layout(newLayout)
             .build_pipeline(gpu_.device);
 
@@ -267,12 +263,12 @@ void pbr_pass::execute(VkCommandBuffer cmd) {
   renderer_->stats_.triangle_count = 0;
   
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, opaquePipeline);
-  VkDescriptorSet descriptorSets[] = {descriptor_set_, resource_manager_.materialSet};
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, opaquePipelineLayout, 0, 2,
+  VkDescriptorSet descriptorSets[] = {descriptor_set_, resource_manager_.materialSet, resource_manager_.materialConstantsSet};
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, opaquePipelineLayout, 0, 3,
                           descriptorSets, 0, nullptr);
 
   const VkViewport viewport = {
-      .x = 0,
+       .x = 0,
       .y = 0,
       .width = static_cast<float>(renderer_->window_.extent.width),
       .height = static_cast<float>(renderer_->window_.extent.height),
@@ -294,7 +290,7 @@ void pbr_pass::execute(VkCommandBuffer cmd) {
 
   
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, transparentPipeline);
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, transparentPipelineLayout, 0, 2,
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, transparentPipelineLayout, 0, 3,
                           descriptorSets, 0, nullptr);
 
   vkCmdSetViewport(cmd, 0, 1, &viewport);

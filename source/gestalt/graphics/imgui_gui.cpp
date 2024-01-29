@@ -205,47 +205,47 @@ void imgui_gui::display_scene_hierarchy(const entity_component& node) {
 
 void imgui_gui::show_scene_hierarchy_window() {
   if (ImGui::Begin("Scene Hierarchy")) {
-    const entity_component& root = actions_.get_scene_root();
-    for (const auto child_entity : root.children) {
-      display_scene_hierarchy(actions_.get_scene_object(child_entity));
-    }
-
-    if (selected_node_.is_valid()) {
-      ImGui::SeparatorText(selected_node_.name.c_str());
-
-      if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_None)) {
-        auto& transform = actions_.get_transform_component(selected_node_.transform);
-        ImGui::DragFloat3("Position", &transform.position.x, 0.1f);
-        glm::vec3 euler = eulerAngles(transform.rotation);
-        if (ImGui::DragFloat3("Rotation", &euler.x, 0.1f)) {
-          transform.rotation = glm::quat(euler);
-        }
-        ImGui::DragFloat3("Scale", &transform.scale.x, 0.1f);
-        transform.is_dirty = true;
+      const entity_component& root = actions_.get_scene_root();
+      for (const auto child_entity : root.children) {
+        display_scene_hierarchy(actions_.get_scene_object(child_entity));
       }
-      if (selected_node_.has_mesh()) {
-        if (ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_None)) {
-          auto& mesh = actions_.get_mesh_component(selected_node_.mesh);
-          for (auto surface_index : mesh.surfaces) {
-            auto& surface = actions_.get_surface(surface_index);
-            auto& material = actions_.get_material(surface.material);
-            if (ImGui::TreeNode(material.name.c_str())) {
-              auto& config = material.config;
-              ImGui::DragFloat4("Albedo Factor", &config.albedo_factor.x, 0.5f);
-              ImGui::Checkbox("Albedo Texture", &config.use_albedo_tex);
-              ImGui::DragFloat2("Metallic-Roughness Factor", &config.metal_rough_factor.x, 0.5f);
-              ImGui::Checkbox("Metallic-Roughness Texture", &config.use_metal_rough_tex);
-              ImGui::Checkbox("Normal Texture", &config.use_normal_tex);
-              ImGui::DragFloat3("Emissive Factor", &config.emissive_factor.x, 0.5f);
-              ImGui::Checkbox("Emissive Texture", &config.use_emissive_tex);
-              ImGui::Checkbox("Occlusion Texture", &config.use_occlusion_tex);
 
-              ImGui::TreePop();
+      if (selected_node_.is_valid()) {
+        ImGui::SeparatorText(selected_node_.name.c_str());
+
+        if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_None)) {
+          auto& transform = actions_.get_transform_component(selected_node_.transform);
+          ImGui::DragFloat3("Position", &transform.position.x, 0.1f);
+          glm::vec3 euler = eulerAngles(transform.rotation);
+          if (ImGui::DragFloat3("Rotation", &euler.x, 0.1f)) {
+            transform.rotation = glm::quat(euler);
+          }
+          ImGui::DragFloat3("Scale", &transform.scale.x, 0.1f);
+          transform.is_dirty = true;
+        }
+        if (selected_node_.has_mesh()) {
+          if (ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_None)) {
+            auto& mesh = actions_.get_mesh_component(selected_node_.mesh);
+            for (auto surface_index : mesh.surfaces) {
+              auto& surface = actions_.get_surface(surface_index);
+              auto& material = actions_.get_material(surface.material);
+              if (ImGui::TreeNode(material.name.c_str())) {
+                auto& config = material.config;
+                ImGui::DragFloat4("Albedo Factor", &config.albedo_factor.x, 0.5f);
+                ImGui::Checkbox("Albedo Texture", &config.use_albedo_tex);
+                ImGui::DragFloat2("Metallic-Roughness Factor", &config.metal_rough_factor.x, 0.5f);
+                ImGui::Checkbox("Metallic-Roughness Texture", &config.use_metal_rough_tex);
+                ImGui::Checkbox("Normal Texture", &config.use_normal_tex);
+                ImGui::DragFloat3("Emissive Factor", &config.emissive_factor.x, 0.5f);
+                ImGui::Checkbox("Emissive Texture", &config.use_emissive_tex);
+                ImGui::Checkbox("Occlusion Texture", &config.use_occlusion_tex);
+
+                ImGui::TreePop();
+              }
             }
           }
         }
       }
     }
-  }
   ImGui::End();
 }

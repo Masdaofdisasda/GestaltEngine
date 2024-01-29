@@ -236,7 +236,7 @@ void main() {
 	uint normalIndex =			inMaterialIndex + 2;
 	uint emissiveIndex =		inMaterialIndex + 3;
 	uint occlusionIndex =		inMaterialIndex + 4;
-    
+
     vec2 UV = inUV;
 
     //vec4 Kd = texture(colorTex, UV);

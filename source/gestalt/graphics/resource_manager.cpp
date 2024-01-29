@@ -31,20 +31,44 @@ AllocatedBuffer resource_manager::create_buffer(size_t allocSize, VkBufferUsageF
 void resource_manager::init(const vk_gpu& gpu) {
   gpu_ = gpu;
 
-  materialLayout = descriptor_layout_builder()
-                       //.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, shader_stages)
-                       .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                    VK_SHADER_STAGE_FRAGMENT_BIT, true)
-                       .build(gpu_.device);
+  material_data_buffer_ = create_buffer(
+      sizeof(gltf_material::MaterialConstants) * 250,  // TODO decide on material count dynamically
+      VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+  gltf_material::MaterialConstants defaultMaterialConstants = {};  // Populate with default values
+  gltf_material::MaterialConstants* mappedData;
+  vmaMapMemory(gpu_.allocator, material_data_buffer_.allocation, (void**)&mappedData);
+
+  for (uint32_t i = 0; i < 250; ++i) {
+    memcpy(&mappedData[i], &defaultMaterialConstants, sizeof(gltf_material::MaterialConstants));
+  }
+
+  vmaUnmapMemory(gpu_.allocator, material_data_buffer_.allocation);
+
+
+  writer.clear();
+  writer.write_buffer(2, material_data_buffer_.buffer, sizeof(gltf_material::MaterialConstants) * 250,
+                           0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+
+  materialLayout
+      = descriptor_layout_builder()
+            .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT,
+                         true)
+            .build(gpu_.device);
+  materialConstantsLayout = descriptor_layout_builder()
+            .add_binding(2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, true)
+            .build(gpu_.device);
 
   std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes
       = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 250},  // TODO
-         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3},
+         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 250},
          {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}};
 
   descriptorPool.init(gpu_.device, 1, sizes);
   std::vector<uint32_t> variableCounts = {250};
   materialSet = descriptorPool.allocate(gpu_.device, materialLayout, variableCounts);
+  materialConstantsSet
+      = descriptorPool.allocate(gpu_.device, materialConstantsLayout, variableCounts);
+  writer.update_set(gpu_.device, materialConstantsSet);
 }
 
 void resource_manager::cleanup() {
@@ -277,8 +301,11 @@ AllocatedImage resource_manager::create_cubemap(std::array<void*, 6> face_data, 
   return new_image;
 }
 
-void resource_manager::write_material(const gltf_material::MaterialResources& resources,
+void resource_manager::write_material(const gltf_material& material,
                                       const uint32_t material_id) {
+  gltf_material::MaterialResources resources = material.resources;
+  gltf_material::MaterialConstants constants = material.constants;
+
   writer.clear();
   /*
     writer.write_buffer(0, resources.dataBuffer, sizeof(MaterialConstants),
@@ -299,6 +326,19 @@ void resource_manager::write_material(const gltf_material::MaterialResources& re
   writer.write_image_array(1, imageInfos, imageInfos.size() * material_id);
 
   writer.update_set(gpu_.device, materialSet);
+
+  gltf_material::MaterialConstants* mappedData;
+  vmaMapMemory(gpu_.allocator, material_data_buffer_.allocation, (void**)&mappedData);
+
+  memcpy(&mappedData[material_id], &constants, sizeof(gltf_material::MaterialConstants));
+
+  vmaUnmapMemory(gpu_.allocator, material_data_buffer_.allocation);
+
+  writer.clear();
+  writer.write_buffer(2, material_data_buffer_.buffer, sizeof(gltf_material::MaterialConstants),
+                      sizeof(gltf_material::MaterialConstants) * material_id,
+                      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+  writer.update_set(gpu_.device, materialConstantsSet);
 }
 
 std::optional<AllocatedImage> resource_manager::load_image(fastgltf::Asset& asset, fastgltf::Image& image) {

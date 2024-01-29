@@ -41,7 +41,7 @@ public:
   void add_camera_component(entity entity, const CameraComponent& camera);
   void add_light_component(entity entity, const LightComponent& light);
   size_t create_material(
-                    const gltf_material::MaterialResources& resources,
+                    const gltf_material& material,
                     const pbr_config& config = pbr_config{},
                     const std::string& name = "");
   void add_material_component(size_t surface, size_t material);

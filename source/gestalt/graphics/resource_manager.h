@@ -17,7 +17,9 @@ public:
   DescriptorAllocatorGrowable descriptorPool;
   descriptor_writer writer;
   VkDescriptorSet materialSet;
+  VkDescriptorSet materialConstantsSet;
   VkDescriptorSetLayout materialLayout;
+  VkDescriptorSetLayout materialConstantsLayout;
 
   void init(const vk_gpu& gpu);
 
@@ -36,6 +38,6 @@ public:
   std::optional<AllocatedImage> load_image(fastgltf::Asset& asset, fastgltf::Image& image);
   AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
                               bool mipmapped = false, bool cubemap = false);
-  void write_material(const gltf_material::MaterialResources& resources, uint32_t material_id);
+  void write_material(const gltf_material& material, uint32_t material_id);
   void destroy_image(const AllocatedImage& img);
 };
