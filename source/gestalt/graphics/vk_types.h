@@ -59,15 +59,11 @@ struct gpu_scene_data {
 };
 
 //> mat_types
-enum class MaterialPass : uint8_t { MainColor, Transparent, Other };
 struct MaterialPipeline {
   VkPipeline pipeline;
   VkPipelineLayout layout;
 };
 
-struct MaterialInstance {
-  MaterialPass passType;
-};
 //< mat_types
 //> vbuf_types
 struct Vertex {
@@ -105,10 +101,6 @@ struct Bounds {
   glm::vec3 origin;
   glm::vec3 extents;
   float sphereRadius;
-};
-
-struct GLTFMaterial {
-  MaterialInstance data;
 };
 
 struct render_object {

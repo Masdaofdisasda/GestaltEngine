@@ -28,6 +28,31 @@ AllocatedBuffer resource_manager::create_buffer(size_t allocSize, VkBufferUsageF
   return newBuffer;
 }
 
+void resource_manager::init(const vk_gpu& gpu) {
+  gpu_ = gpu;
+
+  materialLayout = descriptor_layout_builder()
+                       //.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, shader_stages)
+                       .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                    VK_SHADER_STAGE_FRAGMENT_BIT, true)
+                       .build(gpu_.device);
+
+  std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes
+      = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 250},  // TODO
+         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3},
+         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}};
+
+  descriptorPool.init(gpu_.device, 1, sizes);
+  std::vector<uint32_t> variableCounts = {250};
+  materialSet = descriptorPool.allocate(gpu_.device, materialLayout, variableCounts);
+}
+
+void resource_manager::cleanup() {
+  destroy_buffer(material_data_buffer_);
+  vkDestroyDescriptorSetLayout(gpu_.device, materialLayout, nullptr);
+  descriptorPool.destroy_pools(gpu_.device);
+}
+
 // TODO : make this work with multiple meshes/scenes by resizing the buffers
 void resource_manager::upload_mesh(const std::span<uint32_t> indices, const std::span<Vertex> vertices) {
   //> mesh_create_1
@@ -35,7 +60,7 @@ void resource_manager::upload_mesh(const std::span<uint32_t> indices, const std:
   const size_t index_buffer_size = indices.size() * sizeof(uint32_t);
 
   // create vertex buffer
-  scene_buffers_.vertexBuffer = create_buffer(
+  scene_geometry_.vertexBuffer = create_buffer(
       vertex_buffer_size,
       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
           | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -43,11 +68,11 @@ void resource_manager::upload_mesh(const std::span<uint32_t> indices, const std:
 
   // find the adress of the vertex buffer
   VkBufferDeviceAddressInfo deviceAdressInfo{.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-                                             .buffer = scene_buffers_.vertexBuffer.buffer};
-  scene_buffers_.vertexBufferAddress = vkGetBufferDeviceAddress(gpu_.device, &deviceAdressInfo);
+                                             .buffer = scene_geometry_.vertexBuffer.buffer};
+  scene_geometry_.vertexBufferAddress = vkGetBufferDeviceAddress(gpu_.device, &deviceAdressInfo);
 
   // create index buffer
-  scene_buffers_.indexBuffer = create_buffer(
+  scene_geometry_.indexBuffer = create_buffer(
       index_buffer_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
       VMA_MEMORY_USAGE_GPU_ONLY);
 
@@ -73,14 +98,14 @@ void resource_manager::upload_mesh(const std::span<uint32_t> indices, const std:
     vertex_copy.srcOffset = 0;
     vertex_copy.size = vertex_buffer_size;
 
-    vkCmdCopyBuffer(cmd, staging.buffer, scene_buffers_.vertexBuffer.buffer, 1, &vertex_copy);
+    vkCmdCopyBuffer(cmd, staging.buffer, scene_geometry_.vertexBuffer.buffer, 1, &vertex_copy);
 
     VkBufferCopy index_copy;
     index_copy.dstOffset = 0;
     index_copy.srcOffset = vertex_buffer_size;
     index_copy.size = index_buffer_size;
 
-    vkCmdCopyBuffer(cmd, staging.buffer, scene_buffers_.indexBuffer.buffer, 1, &index_copy);
+    vkCmdCopyBuffer(cmd, staging.buffer, scene_geometry_.indexBuffer.buffer, 1, &index_copy);
   });
 
   vmaUnmapMemory(gpu_.allocator, allocation);
@@ -252,6 +277,29 @@ AllocatedImage resource_manager::create_cubemap(std::array<void*, 6> face_data, 
   return new_image;
 }
 
+void resource_manager::write_material(const gltf_material::MaterialResources& resources,
+                                      const uint32_t material_id) {
+  writer.clear();
+  /*
+    writer.write_buffer(0, resources.dataBuffer, sizeof(MaterialConstants),
+                        resources.dataBufferOffset, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);*/
+
+  std::vector<VkDescriptorImageInfo> imageInfos
+      = {{resources.colorSampler, resources.colorImage.imageView,
+          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+         {resources.metalRoughSampler, resources.metalRoughImage.imageView,
+          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+         {resources.normalSampler, resources.normalImage.imageView,
+          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+         {resources.emissiveSampler, resources.emissiveImage.imageView,
+          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+         {resources.occlusionSampler, resources.occlusionImage.imageView,
+          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
+
+  writer.write_image_array(1, imageInfos, imageInfos.size() * material_id);
+
+  writer.update_set(gpu_.device, materialSet);
+}
 
 std::optional<AllocatedImage> resource_manager::load_image(fastgltf::Asset& asset, fastgltf::Image& image) {
   AllocatedImage newImage{};

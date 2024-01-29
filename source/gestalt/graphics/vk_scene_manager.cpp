@@ -39,22 +39,10 @@ VkSamplerMipmapMode extract_mipmap_mode(fastgltf::Filter filter) {
   }
 }
 
-void vk_scene_manager::init(const vk_gpu& gpu, const resource_manager& resource_manager,
-                            const gltf_metallic_roughness& material) {
+void vk_scene_manager::init(const vk_gpu& gpu, const resource_manager& resource_manager) {
   gpu_ = gpu;
   resource_manager_ = resource_manager;
   deletion_service_.init(gpu.device, gpu.allocator);
-  gltf_material_ = material;
-
-  std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes
-      = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 250},  // TODO
-         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3},
-         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}};
-
-  descriptorPool.init(gpu_.device, 1, sizes);
-  std::vector<uint32_t> variableCounts = {250};
-  // make this "global" for the engine
-  materialSet = descriptorPool.allocate(gpu_.device, gltf_material_.materialLayout, variableCounts); 
 
   init_default_data();
   //load_scene_from_gltf(R"(..\..\assets\Models\MetalRoughSpheres\glTF-Binary\MetalRoughSpheres.glb)");
@@ -139,19 +127,16 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
 
   // load buffer and materials
   size_t material_offset = materials_.size();
-  material_data_buffer_ = resource_manager_.create_buffer(
-      sizeof(gltf_metallic_roughness::MaterialConstants) * gltf.materials.size(),
-      VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-  int data_index = 0;
-  gltf_metallic_roughness::MaterialConstants* sceneMaterialConstants
-      = (gltf_metallic_roughness::MaterialConstants*)material_data_buffer_.info.pMappedData;
-  //< l
+  int data_index = material_offset;
+  gltf_material::MaterialConstants* sceneMaterialConstants
+      = (gltf_material::MaterialConstants*)
+            resource_manager_.material_data_buffer_.info.pMappedData;
 
   for (fastgltf::Material& mat : gltf.materials) {
 
 
     pbr_config pbr_config{};
-    gltf_metallic_roughness::MaterialConstants constants;
+    gltf_material::MaterialConstants constants;
     constants.colorFactors.x = mat.pbrData.baseColorFactor[0];
     constants.colorFactors.y = mat.pbrData.baseColorFactor[1];
     constants.colorFactors.z = mat.pbrData.baseColorFactor[2];
@@ -162,12 +147,11 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
     // write material parameters to buffer
     sceneMaterialConstants[data_index] = constants;
 
-    auto pass_type = MaterialPass::MainColor;
     if (mat.alphaMode == fastgltf::AlphaMode::Blend) {
-      pass_type = MaterialPass::Transparent;
+      pbr_config.transparent = true;
     }
 
-    gltf_metallic_roughness::MaterialResources materialResources
+    gltf_material::MaterialResources materialResources
         = {.colorImage = default_material_.color_image,
            .colorSampler = default_material_.default_sampler_linear,
            .metalRoughImage = default_material_.metallic_roughness_image,
@@ -180,9 +164,8 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
            .occlusionSampler = default_material_.default_sampler_nearest};
 
     // set the uniform buffer for the material data
-    materialResources.dataBuffer = material_data_buffer_.buffer;
-    materialResources.dataBufferOffset
-        = data_index * sizeof(gltf_metallic_roughness::MaterialConstants);
+    materialResources.dataBuffer = resource_manager_.material_data_buffer_.buffer;
+    materialResources.dataBufferOffset = data_index * sizeof(gltf_material::MaterialConstants);
     // grab textures from gltf file
     if (mat.pbrData.baseColorTexture.has_value()) {
       size_t img
@@ -251,7 +234,7 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
       pbr_config.occlusion_strength = 1.f; //TODO
     }
     // build material
-    create_material(pass_type, materialResources, pbr_config, std::string(mat.name));
+    create_material(materialResources, pbr_config, std::string(mat.name));
     data_index++;
   }
 
@@ -461,19 +444,19 @@ void vk_scene_manager::add_light_component(entity entity, const LightComponent& 
   object.camera = lights_.size() - 1;
 }
 
-size_t vk_scene_manager::create_material(
-    MaterialPass pass_type, const gltf_metallic_roughness::MaterialResources& resources,
+size_t vk_scene_manager::create_material(const gltf_material::MaterialResources& resources,
     const pbr_config& config, const std::string& name) {
 
-  const std::string key = name.empty() ? "material_" + std::to_string(materials_.size()) : name;
+  const size_t material_id = materials_.size();
+  const std::string key = name.empty() ? "material_" + std::to_string(material_id) : name;
+  resource_manager_.write_material(resources, material_id);
 
   materials_.emplace_back(material_component{
       .name = key,
-      .data = gltf_material_.write_material(gpu_.device, pass_type, resources, materialSet, materials_.size()),
       .config = config
   });
 
-  return materials_.size() - 1;
+  return material_id;
 }
 
 void vk_scene_manager::add_material_component(const size_t surface, const size_t material) {
@@ -530,16 +513,16 @@ void vk_scene_manager::traverse_scene(const entity entity, const glm::mat4& pare
       render_object def;
       def.index_count = surface.index_count;
       def.first_index = surface.first_index;
-      def.index_buffer = resource_manager_.get_scene_buffers().indexBuffer.buffer;
+      def.index_buffer = resource_manager_.scene_geometry_.indexBuffer.buffer;
       def.material = surface.material;
       def.bounds = surface.bounds;
       def.transform = world_transform;
-      def.vertex_buffer_address = resource_manager_.get_scene_buffers().vertexBufferAddress;
+      def.vertex_buffer_address = resource_manager_.scene_geometry_.vertexBufferAddress;
 
-      if (material.data.passType == MaterialPass::MainColor) {
-        draw_context.opaque_surfaces.push_back(def);
-      } else {
+      if (material.config.transparent) {
         draw_context.transparent_surfaces.push_back(def);
+      } else {
+        draw_context.opaque_surfaces.push_back(def);
       }
     }
   }
@@ -598,15 +581,15 @@ void vk_scene_manager::init_default_data() {
   sampl.minFilter = VK_FILTER_LINEAR;
   vkCreateSampler(gpu_.device, &sampl, nullptr, &default_material_.default_sampler_linear);
 
-  // create default material
-  AllocatedBuffer materialDataBuffer = resource_manager_.create_buffer(
-      sizeof(gltf_metallic_roughness::MaterialConstants),
+  
+  resource_manager_.material_data_buffer_ = resource_manager_.create_buffer(
+      sizeof(gltf_material::MaterialConstants) * 250, //TODO decide on material count dynamically
       VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
   int data_index = 0;
-  gltf_metallic_roughness::MaterialConstants* sceneMaterialConstants
-      = (gltf_metallic_roughness::MaterialConstants*)materialDataBuffer.info.pMappedData;
+  gltf_material::MaterialConstants* sceneMaterialConstants
+      = (gltf_material::MaterialConstants*)resource_manager_.material_data_buffer_.info.pMappedData;
 
-  gltf_metallic_roughness::MaterialConstants constants;
+  gltf_material::MaterialConstants constants;
   constants.colorFactors.x = 1.f;
   constants.colorFactors.y = 1.f;
   constants.colorFactors.z = 1.f;
@@ -617,9 +600,7 @@ void vk_scene_manager::init_default_data() {
   // write material parameters to buffer
   sceneMaterialConstants[data_index] = constants;
 
-auto pass_type = MaterialPass::MainColor;
-
-  gltf_metallic_roughness::MaterialResources material_resources;
+  gltf_material::MaterialResources material_resources;
   // default the material textures
   material_resources.colorImage = default_material_.color_image;
   material_resources.colorSampler = default_material_.default_sampler_linear;
@@ -633,12 +614,11 @@ auto pass_type = MaterialPass::MainColor;
   material_resources.occlusionSampler = default_material_.default_sampler_nearest;
 
   // set the uniform buffer for the material data
-  material_resources.dataBuffer = materialDataBuffer.buffer;
-  material_resources.dataBufferOffset
-      = data_index * sizeof(gltf_metallic_roughness::MaterialConstants);
+  material_resources.dataBuffer = resource_manager_.material_data_buffer_.buffer;
+  material_resources.dataBufferOffset = data_index * sizeof(gltf_material::MaterialConstants);
   pbr_config config{};
   // build material
-  create_material(pass_type, material_resources, config, "default_material");
+  create_material(material_resources, config, "default_material");
 
   deletion_service_.push_function([this]() {
     resource_manager_.destroy_image(default_material_.color_image);
@@ -660,8 +640,4 @@ auto pass_type = MaterialPass::MainColor;
   }); 
   deletion_service_.push(default_material_.default_sampler_nearest);
   deletion_service_.push(default_material_.default_sampler_linear);
-  deletion_service_.push_function([this, materialDataBuffer]() {
-       resource_manager_.destroy_buffer(materialDataBuffer);
-  });
-  deletion_service_.push_function([this]() { descriptorPool.destroy_pools(gpu_.device); });
 }

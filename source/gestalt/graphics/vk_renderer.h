@@ -94,7 +94,6 @@ public:
 
   // draw resources
   frame_buffer frame_buffer_;
-  gltf_metallic_roughness gltf_material;
 
   draw_context main_draw_context_;
 

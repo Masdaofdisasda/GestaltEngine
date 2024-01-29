@@ -27,12 +27,7 @@ using transform_container = std::vector<transform_component>;
 class vk_scene_manager { //TODO split into data base and importer/loader
 public:
 
-  AllocatedBuffer material_data_buffer_;
-  DescriptorAllocatorGrowable descriptorPool;
-  VkDescriptorSet materialSet;
-
-  void init(const vk_gpu& gpu, const resource_manager& resource_manager,
-            const gltf_metallic_roughness& material);
+  void init(const vk_gpu& gpu, const resource_manager& resource_manager);
   void cleanup();
 
   void load_scene_from_gltf(const std::string& file_path);
@@ -45,8 +40,8 @@ public:
   void add_mesh_component(entity entity, size_t mesh_index);
   void add_camera_component(entity entity, const CameraComponent& camera);
   void add_light_component(entity entity, const LightComponent& light);
-  size_t create_material(MaterialPass pass_type,
-                    const gltf_metallic_roughness::MaterialResources& resources,
+  size_t create_material(
+                    const gltf_material::MaterialResources& resources,
                     const pbr_config& config = pbr_config{},
                     const std::string& name = "");
   void add_material_component(size_t surface, size_t material);
@@ -69,7 +64,6 @@ public:
 private:
   resource_manager resource_manager_;
   vk_deletion_service deletion_service_ = {};
-  gltf_metallic_roughness gltf_material_ = {};
 
   vk_gpu gpu_ = {}; //TODO remove
 

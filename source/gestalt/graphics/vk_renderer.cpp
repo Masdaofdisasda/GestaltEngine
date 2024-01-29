@@ -162,28 +162,7 @@ void pbr_pass::init(vk_renderer& renderer) {
   matrix_range.size = sizeof(GPUDrawPushConstants);
   matrix_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-  auto shader_stages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-  #if 1
-  renderer_->gltf_material.materialLayout
-      = descriptor_layout_builder()
-            .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, shader_stages)
-            .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT,
-                         true)
-            .build(gpu_.device);
-#elif
-  renderer_->gltf_material.materialLayout
-      = descriptor_layout_builder()
-            .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, shader_stages)
-            .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, shader_stages)
-            .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, shader_stages)
-            .add_binding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, shader_stages)
-            .add_binding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, shader_stages)
-            .add_binding(5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, shader_stages)
-            .build(gpu_.device);
-#endif
-
-
-  VkDescriptorSetLayout layouts[] = {descriptor_layout_, renderer_->gltf_material.materialLayout};
+  VkDescriptorSetLayout layouts[] = {descriptor_layout_, resource_manager_.materialLayout};
 
   VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
   mesh_layout_info.setLayoutCount = 2;
@@ -225,7 +204,6 @@ void pbr_pass::init(vk_renderer& renderer) {
 }
 
 void pbr_pass::cleanup() {
-  vkDestroyDescriptorSetLayout(gpu_.device, renderer_->gltf_material.materialLayout, nullptr);
   vkDestroyPipeline(gpu_.device, transparentPipeline, nullptr);
   vkDestroyPipeline(gpu_.device, opaquePipeline, nullptr);
 
@@ -287,10 +265,9 @@ void pbr_pass::execute(VkCommandBuffer cmd) {
   // reset counters
   renderer_->stats_.drawcall_count = 0;
   renderer_->stats_.triangle_count = 0;
-
   
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, opaquePipeline);
-  VkDescriptorSet descriptorSets[] = {descriptor_set_, renderer_->scene_manager_->materialSet};
+  VkDescriptorSet descriptorSets[] = {descriptor_set_, resource_manager_.materialSet};
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, opaquePipelineLayout, 0, 2,
                           descriptorSets, 0, nullptr);
 

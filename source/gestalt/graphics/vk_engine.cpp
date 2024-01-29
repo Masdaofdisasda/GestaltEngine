@@ -42,7 +42,7 @@ void render_engine::init() {
   resource_manager_.init(gpu_);
 
   renderer_.init(gpu_, window_, resource_manager_, resize_requested_, stats_);
-  scene_manager_.init(gpu_, resource_manager_, renderer_.gltf_material);
+  scene_manager_.init(gpu_, resource_manager_);
   renderer_.scene_manager_ = &scene_manager_;
 
   register_gui_actions();
@@ -126,6 +126,7 @@ void render_engine::cleanup() {
       imgui_.cleanup();
       scene_manager_.cleanup();
       renderer_.cleanup();
+      resource_manager_.cleanup();
       gpu_.cleanup();
       window_.cleanup();
     }
@@ -205,33 +206,4 @@ void render_engine::run()
     // convert to microseconds (integer), and then come back to miliseconds
     auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     stats_.frametime = elapsed.count() / 1000.f;
-}
-
-MaterialInstance gltf_metallic_roughness::write_material(
-    VkDevice device, MaterialPass pass, const MaterialResources& resources,
-    const VkDescriptorSet& materialSet, uint32_t material_id) {
-    MaterialInstance matData;
-    matData.passType = pass;
-
-    writer.clear();
-    writer.write_buffer(0, resources.dataBuffer, sizeof(MaterialConstants),
-                        resources.dataBufferOffset, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-
-  std::vector<VkDescriptorImageInfo> imageInfos
-        = {{resources.colorSampler, resources.colorImage.imageView,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-           {resources.metalRoughSampler, resources.metalRoughImage.imageView,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-           {resources.normalSampler, resources.normalImage.imageView,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-           {resources.emissiveSampler, resources.emissiveImage.imageView,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-           {resources.occlusionSampler, resources.occlusionImage.imageView,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
-
-    writer.write_image_array(1, imageInfos, imageInfos.size() * material_id);
-
-    writer.update_set(device, materialSet);
-
-    return matData;
 }

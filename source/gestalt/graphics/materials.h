@@ -3,9 +3,7 @@
 #include "vk_descriptors.h"
 #include "vk_types.h"
 
-struct gltf_metallic_roughness {
-
-  VkDescriptorSetLayout materialLayout;
+struct gltf_material {
 
   struct MaterialConstants {
     glm::vec4 colorFactors;
@@ -31,14 +29,4 @@ struct gltf_metallic_roughness {
     VkBuffer dataBuffer;
     uint32_t dataBufferOffset;
   };
-
-
-  descriptor_writer writer;
-
-  void clear_resources(VkDevice device);
-
-  MaterialInstance write_material(VkDevice device, MaterialPass pass,
-                                  const MaterialResources& resources,
-                                  const VkDescriptorSet& materialSet,
-                                  uint32_t material_id);
 };

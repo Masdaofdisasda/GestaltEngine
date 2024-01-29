@@ -91,13 +91,12 @@ struct pbr_config {
   std::string occlusion_uri;
 
   float alpha_cutoff = 0.5f;
-  bool double_sided = false;
+  bool double_sided{false};
+  bool transparent{false};
 };
 
 struct material_component {
   std::string name;
-  MaterialInstance data;
-
   pbr_config config;
 };
 
