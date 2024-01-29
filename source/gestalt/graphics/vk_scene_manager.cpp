@@ -46,6 +46,16 @@ void vk_scene_manager::init(const vk_gpu& gpu, const resource_manager& resource_
   deletion_service_.init(gpu.device, gpu.allocator);
   gltf_material_ = material;
 
+  std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes
+      = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 250},  // TODO
+         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3},
+         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}};
+
+  descriptorPool.init(gpu_.device, 1, sizes);
+  std::vector<uint32_t> variableCounts = {250};
+  // make this "global" for the engine
+  materialSet = descriptorPool.allocate(gpu_.device, gltf_material_.materialLayout, variableCounts); 
+
   init_default_data();
   //load_scene_from_gltf(R"(..\..\assets\Models\MetalRoughSpheres\glTF-Binary\MetalRoughSpheres.glb)");
   //load_scene_from_gltf(R"(..\..\assets\sponza_pestana.glb)");
@@ -97,12 +107,6 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
   } else {
     fmt::print("Failed to determine glTF container");
   }
-  std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes
-      = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3},
-         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3},
-         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}};
-
-  descriptorPool.init(gpu_.device, gltf.materials.size(), sizes);
 
   // samplers and textures
   for (fastgltf::Sampler& sampler : gltf.samplers) {
@@ -465,7 +469,7 @@ size_t vk_scene_manager::create_material(
 
   materials_.emplace_back(material_component{
       .name = key,
-      .data = gltf_material_.write_material(gpu_.device, pass_type, resources, descriptorPool),
+      .data = gltf_material_.write_material(gpu_.device, pass_type, resources, materialSet, materials_.size()),
       .config = config
   });
 
@@ -527,7 +531,7 @@ void vk_scene_manager::traverse_scene(const entity entity, const glm::mat4& pare
       def.index_count = surface.index_count;
       def.first_index = surface.first_index;
       def.index_buffer = resource_manager_.get_scene_buffers().indexBuffer.buffer;
-      def.material = &material.data;
+      def.material = surface.material;
       def.bounds = surface.bounds;
       def.transform = world_transform;
       def.vertex_buffer_address = resource_manager_.get_scene_buffers().vertexBufferAddress;
@@ -595,12 +599,6 @@ void vk_scene_manager::init_default_data() {
   vkCreateSampler(gpu_.device, &sampl, nullptr, &default_material_.default_sampler_linear);
 
   // create default material
-  std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes
-      = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3},
-         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3},
-         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}};
-
-  descriptorPool.init(gpu_.device, 1, sizes);
   AllocatedBuffer materialDataBuffer = resource_manager_.create_buffer(
       sizeof(gltf_metallic_roughness::MaterialConstants),
       VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);

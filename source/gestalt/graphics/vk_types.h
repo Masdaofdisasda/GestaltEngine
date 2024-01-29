@@ -66,7 +66,6 @@ struct MaterialPipeline {
 };
 
 struct MaterialInstance {
-  VkDescriptorSet materialSet;
   MaterialPass passType;
 };
 //< mat_types
@@ -89,6 +88,7 @@ struct gpu_mesh_buffers {
 // push constants for our mesh object draws
 struct GPUDrawPushConstants {
   glm::mat4 worldMatrix;
+  int material_id;
   VkDeviceAddress vertexBuffer;
 };
 //< vbuf_types
@@ -116,7 +116,7 @@ struct render_object {
   uint32_t first_index;
   VkBuffer index_buffer;
 
-  MaterialInstance* material;
+  uint32_t material;
   Bounds bounds;
   glm::mat4 transform;
   VkDeviceAddress vertex_buffer_address;

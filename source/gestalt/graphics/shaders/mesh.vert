@@ -8,6 +8,7 @@
 layout (location = 0) out vec3 outNormal;
 layout (location = 1) out vec3 outPosition; //was color
 layout (location = 2) out vec2 outUV;
+layout (location = 3) flat out int outMaterialIndex;
 
 struct Vertex {
 
@@ -26,6 +27,7 @@ layout(buffer_reference, std430) readonly buffer VertexBuffer{
 layout( push_constant ) uniform constants
 {
 	mat4 render_matrix;
+	int materialIndex;
 	VertexBuffer vertexBuffer;
 } PushConstants;
 
@@ -42,4 +44,5 @@ void main()
 	outPosition = vec3(PushConstants.render_matrix * vec4(v.position, 1.0));
 	outUV.x = v.uv_x;
 	outUV.y = v.uv_y;
+	outMaterialIndex = PushConstants.materialIndex;
 }

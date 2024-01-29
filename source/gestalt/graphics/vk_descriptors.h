@@ -7,9 +7,10 @@
 
 struct descriptor_layout_builder {
   std::vector<VkDescriptorSetLayoutBinding> bindings;
+  std::vector<VkDescriptorBindingFlags> binding_flags;
 
   descriptor_layout_builder& add_binding(uint32_t binding, VkDescriptorType type,
-                                       VkShaderStageFlags shader_stages);
+                                         VkShaderStageFlags shader_stages, bool bindless = false);
   void clear();
   VkDescriptorSetLayout build(VkDevice device);
 };
@@ -23,6 +24,8 @@ struct descriptor_writer {
                    VkDescriptorType type);
   void write_buffer(int binding, VkBuffer buffer, size_t size, size_t offset,
                     VkDescriptorType type);
+  void write_image_array(int binding, const std::vector<VkDescriptorImageInfo>& imageInfos,
+                         uint32_t arrayElementStart = 0);
 
   void clear();
   void update_set(VkDevice device, VkDescriptorSet set);
@@ -53,7 +56,8 @@ struct DescriptorAllocatorGrowable {
   void clear_pools(VkDevice device);
   void destroy_pools(VkDevice device);
 
-  VkDescriptorSet allocate(VkDevice device, VkDescriptorSetLayout layout);
+  VkDescriptorSet allocate(VkDevice device, VkDescriptorSetLayout layout, const std::vector<uint32_t>&
+                           variableDescriptorCounts = {});
 
 private:
   VkDescriptorPool get_pool(VkDevice device);
@@ -73,5 +77,5 @@ struct frame_data {
   VkCommandPool command_pool;
   VkCommandBuffer main_command_buffer;
 
-  DescriptorAllocatorGrowable frame_descriptors;
+  DescriptorAllocatorGrowable descriptor_pools;
 };

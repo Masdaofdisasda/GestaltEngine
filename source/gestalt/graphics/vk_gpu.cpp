@@ -37,6 +37,10 @@ void vk_gpu::init(
   features12.bufferDeviceAddress = true;
   features12.descriptorIndexing = true;
 
+  features12.shaderSampledImageArrayNonUniformIndexing = true;
+  features12.descriptorBindingVariableDescriptorCount = true;
+  features12.runtimeDescriptorArray = true;
+
   // use vkbootstrap to select a gpu.
   // We want a gpu that can write to the SDL surface and supports vulkan 1.3 with the correct
   // features

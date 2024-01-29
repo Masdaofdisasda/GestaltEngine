@@ -161,11 +161,8 @@ void render_engine::run()
 
     SDL_Event e;
 
-    // main loop
     while (!quit_) {
-      // Handle events on queue
       while (SDL_PollEvent(&e) != 0) {
-        // close the window when user alt-f4s or clicks the X button
         if (e.type == SDL_QUIT) quit_ = true;
 
         input_system_.handle_event(e, window_.extent.width, window_.extent.height);
@@ -179,7 +176,6 @@ void render_engine::run()
           }
         }
 
-        // send SDL event to imgui for handling
         imgui_.update(e);
       }
 
@@ -213,33 +209,29 @@ void render_engine::run()
 
 MaterialInstance gltf_metallic_roughness::write_material(
     VkDevice device, MaterialPass pass, const MaterialResources& resources,
-    DescriptorAllocatorGrowable& descriptorAllocator) {
+    const VkDescriptorSet& materialSet, uint32_t material_id) {
     MaterialInstance matData;
     matData.passType = pass;
-
-    matData.materialSet = descriptorAllocator.allocate(device, materialLayout);
 
     writer.clear();
     writer.write_buffer(0, resources.dataBuffer, sizeof(MaterialConstants),
                         resources.dataBufferOffset, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 
-    writer.write_image(1, resources.colorImage.imageView, resources.colorSampler,
-                       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                       VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    writer.write_image(2, resources.metalRoughImage.imageView, resources.metalRoughSampler,
-                       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                       VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    writer.write_image(3, resources.normalImage.imageView, resources.normalSampler,
-                       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                       VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    writer.write_image(4, resources.emissiveImage.imageView, resources.emissiveSampler,
-                       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                       VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    writer.write_image(5, resources.occlusionImage.imageView, resources.occlusionSampler,
-                       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                       VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+  std::vector<VkDescriptorImageInfo> imageInfos
+        = {{resources.colorSampler, resources.colorImage.imageView,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+           {resources.metalRoughSampler, resources.metalRoughImage.imageView,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+           {resources.normalSampler, resources.normalImage.imageView,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+           {resources.emissiveSampler, resources.emissiveImage.imageView,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+           {resources.occlusionSampler, resources.occlusionImage.imageView,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
 
-    writer.update_set(device, matData.materialSet);
+    writer.write_image_array(1, imageInfos, imageInfos.size() * material_id);
+
+    writer.update_set(device, materialSet);
 
     return matData;
 }

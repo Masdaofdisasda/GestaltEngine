@@ -1,11 +1,13 @@
 #version 450
 
+#extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_GOOGLE_include_directive : require
 #include "input_structures.glsl"
 
 layout (location = 0) in vec3 inNormal;
 layout (location = 1) in vec3 inPosition;
 layout (location = 2) in vec2 inUV;
+layout (location = 3) flat in int inMaterialIndex;
 
 layout (location = 0) out vec4 outFragColor;
 
@@ -228,21 +230,32 @@ vec3 perturbNormal(vec3 n, vec3 v, vec3 normalSample, vec2 uv)
 }
 
 void main() {
+
+	uint albedoIndex =			inMaterialIndex;
+	uint metalicRoughIndex =	inMaterialIndex + 1;
+	uint normalIndex =			inMaterialIndex + 2;
+	uint emissiveIndex =		inMaterialIndex + 3;
+	uint occlusionIndex =		inMaterialIndex + 4;
     
     vec2 UV = inUV;
 
-    vec4 Kd = texture(colorTex, UV);
+    //vec4 Kd = texture(colorTex, UV);
+    vec4 Kd = texture(nonuniformEXT(textures[albedoIndex]), UV);
 
-    vec3 normal_sample = texture(normalTex, UV).rgb;
+    //vec3 normal_sample = texture(normalTex, UV).rgb;
+    vec3 normal_sample = texture(nonuniformEXT(textures[normalIndex]), UV).rgb;
 	vec3 viewPos = -normalize(vec3(sceneData.view[0][2], sceneData.view[1][2], sceneData.view[2][2]));
     vec3 n = perturbNormal(normalize(inNormal), normalize(viewPos - inPosition), normal_sample, UV);
 
-	vec4 Ke = texture(emissiveTex, UV);
+	//vec4 Ke = texture(emissiveTex, UV);
+	vec4 Ke = texture(nonuniformEXT(textures[emissiveIndex]), UV);
 	Ke.rgb = pow(Ke.rgb, vec3(2.2));
 
-	float Kao = texture(occlusionTex, UV).r;
+	//float Kao = texture(occlusionTex, UV).r;
+	float Kao = texture(nonuniformEXT(textures[occlusionIndex]), UV).r;
 
-	vec4 MeR = texture(metalRoughTex, UV);
+	//vec4 MeR = texture(metalRoughTex, UV);
+	vec4 MeR = texture(nonuniformEXT(textures[metalicRoughIndex]), UV);
 
 	PBRInfo pbrInputs;
 	

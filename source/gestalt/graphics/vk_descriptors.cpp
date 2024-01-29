@@ -1,36 +1,53 @@
 ﻿#include <vk_descriptors.h>
 
-descriptor_layout_builder& descriptor_layout_builder::add_binding(uint32_t binding,
-                                                              VkDescriptorType type,
-                                                              VkShaderStageFlags shader_stages) {
+descriptor_layout_builder& descriptor_layout_builder::add_binding(
+    uint32_t binding, VkDescriptorType type, VkShaderStageFlags shader_stages,
+    bool bindless) {
+
+  uint32_t descriptorCount = bindless ? 4096 : 1;
 
   bindings.emplace_back(VkDescriptorSetLayoutBinding{
       .binding = binding,
       .descriptorType = type,
-      .descriptorCount = 1,
+      .descriptorCount = descriptorCount,
       .stageFlags = shader_stages,
   });
+
+  if (bindless) {
+    binding_flags.push_back(VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT);
+  } else {
+    binding_flags.push_back(0);  // Default flag for regular bindings
+  }
 
   return *this;
 }
 
+
 void descriptor_layout_builder::clear() { bindings.clear(); }
 
 VkDescriptorSetLayout descriptor_layout_builder::build(VkDevice device) {
-
   VkDescriptorSetLayoutCreateInfo info
-      = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-  info.pNext = nullptr;
+      = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+         .pNext = nullptr,
+         .flags = 0,
+         .bindingCount = static_cast<uint32_t>(bindings.size()),
+         .pBindings = bindings.data()};
 
-  info.pBindings = bindings.data();
-  info.bindingCount = static_cast<uint32_t>(bindings.size());
-  info.flags = 0;
+  VkDescriptorSetLayoutBindingFlagsCreateInfoEXT bindingFlagsInfo
+      = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT,
+         .bindingCount = static_cast<uint32_t>(binding_flags.size()),
+         .pBindingFlags = binding_flags.data()};
+
+  if (!binding_flags.empty()) {
+    info.pNext = &bindingFlagsInfo;  // Chain the binding flags info
+  }
 
   VkDescriptorSetLayout set;
   VK_CHECK(vkCreateDescriptorSetLayout(device, &info, nullptr, &set));
 
   return set;
 }
+
 
 void descriptor_writer::write_buffer(int binding, VkBuffer buffer, size_t size, size_t offset,
                                     VkDescriptorType type) {
@@ -44,6 +61,21 @@ void descriptor_writer::write_buffer(int binding, VkBuffer buffer, size_t size, 
   write.descriptorCount = 1;
   write.descriptorType = type;
   write.pBufferInfo = &info;
+
+  writes.push_back(write);
+}
+
+void descriptor_writer::write_image_array(int binding,
+                                          const std::vector<VkDescriptorImageInfo>& imageInfos,
+                                          uint32_t arrayElementStart) {
+  VkWriteDescriptorSet write = {};
+  write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  write.dstBinding = binding;
+  write.dstSet = VK_NULL_HANDLE;  // Will be set in update_set()
+  write.descriptorCount = imageInfos.size();
+  write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  write.pImageInfo = imageInfos.data();
+  write.dstArrayElement = arrayElementStart;
 
   writes.push_back(write);
 }
@@ -154,14 +186,23 @@ VkDescriptorPool DescriptorAllocatorGrowable::create_pool(VkDevice device, uint3
   return newPool;
 }
 
-VkDescriptorSet DescriptorAllocatorGrowable::allocate(VkDevice device,
-                                                      VkDescriptorSetLayout layout) {
+VkDescriptorSet DescriptorAllocatorGrowable::allocate(
+    VkDevice device, VkDescriptorSetLayout layout,
+    const std::vector<uint32_t>& variableDescriptorCounts) {
   // get or create a pool to allocate from
   VkDescriptorPool poolToUse = get_pool(device);
 
+  VkDescriptorSetVariableDescriptorCountAllocateInfo variableDescriptorCountInfo = {};
+  variableDescriptorCountInfo.sType
+      = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO;
+  variableDescriptorCountInfo.descriptorSetCount = variableDescriptorCounts.size();
+  variableDescriptorCountInfo.pDescriptorCounts = variableDescriptorCounts.data();
+
   VkDescriptorSetAllocateInfo allocInfo = {};
-  allocInfo.pNext = nullptr;
   allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+  allocInfo.pNext = variableDescriptorCounts.empty()
+                        ? nullptr
+                        : &variableDescriptorCountInfo;  // Chain the variable descriptor count info
   allocInfo.descriptorPool = poolToUse;
   allocInfo.descriptorSetCount = 1;
   allocInfo.pSetLayouts = &layout;

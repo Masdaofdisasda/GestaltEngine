@@ -131,12 +131,6 @@ void pbr_pass::init(vk_renderer& renderer) {
   frame_buffer_ = renderer.frame_buffer_;
   renderer_ = &renderer;
 
-  std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes = {
-      {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3},
-      {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3},
-      {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3},
-  };
-
   {
     descriptor_layout_ = descriptor_layout_builder()
                              .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -147,27 +141,15 @@ void pbr_pass::init(vk_renderer& renderer) {
   for (auto& frame : renderer_->frames_) {
     // create a descriptor pool
     std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> frame_sizes = {
-        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3},
+        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 250},
         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3},
         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3},
         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4},
     };
 
-    frame.frame_descriptors = DescriptorAllocatorGrowable{};
-    frame.frame_descriptors.init(gpu_.device, 1000, frame_sizes);
-
-    auto& frame_descriptor = frame.frame_descriptors;
+    frame.descriptor_pools = DescriptorAllocatorGrowable{};
+    frame.descriptor_pools.init(gpu_.device, 1000, frame_sizes);
   }
-
-  VkPipelineLayoutCreateInfo pipeline_layout_create_info{
-      .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-      .pNext = nullptr,
-      .setLayoutCount = 1,
-      .pSetLayouts = &descriptor_layout_,
-  };
-
-  VK_CHECK(vkCreatePipelineLayout(gpu_.device, &pipeline_layout_create_info, nullptr,
-                                  &pipeline_layout_));
 
   VkShaderModule meshFragShader;
   vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &meshFragShader);
@@ -181,6 +163,14 @@ void pbr_pass::init(vk_renderer& renderer) {
   matrix_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
   auto shader_stages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+  #if 1
+  renderer_->gltf_material.materialLayout
+      = descriptor_layout_builder()
+            .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, shader_stages)
+            .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT,
+                         true)
+            .build(gpu_.device);
+#elif
   renderer_->gltf_material.materialLayout
       = descriptor_layout_builder()
             .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, shader_stages)
@@ -190,6 +180,8 @@ void pbr_pass::init(vk_renderer& renderer) {
             .add_binding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, shader_stages)
             .add_binding(5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, shader_stages)
             .build(gpu_.device);
+#endif
+
 
   VkDescriptorSetLayout layouts[] = {descriptor_layout_, renderer_->gltf_material.materialLayout};
 
@@ -237,16 +229,15 @@ void pbr_pass::cleanup() {
   vkDestroyPipeline(gpu_.device, transparentPipeline, nullptr);
   vkDestroyPipeline(gpu_.device, opaquePipeline, nullptr);
 
-  vkDestroyPipelineLayout(gpu_.device, pipeline_layout_, nullptr);
   for (auto frame : renderer_->frames_) {
-    frame.frame_descriptors.destroy_pools(gpu_.device);
+    frame.descriptor_pools.destroy_pools(gpu_.device);
   }
   vkDestroyDescriptorSetLayout(gpu_.device, descriptor_layout_, nullptr);
 }
 
 void pbr_pass::bind_resources() {
-    descriptor_set_ = renderer_->get_current_frame().frame_descriptors.allocate(
-	  gpu_.device, descriptor_layout_);
+    descriptor_set_ = renderer_->get_current_frame().descriptor_pools.allocate(
+        gpu_.device, descriptor_layout_);
 
   writer.clear();
   writer.write_buffer(0, renderer_->gpu_scene_data_buffer.buffer, sizeof(gpu_scene_data), 0,
@@ -276,44 +267,15 @@ void pbr_pass::execute(VkCommandBuffer cmd) {
   bind_resources();
   writer.update_set(gpu_.device, descriptor_set_);
 
-  MaterialInstance* lastMaterial = nullptr;
   const auto& buffer_index = renderer_->main_draw_context_.opaque_surfaces[0].index_buffer;
   vkCmdBindIndexBuffer(cmd, buffer_index, 0, VK_INDEX_TYPE_UINT32);
 
-  auto draw = [&](const render_object& r, VkPipeline pipeline, VkPipelineLayout pipeline_layout) {
-    if (r.material != lastMaterial) {
-      lastMaterial = r.material;
-
-      vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0,
-                              1, &descriptor_set_, 0, nullptr);
-
-      VkViewport viewport = {};
-      viewport.x = 0;
-      viewport.y = 0;
-      viewport.width = static_cast<float>(renderer_->window_.extent.width);
-      viewport.height = static_cast<float>(renderer_->window_.extent.height);
-      viewport.minDepth = 0.f;
-      viewport.maxDepth = 1.f;
-
-      vkCmdSetViewport(cmd, 0, 1, &viewport);
-
-      VkRect2D scissor = {};
-      scissor.offset.x = 0;
-      scissor.offset.y = 0;
-      scissor.extent.width = renderer_->window_.extent.width;
-      scissor.extent.height = renderer_->window_.extent.height;
-
-      vkCmdSetScissor(cmd, 0, 1, &scissor);
-
-      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 1,
-                              1, &r.material->materialSet, 0, nullptr);
-    }
+  auto draw = [&](const render_object& r, VkPipelineLayout pipeline_layout) {
 
     GPUDrawPushConstants push_constants;
     push_constants.worldMatrix = r.transform;
+    push_constants.material_id = r.material * 5;
     push_constants.vertexBuffer = r.vertex_buffer_address;
-
     vkCmdPushConstants(cmd, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
                        sizeof(GPUDrawPushConstants), &push_constants);
 
@@ -326,12 +288,43 @@ void pbr_pass::execute(VkCommandBuffer cmd) {
   renderer_->stats_.drawcall_count = 0;
   renderer_->stats_.triangle_count = 0;
 
+  
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, opaquePipeline);
+  VkDescriptorSet descriptorSets[] = {descriptor_set_, renderer_->scene_manager_->materialSet};
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, opaquePipelineLayout, 0, 2,
+                          descriptorSets, 0, nullptr);
+
+  const VkViewport viewport = {
+      .x = 0,
+      .y = 0,
+      .width = static_cast<float>(renderer_->window_.extent.width),
+      .height = static_cast<float>(renderer_->window_.extent.height),
+      .minDepth = 0.f,
+      .maxDepth = 1.f,
+  };
+  vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+  VkRect2D scissor = {};
+  scissor.offset.y = 0;
+  scissor.offset.x = 0;
+  scissor.extent.width = renderer_->window_.extent.width;
+  scissor.extent.height = renderer_->window_.extent.height;
+  vkCmdSetScissor(cmd, 0, 1, &scissor);
+
   for (auto& r : opaque_draws) {
-      draw(renderer_->main_draw_context_.opaque_surfaces[r], opaquePipeline, opaquePipelineLayout);
+      draw(renderer_->main_draw_context_.opaque_surfaces[r], opaquePipelineLayout);
   }
 
+  
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, transparentPipeline);
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, transparentPipelineLayout, 0, 2,
+                          descriptorSets, 0, nullptr);
+
+  vkCmdSetViewport(cmd, 0, 1, &viewport);
+  vkCmdSetScissor(cmd, 0, 1, &scissor);
+
   for (auto& r : renderer_->main_draw_context_.transparent_surfaces) {
-    draw(r, transparentPipeline, transparentPipelineLayout);
+    draw(r, transparentPipelineLayout);
   }
 }
 
@@ -390,7 +383,7 @@ void vk_renderer::draw() {
   // wait until the gpu has finished rendering the last frame. Timeout of 1 second
   VK_CHECK(vkWaitForFences(gpu_.device, 1, &get_current_frame().render_fence, true, 1000000000));
 
-  get_current_frame().frame_descriptors.clear_pools(gpu_.device);
+  get_current_frame().descriptor_pools.clear_pools(gpu_.device);
   // request image from the swapchain
   uint32_t swapchainImageIndex;
 

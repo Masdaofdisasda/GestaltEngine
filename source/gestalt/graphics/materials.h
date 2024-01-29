@@ -39,5 +39,6 @@ struct gltf_metallic_roughness {
 
   MaterialInstance write_material(VkDevice device, MaterialPass pass,
                                   const MaterialResources& resources,
-                                  DescriptorAllocatorGrowable& descriptorAllocator);
+                                  const VkDescriptorSet& materialSet,
+                                  uint32_t material_id);
 };

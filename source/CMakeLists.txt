@@ -18,15 +18,22 @@ set(SHADER_BINARY_DIR "${CMAKE_SOURCE_DIR}/bin/shaders")
 
 file(MAKE_DIRECTORY ${SHADER_BINARY_DIR})
 
-file(GLOB_RECURSE GLSL_SOURCE_FILES
+file(GLOB_RECURSE GLSL_COMPILE_FILES
     "${SHADER_SOURCE_DIR}/*.frag"
     "${SHADER_SOURCE_DIR}/*.vert"
     "${SHADER_SOURCE_DIR}/*.comp"
 )
 
+file(GLOB_RECURSE GLSL_SOURCE_FILES
+    "${SHADER_SOURCE_DIR}/*.frag"
+    "${SHADER_SOURCE_DIR}/*.vert"
+    "${SHADER_SOURCE_DIR}/*.comp"
+    "${SHADER_SOURCE_DIR}/*.glsl" # Include .glsl files
+)
+
 source_group("Source" FILES ${GLSL_SOURCE_FILES})
 
-foreach(GLSL ${GLSL_SOURCE_FILES})
+foreach(GLSL ${GLSL_COMPILE_FILES})
   message(STATUS "Building Shader: ${GLSL}")
   get_filename_component(FILE_NAME ${GLSL} NAME)
   set(SPIRV "${SHADER_BINARY_DIR}/${FILE_NAME}.spv")

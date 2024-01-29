@@ -29,6 +29,7 @@ public:
 
   AllocatedBuffer material_data_buffer_;
   DescriptorAllocatorGrowable descriptorPool;
+  VkDescriptorSet materialSet;
 
   void init(const vk_gpu& gpu, const resource_manager& resource_manager,
             const gltf_metallic_roughness& material);
