@@ -305,7 +305,7 @@ AllocatedImage resource_manager::create_cubemap(const void* imageData, VkExtent3
           //VkExtent2D{new_image.imageExtent.width, new_image.imageExtent.height});
     } else {
       vkutil::transition_image(cmd, new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                               VK_IMAGE_LAYOUT_GENERAL);
     }
   });
   destroy_buffer(uploadbuffer);
@@ -318,9 +318,6 @@ void resource_manager::write_material(const gltf_material& material,
   gltf_material::MaterialConstants constants = material.constants;
 
   writer.clear();
-  /*
-    writer.write_buffer(0, resources.dataBuffer, sizeof(MaterialConstants),
-                        resources.dataBufferOffset, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);*/
 
   std::vector<VkDescriptorImageInfo> imageInfos
       = {{resources.colorSampler, resources.colorImage.imageView,
@@ -456,6 +453,16 @@ void resource_manager::load_and_process_cubemap(const std::string& file_path) {
     return;
   }
 
+  {
+    std::vector<float> img32(w * h * 4);
+
+    float24to32(w, h, img, img32.data());
+
+    environment_map = create_cubemap_from_HDR(img32, h, w);
+  }
+
+  //TODO bdrf convolution
+
   const int dstW = 256;
   const int dstH = 128;
 
@@ -479,15 +486,19 @@ void resource_manager::load_and_process_cubemap(const std::string& file_path) {
 
   stbi_image_free((void*)filtered);
 
-  Bitmap in(w, h, 4, eBitmapFormat_Float, img32.data());
+  filtered_map = create_cubemap_from_HDR(img32, h, w);
+}
+
+AllocatedImage resource_manager::create_cubemap_from_HDR(std::vector<float>& image_data, int h,
+                                                         int w) {
+  Bitmap in(w, h, 4, eBitmapFormat_Float, image_data.data());
   Bitmap out_bitmap = convertEquirectangularMapToVerticalCross(in);
 
   Bitmap cube = convertVerticalCrossToCubeMapFaces(out_bitmap);
 
-  filtered_map = create_cubemap(cube.data_.data(),
-      {static_cast<uint32_t>(cube.w_), static_cast<uint32_t>(cube.h_), 1},
-      VK_FORMAT_R32G32B32A32_SFLOAT,
-                             VK_IMAGE_USAGE_SAMPLED_BIT, true);
+  return create_cubemap(cube.data_.data(),
+                                {static_cast<uint32_t>(cube.w_), static_cast<uint32_t>(cube.h_), 1},
+                                VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 }
 
 void resource_manager::destroy_image(const AllocatedImage& img) {

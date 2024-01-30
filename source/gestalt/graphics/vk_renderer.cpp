@@ -94,7 +94,7 @@ void skybox_pass::bind_resources() {
   descriptor_set_ = descriptor_allocator_.allocate(gpu_.device, descriptor_layout_);
 
   writer.clear();
-  writer.write_image(1, renderer_->resource_manager_->filtered_map.imageView, cube_map_sampler, VK_IMAGE_LAYOUT_GENERAL,
+  writer.write_image(1, renderer_->resource_manager_->environment_map.imageView, cube_map_sampler, VK_IMAGE_LAYOUT_GENERAL,
                      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 }
 

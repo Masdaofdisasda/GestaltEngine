@@ -14,6 +14,8 @@ public:
   gpu_mesh_buffers scene_geometry_;
   AllocatedBuffer material_data_buffer_;
   AllocatedImage filtered_map;
+  AllocatedImage environment_map;
+  AllocatedImage bdrfLUT;
 
   DescriptorAllocatorGrowable descriptorPool;
   descriptor_writer writer;
@@ -38,6 +40,7 @@ public:
                                 VkImageUsageFlags usage, bool mipmapped = false);
   std::optional<AllocatedImage> load_image(fastgltf::Asset& asset, fastgltf::Image& image);
   void load_and_process_cubemap(const std::string& file_path);
+  AllocatedImage create_cubemap_from_HDR(std::vector<float>& image_data, int h, int w);
   AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
                               bool mipmapped = false, bool cubemap = false);
   void write_material(const gltf_material& material, uint32_t material_id);
