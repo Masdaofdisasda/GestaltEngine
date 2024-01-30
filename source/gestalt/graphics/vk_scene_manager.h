@@ -26,11 +26,11 @@ using transform_container = std::vector<transform_component>;
  */
 class vk_scene_manager { //TODO split into data base and importer/loader
 public:
-
-  void init(const vk_gpu& gpu, const resource_manager& resource_manager);
+  void init(const vk_gpu& gpu, resource_manager* resource_manager);
   void cleanup();
 
   void load_scene_from_gltf(const std::string& file_path);
+  void load_enviroment_map(const std::string& file_path);
   void update_scene(draw_context& draw_context);
   void traverse_scene(entity entity, const glm::mat4& parent_transform, draw_context& draw_context);
 
@@ -62,7 +62,7 @@ public:
 
 
 private:
-  resource_manager resource_manager_;
+  resource_manager* resource_manager_;
   vk_deletion_service deletion_service_ = {};
 
   vk_gpu gpu_ = {}; //TODO remove

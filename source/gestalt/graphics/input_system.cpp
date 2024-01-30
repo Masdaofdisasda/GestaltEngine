@@ -66,6 +66,9 @@ void input_system::handle_keyboard(const SDL_Event& e) {
     case SDL_SCANCODE_LCTRL:
       movement_.run = pressed;
       break;
+    case SDL_SCANCODE_LALT:
+      movement_.crouch = pressed;
+      break;
     default:
       break;
   }

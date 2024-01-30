@@ -13,6 +13,7 @@ public:
   // scene data for the gpu
   gpu_mesh_buffers scene_geometry_;
   AllocatedBuffer material_data_buffer_;
+  AllocatedImage filtered_map;
 
   DescriptorAllocatorGrowable descriptorPool;
   descriptor_writer writer;
@@ -33,9 +34,10 @@ public:
 
   AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
                               bool mipmapped = false);
-  AllocatedImage create_cubemap(std::array<void*, 6> face_data, VkExtent3D size, VkFormat format,
+  AllocatedImage create_cubemap(const void* imageData, VkExtent3D size, VkFormat format,
                                 VkImageUsageFlags usage, bool mipmapped = false);
   std::optional<AllocatedImage> load_image(fastgltf::Asset& asset, fastgltf::Image& image);
+  void load_and_process_cubemap(const std::string& file_path);
   AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
                               bool mipmapped = false, bool cubemap = false);
   void write_material(const gltf_material& material, uint32_t material_id);

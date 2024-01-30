@@ -9,8 +9,6 @@
 
 void skybox_pass::init(vk_renderer& renderer) {
   gpu_ = renderer.gpu_;
-  resource_manager_ = renderer.resource_manager_;
-  frame_buffer_ = renderer.frame_buffer_;
   renderer_ = &renderer;
 
   std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes = {
@@ -52,8 +50,8 @@ void skybox_pass::init(vk_renderer& renderer) {
                   .set_multisampling_none()
                   .disable_blending()
                   .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-                  .set_color_attachment_format(frame_buffer_.color_image.imageFormat)
-                  .set_depth_format(frame_buffer_.depth_image.imageFormat)
+                  .set_color_attachment_format(renderer_->frame_buffer_.color_image.imageFormat)
+                  .set_depth_format(renderer_->frame_buffer_.depth_image.imageFormat)
                   .set_pipeline_layout(pipeline_layout_)
                   .build_pipeline(gpu_.device);
 
@@ -79,8 +77,8 @@ void skybox_pass::init(vk_renderer& renderer) {
   // Prepare array with one color for each face of the cube
   std::array<void*, 6> cube_colors = {&white, &red, &green, &blue, &yellow, &magenta};
 
-  cube_map_image = resource_manager_.create_cubemap(
-      cube_colors, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+  //cube_map_image = renderer_->resource_manager_->create_cubemap(
+      //cube_colors, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 }
 
 void skybox_pass::cleanup() {
@@ -96,7 +94,7 @@ void skybox_pass::bind_resources() {
   descriptor_set_ = descriptor_allocator_.allocate(gpu_.device, descriptor_layout_);
 
   writer.clear();
-  writer.write_image(1, cube_map_image.imageView, cube_map_sampler, VK_IMAGE_LAYOUT_GENERAL,
+  writer.write_image(1, renderer_->resource_manager_->filtered_map.imageView, cube_map_sampler, VK_IMAGE_LAYOUT_GENERAL,
                      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 }
 
@@ -127,8 +125,6 @@ void skybox_pass::execute(const VkCommandBuffer cmd) {
 
 void pbr_pass::init(vk_renderer& renderer) {
   gpu_ = renderer.gpu_;
-  resource_manager_ = renderer.resource_manager_;
-  frame_buffer_ = renderer.frame_buffer_;
   renderer_ = &renderer;
 
   {
@@ -162,7 +158,9 @@ void pbr_pass::init(vk_renderer& renderer) {
   matrix_range.size = sizeof(GPUDrawPushConstants);
   matrix_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-  VkDescriptorSetLayout layouts[] = {descriptor_layout_, resource_manager_.materialLayout, resource_manager_.materialConstantsLayout};
+  VkDescriptorSetLayout layouts[]
+      = {descriptor_layout_, renderer_->resource_manager_->materialLayout,
+         renderer_->resource_manager_->materialConstantsLayout};
 
   VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
   mesh_layout_info.setLayoutCount = 3;
@@ -233,7 +231,7 @@ void pbr_pass::execute(VkCommandBuffer cmd) {
     const render_object& A = renderer_->main_draw_context_.opaque_surfaces[iA];
     const render_object& B = renderer_->main_draw_context_.opaque_surfaces[iB];
     if (A.material == B.material) {
-      return A.index_buffer < B.index_buffer;
+      return A.first_index < B.first_index;
     }
     return A.material < B.material;
   });
@@ -241,8 +239,8 @@ void pbr_pass::execute(VkCommandBuffer cmd) {
   bind_resources();
   writer.update_set(gpu_.device, descriptor_set_);
 
-  const auto& buffer_index = renderer_->main_draw_context_.opaque_surfaces[0].index_buffer;
-  vkCmdBindIndexBuffer(cmd, buffer_index, 0, VK_INDEX_TYPE_UINT32);
+  vkCmdBindIndexBuffer(cmd, renderer_->resource_manager_->scene_geometry_.indexBuffer.buffer, 0,
+                       VK_INDEX_TYPE_UINT32);
 
   auto draw = [&](const render_object& r, VkPipelineLayout pipeline_layout) {
 
@@ -263,7 +261,8 @@ void pbr_pass::execute(VkCommandBuffer cmd) {
   renderer_->stats_.triangle_count = 0;
   
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, opaquePipeline);
-  VkDescriptorSet descriptorSets[] = {descriptor_set_, resource_manager_.materialSet, resource_manager_.materialConstantsSet};
+  VkDescriptorSet descriptorSets[] = {descriptor_set_, renderer_->resource_manager_->materialSet,
+                                      renderer_->resource_manager_->materialConstantsSet};
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, opaquePipelineLayout, 0, 3,
                           descriptorSets, 0, nullptr);
 
@@ -302,7 +301,7 @@ void pbr_pass::execute(VkCommandBuffer cmd) {
 }
 
 void vk_renderer::init(const vk_gpu& gpu, const sdl_window& window,
-                       resource_manager& resource_manager,
+                       resource_manager* resource_manager,
                        const bool& resize_requested, engine_stats stats) {
   gpu_ = gpu;
   window_ = window;
@@ -314,7 +313,7 @@ void vk_renderer::init(const vk_gpu& gpu, const sdl_window& window,
   commands.init(gpu_, frames_);
   sync.init(gpu_, frames_);
 
-  gpu_scene_data_buffer = resource_manager_.create_buffer(
+  gpu_scene_data_buffer = resource_manager_->create_buffer(
       sizeof(gpu_scene_data), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
   skybox_pass_.init(*this);
   pbr_pass_.init(*this);

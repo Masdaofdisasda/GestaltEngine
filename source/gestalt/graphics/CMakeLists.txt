@@ -39,6 +39,8 @@ gui_actions.h
 vk_renderer.h
 vk_renderer.cpp
 scene_components.h
+cubemap_util.cpp
+cubemap_util.h
 )
 
 target_compile_features(graphics PRIVATE cxx_std_20)
@@ -46,6 +48,7 @@ target_compile_features(graphics PRIVATE cxx_std_20)
 target_include_directories(graphics PUBLIC 
     "${CMAKE_CURRENT_SOURCE_DIR}"
     ${Vulkan_INCLUDE_DIRS}
+${Stb_SOURCE_DIR}
 )
 
 target_link_libraries(graphics PRIVATE fmt::fmt vk-bootstrap::vk-bootstrap)

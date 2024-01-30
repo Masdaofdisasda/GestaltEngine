@@ -40,6 +40,7 @@ void free_fly_camera::update(double delta_seconds, const movement& movement) {
   if (movement.up) accel += up;
   if (movement.down) accel -= up;
   if (movement.run) accel *= fast_coef;
+  if (movement.crouch) accel *= slow_coef;
 
   if (accel == glm::vec3(0)) {
     // decelerate naturally according to the damping value
@@ -48,6 +49,13 @@ void free_fly_camera::update(double delta_seconds, const movement& movement) {
   } else {
     // acceleration
     move_speed_ += accel * acceleration * static_cast<float>(delta_seconds);
+    if (movement.run) {
+      float maxSpeed = max_speed * fast_coef;
+    } else if (movement.crouch) {
+      float maxSpeed = max_speed * slow_coef;
+    } else {
+      float maxSpeed = max_speed;
+    }
     const float maxSpeed = movement.run ? max_speed * fast_coef : max_speed;
     if (length(move_speed_) > maxSpeed) move_speed_ = glm::normalize(move_speed_) * maxSpeed;
   }

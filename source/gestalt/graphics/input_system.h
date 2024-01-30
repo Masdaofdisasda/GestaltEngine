@@ -14,6 +14,7 @@ struct movement {
   bool up{false};
   bool down{false};
   bool run{false};
+  bool crouch{false};
 };
 
 class input_system {

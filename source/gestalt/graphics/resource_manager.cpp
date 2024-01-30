@@ -1,12 +1,17 @@
 #include "resource_manager.h"
-#include <stb_image.h>
 
 #include "vk_images.h"
 #include "vk_initializers.h"
 
+#include <stb_image.h>
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
+
 #include <fastgltf/glm_element_traits.hpp>
 #include <fastgltf/parser.hpp>
 #include <fastgltf/tools.hpp>
+
+#include "cubemap_util.h"
 
 AllocatedBuffer resource_manager::create_buffer(size_t allocSize, VkBufferUsageFlags usage,
                                                 VmaMemoryUsage memoryUsage) {
@@ -31,14 +36,16 @@ AllocatedBuffer resource_manager::create_buffer(size_t allocSize, VkBufferUsageF
 void resource_manager::init(const vk_gpu& gpu) {
   gpu_ = gpu;
 
-  material_data_buffer_ = create_buffer(
-      sizeof(gltf_material::MaterialConstants) * 250,  // TODO decide on material count dynamically
+  const uint32_t maxTextures = 1200;
+
+  material_data_buffer_ = create_buffer(sizeof(gltf_material::MaterialConstants)
+                          * maxTextures,  // TODO decide on material count dynamically
       VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
   gltf_material::MaterialConstants defaultMaterialConstants = {};  // Populate with default values
   gltf_material::MaterialConstants* mappedData;
   vmaMapMemory(gpu_.allocator, material_data_buffer_.allocation, (void**)&mappedData);
 
-  for (uint32_t i = 0; i < 250; ++i) {
+  for (uint32_t i = 0; i < maxTextures; ++i) {
     memcpy(&mappedData[i], &defaultMaterialConstants, sizeof(gltf_material::MaterialConstants));
   }
 
@@ -46,7 +53,8 @@ void resource_manager::init(const vk_gpu& gpu) {
 
 
   writer.clear();
-  writer.write_buffer(2, material_data_buffer_.buffer, sizeof(gltf_material::MaterialConstants) * 250,
+  writer.write_buffer(2, material_data_buffer_.buffer,
+                      sizeof(gltf_material::MaterialConstants) * maxTextures,
                            0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 
   materialLayout
@@ -59,12 +67,12 @@ void resource_manager::init(const vk_gpu& gpu) {
             .build(gpu_.device);
 
   std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes
-      = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 250},  // TODO
-         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 250},
+      = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, maxTextures},  // TODO
+         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, maxTextures},
          {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}};
 
   descriptorPool.init(gpu_.device, 1, sizes);
-  std::vector<uint32_t> variableCounts = {250};
+  std::vector<uint32_t> variableCounts = {maxTextures};
   materialSet = descriptorPool.allocate(gpu_.device, materialLayout, variableCounts);
   materialConstantsSet
       = descriptorPool.allocate(gpu_.device, materialConstantsLayout, variableCounts);
@@ -245,21 +253,24 @@ AllocatedImage resource_manager::create_image(void* data, VkExtent3D size, VkFor
   return new_image;
 }
 
-AllocatedImage resource_manager::create_cubemap(std::array<void*, 6> face_data, VkExtent3D size,
+AllocatedImage resource_manager::create_cubemap(const void* imageData, VkExtent3D size,
                                                 VkFormat format, VkImageUsageFlags usage,
                                                 bool mipmapped) {
-  // Calculate the size of data for each face
-  size_t face_data_size = static_cast<size_t>(size.width * size.height) * 4;
+  size_t faceWidth = size.width;
+  size_t faceHeight = size.height;
+  size_t numChannels = 4;  // Assuming RGBA
+  size_t bytesPerFloat = sizeof(float);
+
+  size_t faceSizeBytes = faceWidth * faceHeight * numChannels * bytesPerFloat;
+  size_t totalCubemapSizeBytes = faceSizeBytes * 6;
 
   // Create a buffer large enough to hold all faces
-  AllocatedBuffer uploadbuffer = create_buffer(face_data_size * 6, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+  AllocatedBuffer uploadbuffer = create_buffer(
+      totalCubemapSizeBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                                VMA_MEMORY_USAGE_CPU_TO_GPU);
 
   // Copy each face data into the buffer
-  for (int i = 0; i < 6; ++i) {
-    memcpy(static_cast<char*>(uploadbuffer.info.pMappedData) + face_data_size * i, face_data[i],
-           face_data_size);
-  }
+  memcpy(uploadbuffer.info.pMappedData, imageData, totalCubemapSizeBytes);
 
   // Create the image with VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT flag for cubemaps
   AllocatedImage new_image = create_image(
@@ -274,7 +285,7 @@ AllocatedImage resource_manager::create_cubemap(std::array<void*, 6> face_data, 
     // Copy each face from the buffer to the image
     for (int i = 0; i < 6; ++i) {
       VkBufferImageCopy copyRegion = {};
-      copyRegion.bufferOffset = face_data_size * i;
+      copyRegion.bufferOffset = faceSizeBytes * i;
       copyRegion.bufferRowLength = 0;
       copyRegion.bufferImageHeight = 0;
 
@@ -294,7 +305,7 @@ AllocatedImage resource_manager::create_cubemap(std::array<void*, 6> face_data, 
           //VkExtent2D{new_image.imageExtent.width, new_image.imageExtent.height});
     } else {
       vkutil::transition_image(cmd, new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                               VK_IMAGE_LAYOUT_GENERAL);
+                               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
   });
   destroy_buffer(uploadbuffer);
@@ -338,7 +349,7 @@ void resource_manager::write_material(const gltf_material& material,
   writer.write_buffer(2, material_data_buffer_.buffer, sizeof(gltf_material::MaterialConstants),
                       sizeof(gltf_material::MaterialConstants) * material_id,
                       VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-  writer.update_set(gpu_.device, materialConstantsSet);
+  //writer.update_set(gpu_.device, materialConstantsSet);
 }
 
 std::optional<AllocatedImage> resource_manager::load_image(fastgltf::Asset& asset, fastgltf::Image& image) {
@@ -423,6 +434,60 @@ std::optional<AllocatedImage> resource_manager::load_image(fastgltf::Asset& asse
     return {};
   }
   return newImage;
+}
+
+static void float24to32(int w, int h, const float* img24, float* img32) {
+  const int numPixels = w * h;
+  for (int i = 0; i != numPixels; i++) {
+    *img32++ = *img24++;
+    *img32++ = *img24++;
+    *img32++ = *img24++;
+    *img32++ = 1.0f;
+  }
+}
+
+void resource_manager::load_and_process_cubemap(const std::string& file_path) {
+  int w, h, comp;
+  const float* img = stbi_loadf(file_path.c_str(), &w, &h, &comp, 3);
+
+  if (!img) {
+      fmt::print("Failed to load image: {}\n", file_path);
+    fflush(stdout);
+    return;
+  }
+
+  const int dstW = 256;
+  const int dstH = 128;
+
+  std::vector<glm::vec3> out(dstW * dstH);
+
+  int numPoints = 1024;
+  convolveDiffuse((glm::vec3*)img, w, h, dstW, dstH, out.data(), numPoints);
+
+  stbi_image_free((void*)img);
+  stbi_write_hdr("../../assets/filtered.hdr", dstW, dstH, 3, (float*)out.data());
+
+  const float* filtered = stbi_loadf("../../assets/filtered.hdr", &w, &h, &comp, 3);
+  std::vector<float> img32(w * h * 4);
+
+  float24to32(w, h, filtered, img32.data());
+
+  if (!filtered) {
+    fmt::print("Failed to load image: {}\n", "../../assets/filtered.hdr");
+    fflush(stdout);
+  }
+
+  stbi_image_free((void*)filtered);
+
+  Bitmap in(w, h, 4, eBitmapFormat_Float, img32.data());
+  Bitmap out_bitmap = convertEquirectangularMapToVerticalCross(in);
+
+  Bitmap cube = convertVerticalCrossToCubeMapFaces(out_bitmap);
+
+  filtered_map = create_cubemap(cube.data_.data(),
+      {static_cast<uint32_t>(cube.w_), static_cast<uint32_t>(cube.h_), 1},
+      VK_FORMAT_R32G32B32A32_SFLOAT,
+                             VK_IMAGE_USAGE_SAMPLED_BIT, true);
 }
 
 void resource_manager::destroy_image(const AllocatedImage& img) {

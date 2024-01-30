@@ -106,7 +106,6 @@ struct Bounds {
 struct render_object {
   uint32_t index_count;
   uint32_t first_index;
-  VkBuffer index_buffer;
 
   uint32_t material;
   Bounds bounds;

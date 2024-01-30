@@ -152,8 +152,8 @@ void imgui_gui::new_frame() {
     ImGui::Text("update time %f ms", stats.scene_update_time);
     ImGui::Text("triangles %i", stats.triangle_count);
     ImGui::Text("draws %i", stats.drawcall_count);
-    ImGui::End();
   }
+    ImGui::End();
 
   if (ImGui::Begin("Light")) {
     auto& scene_data = actions_.get_scene_data();
@@ -162,10 +162,21 @@ void imgui_gui::new_frame() {
     ImGui::SliderFloat("Light Y", &scene_data.sunlightDirection.y, -10.f, 10.f);
     ImGui::SliderFloat("Light Z", &scene_data.sunlightDirection.z, -10.f, 10.f);
     ImGui::SliderFloat("Light intensity", &scene_data.sunlightDirection.w, 0.f, 100.f);
-    ImGui::End();
   }
+    ImGui::End();
 
-  show_scene_hierarchy_window();
+  float windowWidth = 300.0f;                               // Width of the ImGui window
+  float windowHeight = window_.extent.height;                        // Full height of the application window
+  ImVec2 windowPos = ImVec2(window_.extent.width - windowWidth, 0);  // Position to the right
+  ImVec2 windowSize = ImVec2(windowWidth, windowHeight);    // Size of the ImGui window
+
+  ImGui::SetNextWindowPos(windowPos);
+  ImGui::SetNextWindowSize(windowSize);
+  if (ImGui::Begin("Scene Graph", nullptr,
+                   ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {
+    show_scene_hierarchy_window();
+  }
+  ImGui::End();
 
   ImGui::Render();
 }
@@ -204,48 +215,101 @@ void imgui_gui::display_scene_hierarchy(const entity_component& node) {
 }
 
 void imgui_gui::show_scene_hierarchy_window() {
-  if (ImGui::Begin("Scene Hierarchy")) {
-      const entity_component& root = actions_.get_scene_root();
-      for (const auto child_entity : root.children) {
-        display_scene_hierarchy(actions_.get_scene_object(child_entity));
-      }
+  ImVec2 windowAvail = ImGui::GetContentRegionAvail();
+  ImVec2 childSize = ImVec2(0, windowAvail.y * 0.4f);
 
-      if (selected_node_.is_valid()) {
-        ImGui::SeparatorText(selected_node_.name.c_str());
+  // Child window for the scrollable scene hierarchy
+  if (ImGui::BeginChild("HierarchyTree", childSize, true)) {
+    const entity_component& root = actions_.get_scene_root();
+    for (const auto child_entity : root.children) {
+      display_scene_hierarchy(actions_.get_scene_object(child_entity));
+    }
+  }
+  ImGui::EndChild();
 
-        if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_None)) {
-          auto& transform = actions_.get_transform_component(selected_node_.transform);
-          ImGui::DragFloat3("Position", &transform.position.x, 0.1f);
-          glm::vec3 euler = eulerAngles(transform.rotation);
-          if (ImGui::DragFloat3("Rotation", &euler.x, 0.1f)) {
-            transform.rotation = glm::quat(euler);
-          }
-          ImGui::DragFloat3("Scale", &transform.scale.x, 0.1f);
-          transform.is_dirty = true;
+  ImGui::Separator();
+
+  childSize = ImVec2(0, windowAvail.y - childSize.y);  // Remaining space for the selected node
+  if (ImGui::BeginChild("SelectedNodeDetails", childSize, false)) {
+    if (selected_node_.is_valid()) {
+      ImGui::Text(selected_node_.name.c_str());
+
+      if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_None)) {
+        auto& transform = actions_.get_transform_component(selected_node_.transform);
+        ImGui::DragFloat3("Position", &transform.position.x, 0.1f);
+        glm::vec3 euler = eulerAngles(transform.rotation);
+        if (ImGui::DragFloat3("Rotation", &euler.x, 0.1f)) {
+          transform.rotation = glm::quat(euler);
         }
-        if (selected_node_.has_mesh()) {
-          if (ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_None)) {
-            auto& mesh = actions_.get_mesh_component(selected_node_.mesh);
-            for (auto surface_index : mesh.surfaces) {
-              auto& surface = actions_.get_surface(surface_index);
-              auto& material = actions_.get_material(surface.material);
-              if (ImGui::TreeNode(material.name.c_str())) {
-                auto& config = material.config;
-                ImGui::DragFloat4("Albedo Factor", &config.albedo_factor.x, 0.5f);
-                ImGui::Checkbox("Albedo Texture", &config.use_albedo_tex);
-                ImGui::DragFloat2("Metallic-Roughness Factor", &config.metal_rough_factor.x, 0.5f);
-                ImGui::Checkbox("Metallic-Roughness Texture", &config.use_metal_rough_tex);
-                ImGui::Checkbox("Normal Texture", &config.use_normal_tex);
-                ImGui::DragFloat3("Emissive Factor", &config.emissive_factor.x, 0.5f);
-                ImGui::Checkbox("Emissive Texture", &config.use_emissive_tex);
-                ImGui::Checkbox("Occlusion Texture", &config.use_occlusion_tex);
+        ImGui::DragFloat3("Scale", &transform.scale.x, 0.1f);
+        transform.is_dirty = true;
+      }
+      if (selected_node_.has_mesh()) {
+        if (ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_None)) {
+          auto& mesh = actions_.get_mesh_component(selected_node_.mesh);
+          for (auto surface_index : mesh.surfaces) {
+            auto& surface = actions_.get_surface(surface_index);
+            auto& material = actions_.get_material(surface.material);
+            if (ImGui::TreeNode(material.name.c_str())) {
+              auto& config = material.config;
 
-                ImGui::TreePop();
+              if (ImGui::CollapsingHeader("Albedo", ImGuiTreeNodeFlags_DefaultOpen)) {
+                ImGui::DragFloat4("Factor", &config.albedo_factor.x, 0.01f, 0.0f, 1.0f, "%.2f");
+                ImGui::Checkbox("Use Texture", &config.use_albedo_tex);
+                if (config.use_albedo_tex) {
+                  ImGui::Text("Texture ID: %zu", config.albedo_tex);
+                  ImGui::Text("URI: %s", config.albedo_uri.c_str());
+                }
               }
+
+              if (ImGui::CollapsingHeader("Metallic-Roughness", ImGuiTreeNodeFlags_DefaultOpen)) {
+                ImGui::DragFloat2("Factor", &config.metal_rough_factor.x, 0.01f, 0.0f, 1.0f,
+                                  "%.2f");
+                ImGui::Checkbox("Use Texture", &config.use_metal_rough_tex);
+                if (config.use_metal_rough_tex) {
+                  ImGui::Text("Texture ID: %zu", config.metal_rough_tex);
+                  ImGui::Text("URI: %s", config.metal_rough_uri.c_str());
+                }
+              }
+
+              if (ImGui::CollapsingHeader("Normal Map", ImGuiTreeNodeFlags_DefaultOpen)) {
+                ImGui::DragFloat("Scale", &config.normal_scale, 0.01f, 0.0f, 10.0f, "%.2f");
+                ImGui::Checkbox("Use Texture", &config.use_normal_tex);
+                if (config.use_normal_tex) {
+                  ImGui::Text("Texture ID: %zu", config.normal_tex);
+                  ImGui::Text("URI: %s", config.normal_uri.c_str());
+                }
+              }
+
+              if (ImGui::CollapsingHeader("Emissive", ImGuiTreeNodeFlags_DefaultOpen)) {
+                ImGui::DragFloat3("Factor", &config.emissive_factor.x, 0.01f, 0.0f, 10.0f, "%.2f");
+                ImGui::Checkbox("Use Texture", &config.use_emissive_tex);
+                if (config.use_emissive_tex) {
+                  ImGui::Text("Texture ID: %zu", config.emissive_tex);
+                  ImGui::Text("URI: %s", config.emissive_uri.c_str());
+                }
+              }
+
+              if (ImGui::CollapsingHeader("Occlusion", ImGuiTreeNodeFlags_DefaultOpen)) {
+                ImGui::DragFloat("Strength", &config.occlusion_strength, 0.01f, 0.0f, 10.0f,
+                                 "%.2f");
+                ImGui::Checkbox("Use Texture", &config.use_occlusion_tex);
+                if (config.use_occlusion_tex) {
+                  ImGui::Text("Texture ID: %zu", config.occlusion_tex);
+                  ImGui::Text("URI: %s", config.occlusion_uri.c_str());
+                }
+              }
+
+              ImGui::Checkbox("Double Sided", &config.double_sided);
+              ImGui::Checkbox("Transparent", &config.transparent);
+              ImGui::DragFloat("Alpha Cutoff", &config.alpha_cutoff, 0.01f, 0.0f, 1.0f, "%.2f");
+
+              ImGui::TreePop();
             }
           }
         }
       }
     }
-  ImGui::End();
+  }
+  ImGui::EndChild();
 }

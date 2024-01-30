@@ -22,8 +22,6 @@ public:
   virtual void execute(VkCommandBuffer cmd) = 0;
 protected:
   vk_gpu gpu_ = {};
-  resource_manager resource_manager_;
-  frame_buffer frame_buffer_ = {};
   vk_renderer* renderer_ = nullptr;
 
   VkPipeline pipeline_;
@@ -80,7 +78,7 @@ class vk_renderer {
 public:
   vk_gpu gpu_ = {};
   sdl_window window_;
-  resource_manager resource_manager_;
+  resource_manager* resource_manager_;
   vk_scene_manager* scene_manager_; //WIP
   imgui_gui* imgui_;
 
@@ -102,12 +100,12 @@ public:
   gpu_scene_data scene_data;
   AllocatedBuffer gpu_scene_data_buffer;
 
-  void init(const vk_gpu& gpu, const sdl_window& window, resource_manager& resource_manager, const bool& resize_requested, engine_stats stats);
+  void init(const vk_gpu& gpu, const sdl_window& window, resource_manager* resource_manager, const bool& resize_requested, engine_stats stats);
 
   void draw();
 
   void cleanup() {
-    resource_manager_.destroy_buffer(gpu_scene_data_buffer);
+    resource_manager_->destroy_buffer(gpu_scene_data_buffer);
 
     sync.cleanup();
     commands.cleanup();

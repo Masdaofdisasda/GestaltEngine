@@ -34,15 +34,15 @@ void render_engine::init() {
   assert(loaded_engine == nullptr);
   loaded_engine = this;
 
-  window_.init({1280, 720}); // todo : get window size from config
+  window_.init({1600, 1000}); // todo : get window size from config
 
   gpu_.init(use_validation_layers, window_,
             [this](auto func) { this->immediate_submit(std::move(func)); });
 
   resource_manager_.init(gpu_);
 
-  renderer_.init(gpu_, window_, resource_manager_, resize_requested_, stats_);
-  scene_manager_.init(gpu_, resource_manager_);
+  renderer_.init(gpu_, window_, &resource_manager_, resize_requested_, stats_);
+  scene_manager_.init(gpu_, &resource_manager_);
   renderer_.scene_manager_ = &scene_manager_;
 
   register_gui_actions();

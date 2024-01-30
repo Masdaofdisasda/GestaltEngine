@@ -39,20 +39,23 @@ VkSamplerMipmapMode extract_mipmap_mode(fastgltf::Filter filter) {
   }
 }
 
-void vk_scene_manager::init(const vk_gpu& gpu, const resource_manager& resource_manager) {
+void vk_scene_manager::init(const vk_gpu& gpu, resource_manager* resource_manager) {
   gpu_ = gpu;
   resource_manager_ = resource_manager;
   deletion_service_.init(gpu.device, gpu.allocator);
 
   init_default_data();
   //load_scene_from_gltf(R"(..\..\assets\Models\MetalRoughSpheres\glTF-Binary\MetalRoughSpheres.glb)");
-  //load_scene_from_gltf(R"(..\..\assets\sponza_pestana.glb)");
-  load_scene_from_gltf(R"(..\..\assets\structure.glb)");
+  load_scene_from_gltf(R"(..\..\assets\sponza_pestana.glb)");
+  //load_scene_from_gltf(R"(..\..\assets\awesome-3d-meshes\McGuire\Amazon Lumberyard Bistro\gltf\Bistro.glb)");
+  //load_scene_from_gltf(R"(..\..\assets\structure.glb)");
+
+  load_enviroment_map(R"(..\..\assets\san_giuseppe_bridge_4k.hdr)"); 
 }
 
 void vk_scene_manager::cleanup() {
   for (auto img : images_) {
-    resource_manager_.destroy_image(img);
+    resource_manager_->destroy_image(img);
   }
 
   deletion_service_.flush();
@@ -109,15 +112,17 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
     VkSampler new_sampler;
     vkCreateSampler(gpu_.device, &sampl, nullptr, &new_sampler);
 
+    fmt::print("created sampler {}, sampler_id {}\n", sampler.name, samplers_.size());
     samplers_.push_back(new_sampler);
     deletion_service_.push(new_sampler);
   }
 
   for (fastgltf::Image& image : gltf.images) {
-    std::optional<AllocatedImage> img = resource_manager_.load_image(gltf, image);
+    std::optional<AllocatedImage> img = resource_manager_->load_image(gltf, image);
 
     if (img.has_value()) {
       images_.push_back(img.value());
+      fmt::print("loaded texture {}, image_id {}\n", image.name, images_.size() - 1);
     } else {
       fmt::print("gltf failed to load texture {}\n", image.name);
       images_.push_back(default_material_.error_checkerboard_image);
@@ -297,7 +302,7 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
     }
     create_mesh(surfaces, std::string(mesh.name));
   }
-  resource_manager_.upload_mesh(indices_, vertices_);
+  resource_manager_->upload_mesh(indices_, vertices_);
 
   // hierachy
   for (fastgltf::Node& node : gltf.nodes) {
@@ -338,6 +343,10 @@ void vk_scene_manager::load_scene_from_gltf(const std::string& file_path) {
   }
 }
 
+void vk_scene_manager::load_enviroment_map(const std::string& file_path) {
+  resource_manager_->load_and_process_cubemap(file_path);
+}
+
 entity_component& vk_scene_manager::create_entity() {
   const entity new_entity = {next_entity_id_++};
 
@@ -348,6 +357,8 @@ entity_component& vk_scene_manager::create_entity() {
   scene_graph_.push_back(object);
 
   set_transform_component(new_entity, glm::vec3(0));
+
+  fmt::print("created entity {}\n", new_entity);
 
   return scene_graph_.at(new_entity);
 }
@@ -394,6 +405,7 @@ size_t vk_scene_manager::create_surface(std::vector<Vertex>& vertices,
   indices_.insert(indices_.end(), indices.begin(), indices.end());
 
   surfaces_.push_back(surface);
+  fmt::print("created surface {}, index count {}\n", surfaces_.size() - 1, surface.index_count);
 
   return surfaces_.size() - 1;
 }
@@ -402,7 +414,7 @@ size_t vk_scene_manager::create_mesh(std::vector<size_t> surfaces, const std::st
 
   meshes_.emplace_back(mesh_component{surfaces});
   const std::string key = name.empty() ? "mesh_" + std::to_string(meshes_.size()) : name;
-
+  fmt::print("created mesh {}, mesh_id {}\n", key, meshes_.size() - 1);
   return meshes_.size() - 1;
 }
 
@@ -429,8 +441,10 @@ size_t vk_scene_manager::create_material(const gltf_material& material,
     const pbr_config& config, const std::string& name) {
 
   const size_t material_id = materials_.size();
+  fmt::print("creating material {}, mat_id {}\n", name, material_id);
+
   const std::string key = name.empty() ? "material_" + std::to_string(material_id) : name;
-  resource_manager_.write_material(material, material_id);
+  resource_manager_->write_material(material, material_id);
 
   materials_.emplace_back(material_component{
       .name = key,
@@ -494,11 +508,10 @@ void vk_scene_manager::traverse_scene(const entity entity, const glm::mat4& pare
       render_object def;
       def.index_count = surface.index_count;
       def.first_index = surface.first_index;
-      def.index_buffer = resource_manager_.scene_geometry_.indexBuffer.buffer;
       def.material = surface.material;
       def.bounds = surface.bounds;
       def.transform = world_transform;
-      def.vertex_buffer_address = resource_manager_.scene_geometry_.vertexBufferAddress;
+      def.vertex_buffer_address = resource_manager_->scene_geometry_.vertexBufferAddress;
 
       if (material.config.transparent) {
         draw_context.transparent_surfaces.push_back(def);
@@ -520,21 +533,21 @@ void vk_scene_manager::init_default_data() {
   uint32_t flat_normal = 0xFFFF8080;                 // Flat normal
   uint32_t black = 0xFF000000;                       // Black color for emissive
 
-  default_material_.color_image = resource_manager_.create_image(
+  default_material_.color_image = resource_manager_->create_image(
       (void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
   default_material_.metallic_roughness_image
-      = resource_manager_.create_image((void*)&default_metallic_roughness, VkExtent3D{1, 1, 1},
+      = resource_manager_->create_image((void*)&default_metallic_roughness, VkExtent3D{1, 1, 1},
                                        VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
   default_material_.normal_image
-      = resource_manager_.create_image((void*)&flat_normal, VkExtent3D{1, 1, 1},
+      = resource_manager_->create_image((void*)&flat_normal, VkExtent3D{1, 1, 1},
                                        VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
-  default_material_.emissive_image = resource_manager_.create_image(
+  default_material_.emissive_image = resource_manager_->create_image(
       (void*)&black, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
-  default_material_.occlusion_image = resource_manager_.create_image(
+  default_material_.occlusion_image = resource_manager_->create_image(
       (void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
   // checkerboard image for error textures and testing
@@ -546,7 +559,7 @@ void vk_scene_manager::init_default_data() {
       pixels[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
     }
   }
-  default_material_.error_checkerboard_image = resource_manager_.create_image(
+  default_material_.error_checkerboard_image = resource_manager_->create_image(
       pixels.data(), VkExtent3D{16, 16, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
 
   VkSamplerCreateInfo sampl = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
@@ -593,17 +606,17 @@ void vk_scene_manager::init_default_data() {
       config, "default_material");
 
   deletion_service_.push_function(
-      [this]() { resource_manager_.destroy_image(default_material_.color_image); });
+      [this]() { resource_manager_->destroy_image(default_material_.color_image); });
   deletion_service_.push_function(
-      [this]() { resource_manager_.destroy_image(default_material_.metallic_roughness_image); });
+      [this]() { resource_manager_->destroy_image(default_material_.metallic_roughness_image); });
   deletion_service_.push_function(
-      [this]() { resource_manager_.destroy_image(default_material_.normal_image); });
+      [this]() { resource_manager_->destroy_image(default_material_.normal_image); });
   deletion_service_.push_function(
-      [this]() { resource_manager_.destroy_image(default_material_.emissive_image); });
+      [this]() { resource_manager_->destroy_image(default_material_.emissive_image); });
   deletion_service_.push_function(
-      [this]() { resource_manager_.destroy_image(default_material_.occlusion_image); });
+      [this]() { resource_manager_->destroy_image(default_material_.occlusion_image); });
   deletion_service_.push_function(
-      [this]() { resource_manager_.destroy_image(default_material_.error_checkerboard_image); });
+      [this]() { resource_manager_->destroy_image(default_material_.error_checkerboard_image); });
   deletion_service_.push(default_material_.default_sampler_nearest);
   deletion_service_.push(default_material_.default_sampler_linear);
 }
