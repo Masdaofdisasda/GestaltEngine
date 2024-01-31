@@ -160,10 +160,10 @@ void pbr_pass::init(vk_renderer& renderer) {
 
   VkDescriptorSetLayout layouts[]
       = {descriptor_layout_, renderer_->resource_manager_->materialLayout,
-         renderer_->resource_manager_->materialConstantsLayout};
+         renderer_->resource_manager_->materialConstantsLayout, renderer_->resource_manager_->IblLayout};
 
   VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
-  mesh_layout_info.setLayoutCount = 3;
+  mesh_layout_info.setLayoutCount = 4;
   mesh_layout_info.pSetLayouts = layouts;
   mesh_layout_info.pPushConstantRanges = &matrix_range;
   mesh_layout_info.pushConstantRangeCount = 1;
@@ -262,8 +262,8 @@ void pbr_pass::execute(VkCommandBuffer cmd) {
   
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, opaquePipeline);
   VkDescriptorSet descriptorSets[] = {descriptor_set_, renderer_->resource_manager_->materialSet,
-                                      renderer_->resource_manager_->materialConstantsSet};
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, opaquePipelineLayout, 0, 3,
+                                      renderer_->resource_manager_->materialConstantsSet, renderer_->resource_manager_->IblSet};
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, opaquePipelineLayout, 0, 4,
                           descriptorSets, 0, nullptr);
 
   const VkViewport viewport = {

@@ -52,7 +52,7 @@ void render_engine::init() {
 
   renderer_.scene_data.ambientColor = glm::vec4(0.1f);
   renderer_.scene_data.sunlightColor = glm::vec4(1.f);
-  renderer_.scene_data.sunlightDirection = glm::vec4(0.1, 0.5, 0.1, 10.f);
+  renderer_.scene_data.sunlightDirection = glm::vec4(0.1, 0.5, 0.1, 1.5f);
 
   for (auto& cam : camera_positioners_) {
     auto free_fly_camera_ptr = std::make_unique<free_fly_camera>();

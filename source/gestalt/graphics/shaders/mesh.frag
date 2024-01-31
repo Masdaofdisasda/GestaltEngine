@@ -30,6 +30,40 @@ struct PBRInfo
 
 const float M_PI = 3.141592653589793;
 
+vec3 EnvBRDFApprox( //Todo
+ vec3 specularColor, float roughness, float NoV )
+{
+  const vec4 c0 = vec4(-1, -0.0275, -0.572, 0.022);
+  const vec4 c1 = vec4( 1, 0.0425, 1.04, -0.04);
+  vec4 r = roughness * c0 + c1;
+  float a004 =
+ min( r.x * r.x, exp2(-9.28 * NoV) ) * r.x + r.y;
+  vec2 AB = vec2( -1.04, 1.04 ) * a004 + r.zw;
+  return specularColor * AB.x + AB.y;
+}
+
+// Calculation of the lighting contribution from an optional Image Based Light source.
+// Precomputed Environment Maps are required uniform inputs and are computed as outlined in [1].
+// See our README.md on Environment Maps [3] for additional discussion.
+vec3 getIBLContribution(PBRInfo pbrInputs, vec3 n, vec3 reflection)
+{
+	float mipCount = float(textureQueryLevels(texEnvMap));
+	float lod = pbrInputs.perceptualRoughness * mipCount;
+	// retrieve a scale and bias to F0. See [1], Figure 3
+	vec2 brdfSamplePoint = clamp(vec2(pbrInputs.NdotV, 1.0-pbrInputs.perceptualRoughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
+	//vec3 brdf = textureLod(brdfLutTex, brdfSamplePoint, 0).rgb;
+	vec3 cm = vec3(1.0, 1.0, 1.0);
+	// HDR envmaps are already linear
+	vec3 diffuseLight = texture(texEnvMapIrradiance, n.xyz * cm).rgb;
+	vec3 specularLight = textureLod(texEnvMap, reflection.xyz * cm, lod).rgb;
+
+	vec3 diffuse = diffuseLight * pbrInputs.diffuseColor;
+	//TODO vec3 specular = specularLight * (pbrInputs.specularColor * brdf.x + brdf.y);
+	vec3 specular = specularLight * EnvBRDFApprox(pbrInputs.specularColor, pbrInputs.perceptualRoughness, pbrInputs.NdotV);
+
+	return diffuse + specular ;
+}
+
 vec3 calculatePBRInputsMetallicRoughness( vec4 albedo, vec3 normal, vec3 cameraPos, vec3 worldPos, vec4 mrSample, out PBRInfo pbrInputs )
 {
 	float perceptualRoughness = 1.0;
@@ -54,7 +88,6 @@ vec3 calculatePBRInputsMetallicRoughness( vec4 albedo, vec3 normal, vec3 cameraP
 	vec3 f0 = vec3(0.04);
 	vec3 diffuseColor = baseColor.rgb * (vec3(1.0) - f0);
 	diffuseColor *= 1.0-metallic;
-	//diffuseColor = texture(environmentTex,  normalize(normal)).rgb * diffuseColor;
 	vec3 specularColor = mix(f0, baseColor.rgb, metallic);
 
 	// Compute reflectance.
@@ -81,8 +114,7 @@ vec3 calculatePBRInputsMetallicRoughness( vec4 albedo, vec3 normal, vec3 cameraP
 	pbrInputs.v = v;
 
 	// Calculate lighting contribution from image based lighting source (IBL)
-	//vec3 color = getIBLContribution(pbrInputs, n, reflection); //TODO only fill in the needed parts of pbrInputs
-	vec3 color = diffuseColor + specularColor;
+	vec3 color = getIBLContribution(pbrInputs, n, reflection);
 
 	return color;
 }
@@ -229,6 +261,10 @@ vec3 perturbNormal(vec3 n, vec3 v, vec3 normalSample, vec2 uv)
 	return normalize(TBN * map);
 }
 
+vec3 Reinhard2(vec3 x) {
+  return
+ (x * (1.0 + x / (1.1 * 1.1))) / (1.0 + x);
+}
 void main() {
 
 	uint albedoIndex =			inMaterialIndex;
@@ -273,8 +309,8 @@ void main() {
 	color = color * (Kao.r < 0.01 ? 1.0 : Kao);
 	color = pow(Ke.rgb + color, vec3(1.0/2.2) ) ;
 
-	color = color / (color + vec3(1.0));
-	color = pow(color, vec3(1.0/2.2)); // gamma correction
-
+	//color = color / (color + vec3(1.0));
+	//color = pow(color, vec3(1.0/2.2)); // gamma correction
+	color = Reinhard2(color);
     outFragColor = vec4(color, 1.0);
 }

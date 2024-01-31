@@ -13,16 +13,19 @@ public:
   // scene data for the gpu
   gpu_mesh_buffers scene_geometry_;
   AllocatedBuffer material_data_buffer_;
-  AllocatedImage filtered_map;
   AllocatedImage environment_map;
+  AllocatedImage environment_irradiance_map;
   AllocatedImage bdrfLUT;
 
   DescriptorAllocatorGrowable descriptorPool;
   descriptor_writer writer;
+  VkSampler cube_map_sampler;
   VkDescriptorSet materialSet;
   VkDescriptorSet materialConstantsSet;
+  VkDescriptorSet IblSet;
   VkDescriptorSetLayout materialLayout;
   VkDescriptorSetLayout materialConstantsLayout;
+  VkDescriptorSetLayout IblLayout;
 
   void init(const vk_gpu& gpu);
 

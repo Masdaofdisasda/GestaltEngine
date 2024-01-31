@@ -65,6 +65,10 @@ void resource_manager::init(const vk_gpu& gpu) {
   materialConstantsLayout = descriptor_layout_builder()
             .add_binding(2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, true)
             .build(gpu_.device);
+  IblLayout = descriptor_layout_builder()
+            .add_binding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+            .add_binding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+            .build(gpu_.device);
 
   std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes
       = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, maxTextures},  // TODO
@@ -76,6 +80,7 @@ void resource_manager::init(const vk_gpu& gpu) {
   materialSet = descriptorPool.allocate(gpu_.device, materialLayout, variableCounts);
   materialConstantsSet
       = descriptorPool.allocate(gpu_.device, materialConstantsLayout, variableCounts);
+  IblSet = descriptorPool.allocate(gpu_.device, IblLayout);
   writer.update_set(gpu_.device, materialConstantsSet);
 }
 
@@ -486,7 +491,23 @@ void resource_manager::load_and_process_cubemap(const std::string& file_path) {
 
   stbi_image_free((void*)filtered);
 
-  filtered_map = create_cubemap_from_HDR(img32, h, w);
+  environment_irradiance_map = create_cubemap_from_HDR(img32, h, w);
+
+  VkSamplerCreateInfo sampl = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO, .pNext = nullptr};
+  sampl.maxLod = VK_LOD_CLAMP_NONE;
+  sampl.minLod = 0;
+  sampl.magFilter = VK_FILTER_LINEAR;
+  sampl.minFilter = VK_FILTER_LINEAR;
+  sampl.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+  vkCreateSampler(gpu_.device, &sampl, nullptr, &cube_map_sampler);
+
+  writer.clear();
+  writer.write_image(3, environment_map.imageView, cube_map_sampler,
+                     VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+  writer.write_image(4, environment_irradiance_map.imageView,
+                     cube_map_sampler, VK_IMAGE_LAYOUT_GENERAL,
+                     VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+  writer.update_set(gpu_.device, IblSet);
 }
 
 AllocatedImage resource_manager::create_cubemap_from_HDR(std::vector<float>& image_data, int h,

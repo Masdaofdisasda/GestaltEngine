@@ -16,3 +16,6 @@ layout(set = 2, binding = 2) uniform GLTFMaterialData{
 	vec4 metal_rough_factors;
 	
 } materialData[];
+
+layout(set = 3, binding = 3) uniform samplerCube texEnvMap;
+layout(set = 3, binding = 4) uniform samplerCube texEnvMapIrradiance;

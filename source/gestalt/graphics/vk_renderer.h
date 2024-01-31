@@ -41,8 +41,8 @@ public:
   descriptor_writer writer;
 
 private:
-  VkSampler cube_map_sampler;
   AllocatedImage cube_map_image;
+  VkSampler cube_map_sampler;
 
   std::string vertex_shader_source_ = "../shaders/skybox.vert.spv";
   std::string fragment_shader_source_ = "../shaders/skybox.frag.spv";
@@ -58,6 +58,7 @@ public:
   descriptor_writer writer;
 
 private:
+
   VkPipeline opaquePipeline;//TODO: split into opaque and transparent render passes
   VkPipelineLayout opaquePipelineLayout;
   VkPipeline transparentPipeline;
