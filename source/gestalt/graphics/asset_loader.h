@@ -32,8 +32,8 @@ class asset_loader {
                         const size_t& image_offset, const fastgltf::Material& mat,
                         pbr_material& pbr_config) const;
   void import_material(fastgltf::Asset& gltf, size_t& sampler_offset, size_t& image_offset,
-                       int data_index, fastgltf::Material& mat) const;
-  void import_materials(fastgltf::Asset& gltf, size_t& material_offset, size_t& sampler_offset, size_t& image_offset) const;
+                       fastgltf::Material& mat) const;
+  void import_materials(fastgltf::Asset& gltf, size_t& sampler_offset, size_t& image_offset) const;
   size_t create_surface(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices);
   size_t create_mesh(std::vector<size_t> surfaces, const std::string& name) const;
   void add_material_component(size_t surface, size_t material) const;

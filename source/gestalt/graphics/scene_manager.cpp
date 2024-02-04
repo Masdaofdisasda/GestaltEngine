@@ -18,8 +18,8 @@ void scene_manager::init(const vk_gpu& gpu,const std::shared_ptr <resource_manag
   size_t mesh_offset = resource_manager_->get_database().get_meshes_size();
 
   //load_scene_from_gltf(R"(..\..\assets\Models\MetalRoughSpheres\glTF-Binary\MetalRoughSpheres.glb)");
-  auto nodes = asset_loader_->load_scene_from_gltf(R"(..\..\assets\sponza_pestana.glb)");
-  //load_scene_from_gltf(R"(..\..\assets\awesome-3d-meshes\McGuire\Amazon Lumberyard Bistro\gltf\Bistro.glb)");
+  const auto nodes = asset_loader_->load_scene_from_gltf(R"(..\..\assets\sponza_pestana.glb)");
+  //const auto nodes = asset_loader_->load_scene_from_gltf(R"(..\..\assets\awesome-3d-meshes\McGuire\Amazon Lumberyard Bistro\gltf\Bistro.glb)");
   //load_scene_from_gltf(R"(..\..\assets\structure.glb)");
 
   build_scene_graph(nodes, mesh_offset);

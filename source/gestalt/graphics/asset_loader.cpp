@@ -24,7 +24,7 @@ std::vector<fastgltf::Node> asset_loader::load_scene_from_gltf(const std::string
   import_samplers(gltf);
   import_textures(gltf);
 
-  import_materials(gltf, material_offset, sampler_offset, image_offset);
+  import_materials(gltf, sampler_offset, image_offset);
 
   import_meshes(gltf, material_offset);
 
@@ -232,7 +232,7 @@ void asset_loader::import_occlusion(const fastgltf::Asset& gltf, const size_t& s
   }
 }
 
-void asset_loader::import_material(fastgltf::Asset& gltf, size_t& sampler_offset, size_t& image_offset, int data_index, fastgltf::Material& mat) const {
+void asset_loader::import_material(fastgltf::Asset& gltf, size_t& sampler_offset, size_t& image_offset, fastgltf::Material& mat) const {
   pbr_material pbr_config{};
 
   if (mat.alphaMode == fastgltf::AlphaMode::Blend) {
@@ -262,16 +262,13 @@ void asset_loader::import_material(fastgltf::Asset& gltf, size_t& sampler_offset
 
   // build material
   create_material(pbr_config, std::string(mat.name));
-  data_index++; //TODO unused???
 }
 
-void asset_loader::import_materials(fastgltf::Asset& gltf, size_t& material_offset,
-                                    size_t& sampler_offset, size_t& image_offset) const {
-  int data_index = static_cast<int>(material_offset);
-
+void asset_loader::import_materials(fastgltf::Asset& gltf, size_t& sampler_offset,
+                                    size_t& image_offset) const {
   fmt::print("importing materials\n");
   for (fastgltf::Material& mat : gltf.materials) {
-    import_material(gltf, sampler_offset, image_offset, data_index, mat);
+    import_material(gltf, sampler_offset, image_offset, mat);
   }
 }
 

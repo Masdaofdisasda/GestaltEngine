@@ -464,7 +464,7 @@ void resource_manager::load_and_process_cubemap(const std::string& file_path) {
     fflush(stdout);
     return;
   }
-
+  
   {
     std::vector<float> img32(w * h * 4);
 
