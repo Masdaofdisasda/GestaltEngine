@@ -276,7 +276,12 @@ void main() {
     vec2 UV = inUV;
 
     //vec4 Kd = texture(colorTex, UV);
-    vec4 Kd = texture(nonuniformEXT(textures[albedoIndex]), UV);
+	bool useAlbedoTex = (materialData[inMaterialIndex].texture_flags & 1) != 0;
+	vec4 Kd = vec4(1.0, 0.0, 0.0, 1.0);
+	if (useAlbedoTex == true) {
+		//kd = texture(nonuniformEXT(textures[albedoIndex]), UV);
+		Kd = vec4(0.0, 0.0, 1.0, 1.0);
+	}
 
     //vec3 normal_sample = texture(normalTex, UV).rgb;
     vec3 normal_sample = texture(nonuniformEXT(textures[normalIndex]), UV).rgb;
@@ -309,8 +314,6 @@ void main() {
 	color = color * (Kao.r < 0.01 ? 1.0 : Kao);
 	color = pow(Ke.rgb + color, vec3(1.0/2.2) ) ;
 
-	//color = color / (color + vec3(1.0));
-	//color = pow(color, vec3(1.0/2.2)); // gamma correction
 	color = Reinhard2(color);
     outFragColor = vec4(color, 1.0);
 }

@@ -32,7 +32,7 @@ public:
   void init(const vk_gpu& gpu, const std::shared_ptr<resource_manager>& resource_manager);
   void cleanup();
 
-  void load_environment_map(const std::string& file_path);
+  void load_environment_map(const std::string& file_path) const;
   void update_scene(draw_context& draw_context);
   void traverse_scene(entity entity, const glm::mat4& parent_transform, draw_context& draw_context);
 

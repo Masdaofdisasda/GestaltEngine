@@ -12,6 +12,14 @@ layout(set = 1, binding = 1) uniform sampler2D textures[];
 
 layout(set = 2, binding = 2) uniform GLTFMaterialData{   
 
+    int albedo_tex_index;
+    int metal_rough_tex_index;
+    int normal_tex_index;
+    int emissive_tex_index;
+    int occlusion_tex_index;
+
+    int texture_flags;
+
 	vec4 colorFactors;
 	vec2 metal_rough_factors;
 	

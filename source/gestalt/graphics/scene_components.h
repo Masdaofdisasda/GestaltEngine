@@ -89,6 +89,14 @@ struct pbr_material {
   bool transparent{false};
 
   struct material_constants {
+    int albedo_tex_index;
+    int metal_rough_tex_index;
+    int normal_tex_index;
+    int emissive_tex_index;
+    int occlusion_tex_index;
+
+    int texture_flags = 0;
+
     glm::vec4 albedo_factor{0.f};
     glm::vec2 metal_rough_factor{0.f};
     // glm::vec3 emissiveFactor;
@@ -99,8 +107,8 @@ struct pbr_material {
   } constants;
 
   struct material_resources {
-    AllocatedImage color_image;
-    VkSampler color_sampler;
+    AllocatedImage albedo_image;
+    VkSampler albedo_sampler;
     AllocatedImage metal_rough_image;
     VkSampler metal_rough_sampler;
     AllocatedImage normal_image;

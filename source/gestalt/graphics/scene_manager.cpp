@@ -78,7 +78,7 @@ void scene_manager::build_scene_graph(const std::vector<fastgltf::Node>& nodes, 
 void scene_manager::cleanup() {
 }
 
-void scene_manager::load_environment_map(const std::string& file_path) {
+void scene_manager::load_environment_map(const std::string& file_path) const {
   resource_manager_->load_and_process_cubemap(file_path);
 }
 
@@ -271,8 +271,8 @@ void scene_manager::init_default_data() {
   // write material parameters to buffer
 
   // default the material textures
-  material.resources.color_image = default_material.color_image;
-  material.resources.color_sampler = default_material.default_sampler_linear;
+  material.resources.albedo_image = default_material.color_image;
+  material.resources.albedo_sampler = default_material.default_sampler_linear;
   material.resources.metal_rough_image = default_material.metallic_roughness_image;
   material.resources.metal_rough_sampler = default_material.default_sampler_linear;
   material.resources.normal_image = default_material.normal_image;

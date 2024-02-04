@@ -332,7 +332,7 @@ void resource_manager::write_material(const pbr_material& material,
   writer.clear();
 
   std::vector<VkDescriptorImageInfo> imageInfos
-      = {{material.resources.color_sampler, material.resources.color_image.imageView,
+      = {{material.resources.albedo_sampler, material.resources.albedo_image.imageView,
           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
          {material.resources.metal_rough_sampler, material.resources.metal_rough_image.imageView,
           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
@@ -358,7 +358,7 @@ void resource_manager::write_material(const pbr_material& material,
   writer.write_buffer(2, material_data_buffer_.buffer, sizeof(pbr_material::material_constants),
                       sizeof(pbr_material::material_constants) * material_id,
                       VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-  //writer.update_set(gpu_.device, materialConstantsSet);
+  writer.update_set(gpu_.device, materialConstantsSet);
 }
 
 std::optional<AllocatedImage> resource_manager::load_image(fastgltf::Asset& asset, fastgltf::Image& image) {

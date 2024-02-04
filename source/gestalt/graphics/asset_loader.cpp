@@ -161,11 +161,12 @@ void asset_loader::import_albedo(const fastgltf::Asset& gltf, const size_t& samp
                                  pbr_material& pbr_config) const {
   if (mat.pbrData.baseColorTexture.has_value()) {
     pbr_config.use_albedo_tex = true;
+    pbr_config.constants.texture_flags |= 1;
     auto [image, sampler] = get_textures(gltf, mat.pbrData.baseColorTexture.value().textureIndex,
                                          image_offset, sampler_offset);
 
-    pbr_config.resources.color_image = image;
-    pbr_config.resources.color_sampler = sampler;
+    pbr_config.resources.albedo_image = image;
+    pbr_config.resources.albedo_sampler = sampler;
   } else {
     pbr_config.constants.albedo_factor
         = glm::vec4(mat.pbrData.baseColorFactor.at(0), mat.pbrData.baseColorFactor.at(1),
@@ -242,8 +243,8 @@ void asset_loader::import_material(fastgltf::Asset& gltf, size_t& sampler_offset
   auto& default_material = resource_manager_->get_database().default_material_;
 
   pbr_config.resources
-      = {.color_image = default_material.color_image,
-         .color_sampler = default_material.default_sampler_linear,
+      = {.albedo_image = default_material.color_image,
+         .albedo_sampler = default_material.default_sampler_linear,
          .metal_rough_image = default_material.metallic_roughness_image,
          .metal_rough_sampler = default_material.default_sampler_linear,
          .normal_image = default_material.normal_image,
