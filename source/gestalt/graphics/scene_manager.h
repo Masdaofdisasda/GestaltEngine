@@ -5,7 +5,6 @@
 #include "asset_loader.h"
 #include "scene_components.h"
 
-#include "materials.h"
 #include "resource_manager.h"
 #include "vk_descriptors.h"
 
@@ -16,12 +15,11 @@ class scene_manager {
   vk_gpu gpu_ = {};
   std::shared_ptr<resource_manager> resource_manager_;
   std::unique_ptr<asset_loader> asset_loader_ = std::make_unique<asset_loader>();
-  vk_deletion_service deletion_service_ = {};
 
   void init_default_data(); // todo use resource manager
-  void build_scene_graph(const std::vector<fastgltf::Node>& nodes);
-  void create_entities(std::vector<fastgltf::Node> nodes);
-  void build_hierarchy(std::vector<fastgltf::Node> nodes);
+  void build_scene_graph(const std::vector<fastgltf::Node>& nodes, const size_t& mesh_offset);
+  void create_entities(std::vector<fastgltf::Node> nodes, const size_t& node_offset);
+  void build_hierarchy(std::vector<fastgltf::Node> nodes, const size_t& node_offset);
   void link_orphans_to_root();
 
   std::vector<entity_component> scene_graph_;
@@ -43,9 +41,8 @@ public:
   void add_camera_component(entity entity, const CameraComponent& camera);
   void add_light_component(entity entity, const LightComponent& light);
   size_t create_material(
-                    const gltf_material& material,
-                    const pbr_config& config = pbr_config{},
-                    const std::string& name = "") const;
+      const pbr_material& config = pbr_material{},
+      const std::string& name = "") const;
   void set_transform_component(entity entity, const glm::vec3& position,
                                const glm::quat& rotation = glm::quat(0.f, 0.f, 0.f, 0.f),
                                const glm::vec3& scale = glm::vec3(1.f));

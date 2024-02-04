@@ -254,20 +254,18 @@ void imgui_gui::show_scene_hierarchy_window() {
               auto& config = material.config;
 
               if (ImGui::CollapsingHeader("Albedo", ImGuiTreeNodeFlags_DefaultOpen)) {
-                ImGui::DragFloat4("Factor", &config.albedo_factor.x, 0.01f, 0.0f, 1.0f, "%.2f");
+                ImGui::DragFloat4("Factor", &config.constants.albedo_factor.x, 0.01f, 0.0f, 1.0f, "%.2f");
                 ImGui::Checkbox("Use Texture", &config.use_albedo_tex);
                 if (config.use_albedo_tex) {
-                  ImGui::Text("Texture ID: %zu", config.albedo_tex);
                   ImGui::Text("URI: %s", config.albedo_uri.c_str());
                 }
               }
 
               if (ImGui::CollapsingHeader("Metallic-Roughness", ImGuiTreeNodeFlags_DefaultOpen)) {
-                ImGui::DragFloat2("Factor", &config.metal_rough_factor.x, 0.01f, 0.0f, 1.0f,
+                ImGui::DragFloat2("Factor", &config.constants.metal_rough_factor.x, 0.01f, 0.0f, 1.0f,
                                   "%.2f");
                 ImGui::Checkbox("Use Texture", &config.use_metal_rough_tex);
                 if (config.use_metal_rough_tex) {
-                  ImGui::Text("Texture ID: %zu", config.metal_rough_tex);
                   ImGui::Text("URI: %s", config.metal_rough_uri.c_str());
                 }
               }
@@ -276,7 +274,6 @@ void imgui_gui::show_scene_hierarchy_window() {
                 ImGui::DragFloat("Scale", &config.normal_scale, 0.01f, 0.0f, 10.0f, "%.2f");
                 ImGui::Checkbox("Use Texture", &config.use_normal_tex);
                 if (config.use_normal_tex) {
-                  ImGui::Text("Texture ID: %zu", config.normal_tex);
                   ImGui::Text("URI: %s", config.normal_uri.c_str());
                 }
               }
@@ -285,7 +282,6 @@ void imgui_gui::show_scene_hierarchy_window() {
                 ImGui::DragFloat3("Factor", &config.emissive_factor.x, 0.01f, 0.0f, 10.0f, "%.2f");
                 ImGui::Checkbox("Use Texture", &config.use_emissive_tex);
                 if (config.use_emissive_tex) {
-                  ImGui::Text("Texture ID: %zu", config.emissive_tex);
                   ImGui::Text("URI: %s", config.emissive_uri.c_str());
                 }
               }
@@ -295,7 +291,6 @@ void imgui_gui::show_scene_hierarchy_window() {
                                  "%.2f");
                 ImGui::Checkbox("Use Texture", &config.use_occlusion_tex);
                 if (config.use_occlusion_tex) {
-                  ImGui::Text("Texture ID: %zu", config.occlusion_tex);
                   ImGui::Text("URI: %s", config.occlusion_uri.c_str());
                 }
               }

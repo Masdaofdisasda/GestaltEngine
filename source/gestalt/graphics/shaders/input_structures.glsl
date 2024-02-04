@@ -13,7 +13,7 @@ layout(set = 1, binding = 1) uniform sampler2D textures[];
 layout(set = 2, binding = 2) uniform GLTFMaterialData{   
 
 	vec4 colorFactors;
-	vec4 metal_rough_factors;
+	vec2 metal_rough_factors;
 	
 } materialData[];
 

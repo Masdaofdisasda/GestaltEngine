@@ -38,15 +38,15 @@ void resource_manager::init(const vk_gpu& gpu) {
 
   const uint32_t maxTextures = 1200;
 
-  material_data_buffer_ = create_buffer(sizeof(gltf_material::MaterialConstants)
+  material_data_buffer_ = create_buffer(sizeof(pbr_material::material_constants)
                           * maxTextures,  // TODO decide on material count dynamically
       VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-  gltf_material::MaterialConstants defaultMaterialConstants = {};  // Populate with default values
-  gltf_material::MaterialConstants* mappedData;
+  pbr_material::material_constants defaultMaterialConstants = {};  // Populate with default values
+  pbr_material::material_constants* mappedData;
   vmaMapMemory(gpu_.allocator, material_data_buffer_.allocation, (void**)&mappedData);
 
   for (uint32_t i = 0; i < maxTextures; ++i) {
-    memcpy(&mappedData[i], &defaultMaterialConstants, sizeof(gltf_material::MaterialConstants));
+    memcpy(&mappedData[i], &defaultMaterialConstants, sizeof(pbr_material::material_constants));
   }
 
   vmaUnmapMemory(gpu_.allocator, material_data_buffer_.allocation);
@@ -54,7 +54,7 @@ void resource_manager::init(const vk_gpu& gpu) {
 
   writer.clear();
   writer.write_buffer(2, material_data_buffer_.buffer,
-                      sizeof(gltf_material::MaterialConstants) * maxTextures,
+                      sizeof(pbr_material::material_constants) * maxTextures,
                            0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 
   materialLayout
@@ -85,6 +85,13 @@ void resource_manager::init(const vk_gpu& gpu) {
 }
 
 void resource_manager::cleanup() {
+  for (auto& image : database_->get_images()) {
+       destroy_image(image);
+  }
+  for (const auto& sampler : database_->get_samplers()) {
+       vkDestroySampler(gpu_.device, sampler, nullptr);
+  }
+
   destroy_buffer(material_data_buffer_);
   vkDestroyDescriptorSetLayout(gpu_.device, materialLayout, nullptr);
   descriptorPool.destroy_pools(gpu_.device);
@@ -319,39 +326,37 @@ AllocatedImage resource_manager::create_cubemap(const void* imageData, VkExtent3
   return new_image;
 }
 
-void resource_manager::write_material(const gltf_material& material,
+void resource_manager::write_material(const pbr_material& material,
                                       const uint32_t material_id) {
-  gltf_material::MaterialResources resources = material.resources;
-  gltf_material::MaterialConstants constants = material.constants;
 
   writer.clear();
 
   std::vector<VkDescriptorImageInfo> imageInfos
-      = {{resources.colorSampler, resources.colorImage.imageView,
+      = {{material.resources.color_sampler, material.resources.color_image.imageView,
           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-         {resources.metalRoughSampler, resources.metalRoughImage.imageView,
+         {material.resources.metal_rough_sampler, material.resources.metal_rough_image.imageView,
           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-         {resources.normalSampler, resources.normalImage.imageView,
+         {material.resources.normal_sampler, material.resources.normal_image.imageView,
           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-         {resources.emissiveSampler, resources.emissiveImage.imageView,
+         {material.resources.emissive_sampler, material.resources.emissive_image.imageView,
           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-         {resources.occlusionSampler, resources.occlusionImage.imageView,
+         {material.resources.occlusion_sampler, material.resources.occlusion_image.imageView,
           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
 
   writer.write_image_array(1, imageInfos, imageInfos.size() * material_id);
 
   writer.update_set(gpu_.device, materialSet);
 
-  gltf_material::MaterialConstants* mappedData;
+  pbr_material::material_constants* mappedData;
   vmaMapMemory(gpu_.allocator, material_data_buffer_.allocation, (void**)&mappedData);
 
-  memcpy(&mappedData[material_id], &constants, sizeof(gltf_material::MaterialConstants));
+  memcpy(&mappedData[material_id], &material.constants, sizeof(pbr_material::material_constants));
 
   vmaUnmapMemory(gpu_.allocator, material_data_buffer_.allocation);
 
   writer.clear();
-  writer.write_buffer(2, material_data_buffer_.buffer, sizeof(gltf_material::MaterialConstants),
-                      sizeof(gltf_material::MaterialConstants) * material_id,
+  writer.write_buffer(2, material_data_buffer_.buffer, sizeof(pbr_material::material_constants),
+                      sizeof(pbr_material::material_constants) * material_id,
                       VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
   //writer.update_set(gpu_.device, materialConstantsSet);
 }

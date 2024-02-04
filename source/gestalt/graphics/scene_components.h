@@ -65,40 +65,56 @@ private:
   float outerCone_;      // Used for spot lights
 };
 
-struct pbr_config {
-  glm::vec4 albedo_factor{0.f};
+struct pbr_material {
   bool use_albedo_tex{false};
-  size_t albedo_tex{no_component};
   std::string albedo_uri;
 
-  glm::vec2 metal_rough_factor{0.f};
   bool use_metal_rough_tex{false};
-  size_t metal_rough_tex{no_component};
   std::string metal_rough_uri;
 
   float normal_scale = 1.f;
   bool use_normal_tex{false};
-  size_t normal_tex{no_component};
   std::string normal_uri;
 
   glm::vec3 emissive_factor{0.f};
   bool use_emissive_tex{false};
-  size_t emissive_tex{no_component};
   std::string emissive_uri;
 
   float occlusion_strength = 1.f;
   bool use_occlusion_tex{false};
-  size_t occlusion_tex{no_component};
   std::string occlusion_uri;
 
   float alpha_cutoff = 0.5f;
   bool double_sided{false};
   bool transparent{false};
+
+  struct material_constants {
+    glm::vec4 albedo_factor{0.f};
+    glm::vec2 metal_rough_factor{0.f};
+    // glm::vec3 emissiveFactor;
+    // float normalScale;
+    // float occlusionStrength;
+    //  Additional padding or data as needed
+    // glm::vec4 extra[14];  // Adjust the padding based on your new data
+  } constants;
+
+  struct material_resources {
+    AllocatedImage color_image;
+    VkSampler color_sampler;
+    AllocatedImage metal_rough_image;
+    VkSampler metal_rough_sampler;
+    AllocatedImage normal_image;
+    VkSampler normal_sampler;
+    AllocatedImage emissive_image;
+    VkSampler emissive_sampler;
+    AllocatedImage occlusion_image;
+    VkSampler occlusion_sampler;
+  } resources;
 };
 
 struct material_component {
   std::string name;
-  pbr_config config;
+  pbr_material config;
 };
 
 struct transform_component {

@@ -1,11 +1,6 @@
 ﻿#pragma once 
 #include <vk_types.h>
 
-#include "materials.h"
-#include "vk_deletion_service.h"
-#include "vk_descriptors.h"
-#include "vk_gpu.h"
-
 class PipelineBuilder {
 public:
   std::vector<VkPipelineShaderStageCreateInfo> _shaderStages;

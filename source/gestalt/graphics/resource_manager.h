@@ -5,7 +5,6 @@
 #include "vk_gpu.h"
 #include "vk_types.h"
 #include "vk_descriptors.h"
-#include "materials.h"
 
 class resource_manager {
   vk_gpu gpu_ = {};
@@ -50,6 +49,6 @@ public:
   AllocatedImage create_cubemap_from_HDR(std::vector<float>& image_data, int h, int w);
   AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
                               bool mipmapped = false, bool cubemap = false);
-  void write_material(const gltf_material& material, uint32_t material_id);
+  void write_material(const pbr_material& material, const uint32_t material_id);
   void destroy_image(const AllocatedImage& img);
 };
