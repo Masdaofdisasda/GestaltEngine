@@ -1,6 +1,7 @@
 #pragma once
 #include <fastgltf/types.hpp>
 
+#include "database.h"
 #include "vk_gpu.h"
 #include "vk_types.h"
 #include "vk_descriptors.h"
@@ -8,6 +9,7 @@
 
 class resource_manager {
   vk_gpu gpu_ = {};
+  std::unique_ptr<database> database_ = std::make_unique<database>();
 
 public:
   // scene data for the gpu
@@ -27,6 +29,8 @@ public:
   VkDescriptorSetLayout materialConstantsLayout;
   VkDescriptorSetLayout IblLayout;
 
+  database& get_database() const { return *database_; }
+
   void init(const vk_gpu& gpu);
 
   void cleanup();
@@ -34,7 +38,7 @@ public:
   AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage,
                                 VmaMemoryUsage memoryUsage);
 
-  void upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
+  void upload_mesh();
   void destroy_buffer(const AllocatedBuffer& buffer);
 
   AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage,

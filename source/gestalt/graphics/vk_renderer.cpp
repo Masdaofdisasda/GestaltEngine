@@ -301,11 +301,15 @@ void pbr_pass::execute(VkCommandBuffer cmd) {
 }
 
 void vk_renderer::init(const vk_gpu& gpu, const sdl_window& window,
-                       resource_manager* resource_manager,
-                       const bool& resize_requested, engine_stats stats) {
+                       const std::shared_ptr<resource_manager>& resource_manager,
+                       const std::shared_ptr<scene_manager>& scene_manager,
+                       const std::shared_ptr<imgui_gui>& imgui_gui, const bool& resize_requested,
+                       engine_stats stats) {
   gpu_ = gpu;
   window_ = window;
   resource_manager_ = resource_manager;
+  scene_manager_ = scene_manager;
+  imgui_ = imgui_gui;
   resize_requested_ = resize_requested;
   stats_ = stats;
 

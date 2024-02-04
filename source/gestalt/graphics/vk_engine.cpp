@@ -1,6 +1,4 @@
-﻿//> includes
-#include "vk_engine.h"
-
+﻿#include "vk_engine.h"
 
 #if 0
 #define VMA_DEBUG_INITIALIZE_ALLOCATIONS 1
@@ -19,8 +17,6 @@
 
 #include <vk_initializers.h>
 #include <vk_types.h>
-#include <vk_images.h>
-#include <vk_pipelines.h>
 
 #include <chrono>
 #include <thread>
@@ -30,7 +26,7 @@ render_engine* loaded_engine = nullptr;
 constexpr bool use_validation_layers = true;
 
 void render_engine::init() {
-  // only one engine initialization is allowed with the application.
+
   assert(loaded_engine == nullptr);
   loaded_engine = this;
 
@@ -39,20 +35,19 @@ void render_engine::init() {
   gpu_.init(use_validation_layers, window_,
             [this](auto func) { this->immediate_submit(std::move(func)); });
 
-  resource_manager_.init(gpu_);
+  resource_manager_->init(gpu_);
 
-  renderer_.init(gpu_, window_, &resource_manager_, resize_requested_, stats_);
-  scene_manager_.init(gpu_, &resource_manager_);
-  renderer_.scene_manager_ = &scene_manager_;
+  renderer_->init(gpu_, window_, resource_manager_, scene_manager_, imgui_, resize_requested_, stats_);
+
+  scene_manager_->init(gpu_, resource_manager_);
 
   register_gui_actions();
-  imgui_.init(gpu_, window_, renderer_.swapchain, gui_actions_);
-  renderer_.imgui_ = &imgui_;
+  imgui_->init(gpu_, window_, renderer_->swapchain, gui_actions_);
 
 
-  renderer_.scene_data.ambientColor = glm::vec4(0.1f);
-  renderer_.scene_data.sunlightColor = glm::vec4(1.f);
-  renderer_.scene_data.sunlightDirection = glm::vec4(0.1, 0.5, 0.1, 1.5f);
+  renderer_->scene_data.ambientColor = glm::vec4(0.1f);
+  renderer_->scene_data.sunlightColor = glm::vec4(1.f);
+  renderer_->scene_data.sunlightDirection = glm::vec4(0.1, 0.5, 0.1, 1.5f);
 
   for (auto& cam : camera_positioners_) {
     auto free_fly_camera_ptr = std::make_unique<free_fly_camera>();
@@ -73,29 +68,31 @@ void render_engine::register_gui_actions() {
     camera_positioners_.push_back(std::move(free_fly_camera_ptr));
   };
   gui_actions_.get_stats = [this]() -> engine_stats& { return stats_; };
-  gui_actions_.get_scene_data = [this]() -> gpu_scene_data& { return renderer_.scene_data; };
-  gui_actions_.get_scene_root = [this]() -> const entity_component& { return scene_manager_.get_root(); };
+  gui_actions_.get_scene_data = [this]() -> gpu_scene_data& { return renderer_->scene_data; };
+  gui_actions_.get_scene_root
+      = [this]() -> const entity_component& { return scene_manager_->get_root(); };
   gui_actions_.get_scene_object = [this](const entity entity) -> entity_component& {
-       return scene_manager_.get_scene_object_by_entity(entity).value();
+    return scene_manager_->get_scene_object_by_entity(entity).value();
   };
   gui_actions_.get_transform_component = [this](const size_t transform) -> transform_component& {
-    return scene_manager_.get_transform(transform);
+    return resource_manager_->get_database().get_transform(transform);
   };
-  gui_actions_.get_mesh_component
-      = [this](const size_t mesh) -> mesh_component& { return scene_manager_.get_mesh(mesh); };
+  gui_actions_.get_mesh_component = [this](const size_t mesh) -> mesh_component& {
+    return resource_manager_->get_database().get_mesh(mesh);
+  };
   gui_actions_.get_surface = [this](const size_t surface) -> mesh_surface& {
-    return scene_manager_.get_surface(surface);
+    return resource_manager_->get_database().get_surface(surface);
   };
   gui_actions_.get_material = [this](const size_t material) -> material_component& {
-       return scene_manager_.get_material(material);
+    return resource_manager_->get_database().get_material(material);
   };
 }
 
 void render_engine::immediate_submit(std::function<void(VkCommandBuffer cmd)> function) {
-    VK_CHECK(vkResetFences(gpu_.device, 1, &renderer_.sync.imgui_fence));
-    VK_CHECK(vkResetCommandBuffer(renderer_.commands.imgui_command_buffer, 0));
+    VK_CHECK(vkResetFences(gpu_.device, 1, &renderer_->sync.imgui_fence));
+    VK_CHECK(vkResetCommandBuffer(renderer_->commands.imgui_command_buffer, 0));
 
-    VkCommandBuffer cmd = renderer_.commands.imgui_command_buffer;
+    VkCommandBuffer cmd = renderer_->commands.imgui_command_buffer;
 
     VkCommandBufferBeginInfo cmdBeginInfo
         = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -112,9 +109,9 @@ void render_engine::immediate_submit(std::function<void(VkCommandBuffer cmd)> fu
 
     // submit command buffer to the queue and execute it.
     //  _renderFence will now block until the graphic commands finish execution
-    VK_CHECK(vkQueueSubmit2(gpu_.graphics_queue, 1, &submit, renderer_.sync.imgui_fence));
+    VK_CHECK(vkQueueSubmit2(gpu_.graphics_queue, 1, &submit, renderer_->sync.imgui_fence));
 
-    VK_CHECK(vkWaitForFences(gpu_.device, 1, &renderer_.sync.imgui_fence, true, 9999999999));
+    VK_CHECK(vkWaitForFences(gpu_.device, 1, &renderer_->sync.imgui_fence, true, 9999999999));
 }
 
 void render_engine::cleanup() {
@@ -123,10 +120,10 @@ void render_engine::cleanup() {
 
       vkDeviceWaitIdle(gpu_.device);
 
-      imgui_.cleanup();
-      scene_manager_.cleanup();
-      renderer_.cleanup();
-      resource_manager_.cleanup();
+      imgui_->cleanup();
+      scene_manager_->cleanup();
+      renderer_->cleanup();
+      resource_manager_->cleanup();
       gpu_.cleanup();
       window_.cleanup();
     }
@@ -145,11 +142,11 @@ void render_engine::update_scene() {
     // to opengl and gltf axis
     projection[1][1] *= -1;
 
-    renderer_.scene_data.view = view;
-    renderer_.scene_data.proj = projection;
-    renderer_.scene_data.viewproj = projection * view;
+    renderer_->scene_data.view = view;
+    renderer_->scene_data.proj = projection;
+    renderer_->scene_data.viewproj = projection * view;
 
-    scene_manager_.update_scene(renderer_.main_draw_context_);
+    scene_manager_->update_scene(renderer_->main_draw_context_);
     //scene_manager_.loaded_scenes_["structure"]->Draw(glm::mat4{1.f}, renderer_.main_draw_context_);
 }
 
@@ -177,7 +174,7 @@ void render_engine::run()
           }
         }
 
-        imgui_.update(e);
+        imgui_->update(e);
       }
 
       active_camera_.update(time_tracking_service_.get_delta_time(), input_system_.get_movement());
@@ -189,15 +186,15 @@ void render_engine::run()
       }
 
       if (resize_requested_) {
-        renderer_.swapchain.resize_swapchain(window_);
+        renderer_->swapchain.resize_swapchain(window_);
         resize_requested_ = false;
       }
 
-      imgui_.new_frame(); // TODO
+      imgui_->new_frame();
 
       update_scene();
 
-      renderer_.draw(); 
+      renderer_->draw(); 
     }
 
     // get clock again, compare with start clock

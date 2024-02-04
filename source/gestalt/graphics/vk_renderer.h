@@ -4,7 +4,7 @@
 #include "resource_manager.h"
 #include "vk_types.h"
 #include "vk_gpu.h"
-#include "vk_scene_manager.h"
+#include "scene_manager.h"
 
 #include "vk_pipelines.h"
 #include "vk_swapchain.h"
@@ -79,9 +79,9 @@ class vk_renderer {
 public:
   vk_gpu gpu_ = {};
   sdl_window window_;
-  resource_manager* resource_manager_;
-  vk_scene_manager* scene_manager_; //WIP
-  imgui_gui* imgui_;
+  std::shared_ptr<resource_manager> resource_manager_;
+  std::shared_ptr<scene_manager> scene_manager_;
+  std::shared_ptr<imgui_gui> imgui_;
 
   vk_swapchain swapchain;
   vk_command commands;
@@ -101,7 +101,11 @@ public:
   gpu_scene_data scene_data;
   AllocatedBuffer gpu_scene_data_buffer;
 
-  void init(const vk_gpu& gpu, const sdl_window& window, resource_manager* resource_manager, const bool& resize_requested, engine_stats stats);
+  void init(const vk_gpu& gpu, const sdl_window& window,
+            const std::shared_ptr<resource_manager>& resource_manager,
+            const std::shared_ptr<scene_manager>& scene_manager,
+            const std::shared_ptr<imgui_gui>& imgui_gui, const bool& resize_requested,
+            engine_stats stats);
 
   void draw();
 

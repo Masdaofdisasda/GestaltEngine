@@ -21,6 +21,7 @@ struct mesh_surface {
 };
 
 struct mesh_component {
+  std::string name;
   std::vector<size_t> surfaces;
 };
 

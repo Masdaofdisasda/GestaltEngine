@@ -5,7 +5,7 @@
 #include "vk_gpu.h"
 #include "vk_swapchain.h"
 #include "gui_actions.h"
-#include "vk_scene_manager.h"
+#include "scene_manager.h"
 
 class imgui_gui {
   vk_gpu gpu_ = {};

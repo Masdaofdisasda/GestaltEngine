@@ -12,8 +12,8 @@ add_library(graphics
     vk_pipelines.cpp
     vk_engine.h
     vk_engine.cpp
-    vk_scene_manager.h
-    vk_scene_manager.cpp
+    scene_manager.h
+    scene_manager.cpp
     camera.cpp
     camera.h
     time_tracking_service.h
@@ -41,6 +41,10 @@ vk_renderer.cpp
 scene_components.h
 cubemap_util.cpp
 cubemap_util.h
+asset_loader.h
+asset_loader.cpp
+database.h
+database.cpp
 )
 
 target_compile_features(graphics PRIVATE cxx_std_20)
@@ -48,7 +52,7 @@ target_compile_features(graphics PRIVATE cxx_std_20)
 target_include_directories(graphics PUBLIC 
     "${CMAKE_CURRENT_SOURCE_DIR}"
     ${Vulkan_INCLUDE_DIRS}
-${Stb_SOURCE_DIR}
+	${Stb_SOURCE_DIR}
 )
 
 target_link_libraries(graphics PRIVATE fmt::fmt vk-bootstrap::vk-bootstrap)

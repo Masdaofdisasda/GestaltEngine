@@ -4,7 +4,7 @@
 #include <functional>
 
 #include "vk_types.h"
-#include "vk_scene_manager.h"
+#include "scene_manager.h"
 #include "sdl_window.h"
 #include "vk_gpu.h"
 #include "camera.h"
@@ -31,11 +31,11 @@ private:
   vk_gpu gpu_ = {};
   void immediate_submit(std::function<void(VkCommandBuffer cmd)> function);
 
-  vk_renderer renderer_ = {};
-  vk_scene_manager scene_manager_ = {};
+  std::shared_ptr<vk_renderer> renderer_ = std::make_shared<vk_renderer>();
+  std::shared_ptr<scene_manager> scene_manager_ = std::make_shared<scene_manager>();
 
   gui_actions gui_actions_;
-  imgui_gui imgui_ = {};
+  std::shared_ptr<imgui_gui> imgui_ = std::make_shared<imgui_gui>();
   void register_gui_actions();
 
   void update_scene();
@@ -47,7 +47,7 @@ private:
   // utility services
   time_tracking_service time_tracking_service_;
   input_system input_system_;
-  resource_manager resource_manager_ = {};
+  std::shared_ptr<resource_manager> resource_manager_ = std::make_shared<resource_manager>();
 
   engine_stats stats_ = {};
 };

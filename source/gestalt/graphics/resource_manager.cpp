@@ -91,7 +91,9 @@ void resource_manager::cleanup() {
 }
 
 // TODO : make this work with multiple meshes/scenes by resizing the buffers
-void resource_manager::upload_mesh(const std::span<uint32_t> indices, const std::span<Vertex> vertices) {
+void resource_manager::upload_mesh() {
+  const std::span<uint32_t> indices = database_->get_indices();
+  const std::span<Vertex> vertices = database_->get_vertices();
   //> mesh_create_1
   const size_t vertex_buffer_size = vertices.size() * sizeof(Vertex);
   const size_t index_buffer_size = indices.size() * sizeof(uint32_t);
