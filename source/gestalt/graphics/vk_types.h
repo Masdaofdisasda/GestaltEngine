@@ -49,7 +49,7 @@ struct GPUGLTFMaterial {
 
 static_assert(sizeof(GPUGLTFMaterial) == 256);
 
-struct gpu_scene_data {
+struct per_frame_data {
   glm::mat4 view;
   glm::mat4 proj;
   glm::mat4 viewproj;

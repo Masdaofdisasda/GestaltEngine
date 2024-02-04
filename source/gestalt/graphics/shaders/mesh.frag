@@ -276,12 +276,7 @@ void main() {
     vec2 UV = inUV;
 
     //vec4 Kd = texture(colorTex, UV);
-	bool useAlbedoTex = (materialData[inMaterialIndex].texture_flags & 1) != 0;
-	vec4 Kd = vec4(1.0, 0.0, 0.0, 1.0);
-	if (useAlbedoTex == true) {
-		//kd = texture(nonuniformEXT(textures[albedoIndex]), UV);
-		Kd = vec4(0.0, 0.0, 1.0, 1.0);
-	}
+    vec4 Kd = texture(nonuniformEXT(textures[albedoIndex]), UV);
 
     //vec3 normal_sample = texture(normalTex, UV).rgb;
     vec3 normal_sample = texture(nonuniformEXT(textures[normalIndex]), UV).rgb;

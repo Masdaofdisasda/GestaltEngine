@@ -42,6 +42,11 @@ cubemap_util.cpp
 cubemap_util.h
 asset_loader.cpp
 asset_loader.h
+skybox_pass.h
+skybox_pass.cpp
+render_pass.h
+pbr_pass.h
+pbr_pass.cpp
 )
 
 target_compile_features(graphics PRIVATE cxx_std_20)

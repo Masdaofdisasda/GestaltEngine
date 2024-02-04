@@ -44,11 +44,6 @@ void render_engine::init() {
   register_gui_actions();
   imgui_->init(gpu_, window_, renderer_->swapchain, gui_actions_);
 
-
-  renderer_->scene_data.ambientColor = glm::vec4(0.1f);
-  renderer_->scene_data.sunlightColor = glm::vec4(1.f);
-  renderer_->scene_data.sunlightDirection = glm::vec4(0.1, 0.5, 0.1, 1.5f);
-
   for (auto& cam : camera_positioners_) {
     auto free_fly_camera_ptr = std::make_unique<free_fly_camera>();
     free_fly_camera_ptr->init(glm::vec3(0, 0,-15), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
@@ -68,7 +63,7 @@ void render_engine::register_gui_actions() {
     camera_positioners_.push_back(std::move(free_fly_camera_ptr));
   };
   gui_actions_.get_stats = [this]() -> engine_stats& { return stats_; };
-  gui_actions_.get_scene_data = [this]() -> gpu_scene_data& { return renderer_->scene_data; };
+  gui_actions_.get_scene_data = [this]() -> per_frame_data& { return renderer_->per_frame_data_; };
   gui_actions_.get_scene_root
       = [this]() -> const entity_component& { return scene_manager_->get_root(); };
   gui_actions_.get_scene_object = [this](const entity entity) -> entity_component& {
@@ -142,9 +137,9 @@ void render_engine::update_scene() {
     // to opengl and gltf axis
     projection[1][1] *= -1;
 
-    renderer_->scene_data.view = view;
-    renderer_->scene_data.proj = projection;
-    renderer_->scene_data.viewproj = projection * view;
+    renderer_->per_frame_data_.view = view;
+    renderer_->per_frame_data_.proj = projection;
+    renderer_->per_frame_data_.viewproj = projection * view;
 
     scene_manager_->update_scene(renderer_->main_draw_context_);
     //scene_manager_.loaded_scenes_["structure"]->Draw(glm::mat4{1.f}, renderer_.main_draw_context_);

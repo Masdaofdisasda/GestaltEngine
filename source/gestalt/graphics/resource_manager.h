@@ -11,22 +11,31 @@ class resource_manager {
   std::unique_ptr<database> database_ = std::make_unique<database>();
 
 public:
-  // scene data for the gpu
   gpu_mesh_buffers scene_geometry_;
-  AllocatedBuffer material_data_buffer_;
+  AllocatedBuffer per_frame_data_buffer;
+
+  struct material_data {
+  VkDescriptorSet resource_set;
+  VkDescriptorSetLayout resource_layout;
+
+  AllocatedBuffer constants_buffer;
+  VkDescriptorSet constants_set;
+  VkDescriptorSetLayout constants_layout;
+  } material_data;
+
+  struct ibl_data {
   AllocatedImage environment_map;
   AllocatedImage environment_irradiance_map;
-  AllocatedImage bdrfLUT;
+  AllocatedImage bdrfLUT; // TODO generate this
+
+  VkSampler cube_map_sampler;
+
+  VkDescriptorSet IblSet;
+  VkDescriptorSetLayout IblLayout;
+  } ibl_data;
 
   DescriptorAllocatorGrowable descriptorPool;
   descriptor_writer writer;
-  VkSampler cube_map_sampler;
-  VkDescriptorSet materialSet;
-  VkDescriptorSet materialConstantsSet;
-  VkDescriptorSet IblSet;
-  VkDescriptorSetLayout materialLayout;
-  VkDescriptorSetLayout materialConstantsLayout;
-  VkDescriptorSetLayout IblLayout;
 
   database& get_database() const { return *database_; }
 

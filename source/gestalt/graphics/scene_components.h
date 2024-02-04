@@ -89,22 +89,22 @@ struct pbr_material {
   bool transparent{false};
 
   struct material_constants {
-    int albedo_tex_index;
-    int metal_rough_tex_index;
-    int normal_tex_index;
-    int emissive_tex_index;
-    int occlusion_tex_index;
+    int albedo_tex_index = -1;
+    int metal_rough_tex_index = -1;
+    int normal_tex_index = -1;
+    int emissive_tex_index = -1;
+    int occlusion_tex_index = -1;
 
     int texture_flags = 0;
 
     glm::vec4 albedo_factor{0.f};
     glm::vec2 metal_rough_factor{0.f};
-    // glm::vec3 emissiveFactor;
-    // float normalScale;
+    glm::vec3 emissiveFactor{0.f};
+    float normalScale = 1.f;
     // float occlusionStrength;
-    //  Additional padding or data as needed
-    // glm::vec4 extra[14];  // Adjust the padding based on your new data
   } constants;
+
+  static_assert(sizeof(constants) == 64);
 
   struct material_resources {
     AllocatedImage albedo_image;
