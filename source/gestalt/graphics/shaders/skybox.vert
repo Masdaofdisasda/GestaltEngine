@@ -2,7 +2,7 @@
 
 #extension GL_GOOGLE_include_directive : require
 
-#include "input_structures.glsl"
+#include "per_frame_structs.glsl"
 
 layout(location = 0) out vec3 TexCoords;
 

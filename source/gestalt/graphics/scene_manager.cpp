@@ -85,13 +85,13 @@ void scene_manager::load_environment_map(const std::string& file_path) const {
 size_t scene_manager::create_material(const pbr_material& config,
                                      const std::string& name) const {
   const size_t material_id = resource_manager_->get_database().get_materials_size();
-  fmt::print("creating material {}, mat_id {}\n", name, material_id);
 
   const std::string key = name.empty() ? "material_" + std::to_string(material_id) : name;
   resource_manager_->write_material(config, material_id);
 
   resource_manager_->get_database().add_material(material_component{.name = key, .config = config});
 
+  fmt::print("creating material {}, mat_id {}\n", name, material_id);
   return material_id;
 }
 
@@ -204,7 +204,7 @@ void scene_manager::traverse_scene(const entity entity, const glm::mat4& parent_
   }
 }
 
-void scene_manager::init_default_data() {
+void scene_manager::init_default_data() const {
   auto& default_material = resource_manager_->get_database().default_material_;
 
   uint32_t white = 0xFFFFFFFF;                       // White color for color and occlusion

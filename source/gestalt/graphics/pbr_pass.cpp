@@ -8,12 +8,10 @@ void pbr_pass::init(vk_renderer& renderer) {
   gpu_ = renderer.gpu_;
   renderer_ = &renderer;
 
-  {
-    descriptor_layout_ = descriptor_layout_builder()
-                             .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                                          VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
-                             .build(gpu_.device);
-  }
+  descriptor_layouts_.push_back(renderer_->resource_manager_->per_frame_data_layout);
+  descriptor_layouts_.push_back(renderer_->resource_manager_->ibl_data.IblLayout);
+  descriptor_layouts_.push_back(renderer_->resource_manager_->material_data.resource_layout);
+  descriptor_layouts_.push_back(renderer_->resource_manager_->material_data.constants_layout);
 
   for (auto& frame : renderer_->frames_) {
     // create a descriptor pool
@@ -39,14 +37,9 @@ void pbr_pass::init(vk_renderer& renderer) {
   matrix_range.size = sizeof(GPUDrawPushConstants);
   matrix_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-  VkDescriptorSetLayout layouts[]
-      = {descriptor_layout_, renderer_->resource_manager_->material_data.resource_layout,
-         renderer_->resource_manager_->material_data.constants_layout,
-         renderer_->resource_manager_->ibl_data.IblLayout};
-
   VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
-  mesh_layout_info.setLayoutCount = 4;
-  mesh_layout_info.pSetLayouts = layouts;
+  mesh_layout_info.setLayoutCount = descriptor_layouts_.size();
+  mesh_layout_info.pSetLayouts = descriptor_layouts_.data();
   mesh_layout_info.pPushConstantRanges = &matrix_range;
   mesh_layout_info.pushConstantRangeCount = 1;
 
@@ -86,10 +79,22 @@ void pbr_pass::cleanup() {
   for (auto frame : renderer_->frames_) {
     frame.descriptor_pools.destroy_pools(gpu_.device);
   }
-  vkDestroyDescriptorSetLayout(gpu_.device, descriptor_layout_, nullptr);
 }
 
 void pbr_pass::execute(VkCommandBuffer cmd) {
+  VkDescriptorBufferInfo buffer_info = {};
+  buffer_info.buffer = renderer_->resource_manager_->per_frame_data_buffer.buffer;
+  buffer_info.offset = 0;
+  buffer_info.range = sizeof(per_frame_data);
+
+  VkWriteDescriptorSet descriptor_write = {};
+  descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  descriptor_write.dstBinding = 0;
+  descriptor_write.dstArrayElement = 0;
+  descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  descriptor_write.descriptorCount = 1;
+  descriptor_write.pBufferInfo = &buffer_info;
+
   std::vector<uint32_t> opaque_draws;
   opaque_draws.reserve(renderer_->main_draw_context_.opaque_surfaces.size());
 
@@ -108,14 +113,6 @@ void pbr_pass::execute(VkCommandBuffer cmd) {
     }
     return A.material < B.material;
   });
-
-  descriptor_set_
-      = renderer_->get_current_frame().descriptor_pools.allocate(gpu_.device, descriptor_layout_);
-
-  writer.clear();
-  writer.write_buffer(0, renderer_->resource_manager_->per_frame_data_buffer.buffer,
-                      sizeof(per_frame_data), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-  writer.update_set(gpu_.device, descriptor_set_);
 
   vkCmdBindIndexBuffer(cmd, renderer_->resource_manager_->scene_geometry_.indexBuffer.buffer, 0,
                        VK_INDEX_TYPE_UINT32);
@@ -138,11 +135,13 @@ void pbr_pass::execute(VkCommandBuffer cmd) {
   renderer_->stats_.triangle_count = 0;
 
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, opaquePipeline);
-  VkDescriptorSet descriptorSets[]
-      = {descriptor_set_, renderer_->resource_manager_->material_data.resource_set,
-         renderer_->resource_manager_->material_data.constants_set,
-         renderer_->resource_manager_->ibl_data.IblSet};
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, opaquePipelineLayout, 0, 4,
+  VkDescriptorSet descriptorSets[] = {renderer_->resource_manager_->ibl_data.IblSet,
+                                      renderer_->resource_manager_->material_data.resource_set,
+                                      renderer_->resource_manager_->material_data.constants_set};
+
+  renderer_->vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, opaquePipelineLayout,
+                                       0, 1, &descriptor_write);
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, opaquePipelineLayout, 1, 3,
                           descriptorSets, 0, nullptr);
 
   const VkViewport viewport = {
@@ -167,7 +166,10 @@ void pbr_pass::execute(VkCommandBuffer cmd) {
   }
 
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, transparentPipeline);
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, transparentPipelineLayout, 0, 3,
+
+  renderer_->vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                       transparentPipelineLayout, 0, 1, &descriptor_write);
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, transparentPipelineLayout, 1, 3,
                           descriptorSets, 0, nullptr);
 
   vkCmdSetViewport(cmd, 0, 1, &viewport);

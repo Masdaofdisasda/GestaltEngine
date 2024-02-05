@@ -2,7 +2,6 @@
 
 #include "vk_types.h"
 #include "vk_gpu.h"
-#include "scene_manager.h"
 
 
 class vk_renderer;
@@ -20,7 +19,5 @@ protected:
 
   VkPipeline pipeline_;
   VkPipelineLayout pipeline_layout_;
-  VkDescriptorSetLayout descriptor_layout_;
-  VkDescriptorSet descriptor_set_;
-  DescriptorAllocatorGrowable descriptor_allocator_;
+  std::vector<VkDescriptorSetLayout> descriptor_layouts_;
 };

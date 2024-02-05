@@ -12,7 +12,9 @@ class resource_manager {
 
 public:
   gpu_mesh_buffers scene_geometry_;
+
   AllocatedBuffer per_frame_data_buffer;
+  VkDescriptorSetLayout per_frame_data_layout;
 
   struct material_data {
   VkDescriptorSet resource_set;

@@ -11,8 +11,6 @@ public:
   void cleanup() override;
   void execute(VkCommandBuffer cmd) override;
 
-  descriptor_writer writer;
-
 private:
   VkPipeline opaquePipeline;  // TODO: split into opaque and transparent render passes
   VkPipelineLayout opaquePipelineLayout;

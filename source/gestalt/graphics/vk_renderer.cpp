@@ -33,6 +33,14 @@ void vk_renderer::init(const vk_gpu& gpu, const sdl_window& window,
   per_frame_data_.ambientColor = glm::vec4(0.1f);
   per_frame_data_.sunlightColor = glm::vec4(1.f);
   per_frame_data_.sunlightDirection = glm::vec4(0.1, 0.5, 0.1, 1.5f);
+
+  vkCmdPushDescriptorSetKHR = reinterpret_cast<
+    PFN_vkCmdPushDescriptorSetKHR>(
+    vkGetDeviceProcAddr(gpu_.device, "vkCmdPushDescriptorSetKHR"));
+
+  if (!vkCmdPushDescriptorSetKHR) {
+    throw std::runtime_error("Failed to load vkCmdPushDescriptorSetKHR");
+  }
 }
 
 bool is_visible(const render_object& obj, const glm::mat4& viewproj) {

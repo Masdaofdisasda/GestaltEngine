@@ -45,17 +45,20 @@ void vk_gpu::init(
   // We want a gpu that can write to the SDL surface and supports vulkan 1.3 with the correct
   // features
   vkb::PhysicalDeviceSelector selector{vkb_inst};
-  vkb::PhysicalDevice physicalDevice = selector.set_minimum_version(1, 3)
-                                           .set_required_features_13(features)
-                                           .set_required_features_12(features12)
-                                           .set_surface(surface)
-                                           .select()
-                                           .value();
+  vkb::PhysicalDevice physicalDevice
+      = selector.set_minimum_version(1, 3)
+            .set_required_features_13(features)
+            .set_required_features_12(features12)
+            .add_required_extension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME)
+            .set_surface(surface)
+            .select()
+            .value();
 
   // create the final vulkan device
   vkb::DeviceBuilder deviceBuilder{physicalDevice};
 
-  vkb::Device vkbDevice = deviceBuilder.build().value();
+  vkb::Device vkbDevice
+      = deviceBuilder.build().value();
 
   // Get the VkDevice handle used in the rest of a vulkan application
   device = vkbDevice.device;

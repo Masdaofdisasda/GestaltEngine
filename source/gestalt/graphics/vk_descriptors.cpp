@@ -25,13 +25,17 @@ descriptor_layout_builder& descriptor_layout_builder::add_binding(
 
 void descriptor_layout_builder::clear() { bindings.clear(); }
 
-VkDescriptorSetLayout descriptor_layout_builder::build(VkDevice device) {
+VkDescriptorSetLayout descriptor_layout_builder::build(VkDevice device, bool is_push_descriptor) {
   VkDescriptorSetLayoutCreateInfo info
       = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
          .pNext = nullptr,
          .flags = 0,
          .bindingCount = static_cast<uint32_t>(bindings.size()),
          .pBindings = bindings.data()};
+
+  if (is_push_descriptor) {
+    info.flags |= VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
+  }
 
   VkDescriptorSetLayoutBindingFlagsCreateInfoEXT bindingFlagsInfo
       = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT,

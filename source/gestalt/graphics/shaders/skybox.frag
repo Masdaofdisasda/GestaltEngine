@@ -1,9 +1,13 @@
 #version 450
+
+#extension GL_GOOGLE_include_directive : require
+#include "per_frame_structs.glsl"
+#include "input_structures.glsl"
+
 layout(location = 0) in vec3 TexCoords;
 layout(location = 0) out vec4 FragColor;
 
-layout(set = 0, binding = 1) uniform samplerCube SkyboxTexture;
 
 void main() {
-    FragColor = texture(SkyboxTexture, TexCoords);
+    FragColor = texture(texEnvMap, TexCoords);
 }

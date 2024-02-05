@@ -7,27 +7,14 @@ void skybox_pass::init(vk_renderer& renderer) {
   gpu_ = renderer.gpu_;
   renderer_ = &renderer;
 
-  std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes = {
-      {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2},
-      {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1},
-  };
-
-  descriptor_allocator_.init(gpu_.device, 3, sizes);
-
-  {
-    descriptor_layout_
-        = descriptor_layout_builder()
-              .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
-              .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                           VK_SHADER_STAGE_FRAGMENT_BIT)
-              .build(gpu_.device);
-  }
+  descriptor_layouts_.push_back(renderer_->resource_manager_->per_frame_data_layout);
+  descriptor_layouts_.push_back(renderer_->resource_manager_->ibl_data.IblLayout);
 
   VkPipelineLayoutCreateInfo pipeline_layout_create_info{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
       .pNext = nullptr,
-      .setLayoutCount = 1,
-      .pSetLayouts = &descriptor_layout_,
+      .setLayoutCount = static_cast<uint32_t>(descriptor_layouts_.size()),
+      .pSetLayouts = descriptor_layouts_.data(),
   };
 
   VK_CHECK(vkCreatePipelineLayout(gpu_.device, &pipeline_layout_create_info, nullptr,
@@ -57,27 +44,31 @@ void skybox_pass::init(vk_renderer& renderer) {
 }
 
 void skybox_pass::cleanup() {
-  descriptor_allocator_.destroy_pools(gpu_.device);
-
   vkDestroyPipelineLayout(gpu_.device, pipeline_layout_, nullptr);
   vkDestroyPipeline(gpu_.device, pipeline_, nullptr);
-
-  vkDestroyDescriptorSetLayout(gpu_.device, descriptor_layout_, nullptr);
 }
 
 void skybox_pass::execute(const VkCommandBuffer cmd) {
-  descriptor_set_ = descriptor_allocator_.allocate(gpu_.device, descriptor_layout_);
+  VkDescriptorBufferInfo buffer_info = {};
+  buffer_info.buffer = renderer_->resource_manager_->per_frame_data_buffer.buffer;
+  buffer_info.offset = 0;
+  buffer_info.range = sizeof(per_frame_data);
 
-  writer_.clear();
-  writer_.write_buffer(0, renderer_->resource_manager_->per_frame_data_buffer.buffer,
-                      sizeof(per_frame_data), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-  writer_.write_image(1, renderer_->resource_manager_->ibl_data.environment_map.imageView,
-                     renderer_->resource_manager_->ibl_data.cube_map_sampler, VK_IMAGE_LAYOUT_GENERAL,
-                     VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer_.update_set(gpu_.device, descriptor_set_);
+  VkWriteDescriptorSet descriptor_write = {};
+  descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  descriptor_write.dstBinding = 0;
+  descriptor_write.dstArrayElement = 0;
+  descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  descriptor_write.descriptorCount = 1;
+  descriptor_write.pBufferInfo = &buffer_info;
+
+  renderer_->vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
+                            &descriptor_write);
+
+
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
-                          &descriptor_set_, 0, nullptr);
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 1,
+                          &renderer_->resource_manager_->ibl_data.IblSet, 0, nullptr);
   VkViewport viewport = {};
   viewport.x = 0;
   viewport.y = 0;

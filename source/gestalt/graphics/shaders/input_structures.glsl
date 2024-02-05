@@ -1,17 +1,11 @@
-layout(set = 0, binding = 0) uniform  SceneData{   
 
-	mat4 view;
-	mat4 proj;
-	mat4 viewproj;
-	vec4 ambientColor;
-	vec4 sunlightDirection; //w for sun power
-	vec4 sunlightColor;
-} sceneData;
+layout(set = 1, binding = 1) uniform samplerCube texEnvMap;
+layout(set = 1, binding = 2) uniform samplerCube texEnvMapIrradiance;
+//layout(set = 1, binding = 3) uniform samplerCube texBdrfLut;
 
-layout(set = 1, binding = 1) uniform sampler2D textures[];
+layout(set = 2, binding = 4) uniform sampler2D textures[];
 
-layout(set = 2, binding = 2) uniform GLTFMaterialData{   
-
+layout(std430, binding = 5) readonly buffer MaterialConstants {
     int albedo_tex_index;
     int metal_rough_tex_index;
     int normal_tex_index;
@@ -22,8 +16,4 @@ layout(set = 2, binding = 2) uniform GLTFMaterialData{
 
 	vec4 colorFactors;
 	vec2 metal_rough_factors;
-	
 } materialData[];
-
-layout(set = 3, binding = 3) uniform samplerCube texEnvMap;
-layout(set = 3, binding = 4) uniform samplerCube texEnvMapIrradiance;

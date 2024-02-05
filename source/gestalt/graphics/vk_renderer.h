@@ -18,7 +18,9 @@ class vk_renderer {
   std::unique_ptr<render_pass> skybox_pass_;
   std::unique_ptr<render_pass> pbr_pass_;
 
+
 public:
+  PFN_vkCmdPushDescriptorSetKHR vkCmdPushDescriptorSetKHR;
   vk_gpu gpu_ = {};
   sdl_window window_;
   std::shared_ptr<resource_manager> resource_manager_;

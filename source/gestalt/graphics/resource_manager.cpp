@@ -36,8 +36,8 @@ AllocatedBuffer resource_manager::create_buffer(size_t allocSize, VkBufferUsageF
 void resource_manager::init(const vk_gpu& gpu) {
   gpu_ = gpu;
 
-  per_frame_data_buffer = create_buffer(
-      sizeof(per_frame_data), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+  per_frame_data_buffer = create_buffer(sizeof(per_frame_data), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                                        VMA_MEMORY_USAGE_CPU_TO_GPU);
 
   constexpr uint32_t max_materials = 240;
   constexpr uint32_t max_pbr_textures = 5;
@@ -45,34 +45,38 @@ void resource_manager::init(const vk_gpu& gpu) {
 
   material_data.constants_buffer
       = create_buffer(sizeof(pbr_material::material_constants) * max_materials,
-                      VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
   pbr_material::material_constants defaultMaterialConstants = {};  // Populate with default values
   pbr_material::material_constants* mappedData;
   vmaMapMemory(gpu_.allocator, material_data.constants_buffer.allocation, (void**)&mappedData);
 
-  for (uint32_t i = 0; i < max_textures; ++i) {
+  for (uint32_t i = 0; i < max_materials; ++i) {
     memcpy(&mappedData[i], &defaultMaterialConstants, sizeof(pbr_material::material_constants));
   }
 
   vmaUnmapMemory(gpu_.allocator, material_data.constants_buffer.allocation);
 
   writer.clear();
-  writer.write_buffer(2, material_data.constants_buffer.buffer,
-                      sizeof(pbr_material::material_constants) * max_textures, 0,
-                      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-
+  writer.write_buffer(5, material_data.constants_buffer.buffer,
+                      sizeof(pbr_material::material_constants) * max_materials, 0,
+                      VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+  per_frame_data_layout
+      = descriptor_layout_builder()
+            .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
+            .build(gpu_.device, true);
   material_data.resource_layout = descriptor_layout_builder()
-                                      .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                      .add_binding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                    VK_SHADER_STAGE_FRAGMENT_BIT, true)
                                       .build(gpu_.device);
   material_data.constants_layout
       = descriptor_layout_builder()
-            .add_binding(2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, true)
+            .add_binding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, true)
             .build(gpu_.device);
   ibl_data.IblLayout
       = descriptor_layout_builder()
-            .add_binding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
-            .add_binding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+            .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+            .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
             .build(gpu_.device);
 
   std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes
@@ -352,7 +356,7 @@ void resource_manager::write_material(const pbr_material& material,
          {material.resources.occlusion_sampler, material.resources.occlusion_image.imageView,
           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
 
-  writer.write_image_array(1, imageInfos, imageInfos.size() * material_id);
+  writer.write_image_array(4, imageInfos, imageInfos.size() * material_id);
 
   writer.update_set(gpu_.device, material_data.resource_set);
 
@@ -364,9 +368,9 @@ void resource_manager::write_material(const pbr_material& material,
   vmaUnmapMemory(gpu_.allocator, material_data.constants_buffer.allocation);
 
   writer.clear();
-  writer.write_buffer(2, material_data.constants_buffer.buffer, sizeof(pbr_material::material_constants),
+  writer.write_buffer(5, material_data.constants_buffer.buffer, sizeof(pbr_material::material_constants),
                       sizeof(pbr_material::material_constants) * material_id,
-                      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+                      VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
   writer.update_set(gpu_.device, material_data.constants_set);
 }
 
@@ -518,9 +522,9 @@ void resource_manager::load_and_process_cubemap(const std::string& file_path) {
   vkCreateSampler(gpu_.device, &sampl, nullptr, &ibl_data.cube_map_sampler);
 
   writer.clear();
-  writer.write_image(3, ibl_data.environment_map.imageView, ibl_data.cube_map_sampler,
+  writer.write_image(1, ibl_data.environment_map.imageView, ibl_data.cube_map_sampler,
                      VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.write_image(4, ibl_data.environment_irradiance_map.imageView, ibl_data.cube_map_sampler,
+  writer.write_image(2, ibl_data.environment_irradiance_map.imageView, ibl_data.cube_map_sampler,
                      VK_IMAGE_LAYOUT_GENERAL,
                      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.update_set(gpu_.device, ibl_data.IblSet);

@@ -12,7 +12,7 @@ struct descriptor_layout_builder {
   descriptor_layout_builder& add_binding(uint32_t binding, VkDescriptorType type,
                                          VkShaderStageFlags shader_stages, bool bindless = false);
   void clear();
-  VkDescriptorSetLayout build(VkDevice device);
+  VkDescriptorSetLayout build(VkDevice device, bool is_push_descriptor = false);
 };
 
 struct descriptor_writer {
