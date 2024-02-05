@@ -97,7 +97,7 @@ struct pbr_material {
 
     int texture_flags = 0;
 
-    float alpha_cutoff{.5f};
+    float alpha_cutoff{0.f};
     glm::vec4 albedo_factor{0.f};
     glm::vec2 metal_rough_factor{0.f};
     glm::vec3 emissiveFactor{0.f};

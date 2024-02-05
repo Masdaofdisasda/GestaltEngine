@@ -3,10 +3,11 @@
 #include <chrono>
 
 #include "imgui_gui.h"
-#include "pbr_pass.h"
+#include "geometry_pass.h"
 #include "vk_images.h"
 #include "vk_initializers.h"
 #include "skybox_pass.h"
+#include "transparent_pass.h"
 
 void vk_renderer::init(const vk_gpu& gpu, const sdl_window& window,
                        const std::shared_ptr<resource_manager>& resource_manager,
@@ -27,8 +28,10 @@ void vk_renderer::init(const vk_gpu& gpu, const sdl_window& window,
 
   skybox_pass_ = std::make_unique<skybox_pass>();
   skybox_pass_->init(*this);
-  pbr_pass_ = std::make_unique<pbr_pass>();
-  pbr_pass_->init(*this);
+  geometry_pass_ = std::make_unique<geometry_pass>();
+  geometry_pass_->init(*this);
+  transparency_pass = std::make_unique<transparent_pass>();
+  transparency_pass->init(*this);
   
   per_frame_data_.ambientColor = glm::vec4(0.1f);
   per_frame_data_.sunlightColor = glm::vec4(1.f);
@@ -128,7 +131,8 @@ void vk_renderer::draw() {
     // begin clock
     auto start = std::chrono::system_clock::now();
 
-    pbr_pass_->execute(cmd);
+    geometry_pass_->execute(cmd);
+    transparency_pass->execute(cmd);
 
     auto end = std::chrono::system_clock::now();
 

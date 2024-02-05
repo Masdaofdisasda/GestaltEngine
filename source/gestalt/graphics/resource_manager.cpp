@@ -491,14 +491,14 @@ void resource_manager::load_and_process_cubemap(const std::string& file_path) {
     fflush(stdout);
     return;
   }
-  
+  /*
   {
     std::vector<float> img32(w * h * 4);
 
     float24to32(w, h, img, img32.data());
 
     ibl_data.environment_map = create_cubemap_from_HDR(img32, h, w);
-  }
+  }*/
 
   //TODO bdrf convolution
 
@@ -526,6 +526,7 @@ void resource_manager::load_and_process_cubemap(const std::string& file_path) {
   stbi_image_free((void*)filtered);
 
   ibl_data.environment_irradiance_map = create_cubemap_from_HDR(img32, h, w);
+  ibl_data.environment_map = ibl_data.environment_irradiance_map;
 
   VkSamplerCreateInfo sampl = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO, .pNext = nullptr};
   sampl.maxLod = VK_LOD_CLAMP_NONE;

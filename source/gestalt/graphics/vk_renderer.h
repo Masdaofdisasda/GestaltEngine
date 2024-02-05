@@ -16,8 +16,8 @@ class vk_renderer {
   bool resize_requested_{false};
 
   std::unique_ptr<render_pass> skybox_pass_;
-  std::unique_ptr<render_pass> pbr_pass_;
-
+  std::unique_ptr<render_pass> geometry_pass_;
+  std::unique_ptr<render_pass> transparency_pass;
 
 public:
   PFN_vkCmdPushDescriptorSetKHR vkCmdPushDescriptorSetKHR;

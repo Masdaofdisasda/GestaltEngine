@@ -238,8 +238,9 @@ void asset_loader::import_material(fastgltf::Asset& gltf, size_t& sampler_offset
 
   if (mat.alphaMode == fastgltf::AlphaMode::Blend) {
     pbr_config.transparent = true;
+  } else if (mat.alphaMode == fastgltf::AlphaMode::Mask) {
+    pbr_config.constants.alpha_cutoff = mat.alphaCutoff;
   }
-  pbr_config.constants.alpha_cutoff = mat.alphaCutoff;
 
   auto& default_material = resource_manager_->get_database().default_material_;
 

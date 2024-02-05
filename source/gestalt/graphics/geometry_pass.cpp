@@ -1,10 +1,10 @@
-﻿#include "pbr_pass.h"
+﻿#include "geometry_pass.h"
 
 #include "vk_initializers.h"
 #include "vk_pipelines.h"
 #include "vk_renderer.h"
 
-void pbr_pass::init(vk_renderer& renderer) {
+void geometry_pass::init(vk_renderer& renderer) {
   gpu_ = renderer.gpu_;
   renderer_ = &renderer;
 
@@ -47,10 +47,9 @@ void pbr_pass::init(vk_renderer& renderer) {
   VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &newLayout));
 
   PipelineBuilder pipelineBuilder;
-  opaquePipelineLayout = newLayout;
-  transparentPipelineLayout = newLayout;
+  pipeline_layout_ = newLayout;
 
-  opaquePipeline
+  pipeline_
       = pipelineBuilder.set_shaders(meshVertexShader, meshFragShader)
             .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
             .set_polygon_mode(VK_POLYGON_MODE_FILL)
@@ -63,26 +62,20 @@ void pbr_pass::init(vk_renderer& renderer) {
             .set_pipeline_layout(newLayout)
             .build_pipeline(gpu_.device);
 
-  // create the transparent variant
-  transparentPipeline = pipelineBuilder.enable_blending_additive()
-                            .enable_depthtest(false, VK_COMPARE_OP_LESS_OR_EQUAL)
-                            .build_pipeline(gpu_.device);
-
   vkDestroyShaderModule(gpu_.device, meshFragShader, nullptr);
   vkDestroyShaderModule(gpu_.device, meshVertexShader, nullptr);
 }
 
-void pbr_pass::cleanup() {
-  vkDestroyPipeline(gpu_.device, transparentPipeline, nullptr);
-  vkDestroyPipeline(gpu_.device, opaquePipeline, nullptr);
+void geometry_pass::cleanup() {
+  vkDestroyPipeline(gpu_.device, pipeline_, nullptr);
 
   for (auto frame : renderer_->frames_) {
     frame.descriptor_pools.destroy_pools(gpu_.device);
   }
 }
 
-void pbr_pass::execute(VkCommandBuffer cmd) {
-  VkDescriptorBufferInfo buffer_info = {};
+void geometry_pass::execute(VkCommandBuffer cmd) {
+  VkDescriptorBufferInfo buffer_info;
   buffer_info.buffer = renderer_->resource_manager_->per_frame_data_buffer.buffer;
   buffer_info.offset = 0;
   buffer_info.range = sizeof(per_frame_data);
@@ -95,29 +88,10 @@ void pbr_pass::execute(VkCommandBuffer cmd) {
   descriptor_write.descriptorCount = 1;
   descriptor_write.pBufferInfo = &buffer_info;
 
-  std::vector<uint32_t> opaque_draws;
-  opaque_draws.reserve(renderer_->main_draw_context_.opaque_surfaces.size());
-
-  for (size_t i = 0; i < renderer_->main_draw_context_.opaque_surfaces.size(); i++) {
-    // if (is_visible(main_draw_context_.opaque_surfaces[i], per_frame_data.viewproj)) {
-    opaque_draws.push_back(i);
-    //}
-  }
-
-  // sort the opaque surfaces by material and mesh
-  std::ranges::sort(opaque_draws, [&](const auto& iA, const auto& iB) {
-    const render_object& A = renderer_->main_draw_context_.opaque_surfaces[iA];
-    const render_object& B = renderer_->main_draw_context_.opaque_surfaces[iB];
-    if (A.material == B.material) {
-      return A.first_index < B.first_index;
-    }
-    return A.material < B.material;
-  });
-
   vkCmdBindIndexBuffer(cmd, renderer_->resource_manager_->scene_geometry_.indexBuffer.buffer, 0,
                        VK_INDEX_TYPE_UINT32);
 
-  auto draw = [&](const render_object& r, VkPipelineLayout pipeline_layout) {
+  auto draw = [&](const render_object& r, VkPipelineLayout pipeline_layout) { //TODO remove this lambda
     GPUDrawPushConstants push_constants;
     push_constants.worldMatrix = r.transform;
     push_constants.material_id = r.material * 5;
@@ -135,14 +109,14 @@ void pbr_pass::execute(VkCommandBuffer cmd) {
   renderer_->stats_.drawcall_count = 0;
   renderer_->stats_.triangle_count = 0;
 
-  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, opaquePipeline);
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
   VkDescriptorSet descriptorSets[] = {renderer_->resource_manager_->ibl_data.IblSet,
                                       renderer_->resource_manager_->material_data.resource_set,
                                       renderer_->resource_manager_->material_data.constants_set};
 
-  renderer_->vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, opaquePipelineLayout,
+  renderer_->vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_,
                                        0, 1, &descriptor_write);
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, opaquePipelineLayout, 1, 3,
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 3,
                           descriptorSets, 0, nullptr);
 
   const VkViewport viewport = {
@@ -162,21 +136,8 @@ void pbr_pass::execute(VkCommandBuffer cmd) {
   scissor.extent.height = renderer_->window_.extent.height;
   vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-  for (auto& r : opaque_draws) {
-    draw(renderer_->main_draw_context_.opaque_surfaces[r], opaquePipelineLayout);
+  for (auto& r : renderer_->main_draw_context_.opaque_surfaces) {
+    draw(r, pipeline_layout_);
   }
 
-  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, transparentPipeline);
-
-  renderer_->vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                       transparentPipelineLayout, 0, 1, &descriptor_write);
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, transparentPipelineLayout, 1, 3,
-                          descriptorSets, 0, nullptr);
-
-  vkCmdSetViewport(cmd, 0, 1, &viewport);
-  vkCmdSetScissor(cmd, 0, 1, &scissor);
-
-  for (auto& r : renderer_->main_draw_context_.transparent_surfaces) {
-    draw(r, transparentPipelineLayout);
-  }
 }

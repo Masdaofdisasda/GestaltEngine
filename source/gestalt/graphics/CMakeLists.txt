@@ -45,8 +45,10 @@ asset_loader.h
 skybox_pass.h
 skybox_pass.cpp
 render_pass.h
-pbr_pass.h
-pbr_pass.cpp
+geometry_pass.h
+geometry_pass.cpp
+transparent_pass.h
+transparent_pass.cpp
 )
 
 target_compile_features(graphics PRIVATE cxx_std_20)
