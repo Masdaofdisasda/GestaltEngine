@@ -24,6 +24,8 @@ struct descriptor_writer {
                    VkDescriptorType type);
   void write_buffer(int binding, VkBuffer buffer, size_t size, size_t offset,
                     VkDescriptorType type);
+  void write_buffer_array(int binding, const std::vector<VkDescriptorBufferInfo>& bufferInfos,
+                          VkDescriptorType type, uint32_t arrayElementStart);
   void write_image_array(int binding, const std::vector<VkDescriptorImageInfo>& imageInfos,
                          uint32_t arrayElementStart = 0);
 

@@ -121,6 +121,7 @@ void pbr_pass::execute(VkCommandBuffer cmd) {
     GPUDrawPushConstants push_constants;
     push_constants.worldMatrix = r.transform;
     push_constants.material_id = r.material * 5;
+    push_constants.material_const_id = r.material;
     push_constants.vertexBuffer = r.vertex_buffer_address;
     vkCmdPushConstants(cmd, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0,
                        sizeof(GPUDrawPushConstants), &push_constants);

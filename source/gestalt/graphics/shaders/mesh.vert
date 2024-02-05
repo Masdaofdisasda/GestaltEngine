@@ -9,6 +9,7 @@ layout (location = 0) out vec3 outNormal;
 layout (location = 1) out vec3 outPosition; //was color
 layout (location = 2) out vec2 outUV;
 layout (location = 3) flat out int outMaterialIndex;
+layout (location = 4) flat out int outMaterialConst;
 
 struct Vertex {
 
@@ -28,6 +29,7 @@ layout( push_constant ) uniform constants
 {
 	mat4 render_matrix;
 	int materialIndex;
+	int materialConst;
 	VertexBuffer vertexBuffer;
 } PushConstants;
 
@@ -45,4 +47,5 @@ void main()
 	outUV.x = v.uv_x;
 	outUV.y = v.uv_y;
 	outMaterialIndex = PushConstants.materialIndex;
+	outMaterialConst = PushConstants.materialConst;
 }

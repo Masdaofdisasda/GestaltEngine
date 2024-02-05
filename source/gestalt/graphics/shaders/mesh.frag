@@ -9,6 +9,7 @@ layout (location = 0) in vec3 inNormal;
 layout (location = 1) in vec3 inPosition;
 layout (location = 2) in vec2 inUV;
 layout (location = 3) flat in int inMaterialIndex;
+layout (location = 4) flat in int inMaterialConst;
 
 layout (location = 0) out vec4 outFragColor;
 
@@ -278,6 +279,10 @@ void main() {
 
     //vec4 Kd = texture(colorTex, UV);
     vec4 Kd = texture(nonuniformEXT(textures[albedoIndex]), UV);
+	float alphaCutoff = materialData[nonuniformEXT(inMaterialConst)].alpha_cutoff;
+    if (Kd.a < alphaCutoff) {
+        discard;
+    }
 
     //vec3 normal_sample = texture(normalTex, UV).rgb;
     vec3 normal_sample = texture(nonuniformEXT(textures[normalIndex]), UV).rgb;

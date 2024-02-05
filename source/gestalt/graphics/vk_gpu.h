@@ -13,6 +13,7 @@ public:
 
   VkDebugUtilsMessengerEXT debug_messenger;
   VkPhysicalDevice chosen_gpu;
+  VkPhysicalDeviceProperties device_properties;
   VkQueue graphics_queue;
   uint32_t graphics_queue_family;
   VkSurfaceKHR surface;

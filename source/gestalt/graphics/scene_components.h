@@ -84,7 +84,6 @@ struct pbr_material {
   bool use_occlusion_tex{false};
   std::string occlusion_uri;
 
-  float alpha_cutoff = 0.5f;
   bool double_sided{false};
   bool transparent{false};
 
@@ -93,14 +92,17 @@ struct pbr_material {
     int metal_rough_tex_index = -1;
     int normal_tex_index = -1;
     int emissive_tex_index = -1;
+
     int occlusion_tex_index = -1;
 
     int texture_flags = 0;
 
+    float alpha_cutoff{.5f};
     glm::vec4 albedo_factor{0.f};
     glm::vec2 metal_rough_factor{0.f};
     glm::vec3 emissiveFactor{0.f};
-    float normalScale = 1.f;
+
+    // float normalScale = 1.f;
     // float occlusionStrength;
   } constants;
 

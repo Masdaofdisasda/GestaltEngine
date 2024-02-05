@@ -13,6 +13,10 @@
 
 #include "cubemap_util.h"
 
+constexpr uint32_t max_materials = 240;
+constexpr uint32_t max_pbr_textures = 5;
+constexpr uint32_t max_textures = max_materials * max_pbr_textures;
+
 AllocatedBuffer resource_manager::create_buffer(size_t allocSize, VkBufferUsageFlags usage,
                                                 VmaMemoryUsage memoryUsage) {
   // allocate buffer
@@ -39,27 +43,33 @@ void resource_manager::init(const vk_gpu& gpu) {
   per_frame_data_buffer = create_buffer(sizeof(per_frame_data), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                         VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-  constexpr uint32_t max_materials = 240;
-  constexpr uint32_t max_pbr_textures = 5;
-  constexpr uint32_t max_textures = max_materials * max_pbr_textures;
-
   material_data.constants_buffer
       = create_buffer(sizeof(pbr_material::material_constants) * max_materials,
                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-  pbr_material::material_constants defaultMaterialConstants = {};  // Populate with default values
-  pbr_material::material_constants* mappedData;
-  vmaMapMemory(gpu_.allocator, material_data.constants_buffer.allocation, (void**)&mappedData);
 
-  for (uint32_t i = 0; i < max_materials; ++i) {
-    memcpy(&mappedData[i], &defaultMaterialConstants, sizeof(pbr_material::material_constants));
-  }
+  std::vector<pbr_material::material_constants> material_constants(max_materials);
+
+  pbr_material::material_constants* mappedData;
+  VK_CHECK(
+      vmaMapMemory(gpu_.allocator, material_data.constants_buffer.allocation, (void**)&mappedData));
+  memcpy(mappedData, material_constants.data(),
+         sizeof(pbr_material::material_constants) * max_materials);
 
   vmaUnmapMemory(gpu_.allocator, material_data.constants_buffer.allocation);
 
+  std::vector<VkDescriptorBufferInfo> bufferInfos;
+  for (int i = 0; i < material_constants.size(); ++i) {
+    VkDescriptorBufferInfo bufferInfo = {};
+    bufferInfo.buffer = material_data.constants_buffer.buffer;
+    bufferInfo.offset = sizeof(pbr_material::material_constants) * i;
+    bufferInfo.range = sizeof(pbr_material::material_constants);
+    bufferInfos.push_back(bufferInfo);
+  }
+
+
   writer.clear();
-  writer.write_buffer(5, material_data.constants_buffer.buffer,
-                      sizeof(pbr_material::material_constants) * max_materials, 0,
-                      VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+  writer.write_buffer_array(5, bufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
+
   per_frame_data_layout
       = descriptor_layout_builder()
             .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -81,11 +91,12 @@ void resource_manager::init(const vk_gpu& gpu) {
 
   std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes
       = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, max_textures},
-         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, max_materials},
-         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}};
+         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 5},
+         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, max_materials}};
 
   descriptorPool.init(gpu_.device, 1, sizes);
 
+  // TODO fill unused slots with dummy textures to stop validation layer from complaining
   material_data.resource_set
       = descriptorPool.allocate(gpu_.device, material_data.resource_layout, {max_textures});
   material_data.constants_set
@@ -362,15 +373,18 @@ void resource_manager::write_material(const pbr_material& material,
 
   pbr_material::material_constants* mappedData;
   vmaMapMemory(gpu_.allocator, material_data.constants_buffer.allocation, (void**)&mappedData);
-
-  memcpy(&mappedData[material_id], &material.constants, sizeof(pbr_material::material_constants));
-
+  memcpy(mappedData + material_id, &material.constants, sizeof(pbr_material::material_constants));
   vmaUnmapMemory(gpu_.allocator, material_data.constants_buffer.allocation);
 
+  
+  VkDescriptorBufferInfo buffer_info;
+  buffer_info.buffer = material_data.constants_buffer.buffer;
+  buffer_info.offset = sizeof(pbr_material::material_constants) * material_id;
+  buffer_info.range = sizeof(pbr_material::material_constants);
+  std::vector bufferInfos = {buffer_info};
+
   writer.clear();
-  writer.write_buffer(5, material_data.constants_buffer.buffer, sizeof(pbr_material::material_constants),
-                      sizeof(pbr_material::material_constants) * material_id,
-                      VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+  writer.write_buffer_array(5, bufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
   writer.update_set(gpu_.device, material_data.constants_set);
 }
 

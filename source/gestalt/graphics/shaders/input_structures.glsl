@@ -5,7 +5,8 @@ layout(set = 1, binding = 2) uniform samplerCube texEnvMapIrradiance;
 
 layout(set = 2, binding = 4) uniform sampler2D textures[];
 
-layout(std430, binding = 5) readonly buffer MaterialConstants {
+layout(std430, set = 3, binding = 5) readonly buffer MaterialConstants {
+
     int albedo_tex_index;
     int metal_rough_tex_index;
     int normal_tex_index;
@@ -16,4 +17,6 @@ layout(std430, binding = 5) readonly buffer MaterialConstants {
 
 	vec4 colorFactors;
 	vec2 metal_rough_factors;
+    vec3 emissiveFactor;
+    float alpha_cutoff;
 } materialData[];

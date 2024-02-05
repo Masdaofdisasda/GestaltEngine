@@ -69,6 +69,24 @@ void descriptor_writer::write_buffer(int binding, VkBuffer buffer, size_t size, 
   writes.push_back(write);
 }
 
+void descriptor_writer::write_buffer_array(int binding,
+                                           const std::vector<VkDescriptorBufferInfo>& bufferInfos,
+                                           VkDescriptorType type, uint32_t arrayElementStart) {
+  // Prepare a write descriptor set for an array of buffers
+  VkWriteDescriptorSet write = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+
+  write.dstBinding = binding;
+  write.dstSet = VK_NULL_HANDLE;  // Will be set in update_set()
+  write.descriptorCount = static_cast<uint32_t>(bufferInfos.size());
+  write.descriptorType = type;
+  write.pBufferInfo = bufferInfos.data();  // Point to the array of buffer infos
+  write.dstArrayElement = arrayElementStart;
+
+  // Add to the list of writes
+  writes.push_back(write);
+}
+
+
 void descriptor_writer::write_image_array(int binding,
                                           const std::vector<VkDescriptorImageInfo>& imageInfos,
                                           uint32_t arrayElementStart) {

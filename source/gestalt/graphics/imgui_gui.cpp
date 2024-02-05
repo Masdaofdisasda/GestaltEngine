@@ -297,7 +297,7 @@ void imgui_gui::show_scene_hierarchy_window() {
 
               ImGui::Checkbox("Double Sided", &config.double_sided);
               ImGui::Checkbox("Transparent", &config.transparent);
-              ImGui::DragFloat("Alpha Cutoff", &config.alpha_cutoff, 0.01f, 0.0f, 1.0f, "%.2f");
+              ImGui::DragFloat("Alpha Cutoff", &config.constants.alpha_cutoff, 0.01f, 0.0f, 1.0f, "%.2f");
 
               ImGui::TreePop();
             }

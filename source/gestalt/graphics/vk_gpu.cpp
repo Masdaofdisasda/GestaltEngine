@@ -38,6 +38,7 @@ void vk_gpu::init(
   features12.descriptorIndexing = true;
 
   features12.shaderSampledImageArrayNonUniformIndexing = true;
+  features12.shaderStorageBufferArrayNonUniformIndexing = true;
   features12.descriptorBindingVariableDescriptorCount = true;
   features12.runtimeDescriptorArray = true;
 
@@ -63,6 +64,7 @@ void vk_gpu::init(
   // Get the VkDevice handle used in the rest of a vulkan application
   device = vkbDevice.device;
   chosen_gpu = physicalDevice.physical_device;
+  vkGetPhysicalDeviceProperties(chosen_gpu, &device_properties);
 
   // use vkbootstrap to get a Graphics queue
   graphics_queue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
