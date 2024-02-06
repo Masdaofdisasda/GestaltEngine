@@ -95,15 +95,16 @@ VkCommandBuffer vk_renderer::start_draw() {
 
   VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
-  vkutil::transition_image(cmd, frame_buffer_.color_image.image, VK_IMAGE_LAYOUT_UNDEFINED,
+  vkutil::transition_image(cmd, frame_buffer_.get_write_buffer().color_image.image, VK_IMAGE_LAYOUT_UNDEFINED,
                            VK_IMAGE_LAYOUT_GENERAL);
-  vkutil::transition_image(cmd, frame_buffer_.depth_image.image, VK_IMAGE_LAYOUT_UNDEFINED,
+  vkutil::transition_image(cmd, frame_buffer_.get_write_buffer().depth_image.image,
+                           VK_IMAGE_LAYOUT_UNDEFINED,
                            VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
   VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(
-      frame_buffer_.color_image.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
-  VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
-      frame_buffer_.depth_image.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+      frame_buffer_.get_write_buffer().color_image.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+  VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(frame_buffer_.get_write_buffer().depth_image.imageView,
+                                      VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
   VkRenderingInfo renderInfo
       = vkinit::rendering_info(window_.extent, &colorAttachment, &depthAttachment);
@@ -141,7 +142,7 @@ void vk_renderer::draw() {
     skybox_pass_->execute(cmd);
     geometry_pass_->execute(cmd);
     transparency_pass_->execute(cmd);
-    //ssao_pass_->execute(cmd);
+    ssao_pass_->execute(cmd);
 
     auto end = std::chrono::system_clock::now();
 
@@ -163,7 +164,8 @@ void vk_renderer::draw() {
 
   vkCmdEndRendering(cmd);
 
-  vkutil::transition_image(cmd, frame_buffer_.color_image.image, VK_IMAGE_LAYOUT_GENERAL,
+  vkutil::transition_image(cmd, frame_buffer_.get_write_buffer().color_image.image,
+                           VK_IMAGE_LAYOUT_GENERAL,
                            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   vkutil::transition_image(cmd, swapchain_->swapchain_images[swapchain_image_index_],
                            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -172,7 +174,7 @@ void vk_renderer::draw() {
   extent.height = window_.extent.height;
   extent.width = window_.extent.width;
 
-  vkutil::copy_image_to_image(cmd, frame_buffer_.color_image.image,
+  vkutil::copy_image_to_image(cmd, frame_buffer_.get_write_buffer().color_image.image,
                               swapchain_->swapchain_images[swapchain_image_index_], extent, extent);
   vkutil::transition_image(cmd, swapchain_->swapchain_images[swapchain_image_index_],
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,

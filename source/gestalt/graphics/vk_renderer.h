@@ -40,7 +40,7 @@ class vk_renderer {
 public:
 
   // draw resources
-  frame_buffer frame_buffer_;
+  double_buffered_frame_buffer frame_buffer_;
   draw_context main_draw_context_;
   engine_stats stats_;
 

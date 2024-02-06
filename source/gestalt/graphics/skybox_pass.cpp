@@ -31,8 +31,8 @@ void skybox_pass::prepare() {
                   .set_multisampling_none()
                   .disable_blending()
                   .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-                  .set_color_attachment_format(renderer_->frame_buffer_.color_image.imageFormat)
-                  .set_depth_format(renderer_->frame_buffer_.depth_image.imageFormat)
+                  .set_color_attachment_format(renderer_->frame_buffer_.get_write_buffer().color_image.imageFormat)
+                  .set_depth_format(renderer_->frame_buffer_.get_write_buffer().depth_image.imageFormat)
                   .set_pipeline_layout(pipeline_layout_)
                   .build_pipeline(gpu_.device);
 

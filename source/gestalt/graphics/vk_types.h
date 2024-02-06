@@ -41,13 +41,16 @@ struct frame_buffer {
   AllocatedImage depth_image;
 };
 
-struct GPUGLTFMaterial {
-  glm::vec4 colorFactors;
-  glm::vec4 metal_rough_factors;
-  glm::vec4 extra[14];
-};
+struct double_buffered_frame_buffer {
+  frame_buffer buffers[2];
+  int write_buffer = 0;
 
-static_assert(sizeof(GPUGLTFMaterial) == 256);
+  void switch_buffers() { write_buffer = (write_buffer + 1) % 2; }
+
+  frame_buffer& get_write_buffer() { return buffers[write_buffer]; }
+
+  frame_buffer& get_read_buffer() { return buffers[(write_buffer + 1) % 2]; }
+};
 
 struct per_frame_data {
   glm::mat4 view;
