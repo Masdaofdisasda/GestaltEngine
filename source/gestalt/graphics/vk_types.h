@@ -146,6 +146,7 @@ struct render_config {
     glm::vec4 gamma{1.f};
     glm::vec4 gain{1.f};
     bool show_bright_pass = false;
+    int toneMappingOption{0};
   } hdr{};
 
   bool enable_shadows{true};
