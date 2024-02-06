@@ -47,28 +47,7 @@ void resource_manager::init(const vk_gpu& gpu) {
       = create_buffer(sizeof(pbr_material::material_constants) * max_materials,
                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-  std::vector<pbr_material::material_constants> material_constants(max_materials);
-
-  pbr_material::material_constants* mappedData;
-  VK_CHECK(
-      vmaMapMemory(gpu_.allocator, material_data.constants_buffer.allocation, (void**)&mappedData));
-  memcpy(mappedData, material_constants.data(),
-         sizeof(pbr_material::material_constants) * max_materials);
-
-  vmaUnmapMemory(gpu_.allocator, material_data.constants_buffer.allocation);
-
-  std::vector<VkDescriptorBufferInfo> bufferInfos;
-  for (int i = 0; i < material_constants.size(); ++i) {
-    VkDescriptorBufferInfo bufferInfo = {};
-    bufferInfo.buffer = material_data.constants_buffer.buffer;
-    bufferInfo.offset = sizeof(pbr_material::material_constants) * i;
-    bufferInfo.range = sizeof(pbr_material::material_constants);
-    bufferInfos.push_back(bufferInfo);
-  }
-
-
-  writer.clear();
-  writer.write_buffer_array(5, bufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
+  
 
   per_frame_data_layout
       = descriptor_layout_builder()
@@ -101,8 +80,6 @@ void resource_manager::init(const vk_gpu& gpu) {
   material_data.constants_set
       = descriptorPool.allocate(gpu_.device, material_data.constants_layout, {max_materials});
   ibl_data.IblSet = descriptorPool.allocate(gpu_.device, ibl_data.IblLayout);
-
-  writer.update_set(gpu_.device, material_data.constants_set);
 }
 
 void resource_manager::init_default_data() {
@@ -191,6 +168,29 @@ void resource_manager::init_default_data() {
     get_database().add_material(material_component{.name = key, .config = material});
     fmt::print("creating material {}, mat_id {}\n", key, material_id);
   }
+
+  std::vector<pbr_material::material_constants> material_constants(max_materials);
+
+  pbr_material::material_constants* mappedData;
+  VK_CHECK(
+      vmaMapMemory(gpu_.allocator, material_data.constants_buffer.allocation, (void**)&mappedData));
+  memcpy(mappedData, material_constants.data(),
+         sizeof(pbr_material::material_constants) * max_materials);
+
+  vmaUnmapMemory(gpu_.allocator, material_data.constants_buffer.allocation);
+
+  std::vector<VkDescriptorBufferInfo> bufferInfos;
+  for (int i = 0; i < material_constants.size(); ++i) {
+    VkDescriptorBufferInfo bufferInfo = {};
+    bufferInfo.buffer = material_data.constants_buffer.buffer;
+    bufferInfo.offset = sizeof(pbr_material::material_constants) * i;
+    bufferInfo.range = sizeof(pbr_material::material_constants);
+    bufferInfos.push_back(bufferInfo);
+  }
+
+  writer.clear();
+  writer.write_buffer_array(5, bufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
+  writer.update_set(gpu_.device, material_data.constants_set);
 
   writer.clear();
   std::vector<VkDescriptorImageInfo> imageInfos{max_textures};
@@ -571,6 +571,31 @@ std::optional<AllocatedImage> resource_manager::load_image(fastgltf::Asset& asse
   return newImage;
 }
 
+std::optional<AllocatedImage> resource_manager::load_image(const std::string& filepath) {
+  AllocatedImage new_image;
+
+  int width, height, nrChannels;
+  unsigned char* data = stbi_load(filepath.c_str(), &width, &height, &nrChannels, 4);
+  if (data) {
+    VkExtent3D imageSize;
+    imageSize.width = width;
+    imageSize.height = height;
+    imageSize.depth = 1;
+
+    new_image
+        = create_image(data, imageSize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, true);
+
+    stbi_image_free(data);
+  } else {
+    return {};
+  }
+
+  if (new_image.image == VK_NULL_HANDLE) {
+    return {};
+  }
+  return new_image;
+}
+
 static void float24to32(int w, int h, const float* img24, float* img32) {
   const int numPixels = w * h;
   for (int i = 0; i != numPixels; i++) {
@@ -654,6 +679,64 @@ AllocatedImage resource_manager::create_cubemap_from_HDR(std::vector<float>& ima
   return create_cubemap(cube.data_.data(),
                                 {static_cast<uint32_t>(cube.w_), static_cast<uint32_t>(cube.h_), 1},
                                 VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+}
+
+
+void resource_manager::create_framebuffer(const VkExtent3D& extent,
+                                      double_buffered_frame_buffer& frame_buffer) {
+  for (int i = 0; i < 2; ++i) {
+    AllocatedImage& color_image = frame_buffer.get_write_buffer().color_image;
+    AllocatedImage& depth_image = frame_buffer.get_write_buffer().depth_image;
+
+    // hardcoding the draw format to 32 bit float
+    color_image.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+    color_image.imageExtent = extent;
+
+    VkImageUsageFlags drawImageUsages{};
+    drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    drawImageUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
+    drawImageUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    drawImageUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
+
+    VkImageCreateInfo rimg_info
+        = vkinit::image_create_info(color_image.imageFormat, drawImageUsages, extent);
+
+    // for the draw image, we want to allocate it from gpu local memory
+    VmaAllocationCreateInfo rimg_allocinfo = {};
+    rimg_allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+    rimg_allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    // allocate and create the image
+    vmaCreateImage(gpu_.allocator, &rimg_info, &rimg_allocinfo, &color_image.image,
+                   &color_image.allocation, nullptr);
+
+    // build a image-view for the draw image to use for rendering
+    VkImageViewCreateInfo rview_info = vkinit::imageview_create_info(
+        color_image.imageFormat, color_image.image, VK_IMAGE_ASPECT_COLOR_BIT);
+
+    VK_CHECK(vkCreateImageView(gpu_.device, &rview_info, nullptr, &color_image.imageView));
+
+    depth_image.imageFormat = VK_FORMAT_D32_SFLOAT;
+    depth_image.imageExtent = extent;
+    VkImageUsageFlags depthImageUsages{};
+    depthImageUsages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    depthImageUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
+
+    VkImageCreateInfo dimg_info
+        = vkinit::image_create_info(depth_image.imageFormat, depthImageUsages, extent);
+
+    // allocate and create the image
+    vmaCreateImage(gpu_.allocator, &dimg_info, &rimg_allocinfo, &depth_image.image,
+                   &depth_image.allocation, nullptr);
+
+    // build a image-view for the draw image to use for rendering
+    VkImageViewCreateInfo dview_info = vkinit::imageview_create_info(
+        depth_image.imageFormat, depth_image.image, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+    VK_CHECK(vkCreateImageView(gpu_.device, &dview_info, nullptr, &depth_image.imageView));
+
+    frame_buffer.switch_buffers();
+  }
 }
 
 void resource_manager::destroy_image(const AllocatedImage& img) {

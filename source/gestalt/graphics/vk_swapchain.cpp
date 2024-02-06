@@ -1,76 +1,11 @@
 ﻿#include "vk_swapchain.h"
 
 #include "VkBootstrap.h"
-#include "vk_deletion_service.h"
-#include "vk_initializers.h"
 
-void vk_swapchain::init(const vk_gpu& gpu, const sdl_window& window,
-                        double_buffered_frame_buffer& frame_buffer) {
+void vk_swapchain::init(const vk_gpu& gpu, const VkExtent3D& extent) {
   gpu_ = gpu;
-  deletion_service_.init(gpu_.device, gpu_.allocator);
 
-  create_swapchain(window.extent.width, window.extent.height);
-
-  // draw image size will match the window
-  VkExtent3D drawImageExtent = {window.extent.width, window.extent.height, 1};
-
-  for (int i = 0; i < 2; ++i) {
-    AllocatedImage& color_image = frame_buffer.get_write_buffer().color_image;
-    AllocatedImage& depth_image = frame_buffer.get_write_buffer().depth_image;
-
-    // hardcoding the draw format to 32 bit float
-    color_image.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
-    color_image.imageExtent = drawImageExtent;
-
-    VkImageUsageFlags drawImageUsages{};
-    drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    drawImageUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
-    drawImageUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    drawImageUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
-
-    VkImageCreateInfo rimg_info
-        = vkinit::image_create_info(color_image.imageFormat, drawImageUsages, drawImageExtent);
-
-    // for the draw image, we want to allocate it from gpu local memory
-    VmaAllocationCreateInfo rimg_allocinfo = {};
-    rimg_allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    rimg_allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-    // allocate and create the image
-    vmaCreateImage(gpu_.allocator, &rimg_info, &rimg_allocinfo, &color_image.image,
-                   &color_image.allocation, nullptr);
-
-    // build a image-view for the draw image to use for rendering
-    VkImageViewCreateInfo rview_info = vkinit::imageview_create_info(
-        color_image.imageFormat, color_image.image, VK_IMAGE_ASPECT_COLOR_BIT);
-
-    VK_CHECK(vkCreateImageView(gpu_.device, &rview_info, nullptr, &color_image.imageView));
-
-    depth_image.imageFormat = VK_FORMAT_D32_SFLOAT;
-    depth_image.imageExtent = drawImageExtent;
-    VkImageUsageFlags depthImageUsages{};
-    depthImageUsages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-
-    VkImageCreateInfo dimg_info
-        = vkinit::image_create_info(depth_image.imageFormat, depthImageUsages, drawImageExtent);
-
-    // allocate and create the image
-    vmaCreateImage(gpu_.allocator, &dimg_info, &rimg_allocinfo, &depth_image.image,
-                   &depth_image.allocation, nullptr);
-
-    // build a image-view for the draw image to use for rendering
-    VkImageViewCreateInfo dview_info = vkinit::imageview_create_info(
-        depth_image.imageFormat, depth_image.image, VK_IMAGE_ASPECT_DEPTH_BIT);
-
-    VK_CHECK(vkCreateImageView(gpu_.device, &dview_info, nullptr, &depth_image.imageView));
-
-    deletion_service_.push(color_image.imageView);
-    deletion_service_.push(color_image.image, color_image.allocation);
-    deletion_service_.push(depth_image.imageView);
-    deletion_service_.push(depth_image.image, depth_image.allocation);
-
-    frame_buffer.switch_buffers();
-  }
+  create_swapchain(extent.width, extent.height);
 }
 
 void vk_swapchain::create_swapchain(const uint32_t width, const uint32_t height) {
@@ -108,9 +43,7 @@ void vk_swapchain::resize_swapchain(sdl_window& window) {
   create_swapchain(window.extent.width, window.extent.height);
 }
 
-void vk_swapchain::destroy_swapchain() {
-  deletion_service_.flush();
-
+void vk_swapchain::destroy_swapchain() const {
   vkDestroySwapchainKHR(gpu_.device, swapchain, nullptr);
 
   // destroy swapchain resources

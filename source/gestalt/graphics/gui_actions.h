@@ -15,4 +15,5 @@ struct gui_actions {
   std::function<mesh_component&(size_t)> get_mesh_component;
   std::function<mesh_surface&(size_t)> get_surface;
   std::function<material_component&(size_t)> get_material;
+  std::function<render_config&()> get_render_config;
 };

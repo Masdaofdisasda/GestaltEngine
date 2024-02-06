@@ -20,7 +20,9 @@ void vk_renderer::init(const vk_gpu& gpu, const sdl_window& window,
   imgui_ = imgui_gui;
   stats_ = stats;
 
-  swapchain_->init(gpu_, window_, frame_buffer_);
+  swapchain_->init(gpu_, {window_.extent.width, window_.extent.height, 1});
+  resource_manager_->create_framebuffer({window_.extent.width, window_.extent.height, 1},
+                                        frame_buffer_);
   commands_->init(gpu_, frames_);
   sync_->init(gpu_, frames_);
 
@@ -141,8 +143,12 @@ void vk_renderer::draw() {
 
     skybox_pass_->execute(cmd);
     geometry_pass_->execute(cmd);
-    transparency_pass_->execute(cmd);
-    ssao_pass_->execute(cmd);
+    if (!config_.always_opaque) {
+      transparency_pass_->execute(cmd);
+    }
+    if (config_.enable_ssao) {
+      ssao_pass_->execute(cmd);
+    }
 
     auto end = std::chrono::system_clock::now();
 

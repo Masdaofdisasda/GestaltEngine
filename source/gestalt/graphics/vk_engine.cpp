@@ -81,6 +81,7 @@ void render_engine::register_gui_actions() {
   gui_actions_.get_material = [this](const size_t material) -> material_component& {
     return resource_manager_->get_database().get_material(material);
   };
+  gui_actions_.get_render_config = [this]() -> render_config& { return renderer_->get_config(); };
 }
 
 void render_engine::immediate_submit(std::function<void(VkCommandBuffer cmd)> function) {

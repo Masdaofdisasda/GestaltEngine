@@ -18,6 +18,9 @@ class vk_renderer {
   std::shared_ptr<resource_manager> resource_manager_;
   std::shared_ptr<imgui_gui> imgui_;
 
+
+  render_config config_;
+
   bool resize_requested_{false};
   uint32_t swapchain_image_index_{0};
   uint32_t frame_number_{0};
@@ -55,6 +58,7 @@ public:
   vk_sync& get_sync() const { return *sync_; }
   vk_command& get_commands() const { return *commands_; }
   sdl_window& get_window() { return window_; }
+  render_config& get_config() { return config_; }
 
   void cleanup() const {
     sync_->cleanup();

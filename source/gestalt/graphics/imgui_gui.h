@@ -16,6 +16,14 @@ class imgui_gui {
 
   entity_component selected_node_;
 
+  void menu_bar();
+  void stats();
+  void lights();
+  void scene_graph();
+  void display_scene_hierarchy(const entity_component& node);
+  void show_scene_hierarchy_window();
+  void render_settings();
+
 public:
 
   void init(vk_gpu& gpu, sdl_window& window, const std::shared_ptr<vk_swapchain>& swapchain, gui_actions& actions);
@@ -27,6 +35,4 @@ public:
   void update(const SDL_Event& e);
 
   void new_frame();
-  void display_scene_hierarchy(const entity_component& node);
-  void show_scene_hierarchy_window();
 };

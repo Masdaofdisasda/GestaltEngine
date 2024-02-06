@@ -57,9 +57,11 @@ public:
   AllocatedImage create_cubemap(const void* imageData, VkExtent3D size, VkFormat format,
                                 VkImageUsageFlags usage, bool mipmapped = false);
   std::optional<AllocatedImage> load_image(fastgltf::Asset& asset, fastgltf::Image& image);
+  std::optional<AllocatedImage> load_image(const std::string& filepath);
   void init_default_data();
   void load_and_process_cubemap(const std::string& file_path);
   AllocatedImage create_cubemap_from_HDR(std::vector<float>& image_data, int h, int w);
+  void create_framebuffer(const VkExtent3D& extent, double_buffered_frame_buffer& frame_buffer);
   AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
                               bool mipmapped = false, bool cubemap = false);
   void write_material(const pbr_material& material, const uint32_t material_id);

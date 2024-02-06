@@ -122,6 +122,24 @@ struct draw_context {
   std::vector<render_object> transparent_surfaces;
 };
 
+struct render_config {
+  bool always_opaque{false};
+  bool enable_ssao{true};
+  struct ssao_params {
+    bool show_ssao_only = false;
+    float scale = 0.75f;
+    float bias = 0.008f;
+    float zNear = 0.1f;
+    float zFar = 1000.0f;
+    float radius = 0.4f;
+    float attScale = .95f;
+    float distScale = 5.f;
+  } ssao{}; 
+
+  bool enable_shadows{true};
+  // todo : more settings
+};
+
 #define VK_CHECK(x)                                                     \
     do {                                                                \
         VkResult err = x;                                               \

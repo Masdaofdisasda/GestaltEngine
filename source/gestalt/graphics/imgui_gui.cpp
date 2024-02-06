@@ -7,7 +7,6 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include "vk_initializers.h"
-#include "vk_pipelines.h"
 
 void imgui_gui::init(vk_gpu& gpu, sdl_window& window,
                      const std::shared_ptr<vk_swapchain>& swapchain, gui_actions& actions) {
@@ -100,12 +99,8 @@ void imgui_gui::update(const SDL_Event& e) {
   ImGui_ImplSDL2_ProcessEvent(&e);
 }
 
-void imgui_gui::new_frame() {
-  ImGui_ImplVulkan_NewFrame();
-  ImGui_ImplSDL2_NewFrame(window_.handle);
-  ImGui::NewFrame();
-
-   if (ImGui::BeginMainMenuBar()) {
+void imgui_gui::menu_bar() {
+  if (ImGui::BeginMainMenuBar()) {
     if (ImGui::BeginMenu("File")) {
       if (ImGui::MenuItem("Exit")) {
         actions_.exit();
@@ -143,7 +138,9 @@ void imgui_gui::new_frame() {
 
     ImGui::EndMainMenuBar();
   }
+}
 
+void imgui_gui::stats() {
   if (ImGui::Begin("Stats")) {
     const auto& stats = actions_.get_stats();
 
@@ -153,8 +150,10 @@ void imgui_gui::new_frame() {
     ImGui::Text("triangles %i", stats.triangle_count);
     ImGui::Text("draws %i", stats.drawcall_count);
   }
-    ImGui::End();
+  ImGui::End();
+}
 
+void imgui_gui::lights() {
   if (ImGui::Begin("Light")) {
     auto& scene_data = actions_.get_scene_data();
 
@@ -163,8 +162,10 @@ void imgui_gui::new_frame() {
     ImGui::SliderFloat("Light Z", &scene_data.sunlightDirection.z, -10.f, 10.f);
     ImGui::SliderFloat("Light intensity", &scene_data.sunlightDirection.w, 0.f, 100.f);
   }
-    ImGui::End();
+  ImGui::End();
+}
 
+void imgui_gui::scene_graph() {
   float windowWidth = 300.0f;                               // Width of the ImGui window
   float windowHeight = window_.extent.height;                        // Full height of the application window
   ImVec2 windowPos = ImVec2(window_.extent.width - windowWidth, 0);  // Position to the right
@@ -172,13 +173,63 @@ void imgui_gui::new_frame() {
 
   ImGui::SetNextWindowPos(windowPos);
   ImGui::SetNextWindowSize(windowSize);
-  if (ImGui::Begin("Scene Graph", nullptr,
-                   ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {
+  if (ImGui::Begin("Scene Graph", nullptr)) {
     show_scene_hierarchy_window();
   }
   ImGui::End();
+}
+
+void imgui_gui::new_frame() {
+  ImGui_ImplVulkan_NewFrame();
+  ImGui_ImplSDL2_NewFrame(window_.handle);
+  ImGui::NewFrame();
+
+  menu_bar();
+
+  stats();
+
+  lights();
+
+  scene_graph();
+
+  render_settings();
 
   ImGui::Render();
+}
+
+void imgui_gui::render_settings() {
+  if (ImGui::Begin("Rendering Settings")) {
+    render_config& config = actions_.get_render_config();
+
+    if (ImGui::CollapsingHeader("General Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+      ImGui::Checkbox("Always Opaque", &config.always_opaque);
+    }
+
+    if (ImGui::CollapsingHeader("SSAO Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+      ImGui::Checkbox("Enable SSAO", &config.enable_ssao);
+      ImGui::Checkbox("Show SSAO", &config.ssao.show_ssao_only);
+      ImGui::SliderFloat("Scale", &config.ssao.scale, 0.0f, 2.0f,
+                         "%.3f");  
+      ImGui::SliderFloat("Bias", &config.ssao.bias, 0.0f, 1.0f,
+                         "%.3f");  
+      ImGui::SliderFloat("Radius", &config.ssao.radius, 0.0f, .5f, 
+                         "%.2f");
+      ImGui::SliderFloat("Attenuation Scale", &config.ssao.attScale, 0.0f, 2.0f,
+                         "%.2f");  
+      ImGui::SliderFloat("Distance Scale", &config.ssao.distScale, 0.0f, 10.0f,
+                         "%.2f");
+    }
+
+    // Shadow Settings
+    if (ImGui::CollapsingHeader("Shadow Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+      ImGui::Checkbox("Enable Shadows", &config.enable_shadows);  // Toggle for enabling Shadows
+      // Additional shadow-related settings can be added here
+    }
+
+    // TODO: Add more sections for other settings as necessary
+  }
+
+  ImGui::End();
 }
 
 

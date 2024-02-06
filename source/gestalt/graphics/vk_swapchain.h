@@ -9,7 +9,6 @@
 class vk_swapchain {
 
   vk_gpu gpu_;
-  vk_deletion_service deletion_service_;
 
 public:
 
@@ -21,8 +20,8 @@ public:
   std::vector<VkImage> swapchain_images;
   std::vector<VkImageView> swapchain_image_views;
 
-  void init(const vk_gpu& gpu, const sdl_window& window, double_buffered_frame_buffer& frame_buffer);
+  void init(const vk_gpu& gpu, const VkExtent3D& extent);
   void create_swapchain(uint32_t width, uint32_t height);
   void resize_swapchain(sdl_window& window);
-  void destroy_swapchain();
+  void destroy_swapchain() const;
 };

@@ -119,5 +119,10 @@ void geometry_pass::execute(VkCommandBuffer cmd) {
   for (auto& r : renderer_->main_draw_context_.opaque_surfaces) {
     draw(r, pipeline_layout_);
   }
+  if (renderer_->get_config().always_opaque) {
+    for (auto& r : renderer_->main_draw_context_.transparent_surfaces) {
+           draw(r, pipeline_layout_);
+    }
+  }
 
 }
