@@ -231,8 +231,10 @@ void imgui_gui::render_settings() {
                          "%.3f");  
       ImGui::SliderFloat("Bloom Strength", &config.hdr.bloomStrength, 0.0f, 2.f, 
                          "%.2f");
-      ImGui::SliderFloat("Adaption Speed", &config.hdr.adaptationSpeed, 0.1f, 2.0f,
-                         "%.2f"); 
+      ImGui::SliderFloat("Adaption Speed", &config.hdr.adaptationSpeed, 0.1f, 2.0f, "%.2f");
+      ImGui::ColorPicker4("Lift", &config.hdr.lift[0], ImGuiColorEditFlags_Float);
+      ImGui::ColorPicker4("Gamma", &config.hdr.gamma[0], ImGuiColorEditFlags_Float);
+      ImGui::ColorPicker4("Gain", &config.hdr.gain[0], ImGuiColorEditFlags_Float);
     }
 
     if (ImGui::CollapsingHeader("Shadow Settings", ImGuiTreeNodeFlags_DefaultOpen)) {

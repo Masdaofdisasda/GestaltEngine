@@ -44,6 +44,15 @@ vec3 EnvBRDFApprox( //Todo
   return specularColor * AB.x + AB.y;
 }
 
+vec3 sRGBToLinear(vec3 color) {
+    return mix(color / 12.92, pow((color + vec3(0.055)) / vec3(1.055), vec3(2.4)), step(vec3(0.04045), color));
+}
+
+vec3 linearTosRGB(vec3 color) {
+    return mix(color * 12.92, 1.055 * pow(color, vec3(1.0 / 2.4)) - vec3(0.055), step(vec3(0.0031308), color));
+}
+
+
 // Calculation of the lighting contribution from an optional Image Based Light source.
 // Precomputed Environment Maps are required uniform inputs and are computed as outlined in [1].
 // See our README.md on Environment Maps [3] for additional discussion.
@@ -273,26 +282,22 @@ void main() {
 
     vec2 UV = inUV;
 
-    //vec4 Kd = texture(colorTex, UV);
     vec4 Kd = texture(nonuniformEXT(textures[albedoIndex]), UV);
+	Kd.rgb = sRGBToLinear(Kd.rgb);
 	float alphaCutoff = materialData[nonuniformEXT(inMaterialConst)].alpha_cutoff;
     if (Kd.a < alphaCutoff) {
         discard;
     }
 
-    //vec3 normal_sample = texture(normalTex, UV).rgb;
     vec3 normal_sample = texture(nonuniformEXT(textures[normalIndex]), UV).rgb;
 	vec3 viewPos = -normalize(vec3(sceneData.view[0][2], sceneData.view[1][2], sceneData.view[2][2]));
     vec3 n = perturbNormal(normalize(inNormal), normalize(viewPos - inPosition), normal_sample, UV);
 
-	//vec4 Ke = texture(emissiveTex, UV);
 	vec4 Ke = texture(nonuniformEXT(textures[emissiveIndex]), UV);
-	Ke.rgb = pow(Ke.rgb, vec3(2.2));
+	Ke.rgb = sRGBToLinear(Ke.rgb);
 
-	//float Kao = texture(occlusionTex, UV).r;
 	float Kao = texture(nonuniformEXT(textures[occlusionIndex]), UV).r;
 
-	//vec4 MeR = texture(metalRoughTex, UV);
 	vec4 MeR = texture(nonuniformEXT(textures[metalicRoughIndex]), UV);
 
 	PBRInfo pbrInputs;

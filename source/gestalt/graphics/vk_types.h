@@ -138,11 +138,14 @@ struct render_config {
   bool enable_hdr{true};
   int bloom_quality{3};
   struct hdr_params {
-    bool show_bright_pass = false;
     float exposure{1.f};
     float maxWhite{1.35f};
     float bloomStrength{0.25f};
     float adaptationSpeed{1.f};
+    glm::vec4 lift{0.f};
+    glm::vec4 gamma{1.f};
+    glm::vec4 gain{1.f};
+    bool show_bright_pass = false;
   } hdr{};
 
   bool enable_shadows{true};

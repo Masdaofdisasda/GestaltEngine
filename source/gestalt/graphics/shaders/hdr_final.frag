@@ -6,11 +6,14 @@ layout(location = 0) out vec4 outColor;
 
 layout( push_constant ) uniform constants
 {
-	bool showBrightPass;
     float exposure;
 	float maxWhite; 
 	float bloomStrength; 
 	float adaptationSpeed;
+	vec4 lift; 
+	vec4 gamma; 
+	vec4 gain;
+	bool showBloom;
 } params;
 
 layout(binding = 10) uniform sampler2D texScene;
@@ -23,22 +26,39 @@ vec3 Reinhard2(vec3 x)
 	return (x * (1.0 + x / (params.maxWhite * params.maxWhite))) / (1.0 + x);
 }
 
-void main()
-{
-	vec3 color = texture(texScene, uv).rgb;
-	vec3 bloom = texture(texBloom, vec2(uv.x, uv.y)).rgb;
+vec3 ApplyLiftGammaGain(vec3 color, vec3 lift, vec3 gamma, vec3 gain) {
+    // Apply lift (shadows)
+    color += lift;
 
-	if (params.showBrightPass)
-	{
-		outColor = vec4(bloom, 1.0);
-		return;
-	}
+    // Apply gamma (midtones)
+    color = pow(color, 1.0 / gamma);
 
-	//float avgLuminance = texture(texLuminance, vec2(0.5, 0.5)).x;
+    // Apply gain (highlights)
+    color *= gain;
 
-	float midGray = 0.5;
+    return color;
+}
 
-	//color *= ubo.exposure * midGray / (avgLuminance + 0.001);
-	color = Reinhard2(color);
-	outColor = vec4(color + params.bloomStrength * bloom, 1.0);
+void main() {
+    vec3 sceneColor = texture(texScene, uv).rgb;
+    vec3 bloomColor = texture(texBloom, uv).rgb * params.bloomStrength;
+
+    if (params.showBloom) {
+        outColor = vec4(bloomColor, 1.0);
+        return;
+    }
+
+    // Apply exposure to scene color
+    sceneColor *= params.exposure;
+
+    // Tone mapping
+    sceneColor = Reinhard2(sceneColor);
+
+    // Color grading
+    sceneColor = ApplyLiftGammaGain(sceneColor, params.lift.rgb, params.gamma.rgb, params.gain.rgb);
+
+    // Combine scene color with bloom
+    vec3 finalColor = sceneColor + bloomColor;
+
+    outColor = vec4(finalColor, 1.0);
 }
