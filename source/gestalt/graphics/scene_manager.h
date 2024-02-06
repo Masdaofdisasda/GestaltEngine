@@ -16,7 +16,6 @@ class scene_manager {
   std::shared_ptr<resource_manager> resource_manager_;
   std::unique_ptr<asset_loader> asset_loader_ = std::make_unique<asset_loader>();
 
-  void init_default_data() const; // todo use resource manager
   void build_scene_graph(const std::vector<fastgltf::Node>& nodes, const size_t& mesh_offset);
   void create_entities(std::vector<fastgltf::Node> nodes, const size_t& node_offset);
   void build_hierarchy(std::vector<fastgltf::Node> nodes, const size_t& node_offset);
@@ -32,7 +31,6 @@ public:
   void init(const vk_gpu& gpu, const std::shared_ptr<resource_manager>& resource_manager);
   void cleanup();
 
-  void load_environment_map(const std::string& file_path) const;
   void update_scene(draw_context& draw_context);
   void traverse_scene(entity entity, const glm::mat4& parent_transform, draw_context& draw_context);
 

@@ -10,6 +10,7 @@ class resource_manager {
   vk_gpu gpu_ = {};
   std::unique_ptr<database> database_ = std::make_unique<database>();
 
+
 public:
   gpu_mesh_buffers scene_geometry_;
 
@@ -56,6 +57,7 @@ public:
   AllocatedImage create_cubemap(const void* imageData, VkExtent3D size, VkFormat format,
                                 VkImageUsageFlags usage, bool mipmapped = false);
   std::optional<AllocatedImage> load_image(fastgltf::Asset& asset, fastgltf::Image& image);
+  void init_default_data();
   void load_and_process_cubemap(const std::string& file_path);
   AllocatedImage create_cubemap_from_HDR(std::vector<float>& image_data, int h, int w);
   AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage,

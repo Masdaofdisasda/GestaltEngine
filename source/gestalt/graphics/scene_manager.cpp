@@ -13,7 +13,7 @@ void scene_manager::init(const vk_gpu& gpu,const std::shared_ptr <resource_manag
   resource_manager_ = resource_manager;
   asset_loader_->init(gpu_, resource_manager_);
 
-  init_default_data();
+  resource_manager_->init_default_data();
 
   size_t mesh_offset = resource_manager_->get_database().get_meshes_size();
 
@@ -24,7 +24,7 @@ void scene_manager::init(const vk_gpu& gpu,const std::shared_ptr <resource_manag
 
   build_scene_graph(nodes, mesh_offset);
 
-  load_environment_map(R"(..\..\assets\san_giuseppe_bridge_4k.hdr)"); 
+  resource_manager_->load_and_process_cubemap(R"(..\..\assets\san_giuseppe_bridge_4k.hdr)");
 }
 
 void scene_manager::create_entities(std::vector<fastgltf::Node> nodes, const size_t& mesh_offset) {
@@ -76,10 +76,6 @@ void scene_manager::build_scene_graph(const std::vector<fastgltf::Node>& nodes, 
 }
 
 void scene_manager::cleanup() {
-}
-
-void scene_manager::load_environment_map(const std::string& file_path) const {
-  resource_manager_->load_and_process_cubemap(file_path);
 }
 
 size_t scene_manager::create_material(const pbr_material& config,
@@ -202,87 +198,4 @@ void scene_manager::traverse_scene(const entity entity, const glm::mat4& parent_
   for (const auto& childEntity : object.children) {
     traverse_scene(childEntity, world_transform, draw_context);
   }
-}
-
-void scene_manager::init_default_data() const {
-  auto& default_material = resource_manager_->get_database().default_material_;
-
-  uint32_t white = 0xFFFFFFFF;                       // White color for color and occlusion
-  uint32_t default_metallic_roughness = 0xFF00FF00;  // Green color representing metallic-roughness
-  uint32_t flat_normal = 0xFFFF8080;                 // Flat normal
-  uint32_t black = 0xFF000000;                       // Black color for emissive
-
-  default_material.color_image = resource_manager_->create_image(
-      (void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-  resource_manager_->get_database().add_image(default_material.color_image);
-
-  default_material.metallic_roughness_image
-      = resource_manager_->create_image((void*)&default_metallic_roughness, VkExtent3D{1, 1, 1},
-                                        VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-  resource_manager_->get_database().add_image(default_material.metallic_roughness_image);
-
-  default_material.normal_image
-      = resource_manager_->create_image((void*)&flat_normal, VkExtent3D{1, 1, 1},
-                                        VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-  resource_manager_->get_database().add_image(default_material.normal_image);
-
-  default_material.emissive_image = resource_manager_->create_image(
-      (void*)&black, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-  resource_manager_->get_database().add_image(default_material.emissive_image);
-
-  default_material.occlusion_image = resource_manager_->create_image(
-      (void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-  resource_manager_->get_database().add_image(default_material.occlusion_image);
-
-  // checkerboard image for error textures and testing
-  uint32_t magenta = 0xFFFF00FF;
-  constexpr size_t checkerboard_size = 256;
-  std::array<uint32_t, checkerboard_size> pixels;  // for 16x16 checkerboard texture
-  for (int x = 0; x < 16; x++) {
-    for (int y = 0; y < 16; y++) {
-      pixels[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
-    }
-  }
-  default_material.error_checkerboard_image = resource_manager_->create_image(
-      pixels.data(), VkExtent3D{16, 16, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-  resource_manager_->get_database().add_image(default_material.error_checkerboard_image);
-
-  VkSamplerCreateInfo sampler = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
-
-  sampler.magFilter = VK_FILTER_NEAREST;
-  sampler.minFilter = VK_FILTER_NEAREST;
-
-  vkCreateSampler(gpu_.device, &sampler, nullptr, &default_material.default_sampler_nearest);
-  resource_manager_->get_database().add_sampler(default_material.default_sampler_nearest);
-
-  sampler.magFilter = VK_FILTER_LINEAR;
-  sampler.minFilter = VK_FILTER_LINEAR;
-  vkCreateSampler(gpu_.device, &sampler, nullptr, &default_material.default_sampler_linear);
-  resource_manager_->get_database().add_sampler(default_material.default_sampler_linear);
-
-  pbr_material material{};
-  material.constants.albedo_factor.x = 1.f;
-  material.constants.albedo_factor.y = 1.f;
-  material.constants.albedo_factor.z = 1.f;
-  material.constants.albedo_factor.w = 1.f;
-
-  material.constants.metal_rough_factor.x = 0.f;
-  material.constants.metal_rough_factor.y = 0.f;
-  // write material parameters to buffer
-
-  // default the material textures
-  material.resources.albedo_image = default_material.color_image;
-  material.resources.albedo_sampler = default_material.default_sampler_linear;
-  material.resources.metal_rough_image = default_material.metallic_roughness_image;
-  material.resources.metal_rough_sampler = default_material.default_sampler_linear;
-  material.resources.normal_image = default_material.normal_image;
-  material.resources.normal_sampler = default_material.default_sampler_linear;
-  material.resources.emissive_image = default_material.emissive_image;
-  material.resources.emissive_sampler = default_material.default_sampler_linear;
-  material.resources.occlusion_image = default_material.occlusion_image;
-  material.resources.occlusion_sampler = default_material.default_sampler_nearest;
-
-  // build material
-  create_material(
-      material, "default_material");
 }

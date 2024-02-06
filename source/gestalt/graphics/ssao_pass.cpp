@@ -75,7 +75,7 @@ void ssao_pass::execute(const VkCommandBuffer cmd) {
   descriptor_writer writer;
   writer.clear();
   writer.write_image(10, renderer_->frame_buffer_.get_read_buffer().color_image.imageView,
-                     resource_manager_->get_database().get_sampler(0), //todo
+                     resource_manager_->get_database().get_sampler(0), //todo default_sampler_nearest
                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.update_set(gpu_.device, descriptor_set);
