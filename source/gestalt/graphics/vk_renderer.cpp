@@ -41,6 +41,19 @@ void vk_renderer::init(const vk_gpu& gpu, const sdl_window& window,
   per_frame_data_.ambientColor = glm::vec4(0.1f);
   per_frame_data_.sunlightColor = glm::vec4(1.f);
   per_frame_data_.sunlightDirection = glm::vec4(0.1, 0.5, 0.1, 1.5f);
+
+  for (int i = 0; i < FRAME_OVERLAP; i++) {
+    // create a descriptor pool
+    std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> frame_sizes = {
+        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3},
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3},
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3},
+        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4},
+    };
+
+    frames_[i].descriptor_pool = DescriptorAllocatorGrowable{};
+    frames_[i].descriptor_pool.init(gpu_.device, 1000, frame_sizes);
+  }
 }
 
 bool is_visible(const render_object& obj, const glm::mat4& viewproj) {
@@ -77,6 +90,8 @@ bool is_visible(const render_object& obj, const glm::mat4& viewproj) {
 
 bool vk_renderer::acquire_next_image() {
   VK_CHECK(vkWaitForFences(gpu_.device, 1, &get_current_frame().render_fence, true, 1000000000));
+
+  get_current_frame().descriptor_pool.clear_pools(gpu_.device);
 
   VkResult e = vkAcquireNextImageKHR(gpu_.device, swapchain_->swapchain, 1000000000,
                                      get_current_frame().swapchain_semaphore, nullptr,
@@ -152,7 +167,9 @@ void vk_renderer::draw() {
     if (config_.enable_ssao) {
       ssao_pass_->execute(cmd);
     }
-    hdr_pass_->execute(cmd);
+    if (config_.enable_hdr) {
+      hdr_pass_->execute(cmd);
+    }
 
     auto end = std::chrono::system_clock::now();
 

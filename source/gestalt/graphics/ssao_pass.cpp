@@ -97,7 +97,7 @@ void ssao_pass::prepare_blur_y(VkShaderModule vertex_shader, VkShaderModule ssao
         .set_color_attachment_format(ssao_buffer_.get_write_buffer().color_image.imageFormat)
         .set_depth_format(ssao_buffer_.get_write_buffer().depth_image.imageFormat)
         .set_pipeline_layout(blur_y_.pipeline_layout_)
-        .build_pipeline(gpu_.device);
+            .build_pipeline(gpu_.device);
 }
 
 void ssao_pass::prepare_final(VkShaderModule vertex_shader, VkShaderModule ssao_final_shader) {
@@ -132,7 +132,8 @@ void ssao_pass::prepare_final(VkShaderModule vertex_shader, VkShaderModule ssao_
             renderer_->frame_buffer_.get_write_buffer().color_image.imageFormat)
         .set_depth_format(renderer_->frame_buffer_.get_write_buffer().depth_image.imageFormat)
         .set_pipeline_layout(final_.pipeline_layout_)
-        .build_pipeline(gpu_.device);
+            .build_pipeline(gpu_.device);
+
 }
 
 void ssao_pass::prepare() {
@@ -150,10 +151,6 @@ void ssao_pass::prepare() {
   VkShaderModule ssao_final_shader;
   vkutil::load_shader_module(final_.fragment.c_str(), gpu_.device, &ssao_final_shader);
 
-  std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes
-      = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3}};
-  descriptorPool_.init(gpu_.device, 1, sizes);
-
   prepare_filter_pass(vertex_shader, ssao_filter_shader);
   prepare_blur_x(vertex_shader, ssao_blur_x_shader);
   prepare_blur_y(vertex_shader, ssao_blur_y_shader);
@@ -166,8 +163,9 @@ void ssao_pass::prepare() {
   vkDestroyShaderModule(gpu_.device, ssao_final_shader, nullptr);
 }
 
-void ssao_pass::execute(const VkCommandBuffer cmd) {
-  vkCmdEndRendering(cmd);
+void ssao_pass::execute_filter(const VkCommandBuffer cmd) {
+  filter_.descriptor_set_ = renderer_->get_current_frame().descriptor_pool.allocate(
+      gpu_.device, filter_.descriptor_layouts_.at(0));
 
   renderer_->frame_buffer_.switch_buffers();
 
@@ -188,49 +186,39 @@ void ssao_pass::execute(const VkCommandBuffer cmd) {
                                                          &newColorAttachment, &newDepthAttachment);
   vkCmdBeginRendering(cmd, &newRenderInfo);
 
-  auto descriptor_set
-      = descriptorPool_.allocate(gpu_.device, filter_.descriptor_layouts_.at(0));
-  descriptor_writer writer;
   writer.clear();
   writer.write_image(
       10, renderer_->frame_buffer_.get_read_buffer().depth_image.imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+      resource_manager_->get_database().get_sampler(0), // todo default_sampler_nearest
       VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.write_image(
       11, rotation_pattern.imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+      resource_manager_->get_database().get_sampler(0), // todo default_sampler_nearest
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.update_set(gpu_.device, descriptor_set);
+  writer.update_set(gpu_.device, filter_.descriptor_set_);
 
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, filter_.pipeline_layout_, 0, 1,
-                          &descriptor_set, 0, nullptr);
+                          &filter_.descriptor_set_, 0, nullptr);
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, filter_.pipeline_);
-  VkViewport viewport;
-  viewport.x = 0;
-  viewport.y = 0;
-  viewport.width = static_cast<float>(effect_size_);
-  viewport.height = static_cast<float>(effect_size_);
-  viewport.minDepth = 0.f;
-  viewport.maxDepth = 1.f;
 
-  vkCmdSetViewport(cmd, 0, 1, &viewport);
-
-  VkRect2D scissor;
-  scissor.offset.x = 0;
-  scissor.offset.y = 0;
-  scissor.extent.width = effect_size_;
-  scissor.extent.height = effect_size_;
-
-  vkCmdSetScissor(cmd, 0, 1, &scissor);
+  viewport_.width = static_cast<float>(effect_size_);
+  viewport_.height = static_cast<float>(effect_size_);
+  scissor_.extent.width = effect_size_;
+  scissor_.extent.height = effect_size_;
+  vkCmdSetViewport(cmd, 0, 1, &viewport_);
+  vkCmdSetScissor(cmd, 0, 1, &scissor_);
 
   vkCmdPushConstants(cmd, filter_.pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                      sizeof(render_config::ssao_params), &renderer_->get_config().ssao);
   vkCmdDraw(cmd, 3, 1, 0, 0);
 
   vkCmdEndRendering(cmd);
+}
 
-  // LOOP ???
-  //  X PASS
+void ssao_pass::execute_blur_x(const VkCommandBuffer cmd) {
+  blur_x_.descriptor_set_ = renderer_->get_current_frame().descriptor_pool.allocate(
+      gpu_.device, blur_x_.descriptor_layouts_.at(0));
+
   ssao_buffer_.switch_buffers();
 
   vkutil::transition_image(cmd, ssao_buffer_.get_read_buffer().color_image.image,
@@ -240,33 +228,41 @@ void ssao_pass::execute(const VkCommandBuffer cmd) {
   vkutil::transition_image(cmd, ssao_buffer_.get_write_buffer().depth_image.image,
                            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-  newColorAttachment = vkinit::attachment_info(
+  VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
       ssao_buffer_.get_write_buffer().color_image.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
-  newDepthAttachment
+  VkRenderingAttachmentInfo newDepthAttachment
       = vkinit::depth_attachment_info(ssao_buffer_.get_write_buffer().depth_image.imageView,
                                       VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-  newRenderInfo = vkinit::rendering_info({effect_size_, effect_size_}, &newColorAttachment,
+  VkRenderingInfo newRenderInfo = vkinit::rendering_info({effect_size_, effect_size_},
+                                                         &newColorAttachment,
                                          &newDepthAttachment);
   vkCmdBeginRendering(cmd, &newRenderInfo);
-
-  descriptor_set = descriptorPool_.allocate(gpu_.device, blur_x_.descriptor_layouts_.at(0));
 
   writer.clear();
   writer.write_image(
       10, ssao_buffer_.get_read_buffer().color_image.imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+      resource_manager_->get_database().get_sampler(0), // todo default_sampler_nearest
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.update_set(gpu_.device, descriptor_set);
+  writer.update_set(gpu_.device, blur_x_.descriptor_set_);
 
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, blur_x_.pipeline_layout_, 0, 1,
-                          &descriptor_set, 0, nullptr);
+                          &blur_x_.descriptor_set_, 0, nullptr);
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, blur_x_.pipeline_);
-  vkCmdSetViewport(cmd, 0, 1, &viewport);
-  vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+  viewport_.width = static_cast<float>(effect_size_);
+  viewport_.height = static_cast<float>(effect_size_);
+  scissor_.extent.width = effect_size_;
+  scissor_.extent.height = effect_size_;
+  vkCmdSetViewport(cmd, 0, 1, &viewport_);
+  vkCmdSetScissor(cmd, 0, 1, &scissor_);
   vkCmdDraw(cmd, 3, 1, 0, 0);
   vkCmdEndRendering(cmd);
+}
 
-  // Y PASS
+void ssao_pass::execute_blur_y(const VkCommandBuffer cmd) {
+  blur_y_.descriptor_set_ = renderer_->get_current_frame().descriptor_pool.allocate(
+      gpu_.device, blur_y_.descriptor_layouts_.at(0));
+
   ssao_buffer_.switch_buffers();
 
   vkutil::transition_image(cmd, ssao_buffer_.get_read_buffer().color_image.image,
@@ -276,33 +272,40 @@ void ssao_pass::execute(const VkCommandBuffer cmd) {
   vkutil::transition_image(cmd, ssao_buffer_.get_write_buffer().depth_image.image,
                            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-  newColorAttachment = vkinit::attachment_info(
+  VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
       ssao_buffer_.get_write_buffer().color_image.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
-  newDepthAttachment
+  VkRenderingAttachmentInfo newDepthAttachment
       = vkinit::depth_attachment_info(ssao_buffer_.get_write_buffer().depth_image.imageView,
                                       VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-  newRenderInfo = vkinit::rendering_info({effect_size_, effect_size_}, &newColorAttachment,
+  VkRenderingInfo newRenderInfo = vkinit::rendering_info({effect_size_, effect_size_},
+                                                         &newColorAttachment,
                                          &newDepthAttachment);
   vkCmdBeginRendering(cmd, &newRenderInfo);
-
-  descriptor_set = descriptorPool_.allocate(gpu_.device, blur_y_.descriptor_layouts_.at(0));
 
   writer.clear();
   writer.write_image(
       10, ssao_buffer_.get_read_buffer().color_image.imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+      resource_manager_->get_database().get_sampler(0), // todo default_sampler_nearest
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.update_set(gpu_.device, descriptor_set);
+  writer.update_set(gpu_.device, blur_y_.descriptor_set_);
 
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, blur_y_.pipeline_layout_, 0, 1,
-                          &descriptor_set, 0, nullptr);
+                          &blur_y_.descriptor_set_, 0, nullptr);
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, blur_y_.pipeline_);
-  vkCmdSetViewport(cmd, 0, 1, &viewport);
-  vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+  viewport_.width = static_cast<float>(effect_size_);
+  viewport_.height = static_cast<float>(effect_size_);
+  scissor_.extent.width = effect_size_;
+  scissor_.extent.height = effect_size_;
+  vkCmdSetViewport(cmd, 0, 1, &viewport_);
+  vkCmdSetScissor(cmd, 0, 1, &scissor_);
   vkCmdDraw(cmd, 3, 1, 0, 0);
   vkCmdEndRendering(cmd);
+}
 
-  // FINAL PASS
+void ssao_pass::execute_final(const VkCommandBuffer cmd) {
+  final_.descriptor_set_ = renderer_->get_current_frame().descriptor_pool.allocate(gpu_.device, final_.descriptor_layouts_.at(0));
+
   ssao_buffer_.switch_buffers();
 
   vkutil::transition_image(cmd, ssao_buffer_.get_read_buffer().color_image.image,
@@ -314,17 +317,15 @@ void ssao_pass::execute(const VkCommandBuffer cmd) {
   vkutil::transition_image(cmd, renderer_->frame_buffer_.get_write_buffer().depth_image.image,
                            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-  newColorAttachment
+  VkRenderingAttachmentInfo newColorAttachment
       = vkinit::attachment_info(renderer_->frame_buffer_.get_write_buffer().color_image.imageView,
                                 nullptr, VK_IMAGE_LAYOUT_GENERAL);
-  newDepthAttachment = vkinit::depth_attachment_info(
+  VkRenderingAttachmentInfo newDepthAttachment = vkinit::depth_attachment_info(
       renderer_->frame_buffer_.get_write_buffer().depth_image.imageView,
       VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-  newRenderInfo = vkinit::rendering_info(renderer_->get_window().extent, &newColorAttachment,
-                                         &newDepthAttachment);
+  VkRenderingInfo newRenderInfo = vkinit::rendering_info(renderer_->get_window().extent,
+                                                         &newColorAttachment, &newDepthAttachment);
   vkCmdBeginRendering(cmd, &newRenderInfo);
-
-  descriptor_set = descriptorPool_.allocate(gpu_.device, final_.descriptor_layouts_.at(0));
 
   writer.clear();
   writer.write_image(
@@ -335,21 +336,33 @@ void ssao_pass::execute(const VkCommandBuffer cmd) {
       11, ssao_buffer_.get_read_buffer().color_image.imageView,
       resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.update_set(gpu_.device, descriptor_set);
+  writer.update_set(gpu_.device, final_.descriptor_set_);
 
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, final_.pipeline_layout_, 0, 1,
-                          &descriptor_set, 0, nullptr);
+                          &final_.descriptor_set_, 0, nullptr);
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, final_.pipeline_);
-
-  viewport.width = static_cast<float>(renderer_->get_window().extent.width);
-  viewport.height = static_cast<float>(renderer_->get_window().extent.height);
-  scissor.extent.width = renderer_->get_window().extent.width;
-  scissor.extent.height = renderer_->get_window().extent.height;
-  vkCmdSetViewport(cmd, 0, 1, &viewport);
-  vkCmdSetScissor(cmd, 0, 1, &scissor);
+  viewport_.width = static_cast<float>(renderer_->get_window().extent.width);
+  viewport_.height = static_cast<float>(renderer_->get_window().extent.height);
+  scissor_.extent.width = renderer_->get_window().extent.width;
+  scissor_.extent.height = renderer_->get_window().extent.height;
+  vkCmdSetViewport(cmd, 0, 1, &viewport_);
+  vkCmdSetScissor(cmd, 0, 1, &scissor_);
   vkCmdPushConstants(cmd, final_.pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                      sizeof(render_config::ssao_params), &renderer_->get_config().ssao);
   vkCmdDraw(cmd, 3, 1, 0, 0);
+}
+
+void ssao_pass::execute(const VkCommandBuffer cmd) {
+  vkCmdEndRendering(cmd); //TODO have each pass start and end its own rendering
+
+  execute_filter(cmd);
+
+  for (int i = 0; i < renderer_->get_config().ssao_quality; ++i) {
+    execute_blur_x(cmd);
+    execute_blur_y(cmd);
+  }
+
+  execute_final(cmd);
 }
 
 void ssao_pass::cleanup() {

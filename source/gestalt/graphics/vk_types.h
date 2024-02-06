@@ -1,6 +1,4 @@
-﻿// vulkan_guide.h : Include file for standard system include files,
-// or project specific include files.
-#pragma once
+﻿#pragma once
 
 #define SDL_MAIN_HANDLED
 
@@ -125,6 +123,7 @@ struct draw_context {
 struct render_config {
   bool always_opaque{false};
   bool enable_ssao{true};
+  int ssao_quality{1};
   struct ssao_params {
     bool show_ssao_only = false;
     float scale = 0.75f;
@@ -136,12 +135,13 @@ struct render_config {
     float distScale = 5.f;
   } ssao{};
 
-  bool enable_hdr = true;
+  bool enable_hdr{true};
+  int bloom_quality{3};
   struct hdr_params {
     bool show_bright_pass = false;
     float exposure{1.f};
-    float maxWhite{1.f};
-    float bloomStrength{1.f};
+    float maxWhite{1.35f};
+    float bloomStrength{0.25f};
     float adaptationSpeed{1.f};
   } hdr{};
 

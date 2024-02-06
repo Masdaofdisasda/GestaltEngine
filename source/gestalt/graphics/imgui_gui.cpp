@@ -207,6 +207,7 @@ void imgui_gui::render_settings() {
 
     if (ImGui::CollapsingHeader("SSAO Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
       ImGui::Checkbox("Enable SSAO", &config.enable_ssao);
+      ImGui::SliderInt("SSAO Quality", &config.ssao_quality, 1, 4);
       ImGui::Checkbox("Show SSAO", &config.ssao.show_ssao_only);
       ImGui::SliderFloat("Scale", &config.ssao.scale, 0.0f, 2.0f,
                          "%.3f");  
@@ -222,12 +223,13 @@ void imgui_gui::render_settings() {
 
     if (ImGui::CollapsingHeader("HDR Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
       ImGui::Checkbox("Enable HDR", &config.enable_hdr);
+      ImGui::SliderInt("Bloom Quality", &config.bloom_quality, 1, 4);
       ImGui::Checkbox("Show Bright Pass", &config.hdr.show_bright_pass);
       ImGui::SliderFloat("Exposure", &config.hdr.exposure, 0.1f, 2.0f,
                          "%.3f");  
       ImGui::SliderFloat("Max White", &config.hdr.maxWhite, 0.1f, 2.5f,
                          "%.3f");  
-      ImGui::SliderFloat("Bloom Strength", &config.hdr.bloomStrength, 0.0f, 10.f, 
+      ImGui::SliderFloat("Bloom Strength", &config.hdr.bloomStrength, 0.0f, 2.f, 
                          "%.2f");
       ImGui::SliderFloat("Adaption Speed", &config.hdr.adaptationSpeed, 0.1f, 2.0f,
                          "%.2f"); 

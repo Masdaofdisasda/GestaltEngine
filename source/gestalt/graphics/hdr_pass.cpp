@@ -25,10 +25,6 @@ void hdr_pass::prepare() {
   VkShaderModule final_shader;
   vkutil::load_shader_module(final_.fragment.c_str(), gpu_.device, &final_shader);
 
-  std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes
-      = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3}};
-  descriptor_pool_.init(gpu_.device, 1, sizes);
-
   // Bright Pass
   {
     bright_pass_.descriptor_layouts_.emplace_back(
@@ -159,6 +155,7 @@ void hdr_pass::prepare() {
               .set_depth_format(hdr_buffer_.get_write_buffer().depth_image.imageFormat)
               .set_pipeline_layout(blur_y_.pipeline_layout_)
               .build_pipeline(gpu_.device);
+
   }
 
   // SSAO Final
@@ -206,9 +203,99 @@ void hdr_pass::prepare() {
   vkDestroyShaderModule(gpu_.device, final_shader, nullptr);
 }
 
+void hdr_pass::execute_blur_x(const VkCommandBuffer cmd) {
+  blur_x_.descriptor_set_ = renderer_->get_current_frame().descriptor_pool.allocate(
+      gpu_.device, blur_x_.descriptor_layouts_.at(0));
+  hdr_buffer_.switch_buffers();
+
+  vkutil::transition_image(cmd, hdr_buffer_.get_read_buffer().color_image.image,
+                           VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  vkutil::transition_image(cmd, hdr_buffer_.get_write_buffer().color_image.image,
+                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+  vkutil::transition_image(cmd, hdr_buffer_.get_write_buffer().depth_image.image,
+                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+
+  VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
+      hdr_buffer_.get_write_buffer().color_image.imageView,
+                                               nullptr, VK_IMAGE_LAYOUT_GENERAL);
+  VkRenderingAttachmentInfo newDepthAttachment
+      = vkinit::depth_attachment_info(hdr_buffer_.get_write_buffer().depth_image.imageView,
+                                      VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+  VkRenderingInfo newRenderInfo = vkinit::rendering_info({effect_size_, effect_size_},
+                                                        &newColorAttachment,
+                                         &newDepthAttachment);
+  vkCmdBeginRendering(cmd, &newRenderInfo);
+
+  writer.clear();
+  writer.write_image(
+      10, hdr_buffer_.get_read_buffer().color_image.imageView,
+      resource_manager_->get_database().get_sampler(0), // todo default_sampler_nearest
+      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+  writer.update_set(gpu_.device, blur_x_.descriptor_set_);
+
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, blur_x_.pipeline_layout_, 0, 1,
+                          &blur_x_.descriptor_set_, 0, nullptr);
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, blur_x_.pipeline_);
+  viewport_.width = static_cast<float>(effect_size_);
+  viewport_.height = static_cast<float>(effect_size_);
+  scissor_.extent.width = effect_size_;
+  scissor_.extent.height = effect_size_;
+  vkCmdSetViewport(cmd, 0, 1, &viewport_);
+  vkCmdSetScissor(cmd, 0, 1, &scissor_);
+  vkCmdDraw(cmd, 3, 1, 0, 0);
+  vkCmdEndRendering(cmd);
+}
+
+void hdr_pass::execute_blur_y(const VkCommandBuffer cmd) {
+  blur_y_.descriptor_set_ = renderer_->get_current_frame().descriptor_pool.allocate(
+      gpu_.device, blur_y_.descriptor_layouts_.at(0));
+  hdr_buffer_.switch_buffers();
+
+  vkutil::transition_image(cmd, hdr_buffer_.get_read_buffer().color_image.image,
+                           VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  vkutil::transition_image(cmd, hdr_buffer_.get_write_buffer().color_image.image,
+                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+  vkutil::transition_image(cmd, hdr_buffer_.get_write_buffer().depth_image.image,
+                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+
+  VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
+      hdr_buffer_.get_write_buffer().color_image.imageView,
+                                               nullptr, VK_IMAGE_LAYOUT_GENERAL);
+  VkRenderingAttachmentInfo newDepthAttachment
+      = vkinit::depth_attachment_info(hdr_buffer_.get_write_buffer().depth_image.imageView,
+                                      VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+  VkRenderingInfo newRenderInfo = vkinit::rendering_info({effect_size_, effect_size_},
+                                                        &newColorAttachment,
+                                         &newDepthAttachment);
+  vkCmdBeginRendering(cmd, &newRenderInfo);
+
+  writer.clear();
+  writer.write_image(
+      10, hdr_buffer_.get_read_buffer().color_image.imageView,
+      resource_manager_->get_database().get_sampler(0), // todo default_sampler_nearest
+      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+  writer.update_set(gpu_.device, blur_y_.descriptor_set_);
+
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, blur_y_.pipeline_layout_, 0, 1,
+                          &blur_y_.descriptor_set_, 0, nullptr);
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, blur_y_.pipeline_);
+
+  viewport_.width = static_cast<float>(effect_size_);
+  viewport_.height = static_cast<float>(effect_size_);
+
+  scissor_.extent.width = effect_size_;
+  scissor_.extent.height = effect_size_;
+  vkCmdSetViewport(cmd, 0, 1, &viewport_);
+  vkCmdSetScissor(cmd, 0, 1, &scissor_);
+  vkCmdDraw(cmd, 3, 1, 0, 0);
+  vkCmdEndRendering(cmd);
+}
+
 void hdr_pass::execute(const VkCommandBuffer cmd) {
   vkCmdEndRendering(cmd);
 
+  bright_pass_.descriptor_set_ = renderer_->get_current_frame().descriptor_pool.allocate(
+      gpu_.device, bright_pass_.descriptor_layouts_.at(0));
   renderer_->frame_buffer_.switch_buffers();
 
   vkutil::transition_image(cmd, renderer_->frame_buffer_.get_read_buffer().color_image.image,
@@ -227,114 +314,39 @@ void hdr_pass::execute(const VkCommandBuffer cmd) {
                                                          &newColorAttachment, &newDepthAttachment);
   vkCmdBeginRendering(cmd, &newRenderInfo);
 
-  auto descriptor_set
-      = descriptor_pool_.allocate(gpu_.device, bright_pass_.descriptor_layouts_.at(0));
-  descriptor_writer writer;
   writer.clear();
   writer.write_image(
       10, renderer_->frame_buffer_.get_read_buffer().color_image.imageView,
       resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.update_set(gpu_.device, descriptor_set);
+  writer.update_set(gpu_.device, bright_pass_.descriptor_set_);
 
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, bright_pass_.pipeline_layout_, 0, 1,
-                          &descriptor_set, 0, nullptr);
+                          &bright_pass_.descriptor_set_, 0, nullptr);
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, bright_pass_.pipeline_);
-  VkViewport viewport;
-  viewport.x = 0;
-  viewport.y = 0;
-  viewport.width = static_cast<float>(effect_size_);
-  viewport.height = static_cast<float>(effect_size_);
-  viewport.minDepth = 0.f;
-  viewport.maxDepth = 1.f;
 
-  vkCmdSetViewport(cmd, 0, 1, &viewport);
+  viewport_.width = static_cast<float>(effect_size_);
+  viewport_.height = static_cast<float>(effect_size_);
+  scissor_.extent.width = effect_size_;
+  scissor_.extent.height = effect_size_;
 
-  VkRect2D scissor;
-  scissor.offset.x = 0;
-  scissor.offset.y = 0;
-  scissor.extent.width = effect_size_;
-  scissor.extent.height = effect_size_;
+  vkCmdSetViewport(cmd, 0, 1, &viewport_);
 
-  vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+  vkCmdSetScissor(cmd, 0, 1, &scissor_);
   vkCmdDraw(cmd, 3, 1, 0, 0);
 
   vkCmdEndRendering(cmd);
 
-  // LOOP ???
-  //  X PASS
-  hdr_buffer_.switch_buffers();
-
-  vkutil::transition_image(cmd, hdr_buffer_.get_read_buffer().color_image.image,
-                           VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  vkutil::transition_image(cmd, hdr_buffer_.get_write_buffer().color_image.image,
-                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-  vkutil::transition_image(cmd, hdr_buffer_.get_write_buffer().depth_image.image,
-                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-
-  newColorAttachment = vkinit::attachment_info(hdr_buffer_.get_write_buffer().color_image.imageView,
-                                               nullptr, VK_IMAGE_LAYOUT_GENERAL);
-  newDepthAttachment
-      = vkinit::depth_attachment_info(hdr_buffer_.get_write_buffer().depth_image.imageView,
-                                      VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-  newRenderInfo = vkinit::rendering_info({effect_size_, effect_size_}, &newColorAttachment,
-                                         &newDepthAttachment);
-  vkCmdBeginRendering(cmd, &newRenderInfo);
-
-  descriptor_set = descriptor_pool_.allocate(gpu_.device, blur_x_.descriptor_layouts_.at(0));
-
-  writer.clear();
-  writer.write_image(
-      10, hdr_buffer_.get_read_buffer().color_image.imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
-      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.update_set(gpu_.device, descriptor_set);
-
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, blur_x_.pipeline_layout_, 0, 1,
-                          &descriptor_set, 0, nullptr);
-  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, blur_x_.pipeline_);
-  vkCmdSetViewport(cmd, 0, 1, &viewport);
-  vkCmdSetScissor(cmd, 0, 1, &scissor);
-  vkCmdDraw(cmd, 3, 1, 0, 0);
-  vkCmdEndRendering(cmd);
-
-  // Y PASS
-  hdr_buffer_.switch_buffers();
-
-  vkutil::transition_image(cmd, hdr_buffer_.get_read_buffer().color_image.image,
-                           VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  vkutil::transition_image(cmd, hdr_buffer_.get_write_buffer().color_image.image,
-                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-  vkutil::transition_image(cmd, hdr_buffer_.get_write_buffer().depth_image.image,
-                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-
-  newColorAttachment = vkinit::attachment_info(hdr_buffer_.get_write_buffer().color_image.imageView,
-                                               nullptr, VK_IMAGE_LAYOUT_GENERAL);
-  newDepthAttachment
-      = vkinit::depth_attachment_info(hdr_buffer_.get_write_buffer().depth_image.imageView,
-                                      VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-  newRenderInfo = vkinit::rendering_info({effect_size_, effect_size_}, &newColorAttachment,
-                                         &newDepthAttachment);
-  vkCmdBeginRendering(cmd, &newRenderInfo);
-
-  descriptor_set = descriptor_pool_.allocate(gpu_.device, blur_y_.descriptor_layouts_.at(0));
-
-  writer.clear();
-  writer.write_image(
-      10, hdr_buffer_.get_read_buffer().color_image.imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
-      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.update_set(gpu_.device, descriptor_set);
-
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, blur_y_.pipeline_layout_, 0, 1,
-                          &descriptor_set, 0, nullptr);
-  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, blur_y_.pipeline_);
-  vkCmdSetViewport(cmd, 0, 1, &viewport);
-  vkCmdSetScissor(cmd, 0, 1, &scissor);
-  vkCmdDraw(cmd, 3, 1, 0, 0);
-  vkCmdEndRendering(cmd);
+  for (int i = 0; i < renderer_->get_config().bloom_quality; i++) {
+    execute_blur_x(cmd);
+    execute_blur_y(cmd);
+  }
 
   // FINAL PASS
+  final_.descriptor_set_ = renderer_->get_current_frame().descriptor_pool.allocate(
+      gpu_.device, final_.descriptor_layouts_.at(0));
+
   hdr_buffer_.switch_buffers();
 
   vkutil::transition_image(cmd, hdr_buffer_.get_read_buffer().color_image.image,
@@ -354,8 +366,6 @@ void hdr_pass::execute(const VkCommandBuffer cmd) {
                                          &newDepthAttachment);
   vkCmdBeginRendering(cmd, &newRenderInfo);
 
-  descriptor_set = descriptor_pool_.allocate(gpu_.device, final_.descriptor_layouts_.at(0));
-
   writer.clear();
   writer.write_image(
       10, renderer_->frame_buffer_.get_read_buffer().color_image.imageView,
@@ -365,18 +375,18 @@ void hdr_pass::execute(const VkCommandBuffer cmd) {
       11, hdr_buffer_.get_read_buffer().color_image.imageView,
       resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.update_set(gpu_.device, descriptor_set);
+  writer.update_set(gpu_.device, final_.descriptor_set_);
 
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, final_.pipeline_layout_, 0, 1,
-                          &descriptor_set, 0, nullptr);
+                          &final_.descriptor_set_, 0, nullptr);
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, final_.pipeline_);
 
-  viewport.width = static_cast<float>(renderer_->get_window().extent.width);
-  viewport.height = static_cast<float>(renderer_->get_window().extent.height);
-  scissor.extent.width = renderer_->get_window().extent.width;
-  scissor.extent.height = renderer_->get_window().extent.height;
-  vkCmdSetViewport(cmd, 0, 1, &viewport);
-  vkCmdSetScissor(cmd, 0, 1, &scissor);
+  viewport_.width = static_cast<float>(renderer_->get_window().extent.width);
+  viewport_.height = static_cast<float>(renderer_->get_window().extent.height);
+  scissor_.extent.width = renderer_->get_window().extent.width;
+  scissor_.extent.height = renderer_->get_window().extent.height;
+  vkCmdSetViewport(cmd, 0, 1, &viewport_);
+  vkCmdSetScissor(cmd, 0, 1, &scissor_);
   vkCmdPushConstants(cmd, final_.pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                      sizeof(render_config::hdr_params), &renderer_->get_config().hdr);
   vkCmdDraw(cmd, 3, 1, 0, 0);
