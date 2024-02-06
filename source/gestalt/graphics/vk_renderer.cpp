@@ -4,6 +4,7 @@
 
 #include "imgui_gui.h"
 #include "geometry_pass.h"
+#include "hdr_pass.h"
 #include "vk_images.h"
 #include "vk_initializers.h"
 #include "skybox_pass.h"
@@ -34,6 +35,8 @@ void vk_renderer::init(const vk_gpu& gpu, const sdl_window& window,
   transparency_pass_->init(gpu_, *this, resource_manager_);
   ssao_pass_ = std::make_unique<ssao_pass>();
   ssao_pass_->init(gpu_, *this, resource_manager_);
+  hdr_pass_ = std::make_unique<hdr_pass>();
+  hdr_pass_->init(gpu_, *this, resource_manager_);
   
   per_frame_data_.ambientColor = glm::vec4(0.1f);
   per_frame_data_.sunlightColor = glm::vec4(1.f);
@@ -149,6 +152,7 @@ void vk_renderer::draw() {
     if (config_.enable_ssao) {
       ssao_pass_->execute(cmd);
     }
+    hdr_pass_->execute(cmd);
 
     auto end = std::chrono::system_clock::now();
 

@@ -9,7 +9,6 @@
 
 #include <fastgltf/glm_element_traits.hpp>
 #include <fastgltf/parser.hpp>
-#include <fastgltf/tools.hpp>
 
 #include "cubemap_util.h"
 
@@ -681,60 +680,63 @@ AllocatedImage resource_manager::create_cubemap_from_HDR(std::vector<float>& ima
                                 VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 }
 
+void resource_manager::create_framebuffer(const VkExtent3D& extent,
+                                          frame_buffer& frame_buffer) {
+  AllocatedImage& color_image = frame_buffer.color_image;
+  AllocatedImage& depth_image = frame_buffer.depth_image;
+
+  // hardcoding the draw format to 32 bit float
+  color_image.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+  color_image.imageExtent = extent;
+
+  VkImageUsageFlags drawImageUsages{};
+  drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+  drawImageUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
+  drawImageUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+  drawImageUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
+
+  VkImageCreateInfo rimg_info
+      = vkinit::image_create_info(color_image.imageFormat, drawImageUsages, extent);
+
+  // for the draw image, we want to allocate it from gpu local memory
+  VmaAllocationCreateInfo rimg_allocinfo = {};
+  rimg_allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+  rimg_allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+  // allocate and create the image
+  vmaCreateImage(gpu_.allocator, &rimg_info, &rimg_allocinfo, &color_image.image,
+                 &color_image.allocation, nullptr);
+
+  // build a image-view for the draw image to use for rendering
+  VkImageViewCreateInfo rview_info = vkinit::imageview_create_info(
+      color_image.imageFormat, color_image.image, VK_IMAGE_ASPECT_COLOR_BIT);
+
+  VK_CHECK(vkCreateImageView(gpu_.device, &rview_info, nullptr, &color_image.imageView));
+
+  depth_image.imageFormat = VK_FORMAT_D32_SFLOAT;
+  depth_image.imageExtent = extent;
+  VkImageUsageFlags depthImageUsages{};
+  depthImageUsages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+  depthImageUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
+
+  VkImageCreateInfo dimg_info
+      = vkinit::image_create_info(depth_image.imageFormat, depthImageUsages, extent);
+
+  // allocate and create the image
+  vmaCreateImage(gpu_.allocator, &dimg_info, &rimg_allocinfo, &depth_image.image,
+                 &depth_image.allocation, nullptr);
+
+  // build a image-view for the draw image to use for rendering
+  VkImageViewCreateInfo dview_info = vkinit::imageview_create_info(
+      depth_image.imageFormat, depth_image.image, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+  VK_CHECK(vkCreateImageView(gpu_.device, &dview_info, nullptr, &depth_image.imageView));
+}
 
 void resource_manager::create_framebuffer(const VkExtent3D& extent,
                                       double_buffered_frame_buffer& frame_buffer) {
   for (int i = 0; i < 2; ++i) {
-    AllocatedImage& color_image = frame_buffer.get_write_buffer().color_image;
-    AllocatedImage& depth_image = frame_buffer.get_write_buffer().depth_image;
-
-    // hardcoding the draw format to 32 bit float
-    color_image.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
-    color_image.imageExtent = extent;
-
-    VkImageUsageFlags drawImageUsages{};
-    drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    drawImageUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
-    drawImageUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    drawImageUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
-
-    VkImageCreateInfo rimg_info
-        = vkinit::image_create_info(color_image.imageFormat, drawImageUsages, extent);
-
-    // for the draw image, we want to allocate it from gpu local memory
-    VmaAllocationCreateInfo rimg_allocinfo = {};
-    rimg_allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    rimg_allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-    // allocate and create the image
-    vmaCreateImage(gpu_.allocator, &rimg_info, &rimg_allocinfo, &color_image.image,
-                   &color_image.allocation, nullptr);
-
-    // build a image-view for the draw image to use for rendering
-    VkImageViewCreateInfo rview_info = vkinit::imageview_create_info(
-        color_image.imageFormat, color_image.image, VK_IMAGE_ASPECT_COLOR_BIT);
-
-    VK_CHECK(vkCreateImageView(gpu_.device, &rview_info, nullptr, &color_image.imageView));
-
-    depth_image.imageFormat = VK_FORMAT_D32_SFLOAT;
-    depth_image.imageExtent = extent;
-    VkImageUsageFlags depthImageUsages{};
-    depthImageUsages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    depthImageUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
-
-    VkImageCreateInfo dimg_info
-        = vkinit::image_create_info(depth_image.imageFormat, depthImageUsages, extent);
-
-    // allocate and create the image
-    vmaCreateImage(gpu_.allocator, &dimg_info, &rimg_allocinfo, &depth_image.image,
-                   &depth_image.allocation, nullptr);
-
-    // build a image-view for the draw image to use for rendering
-    VkImageViewCreateInfo dview_info = vkinit::imageview_create_info(
-        depth_image.imageFormat, depth_image.image, VK_IMAGE_ASPECT_DEPTH_BIT);
-
-    VK_CHECK(vkCreateImageView(gpu_.device, &dview_info, nullptr, &depth_image.imageView));
-
+    create_framebuffer(extent, frame_buffer.get_write_buffer());
     frame_buffer.switch_buffers();
   }
 }

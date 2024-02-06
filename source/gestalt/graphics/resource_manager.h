@@ -61,6 +61,7 @@ public:
   void init_default_data();
   void load_and_process_cubemap(const std::string& file_path);
   AllocatedImage create_cubemap_from_HDR(std::vector<float>& image_data, int h, int w);
+  void create_framebuffer(const VkExtent3D& extent, frame_buffer& frame_buffer);
   void create_framebuffer(const VkExtent3D& extent, double_buffered_frame_buffer& frame_buffer);
   AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
                               bool mipmapped = false, bool cubemap = false);

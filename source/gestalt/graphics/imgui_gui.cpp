@@ -220,10 +220,21 @@ void imgui_gui::render_settings() {
                          "%.2f");
     }
 
-    // Shadow Settings
+    if (ImGui::CollapsingHeader("HDR Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+      ImGui::Checkbox("Enable HDR", &config.enable_hdr);
+      ImGui::Checkbox("Show Bright Pass", &config.hdr.show_bright_pass);
+      ImGui::SliderFloat("Exposure", &config.hdr.exposure, 0.1f, 2.0f,
+                         "%.3f");  
+      ImGui::SliderFloat("Max White", &config.hdr.maxWhite, 0.1f, 2.5f,
+                         "%.3f");  
+      ImGui::SliderFloat("Bloom Strength", &config.hdr.bloomStrength, 0.0f, 10.f, 
+                         "%.2f");
+      ImGui::SliderFloat("Adaption Speed", &config.hdr.adaptationSpeed, 0.1f, 2.0f,
+                         "%.2f"); 
+    }
+
     if (ImGui::CollapsingHeader("Shadow Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
-      ImGui::Checkbox("Enable Shadows", &config.enable_shadows);  // Toggle for enabling Shadows
-      // Additional shadow-related settings can be added here
+      ImGui::Checkbox("Enable Shadows", &config.enable_shadows);
     }
 
     // TODO: Add more sections for other settings as necessary

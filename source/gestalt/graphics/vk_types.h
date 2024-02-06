@@ -134,7 +134,16 @@ struct render_config {
     float radius = 0.4f;
     float attScale = .95f;
     float distScale = 5.f;
-  } ssao{}; 
+  } ssao{};
+
+  bool enable_hdr = true;
+  struct hdr_params {
+    bool show_bright_pass = false;
+    float exposure{1.f};
+    float maxWhite{1.f};
+    float bloomStrength{1.f};
+    float adaptationSpeed{1.f};
+  } hdr{};
 
   bool enable_shadows{true};
   // todo : more settings

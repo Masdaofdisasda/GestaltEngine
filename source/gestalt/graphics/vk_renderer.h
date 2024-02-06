@@ -31,6 +31,7 @@ class vk_renderer {
   std::unique_ptr<render_pass> geometry_pass_;
   std::unique_ptr<render_pass> transparency_pass_;
   std::unique_ptr<render_pass> ssao_pass_;
+  std::unique_ptr<render_pass> hdr_pass_;
 
   bool acquire_next_image();
   VkCommandBuffer start_draw();

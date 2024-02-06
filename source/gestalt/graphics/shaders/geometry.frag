@@ -263,10 +263,6 @@ vec3 perturbNormal(vec3 n, vec3 v, vec3 normalSample, vec2 uv)
 	return normalize(TBN * map);
 }
 
-vec3 Reinhard2(vec3 x) {
-  return
- (x * (1.0 + x / (1.1 * 1.1))) / (1.0 + x);
-}
 void main() {
 
 	uint albedoIndex =			inMaterialIndex;
@@ -315,6 +311,5 @@ void main() {
 	color = color * (Kao.r < 0.01 ? 1.0 : Kao);
 	color = pow(Ke.rgb + color, vec3(1.0/2.2) ) ;
 
-	color = Reinhard2(color);
     outFragColor = vec4(color, 1.0);
 }
