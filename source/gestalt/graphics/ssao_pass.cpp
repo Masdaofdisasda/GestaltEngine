@@ -1,13 +1,15 @@
-﻿#include "skybox_pass.h"
+﻿#include "ssao_pass.h"
 
 #include "vk_pipelines.h"
 #include "vk_renderer.h"
 
-void skybox_pass::prepare() {
 
-  descriptor_layouts_.push_back(resource_manager_->per_frame_data_layout);
-  descriptor_layouts_.push_back(resource_manager_->ibl_data.IblLayout);
+void ssao_pass::prepare() {
 
+  descriptor_layouts_.emplace_back(
+      descriptor_layout_builder()
+          .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+          .build(gpu_.device));
   VkPipelineLayoutCreateInfo pipeline_layout_create_info{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
       .pNext = nullptr,
@@ -17,6 +19,10 @@ void skybox_pass::prepare() {
 
   VK_CHECK(vkCreatePipelineLayout(gpu_.device, &pipeline_layout_create_info, nullptr,
                                   &pipeline_layout_));
+  std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes
+      = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1}};
+
+  descriptorPool_.init(gpu_.device, 1, sizes);
 
   VkShaderModule vertex_shader;
   vkutil::load_shader_module(vertex_shader_source_.c_str(), gpu_.device, &vertex_shader);
@@ -41,27 +47,12 @@ void skybox_pass::prepare() {
   vkDestroyShaderModule(gpu_.device, fragment_shader, nullptr);
 }
 
-void skybox_pass::execute(const VkCommandBuffer cmd) {
-  VkDescriptorBufferInfo buffer_info = {};
-  buffer_info.buffer = resource_manager_->per_frame_data_buffer.buffer;
-  buffer_info.offset = 0;
-  buffer_info.range = sizeof(per_frame_data);
+void ssao_pass::execute(const VkCommandBuffer cmd) {
+  auto descriptor_set = descriptorPool_.allocate(gpu_.device, descriptor_layouts_.at(0));
 
-  VkWriteDescriptorSet descriptor_write = {};
-  descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  descriptor_write.dstBinding = 0;
-  descriptor_write.dstArrayElement = 0;
-  descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  descriptor_write.descriptorCount = 1;
-  descriptor_write.pBufferInfo = &buffer_info;
-
-  gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
-                            &descriptor_write);
-
-
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
+                          &descriptor_set , 0, nullptr);
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 1,
-                          &resource_manager_->ibl_data.IblSet, 0, nullptr);
   VkViewport viewport = {};
   viewport.x = 0;
   viewport.y = 0;
@@ -79,10 +70,10 @@ void skybox_pass::execute(const VkCommandBuffer cmd) {
   scissor.extent.height = renderer_->get_window().extent.height;
 
   vkCmdSetScissor(cmd, 0, 1, &scissor);
-  vkCmdDraw(cmd, 36, 1, 0, 0);  // 36 vertices for the cube
+  vkCmdDraw(cmd, 3, 1, 0, 0);
 }
 
-void skybox_pass::cleanup() {
+void ssao_pass::cleanup() {
   vkDestroyPipelineLayout(gpu_.device, pipeline_layout_, nullptr);
   vkDestroyPipeline(gpu_.device, pipeline_, nullptr);
 }

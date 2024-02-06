@@ -49,6 +49,8 @@ geometry_pass.h
 geometry_pass.cpp
 transparent_pass.h
 transparent_pass.cpp
+ssao_pass.h
+ssao_pass.cpp
 )
 
 target_compile_features(graphics PRIVATE cxx_std_20)

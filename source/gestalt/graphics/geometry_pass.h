@@ -7,7 +7,7 @@
 
 class geometry_pass final : public render_pass {
 public:
-  void init(vk_renderer& renderer) override;
+  void prepare() override;
   void cleanup() override;
   void execute(VkCommandBuffer cmd) override;
 

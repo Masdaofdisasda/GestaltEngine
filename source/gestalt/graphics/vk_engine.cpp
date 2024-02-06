@@ -37,12 +37,12 @@ void render_engine::init() {
 
   resource_manager_->init(gpu_);
 
-  renderer_->init(gpu_, window_, resource_manager_, scene_manager_, imgui_, resize_requested_, stats_);
+  renderer_->init(gpu_, window_, resource_manager_, imgui_, stats_);
 
   scene_manager_->init(gpu_, resource_manager_);
 
   register_gui_actions();
-  imgui_->init(gpu_, window_, renderer_->swapchain, gui_actions_);
+  imgui_->init(gpu_, window_, renderer_->get_swapchain(), gui_actions_);
 
   for (auto& cam : camera_positioners_) {
     auto free_fly_camera_ptr = std::make_unique<free_fly_camera>();
@@ -84,10 +84,10 @@ void render_engine::register_gui_actions() {
 }
 
 void render_engine::immediate_submit(std::function<void(VkCommandBuffer cmd)> function) {
-    VK_CHECK(vkResetFences(gpu_.device, 1, &renderer_->sync.imgui_fence));
-    VK_CHECK(vkResetCommandBuffer(renderer_->commands.imgui_command_buffer, 0));
+    VK_CHECK(vkResetFences(gpu_.device, 1, &renderer_->get_sync().imgui_fence));
+    VK_CHECK(vkResetCommandBuffer(renderer_->get_commands().imgui_command_buffer, 0));
 
-    VkCommandBuffer cmd = renderer_->commands.imgui_command_buffer;
+    VkCommandBuffer cmd = renderer_->get_commands().imgui_command_buffer;
 
     VkCommandBufferBeginInfo cmdBeginInfo
         = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -104,9 +104,9 @@ void render_engine::immediate_submit(std::function<void(VkCommandBuffer cmd)> fu
 
     // submit command buffer to the queue and execute it.
     //  _renderFence will now block until the graphic commands finish execution
-    VK_CHECK(vkQueueSubmit2(gpu_.graphics_queue, 1, &submit, renderer_->sync.imgui_fence));
+    VK_CHECK(vkQueueSubmit2(gpu_.graphics_queue, 1, &submit, renderer_->get_sync().imgui_fence));
 
-    VK_CHECK(vkWaitForFences(gpu_.device, 1, &renderer_->sync.imgui_fence, true, 9999999999));
+    VK_CHECK(vkWaitForFences(gpu_.device, 1, &renderer_->get_sync().imgui_fence, true, 9999999999));
 }
 
 void render_engine::cleanup() {
@@ -178,11 +178,6 @@ void render_engine::run()
         // throttle the speed to avoid the endless spinning
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         continue;
-      }
-
-      if (resize_requested_) {
-        renderer_->swapchain.resize_swapchain(window_);
-        resize_requested_ = false;
       }
 
       imgui_->new_frame();

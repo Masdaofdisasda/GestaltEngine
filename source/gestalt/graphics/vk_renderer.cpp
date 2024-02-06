@@ -7,43 +7,35 @@
 #include "vk_images.h"
 #include "vk_initializers.h"
 #include "skybox_pass.h"
+#include "ssao_pass.h"
 #include "transparent_pass.h"
 
 void vk_renderer::init(const vk_gpu& gpu, const sdl_window& window,
                        const std::shared_ptr<resource_manager>& resource_manager,
-                       const std::shared_ptr<scene_manager>& scene_manager,
-                       const std::shared_ptr<imgui_gui>& imgui_gui, const bool& resize_requested,
+                       const std::shared_ptr<imgui_gui>& imgui_gui,
                        engine_stats stats) {
   gpu_ = gpu;
   window_ = window;
   resource_manager_ = resource_manager;
-  scene_manager_ = scene_manager;
   imgui_ = imgui_gui;
-  resize_requested_ = resize_requested;
   stats_ = stats;
 
-  swapchain.init(gpu_, window_, frame_buffer_);
-  commands.init(gpu_, frames_);
-  sync.init(gpu_, frames_);
+  swapchain_->init(gpu_, window_, frame_buffer_);
+  commands_->init(gpu_, frames_);
+  sync_->init(gpu_, frames_);
 
   skybox_pass_ = std::make_unique<skybox_pass>();
-  skybox_pass_->init(*this);
+  skybox_pass_->init(gpu_, *this, resource_manager_);
   geometry_pass_ = std::make_unique<geometry_pass>();
-  geometry_pass_->init(*this);
-  transparency_pass = std::make_unique<transparent_pass>();
-  transparency_pass->init(*this);
+  geometry_pass_->init(gpu_, *this, resource_manager_);
+  transparency_pass_ = std::make_unique<transparent_pass>();
+  transparency_pass_->init(gpu_, *this, resource_manager_);
+  ssao_pass_ = std::make_unique<ssao_pass>();
+  ssao_pass_->init(gpu_, *this, resource_manager_);
   
   per_frame_data_.ambientColor = glm::vec4(0.1f);
   per_frame_data_.sunlightColor = glm::vec4(1.f);
   per_frame_data_.sunlightDirection = glm::vec4(0.1, 0.5, 0.1, 1.5f);
-
-  vkCmdPushDescriptorSetKHR = reinterpret_cast<
-    PFN_vkCmdPushDescriptorSetKHR>(
-    vkGetDeviceProcAddr(gpu_.device, "vkCmdPushDescriptorSetKHR"));
-
-  if (!vkCmdPushDescriptorSetKHR) {
-    throw std::runtime_error("Failed to load vkCmdPushDescriptorSetKHR");
-  }
 }
 
 bool is_visible(const render_object& obj, const glm::mat4& viewproj) {
@@ -78,28 +70,28 @@ bool is_visible(const render_object& obj, const glm::mat4& viewproj) {
   return true;
 }
 
-void vk_renderer::draw() {
-
+bool vk_renderer::acquire_next_image() {
   VK_CHECK(vkWaitForFences(gpu_.device, 1, &get_current_frame().render_fence, true, 1000000000));
 
-  get_current_frame().descriptor_pools.clear_pools(gpu_.device);
-  uint32_t swapchainImageIndex;
-
-  VkResult e = vkAcquireNextImageKHR(gpu_.device, swapchain.swapchain, 1000000000,
+  VkResult e = vkAcquireNextImageKHR(gpu_.device, swapchain_->swapchain, 1000000000,
                                      get_current_frame().swapchain_semaphore, nullptr,
-                                     &swapchainImageIndex);
+                                     &swapchain_image_index_);
   if (e == VK_ERROR_OUT_OF_DATE_KHR) {
     resize_requested_ = true;
-    return;
+    return true;
   }
 
   VK_CHECK(vkResetFences(gpu_.device, 1, &get_current_frame().render_fence));
   VK_CHECK(vkResetCommandBuffer(get_current_frame().main_command_buffer, 0));
 
+  return false;
+}
+
+VkCommandBuffer vk_renderer::start_draw() {
+
   VkCommandBuffer cmd = get_current_frame().main_command_buffer;
   VkCommandBufferBeginInfo cmdBeginInfo
       = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-
 
   VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
@@ -107,7 +99,7 @@ void vk_renderer::draw() {
                            VK_IMAGE_LAYOUT_GENERAL);
   vkutil::transition_image(cmd, frame_buffer_.depth_image.image, VK_IMAGE_LAYOUT_UNDEFINED,
                            VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-  // DRAW MAIN
+
   VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(
       frame_buffer_.color_image.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
   VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
@@ -118,21 +110,38 @@ void vk_renderer::draw() {
 
   vkCmdBeginRendering(cmd, &renderInfo);
 
+  return cmd;
+}
+
+void vk_renderer::draw() {
+
+  if (resize_requested_) {
+    swapchain_->resize_swapchain(window_);
+    resize_requested_ = false;
+  }
+
+  if (acquire_next_image()) {
+    return;
+  }
+
+  VkCommandBuffer cmd = start_draw();
+
   void* mapped_data;
   VmaAllocation allocation = resource_manager_->per_frame_data_buffer.allocation;
   VK_CHECK(vmaMapMemory(gpu_.allocator, allocation, &mapped_data));
   const auto scene_uniform_data = static_cast<per_frame_data*>(mapped_data);
   *scene_uniform_data = per_frame_data_;
 
-  skybox_pass_->execute(cmd);
 
   auto start = std::chrono::system_clock::now();
   {
     // begin clock
     auto start = std::chrono::system_clock::now();
 
+    skybox_pass_->execute(cmd);
     geometry_pass_->execute(cmd);
-    transparency_pass->execute(cmd);
+    transparency_pass_->execute(cmd);
+    //ssao_pass_->execute(cmd);
 
     auto end = std::chrono::system_clock::now();
 
@@ -153,11 +162,10 @@ void vk_renderer::draw() {
   stats_.mesh_draw_time = elapsed.count() / 1000.f;
 
   vkCmdEndRendering(cmd);
-  // END DRAW MAIN
 
   vkutil::transition_image(cmd, frame_buffer_.color_image.image, VK_IMAGE_LAYOUT_GENERAL,
                            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-  vkutil::transition_image(cmd, swapchain.swapchain_images[swapchainImageIndex],
+  vkutil::transition_image(cmd, swapchain_->swapchain_images[swapchain_image_index_],
                            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
   VkExtent2D extent;
@@ -165,17 +173,21 @@ void vk_renderer::draw() {
   extent.width = window_.extent.width;
 
   vkutil::copy_image_to_image(cmd, frame_buffer_.color_image.image,
-                              swapchain.swapchain_images[swapchainImageIndex], extent, extent);
-  vkutil::transition_image(cmd, swapchain.swapchain_images[swapchainImageIndex],
+                              swapchain_->swapchain_images[swapchain_image_index_], extent, extent);
+  vkutil::transition_image(cmd, swapchain_->swapchain_images[swapchain_image_index_],
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-  imgui_->draw(cmd, swapchain.swapchain_image_views[swapchainImageIndex]);
+  imgui_->draw(cmd, swapchain_->swapchain_image_views[swapchain_image_index_]);
 
-  vkutil::transition_image(cmd, swapchain.swapchain_images[swapchainImageIndex],
+  vkutil::transition_image(cmd, swapchain_->swapchain_images[swapchain_image_index_],
                            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
+  present(cmd);
+}
+
+void vk_renderer::present(VkCommandBuffer cmd) {
   VK_CHECK(vkEndCommandBuffer(cmd));
 
   VkCommandBufferSubmitInfo cmdinfo = vkinit::command_buffer_submit_info(cmd);
@@ -188,11 +200,11 @@ void vk_renderer::draw() {
 
   VK_CHECK(vkQueueSubmit2(gpu_.graphics_queue, 1, &submit, get_current_frame().render_fence));
   VkPresentInfoKHR presentInfo = vkinit::present_info();
-  presentInfo.pSwapchains = &swapchain.swapchain;
+  presentInfo.pSwapchains = &swapchain_->swapchain;
   presentInfo.swapchainCount = 1;
   presentInfo.pWaitSemaphores = &get_current_frame().render_semaphore;
   presentInfo.waitSemaphoreCount = 1;
-  presentInfo.pImageIndices = &swapchainImageIndex;
+  presentInfo.pImageIndices = &swapchain_image_index_;
 
   VkResult presentResult = vkQueuePresentKHR(gpu_.graphics_queue, &presentInfo);
   if (presentResult == VK_ERROR_OUT_OF_DATE_KHR) {

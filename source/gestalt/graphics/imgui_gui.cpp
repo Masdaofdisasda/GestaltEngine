@@ -9,8 +9,8 @@
 #include "vk_initializers.h"
 #include "vk_pipelines.h"
 
-void imgui_gui::init(
-    vk_gpu& gpu, sdl_window& window, vk_swapchain& swapchain, gui_actions& actions) {
+void imgui_gui::init(vk_gpu& gpu, sdl_window& window,
+                     const std::shared_ptr<vk_swapchain>& swapchain, gui_actions& actions) {
   gpu_ = gpu;
   window_ = window;
   swapchain_ = swapchain;
@@ -60,7 +60,7 @@ void imgui_gui::init(
   init_info.MinImageCount = 3;
   init_info.ImageCount = 3;
   init_info.UseDynamicRendering = true;
-  init_info.ColorAttachmentFormat = swapchain_.swapchain_image_format;
+  init_info.ColorAttachmentFormat = swapchain_->swapchain_image_format;
 
   init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 
@@ -87,7 +87,7 @@ void imgui_gui::draw(VkCommandBuffer cmd, VkImageView target_image_view) {
   VkRenderingAttachmentInfo colorAttachment
       = vkinit::attachment_info(target_image_view, nullptr, VK_IMAGE_LAYOUT_GENERAL);
   VkRenderingInfo renderInfo
-      = vkinit::rendering_info(swapchain_.swapchain_extent, &colorAttachment, nullptr);
+      = vkinit::rendering_info(swapchain_->swapchain_extent, &colorAttachment, nullptr);
 
   vkCmdBeginRendering(cmd, &renderInfo);
 

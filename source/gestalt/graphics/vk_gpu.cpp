@@ -77,6 +77,13 @@ void vk_gpu::init(
   allocatorInfo.instance = instance;
   allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
   vmaCreateAllocator(&allocatorInfo, &allocator);
+
+  vkCmdPushDescriptorSetKHR = reinterpret_cast<PFN_vkCmdPushDescriptorSetKHR>(
+      vkGetDeviceProcAddr(device, "vkCmdPushDescriptorSetKHR"));
+
+  if (!vkCmdPushDescriptorSetKHR) {
+    throw std::runtime_error("Failed to load vkCmdPushDescriptorSetKHR");
+  }
 }
 
 void vk_gpu::cleanup() {

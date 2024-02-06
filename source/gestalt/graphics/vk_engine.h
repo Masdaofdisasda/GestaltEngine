@@ -24,7 +24,6 @@ public:
 private:
   bool is_initialized_{false};
   bool quit_{false};
-  bool resize_requested_{false};
   bool freeze_rendering_{false};
 
   sdl_window window_;

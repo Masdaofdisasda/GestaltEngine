@@ -78,6 +78,4 @@ struct frame_data {
 
   VkCommandPool command_pool;
   VkCommandBuffer main_command_buffer;
-
-  DescriptorAllocatorGrowable descriptor_pools;
 };
