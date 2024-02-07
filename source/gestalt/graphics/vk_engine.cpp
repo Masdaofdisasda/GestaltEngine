@@ -30,7 +30,7 @@ void render_engine::init() {
   assert(loaded_engine == nullptr);
   loaded_engine = this;
 
-  window_.init({2000, 1500}); // todo : get window size from config
+  window_.init({3000, 1600}); // todo : get window size from config
 
   gpu_.init(use_validation_layers, window_,
             [this](auto func) { this->immediate_submit(std::move(func)); });

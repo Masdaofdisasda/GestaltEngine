@@ -122,6 +122,7 @@ struct draw_context {
 
 struct render_config {
   bool always_opaque{false};
+
   bool enable_ssao{true};
   int ssao_quality{1};
   struct ssao_params {
@@ -146,7 +147,7 @@ struct render_config {
     glm::vec4 gamma{1.f};
     glm::vec4 gain{1.f};
     bool show_bright_pass = false;
-    int toneMappingOption{0};
+    int toneMappingOption{2};
   } hdr{};
 
   bool enable_shadows{true};

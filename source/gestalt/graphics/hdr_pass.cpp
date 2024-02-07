@@ -373,7 +373,7 @@ void hdr_pass::execute(const VkCommandBuffer cmd) {
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.write_image(
       11, hdr_buffer_.get_read_buffer().color_image.imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+      resource_manager_->get_database().get_sampler(1),  // todo default_sampler_linear
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.update_set(gpu_.device, final_.descriptor_set_);
 

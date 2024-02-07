@@ -224,7 +224,7 @@ void imgui_gui::render_settings() {
     if (ImGui::CollapsingHeader("HDR Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
       ImGui::Checkbox("Enable HDR", &config.enable_hdr);
       ImGui::SliderInt("Bloom Quality", &config.bloom_quality, 1, 4);
-      ImGui::SliderInt("Tone Mapping Option", &config.hdr.toneMappingOption, 0, 2);
+      ImGui::SliderInt("Tone Mapping Option", &config.hdr.toneMappingOption, 0, 3);
 
       ImGui::Checkbox("Show Bright Pass", &config.hdr.show_bright_pass);
       ImGui::SliderFloat("Exposure", &config.hdr.exposure, 0.1f, 2.0f,
