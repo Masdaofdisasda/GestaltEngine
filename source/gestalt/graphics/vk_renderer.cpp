@@ -119,7 +119,6 @@ VkCommandBuffer vk_renderer::start_draw() {
 }
 
 void vk_renderer::draw() {
-
   if (resize_requested_) {
     swapchain_->resize_swapchain(window_);
     resize_requested_ = false;
@@ -136,7 +135,6 @@ void vk_renderer::draw() {
   VK_CHECK(vmaMapMemory(gpu_.allocator, allocation, &mapped_data));
   const auto scene_uniform_data = static_cast<per_frame_data*>(mapped_data);
   *scene_uniform_data = per_frame_data_;
-
 
   auto start = std::chrono::system_clock::now();
   {
@@ -174,17 +172,16 @@ void vk_renderer::draw() {
   stats_.mesh_draw_time = elapsed.count() / 1000.f;
 
   vkutil::transition_image(cmd, frame_buffer_.get_write_color_image().image,
-                           VK_IMAGE_LAYOUT_GENERAL,
+                           frame_buffer_.get_write_color_image().currentLayout,
                            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  frame_buffer_.get_write_color_image().currentLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
   vkutil::transition_image(cmd, swapchain_->swapchain_images[swapchain_image_index_],
                            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-  VkExtent2D extent;
-  extent.height = window_.extent.height;
-  extent.width = window_.extent.width;
-
   vkutil::copy_image_to_image(cmd, frame_buffer_.get_write_color_image().image,
-                              swapchain_->swapchain_images[swapchain_image_index_], extent, extent);
+                              swapchain_->swapchain_images[swapchain_image_index_],
+                              frame_buffer_.get_write_color_image().getExtent2D(),
+                              get_window().extent);
   vkutil::transition_image(cmd, swapchain_->swapchain_images[swapchain_image_index_],
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);

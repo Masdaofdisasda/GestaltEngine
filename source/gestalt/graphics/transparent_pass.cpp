@@ -1,5 +1,6 @@
 ﻿#include "transparent_pass.h"
 
+#include "vk_images.h"
 #include "vk_initializers.h"
 #include "vk_pipelines.h"
 #include "vk_renderer.h"
@@ -53,6 +54,9 @@ void transparent_pass::prepare() {
 
 
 void transparent_pass::execute(VkCommandBuffer cmd) {
+  vkutil::transition_write(cmd, renderer_->frame_buffer_.get_write_color_image());
+  vkutil::transition_write(cmd, renderer_->frame_buffer_.get_write_depth_image());
+
   VkRenderingAttachmentInfo colorAttachment
       = vkinit::attachment_info(renderer_->frame_buffer_.get_write_color_image().imageView,
                                 nullptr, VK_IMAGE_LAYOUT_GENERAL);

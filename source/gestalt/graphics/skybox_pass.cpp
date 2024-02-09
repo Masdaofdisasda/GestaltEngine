@@ -44,19 +44,19 @@ void skybox_pass::prepare() {
 }
 
 void skybox_pass::execute(const VkCommandBuffer cmd) {
-  vkutil::transition_image(cmd, renderer_->frame_buffer_.get_write_color_image().image,
-                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-  vkutil::transition_image(cmd, renderer_->frame_buffer_.get_write_depth_image().image,
-                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-  VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(renderer_->frame_buffer_.get_write_color_image().imageView,
-                                nullptr, VK_IMAGE_LAYOUT_GENERAL);
+  vkutil::transition_write(cmd, renderer_->frame_buffer_.get_write_color_image());
+  vkutil::transition_write(cmd, renderer_->frame_buffer_.get_write_depth_image());
+
+  VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(renderer_->frame_buffer_.get_write_color_image().imageView, nullptr,
+                                renderer_->frame_buffer_.get_write_color_image().currentLayout);
   VkClearValue depth_clear = {.depthStencil = {1.f, 0}};
   VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
       renderer_->frame_buffer_.get_write_depth_image().imageView, &depth_clear, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
   VkRenderingInfo renderInfo
-      = vkinit::rendering_info(renderer_->get_window().extent, &colorAttachment, &depthAttachment);
+      = vkinit::rendering_info(renderer_->frame_buffer_.get_write_color_image().getExtent2D(),
+                               &colorAttachment, &depthAttachment);
 
   vkCmdBeginRendering(cmd, &renderInfo);
 
@@ -83,8 +83,10 @@ void skybox_pass::execute(const VkCommandBuffer cmd) {
   VkViewport viewport = {};
   viewport.x = 0;
   viewport.y = 0;
-  viewport.width = static_cast<float>(renderer_->get_window().extent.width);
-  viewport.height = static_cast<float>(renderer_->get_window().extent.height);
+  viewport.width
+      = static_cast<float>(renderer_->frame_buffer_.get_write_color_image().getExtent2D().width);
+  viewport.height
+      = static_cast<float>(renderer_->frame_buffer_.get_write_color_image().getExtent2D().height);
   viewport.minDepth = 0.f;
   viewport.maxDepth = 1.f;
 
@@ -93,8 +95,8 @@ void skybox_pass::execute(const VkCommandBuffer cmd) {
   VkRect2D scissor = {};
   scissor.offset.x = 0;
   scissor.offset.y = 0;
-  scissor.extent.width = renderer_->get_window().extent.width;
-  scissor.extent.height = renderer_->get_window().extent.height;
+  scissor.extent.width = renderer_->frame_buffer_.get_write_color_image().getExtent2D().width;
+  scissor.extent.height = renderer_->frame_buffer_.get_write_color_image().getExtent2D().height;
 
   vkCmdSetScissor(cmd, 0, 1, &scissor);
   vkCmdDraw(cmd, 36, 1, 0, 0);  // 36 vertices for the cube

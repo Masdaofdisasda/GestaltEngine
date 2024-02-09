@@ -49,11 +49,21 @@ struct frame_buffer {
 
   void add_color_image(const AllocatedImage& image) {
     assert(image.type == image_type::color);
+    if (color_image_.has_value()) {
+      assert(color_image_.value().getExtent2D().height == image.getExtent2D().height);
+      assert(color_image_.value().getExtent2D().width == image.getExtent2D().width);
+    }
+
     color_image_ = image;
   }
 
   void add_depth_image(const AllocatedImage& image) {
     assert(image.type == image_type::depth);
+    if (depth_image_.has_value()) {
+      assert(depth_image_.value().getExtent2D().height == image.getExtent2D().height);
+      assert(depth_image_.value().getExtent2D().width == image.getExtent2D().width);
+    }
+
     depth_image_ = image;
   }
 

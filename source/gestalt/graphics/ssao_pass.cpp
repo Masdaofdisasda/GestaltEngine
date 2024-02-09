@@ -169,13 +169,9 @@ void ssao_pass::execute_filter(const VkCommandBuffer cmd) {
 
   renderer_->frame_buffer_.switch_buffers();
 
-  vkutil::transition_image(cmd, renderer_->frame_buffer_.get_read_depth_image().image,
-                           VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-                           VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL);
-  vkutil::transition_image(cmd, ssao_buffer_.get_write_color_image().image,
-                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-  vkutil::transition_image(cmd, ssao_buffer_.get_write_depth_image().image,
-                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+  vkutil::transition_read(cmd, renderer_->frame_buffer_.get_read_depth_image());
+  vkutil::transition_write(cmd, ssao_buffer_.get_write_color_image());
+  vkutil::transition_write(cmd, ssao_buffer_.get_write_depth_image());
 
   VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
       ssao_buffer_.get_write_color_image().imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -221,12 +217,9 @@ void ssao_pass::execute_blur_x(const VkCommandBuffer cmd) {
 
   ssao_buffer_.switch_buffers();
 
-  vkutil::transition_image(cmd, ssao_buffer_.get_read_color_image().image,
-                           VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  vkutil::transition_image(cmd, ssao_buffer_.get_write_color_image().image,
-                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-  vkutil::transition_image(cmd, ssao_buffer_.get_write_depth_image().image,
-                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+  vkutil::transition_read(cmd, ssao_buffer_.get_read_color_image());
+  vkutil::transition_write(cmd, ssao_buffer_.get_write_color_image());
+  vkutil::transition_write(cmd, ssao_buffer_.get_write_depth_image());
 
   VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
       ssao_buffer_.get_write_color_image().imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -266,12 +259,9 @@ void ssao_pass::execute_blur_y(const VkCommandBuffer cmd) {
 
   ssao_buffer_.switch_buffers();
 
-  vkutil::transition_image(cmd, ssao_buffer_.get_read_color_image().image,
-                           VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  vkutil::transition_image(cmd, ssao_buffer_.get_write_color_image().image,
-                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-  vkutil::transition_image(cmd, ssao_buffer_.get_write_depth_image().image,
-                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+  vkutil:: transition_read(cmd, ssao_buffer_.get_read_color_image());
+  vkutil::transition_write(cmd, ssao_buffer_.get_write_color_image());
+  vkutil::transition_write(cmd, ssao_buffer_.get_write_depth_image());
 
   VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
       ssao_buffer_.get_write_color_image().imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -310,14 +300,10 @@ void ssao_pass::execute_final(const VkCommandBuffer cmd) {
 
   ssao_buffer_.switch_buffers();
 
-  vkutil::transition_image(cmd, ssao_buffer_.get_read_color_image().image,
-                           VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  vkutil::transition_image(cmd, renderer_->frame_buffer_.get_read_color_image().image,
-                           VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  vkutil::transition_image(cmd, renderer_->frame_buffer_.get_write_color_image().image,
-                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-  vkutil::transition_image(cmd, renderer_->frame_buffer_.get_write_depth_image().image,
-                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+  vkutil::transition_read(cmd, ssao_buffer_.get_read_color_image());
+  vkutil::transition_read(cmd, renderer_->frame_buffer_.get_read_color_image());
+  vkutil::transition_write(cmd, renderer_->frame_buffer_.get_write_color_image());
+  vkutil::transition_write(cmd, renderer_->frame_buffer_.get_write_depth_image());
 
   VkRenderingAttachmentInfo newColorAttachment
       = vkinit::attachment_info(renderer_->frame_buffer_.get_write_color_image().imageView,

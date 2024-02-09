@@ -208,12 +208,9 @@ void hdr_pass::execute_blur_x(const VkCommandBuffer cmd) {
       gpu_.device, blur_x_.descriptor_layouts_.at(0));
   hdr_buffer_.switch_buffers();
 
-  vkutil::transition_image(cmd, hdr_buffer_.get_read_color_image().image,
-                           VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  vkutil::transition_image(cmd, hdr_buffer_.get_write_color_image().image,
-                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-  vkutil::transition_image(cmd, hdr_buffer_.get_write_depth_image().image,
-                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+  vkutil::transition_read(cmd, hdr_buffer_.get_read_color_image());
+  vkutil::transition_write(cmd, hdr_buffer_.get_write_color_image());
+  vkutil::transition_write(cmd, hdr_buffer_.get_write_depth_image());
 
   VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
       hdr_buffer_.get_write_color_image().imageView,
@@ -251,12 +248,9 @@ void hdr_pass::execute_blur_y(const VkCommandBuffer cmd) {
       gpu_.device, blur_y_.descriptor_layouts_.at(0));
   hdr_buffer_.switch_buffers();
 
-  vkutil::transition_image(cmd, hdr_buffer_.get_read_color_image().image,
-                           VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  vkutil::transition_image(cmd, hdr_buffer_.get_write_color_image().image,
-                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-  vkutil::transition_image(cmd, hdr_buffer_.get_write_depth_image().image,
-                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+  vkutil::transition_read(cmd, hdr_buffer_.get_read_color_image());
+  vkutil::transition_write(cmd, hdr_buffer_.get_write_color_image());
+  vkutil::transition_write(cmd, hdr_buffer_.get_write_depth_image());
 
   VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
       hdr_buffer_.get_write_color_image().imageView,
@@ -297,12 +291,9 @@ void hdr_pass::execute(const VkCommandBuffer cmd) {
       gpu_.device, bright_pass_.descriptor_layouts_.at(0));
   renderer_->frame_buffer_.switch_buffers();
 
-  vkutil::transition_image(cmd, renderer_->frame_buffer_.get_read_color_image().image,
-                           VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  vkutil::transition_image(cmd, hdr_buffer_.get_write_color_image().image,
-                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-  vkutil::transition_image(cmd, hdr_buffer_.get_write_depth_image().image,
-                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+  vkutil::transition_read(cmd, renderer_->frame_buffer_.get_read_color_image());
+  vkutil::transition_write(cmd, hdr_buffer_.get_write_color_image());
+  vkutil::transition_write(cmd, hdr_buffer_.get_write_depth_image());
 
   VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
       hdr_buffer_.get_write_color_image().imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -348,12 +339,9 @@ void hdr_pass::execute(const VkCommandBuffer cmd) {
 
   hdr_buffer_.switch_buffers();
 
-  vkutil::transition_image(cmd, hdr_buffer_.get_read_color_image().image,
-                           VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  vkutil::transition_image(cmd, renderer_->frame_buffer_.get_write_color_image().image,
-                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-  vkutil::transition_image(cmd, renderer_->frame_buffer_.get_write_depth_image().image,
-                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+  vkutil::transition_read(cmd, hdr_buffer_.get_read_color_image());
+  vkutil::transition_write(cmd, renderer_->frame_buffer_.get_write_color_image());
+  vkutil::transition_write(cmd, renderer_->frame_buffer_.get_write_depth_image());
 
   newColorAttachment
       = vkinit::attachment_info(renderer_->frame_buffer_.get_write_color_image().imageView,
