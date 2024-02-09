@@ -1,5 +1,7 @@
 ﻿#include "skybox_pass.h"
 
+#include "vk_images.h"
+#include "vk_initializers.h"
 #include "vk_pipelines.h"
 #include "vk_renderer.h"
 
@@ -42,6 +44,22 @@ void skybox_pass::prepare() {
 }
 
 void skybox_pass::execute(const VkCommandBuffer cmd) {
+  vkutil::transition_image(cmd, renderer_->frame_buffer_.get_write_buffer().color_image.image,
+                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+  vkutil::transition_image(cmd, renderer_->frame_buffer_.get_write_buffer().depth_image.image,
+                           VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+
+  VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(renderer_->frame_buffer_.get_write_buffer().color_image.imageView,
+                                nullptr, VK_IMAGE_LAYOUT_GENERAL);
+  VkClearValue depth_clear = {.depthStencil = {1.f, 0}};
+  VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
+      renderer_->frame_buffer_.get_write_buffer().depth_image.imageView, &depth_clear, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+
+  VkRenderingInfo renderInfo
+      = vkinit::rendering_info(renderer_->get_window().extent, &colorAttachment, &depthAttachment);
+
+  vkCmdBeginRendering(cmd, &renderInfo);
+
   VkDescriptorBufferInfo buffer_info = {};
   buffer_info.buffer = resource_manager_->per_frame_data_buffer.buffer;
   buffer_info.offset = 0;
@@ -80,6 +98,8 @@ void skybox_pass::execute(const VkCommandBuffer cmd) {
 
   vkCmdSetScissor(cmd, 0, 1, &scissor);
   vkCmdDraw(cmd, 36, 1, 0, 0);  // 36 vertices for the cube
+
+  vkCmdEndRendering(cmd);
 }
 
 void skybox_pass::cleanup() {

@@ -143,17 +143,25 @@ VkRenderingAttachmentInfo vkinit::attachment_info(
 //< color_info
 //> depth_info
 VkRenderingAttachmentInfo vkinit::depth_attachment_info(
-    VkImageView view, VkImageLayout layout /*= VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL*/)
-{
-    VkRenderingAttachmentInfo depthAttachment {};
+    VkImageView view,
+    VkClearValue* clear, VkImageLayout layout /*= VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL*/) {
+    VkRenderingAttachmentInfo depthAttachment{};
     depthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     depthAttachment.pNext = nullptr;
 
     depthAttachment.imageView = view;
     depthAttachment.imageLayout = layout;
-    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachment.loadOp = clear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
     depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    depthAttachment.clearValue.depthStencil.depth = 1.f;
+
+    // If a clear value is provided, use it; otherwise, default to clearing with 1.f for depth
+    if (clear) {
+        depthAttachment.clearValue = *clear;
+    } else {
+        depthAttachment.clearValue.depthStencil.depth = 1.f;
+        depthAttachment.clearValue.depthStencil.stencil
+            = 0;  // Set stencil to 0 if not using stencil or adjust as needed
+    }
 
     return depthAttachment;
 }

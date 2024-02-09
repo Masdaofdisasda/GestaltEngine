@@ -115,22 +115,6 @@ VkCommandBuffer vk_renderer::start_draw() {
 
   VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
-  vkutil::transition_image(cmd, frame_buffer_.get_write_buffer().color_image.image, VK_IMAGE_LAYOUT_UNDEFINED,
-                           VK_IMAGE_LAYOUT_GENERAL);
-  vkutil::transition_image(cmd, frame_buffer_.get_write_buffer().depth_image.image,
-                           VK_IMAGE_LAYOUT_UNDEFINED,
-                           VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-
-  VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(
-      frame_buffer_.get_write_buffer().color_image.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
-  VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(frame_buffer_.get_write_buffer().depth_image.imageView,
-                                      VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-
-  VkRenderingInfo renderInfo
-      = vkinit::rendering_info(window_.extent, &colorAttachment, &depthAttachment);
-
-  vkCmdBeginRendering(cmd, &renderInfo);
-
   return cmd;
 }
 
@@ -188,8 +172,6 @@ void vk_renderer::draw() {
   auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
   stats_.mesh_draw_time = elapsed.count() / 1000.f;
-
-  vkCmdEndRendering(cmd);
 
   vkutil::transition_image(cmd, frame_buffer_.get_write_buffer().color_image.image,
                            VK_IMAGE_LAYOUT_GENERAL,

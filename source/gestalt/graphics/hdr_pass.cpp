@@ -219,7 +219,7 @@ void hdr_pass::execute_blur_x(const VkCommandBuffer cmd) {
       hdr_buffer_.get_write_buffer().color_image.imageView,
                                                nullptr, VK_IMAGE_LAYOUT_GENERAL);
   VkRenderingAttachmentInfo newDepthAttachment
-      = vkinit::depth_attachment_info(hdr_buffer_.get_write_buffer().depth_image.imageView,
+      = vkinit::depth_attachment_info(hdr_buffer_.get_write_buffer().depth_image.imageView, nullptr,
                                       VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
   VkRenderingInfo newRenderInfo = vkinit::rendering_info({effect_size_, effect_size_},
                                                         &newColorAttachment,
@@ -262,7 +262,7 @@ void hdr_pass::execute_blur_y(const VkCommandBuffer cmd) {
       hdr_buffer_.get_write_buffer().color_image.imageView,
                                                nullptr, VK_IMAGE_LAYOUT_GENERAL);
   VkRenderingAttachmentInfo newDepthAttachment
-      = vkinit::depth_attachment_info(hdr_buffer_.get_write_buffer().depth_image.imageView,
+      = vkinit::depth_attachment_info(hdr_buffer_.get_write_buffer().depth_image.imageView, nullptr,
                                       VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
   VkRenderingInfo newRenderInfo = vkinit::rendering_info({effect_size_, effect_size_},
                                                         &newColorAttachment,
@@ -292,7 +292,6 @@ void hdr_pass::execute_blur_y(const VkCommandBuffer cmd) {
 }
 
 void hdr_pass::execute(const VkCommandBuffer cmd) {
-  vkCmdEndRendering(cmd);
 
   bright_pass_.descriptor_set_ = renderer_->get_current_frame().descriptor_pool.allocate(
       gpu_.device, bright_pass_.descriptor_layouts_.at(0));
@@ -308,7 +307,7 @@ void hdr_pass::execute(const VkCommandBuffer cmd) {
   VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
       hdr_buffer_.get_write_buffer().color_image.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
   VkRenderingAttachmentInfo newDepthAttachment
-      = vkinit::depth_attachment_info(hdr_buffer_.get_write_buffer().depth_image.imageView,
+      = vkinit::depth_attachment_info(hdr_buffer_.get_write_buffer().depth_image.imageView, nullptr,
                                       VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
   VkRenderingInfo newRenderInfo = vkinit::rendering_info({effect_size_, effect_size_},
                                                          &newColorAttachment, &newDepthAttachment);
@@ -360,7 +359,7 @@ void hdr_pass::execute(const VkCommandBuffer cmd) {
       = vkinit::attachment_info(renderer_->frame_buffer_.get_write_buffer().color_image.imageView,
                                 nullptr, VK_IMAGE_LAYOUT_GENERAL);
   newDepthAttachment = vkinit::depth_attachment_info(
-      renderer_->frame_buffer_.get_write_buffer().depth_image.imageView,
+      renderer_->frame_buffer_.get_write_buffer().depth_image.imageView, nullptr,
       VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
   newRenderInfo = vkinit::rendering_info(renderer_->get_window().extent, &newColorAttachment,
                                          &newDepthAttachment);
@@ -390,6 +389,7 @@ void hdr_pass::execute(const VkCommandBuffer cmd) {
   vkCmdPushConstants(cmd, final_.pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                      sizeof(render_config::hdr_params), &renderer_->get_config().hdr);
   vkCmdDraw(cmd, 3, 1, 0, 0);
+  vkCmdEndRendering(cmd);
 }
 
 void hdr_pass::cleanup() {

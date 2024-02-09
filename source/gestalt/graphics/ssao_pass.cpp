@@ -180,7 +180,7 @@ void ssao_pass::execute_filter(const VkCommandBuffer cmd) {
   VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
       ssao_buffer_.get_write_buffer().color_image.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
   VkRenderingAttachmentInfo newDepthAttachment
-      = vkinit::depth_attachment_info(ssao_buffer_.get_write_buffer().depth_image.imageView,
+      = vkinit::depth_attachment_info(ssao_buffer_.get_write_buffer().depth_image.imageView,nullptr,
                                       VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
   VkRenderingInfo newRenderInfo = vkinit::rendering_info({effect_size_, effect_size_},
                                                          &newColorAttachment, &newDepthAttachment);
@@ -232,6 +232,7 @@ void ssao_pass::execute_blur_x(const VkCommandBuffer cmd) {
       ssao_buffer_.get_write_buffer().color_image.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
   VkRenderingAttachmentInfo newDepthAttachment
       = vkinit::depth_attachment_info(ssao_buffer_.get_write_buffer().depth_image.imageView,
+                                      nullptr,
                                       VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
   VkRenderingInfo newRenderInfo = vkinit::rendering_info({effect_size_, effect_size_},
                                                          &newColorAttachment,
@@ -276,6 +277,7 @@ void ssao_pass::execute_blur_y(const VkCommandBuffer cmd) {
       ssao_buffer_.get_write_buffer().color_image.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
   VkRenderingAttachmentInfo newDepthAttachment
       = vkinit::depth_attachment_info(ssao_buffer_.get_write_buffer().depth_image.imageView,
+                                      nullptr,
                                       VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
   VkRenderingInfo newRenderInfo = vkinit::rendering_info({effect_size_, effect_size_},
                                                          &newColorAttachment,
@@ -321,7 +323,7 @@ void ssao_pass::execute_final(const VkCommandBuffer cmd) {
       = vkinit::attachment_info(renderer_->frame_buffer_.get_write_buffer().color_image.imageView,
                                 nullptr, VK_IMAGE_LAYOUT_GENERAL);
   VkRenderingAttachmentInfo newDepthAttachment = vkinit::depth_attachment_info(
-      renderer_->frame_buffer_.get_write_buffer().depth_image.imageView,
+      renderer_->frame_buffer_.get_write_buffer().depth_image.imageView, nullptr,
       VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
   VkRenderingInfo newRenderInfo = vkinit::rendering_info(renderer_->get_window().extent,
                                                          &newColorAttachment, &newDepthAttachment);
@@ -350,10 +352,10 @@ void ssao_pass::execute_final(const VkCommandBuffer cmd) {
   vkCmdPushConstants(cmd, final_.pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                      sizeof(render_config::ssao_params), &renderer_->get_config().ssao);
   vkCmdDraw(cmd, 3, 1, 0, 0);
+  vkCmdEndRendering(cmd);
 }
 
 void ssao_pass::execute(const VkCommandBuffer cmd) {
-  vkCmdEndRendering(cmd); //TODO have each pass start and end its own rendering
 
   execute_filter(cmd);
 

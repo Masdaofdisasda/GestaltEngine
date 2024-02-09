@@ -56,6 +56,18 @@ void geometry_pass::cleanup() {
 }
 
 void geometry_pass::execute(VkCommandBuffer cmd) {
+  VkRenderingAttachmentInfo colorAttachment
+      = vkinit::attachment_info(renderer_->frame_buffer_.get_write_buffer().color_image.imageView,
+                                nullptr, VK_IMAGE_LAYOUT_GENERAL);
+  VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
+      renderer_->frame_buffer_.get_write_buffer().depth_image.imageView, nullptr,
+      VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+
+  VkRenderingInfo renderInfo
+      = vkinit::rendering_info(renderer_->get_window().extent, &colorAttachment, &depthAttachment);
+
+  vkCmdBeginRendering(cmd, &renderInfo);
+
   VkDescriptorBufferInfo buffer_info;
   buffer_info.buffer = resource_manager_->per_frame_data_buffer.buffer;
   buffer_info.offset = 0;
@@ -124,5 +136,7 @@ void geometry_pass::execute(VkCommandBuffer cmd) {
            draw(r, pipeline_layout_);
     }
   }
+
+  vkCmdEndRendering(cmd);
 
 }
