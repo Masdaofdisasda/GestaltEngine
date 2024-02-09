@@ -28,11 +28,9 @@ void geometry_pass::prepare() {
   mesh_layout_info.pPushConstantRanges = &matrix_range;
   mesh_layout_info.pushConstantRangeCount = 1;
 
-  VkPipelineLayout newLayout;
-  VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &newLayout));
+  VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
 
   PipelineBuilder pipelineBuilder;
-  pipeline_layout_ = newLayout;
 
   pipeline_
       = pipelineBuilder.set_shaders(meshVertexShader, meshFragShader)
@@ -44,7 +42,7 @@ void geometry_pass::prepare() {
             .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
             .set_color_attachment_format(renderer_->frame_buffer_.get_write_color_image().imageFormat)
             .set_depth_format(renderer_->frame_buffer_.get_write_depth_image().imageFormat)
-            .set_pipeline_layout(newLayout)
+                  .set_pipeline_layout(pipeline_layout_)
             .build_pipeline(gpu_.device);
 
   vkDestroyShaderModule(gpu_.device, meshFragShader, nullptr);

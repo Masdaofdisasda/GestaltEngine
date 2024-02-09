@@ -5,6 +5,29 @@
 #include <vk_images.h>
 #include <vk_initializers.h>
 
+void vkutil::transition_read(VkCommandBuffer cmd, AllocatedImage& image) {
+  if (image.type == image_type::color
+      && image.currentLayout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+    transition_image(cmd, image.image, image.currentLayout,
+                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  } else if (image.type == image_type::depth
+             && image.currentLayout != VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL) {
+    transition_image(cmd, image.image, image.currentLayout,
+                     VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
+  }
+}
+
+void vkutil::transition_write(VkCommandBuffer cmd, AllocatedImage& image) {
+  if (image.type == image_type::color && image.currentLayout != VK_IMAGE_LAYOUT_GENERAL) {
+       transition_image(cmd, image.image, image.currentLayout, VK_IMAGE_LAYOUT_GENERAL);
+  } else if (image.type == image_type::depth
+             && image.currentLayout != VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL) {
+       transition_image(cmd, image.image, image.currentLayout,
+                        VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+  }
+}
+
+
 void vkutil::transition_image(VkCommandBuffer cmd, VkImage image, VkImageLayout currentLayout,
                               VkImageLayout newLayout) {
   VkImageMemoryBarrier2 imageBarrier{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
