@@ -680,11 +680,9 @@ AllocatedImage resource_manager::create_cubemap_from_HDR(std::vector<float>& ima
                                 VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 }
 
-void resource_manager::create_framebuffer(const VkExtent3D& extent,
-                                          frame_buffer& frame_buffer) {
-  AllocatedImage& color_image = frame_buffer.color_image;
-  AllocatedImage& depth_image = frame_buffer.depth_image;
-
+void resource_manager::create_color_frame_buffer(const VkExtent3D& extent,
+                                                 AllocatedImage& color_image) const {
+  assert(color_image.type == image_type::color);
   // hardcoding the draw format to 32 bit float
   color_image.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
   color_image.imageExtent = extent;
@@ -712,6 +710,11 @@ void resource_manager::create_framebuffer(const VkExtent3D& extent,
       color_image.imageFormat, color_image.image, VK_IMAGE_ASPECT_COLOR_BIT);
 
   VK_CHECK(vkCreateImageView(gpu_.device, &rview_info, nullptr, &color_image.imageView));
+}
+
+void resource_manager::create_depth_frame_buffer(const VkExtent3D& extent,
+                                                 AllocatedImage& depth_image) const {
+  assert(depth_image.type == image_type::depth);
 
   depth_image.imageFormat = VK_FORMAT_D32_SFLOAT;
   depth_image.imageExtent = extent;
@@ -719,6 +722,9 @@ void resource_manager::create_framebuffer(const VkExtent3D& extent,
   depthImageUsages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
   depthImageUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
 
+  VmaAllocationCreateInfo rimg_allocinfo = {};
+  rimg_allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+  rimg_allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
   VkImageCreateInfo dimg_info
       = vkinit::image_create_info(depth_image.imageFormat, depthImageUsages, extent);
 
@@ -731,6 +737,17 @@ void resource_manager::create_framebuffer(const VkExtent3D& extent,
       depth_image.imageFormat, depth_image.image, VK_IMAGE_ASPECT_DEPTH_BIT);
 
   VK_CHECK(vkCreateImageView(gpu_.device, &dview_info, nullptr, &depth_image.imageView));
+}
+
+void resource_manager::create_framebuffer(const VkExtent3D& extent, frame_buffer& frame_buffer) {
+  AllocatedImage color_image{image_type::color};
+  AllocatedImage depth_image{image_type::depth};
+
+  create_color_frame_buffer(extent, color_image);
+  create_depth_frame_buffer(extent, depth_image);
+
+  frame_buffer.add_color_image(color_image);
+  frame_buffer.add_depth_image(depth_image);
 }
 
 void resource_manager::create_framebuffer(const VkExtent3D& extent,

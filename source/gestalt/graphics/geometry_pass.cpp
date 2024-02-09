@@ -42,8 +42,8 @@ void geometry_pass::prepare() {
             .set_multisampling_none()
             .disable_blending()
             .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-            .set_color_attachment_format(renderer_->frame_buffer_.get_write_buffer().color_image.imageFormat)
-            .set_depth_format(renderer_->frame_buffer_.get_read_buffer().depth_image.imageFormat)
+            .set_color_attachment_format(renderer_->frame_buffer_.get_write_color_image().imageFormat)
+            .set_depth_format(renderer_->frame_buffer_.get_write_depth_image().imageFormat)
             .set_pipeline_layout(newLayout)
             .build_pipeline(gpu_.device);
 
@@ -57,10 +57,10 @@ void geometry_pass::cleanup() {
 
 void geometry_pass::execute(VkCommandBuffer cmd) {
   VkRenderingAttachmentInfo colorAttachment
-      = vkinit::attachment_info(renderer_->frame_buffer_.get_write_buffer().color_image.imageView,
+      = vkinit::attachment_info(renderer_->frame_buffer_.get_write_color_image().imageView,
                                 nullptr, VK_IMAGE_LAYOUT_GENERAL);
   VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
-      renderer_->frame_buffer_.get_write_buffer().depth_image.imageView, nullptr,
+      renderer_->frame_buffer_.get_write_depth_image().imageView, nullptr,
       VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
   VkRenderingInfo renderInfo

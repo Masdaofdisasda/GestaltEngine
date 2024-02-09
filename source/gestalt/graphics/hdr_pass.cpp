@@ -52,8 +52,8 @@ void hdr_pass::prepare() {
               .set_multisampling_none()
               .disable_blending()
               .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-              .set_color_attachment_format(hdr_buffer_.get_write_buffer().color_image.imageFormat)
-              .set_depth_format(hdr_buffer_.get_write_buffer().depth_image.imageFormat)
+              .set_color_attachment_format(hdr_buffer_.get_write_color_image().imageFormat)
+              .set_depth_format(hdr_buffer_.get_write_depth_image().imageFormat)
               .set_pipeline_layout(bright_pass_.pipeline_layout_)
               .build_pipeline(gpu_.device);
   }
@@ -120,8 +120,8 @@ void hdr_pass::prepare() {
               .set_multisampling_none()
               .disable_blending()
               .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-              .set_color_attachment_format(hdr_buffer_.get_write_buffer().color_image.imageFormat)
-              .set_depth_format(hdr_buffer_.get_write_buffer().depth_image.imageFormat)
+              .set_color_attachment_format(hdr_buffer_.get_write_color_image().imageFormat)
+              .set_depth_format(hdr_buffer_.get_write_depth_image().imageFormat)
               .set_pipeline_layout(blur_x_.pipeline_layout_)
               .build_pipeline(gpu_.device);
   }
@@ -151,8 +151,8 @@ void hdr_pass::prepare() {
               .set_multisampling_none()
               .disable_blending()
               .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-              .set_color_attachment_format(hdr_buffer_.get_write_buffer().color_image.imageFormat)
-              .set_depth_format(hdr_buffer_.get_write_buffer().depth_image.imageFormat)
+              .set_color_attachment_format(hdr_buffer_.get_write_color_image().imageFormat)
+              .set_depth_format(hdr_buffer_.get_write_depth_image().imageFormat)
               .set_pipeline_layout(blur_y_.pipeline_layout_)
               .build_pipeline(gpu_.device);
 
@@ -188,8 +188,8 @@ void hdr_pass::prepare() {
               .disable_blending()
               .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
               .set_color_attachment_format(
-                  renderer_->frame_buffer_.get_write_buffer().color_image.imageFormat)
-              .set_depth_format(renderer_->frame_buffer_.get_write_buffer().depth_image.imageFormat)
+                  renderer_->frame_buffer_.get_write_color_image().imageFormat)
+              .set_depth_format(renderer_->frame_buffer_.get_write_depth_image().imageFormat)
               .set_pipeline_layout(final_.pipeline_layout_)
               .build_pipeline(gpu_.device);
   }
@@ -208,18 +208,18 @@ void hdr_pass::execute_blur_x(const VkCommandBuffer cmd) {
       gpu_.device, blur_x_.descriptor_layouts_.at(0));
   hdr_buffer_.switch_buffers();
 
-  vkutil::transition_image(cmd, hdr_buffer_.get_read_buffer().color_image.image,
+  vkutil::transition_image(cmd, hdr_buffer_.get_read_color_image().image,
                            VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  vkutil::transition_image(cmd, hdr_buffer_.get_write_buffer().color_image.image,
+  vkutil::transition_image(cmd, hdr_buffer_.get_write_color_image().image,
                            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-  vkutil::transition_image(cmd, hdr_buffer_.get_write_buffer().depth_image.image,
+  vkutil::transition_image(cmd, hdr_buffer_.get_write_depth_image().image,
                            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
   VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
-      hdr_buffer_.get_write_buffer().color_image.imageView,
+      hdr_buffer_.get_write_color_image().imageView,
                                                nullptr, VK_IMAGE_LAYOUT_GENERAL);
   VkRenderingAttachmentInfo newDepthAttachment
-      = vkinit::depth_attachment_info(hdr_buffer_.get_write_buffer().depth_image.imageView, nullptr,
+      = vkinit::depth_attachment_info(hdr_buffer_.get_write_depth_image().imageView, nullptr,
                                       VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
   VkRenderingInfo newRenderInfo = vkinit::rendering_info({effect_size_, effect_size_},
                                                         &newColorAttachment,
@@ -228,7 +228,7 @@ void hdr_pass::execute_blur_x(const VkCommandBuffer cmd) {
 
   writer.clear();
   writer.write_image(
-      10, hdr_buffer_.get_read_buffer().color_image.imageView,
+      10, hdr_buffer_.get_read_color_image().imageView,
       resource_manager_->get_database().get_sampler(0), // todo default_sampler_nearest
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.update_set(gpu_.device, blur_x_.descriptor_set_);
@@ -251,18 +251,18 @@ void hdr_pass::execute_blur_y(const VkCommandBuffer cmd) {
       gpu_.device, blur_y_.descriptor_layouts_.at(0));
   hdr_buffer_.switch_buffers();
 
-  vkutil::transition_image(cmd, hdr_buffer_.get_read_buffer().color_image.image,
+  vkutil::transition_image(cmd, hdr_buffer_.get_read_color_image().image,
                            VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  vkutil::transition_image(cmd, hdr_buffer_.get_write_buffer().color_image.image,
+  vkutil::transition_image(cmd, hdr_buffer_.get_write_color_image().image,
                            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-  vkutil::transition_image(cmd, hdr_buffer_.get_write_buffer().depth_image.image,
+  vkutil::transition_image(cmd, hdr_buffer_.get_write_depth_image().image,
                            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
   VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
-      hdr_buffer_.get_write_buffer().color_image.imageView,
+      hdr_buffer_.get_write_color_image().imageView,
                                                nullptr, VK_IMAGE_LAYOUT_GENERAL);
   VkRenderingAttachmentInfo newDepthAttachment
-      = vkinit::depth_attachment_info(hdr_buffer_.get_write_buffer().depth_image.imageView, nullptr,
+      = vkinit::depth_attachment_info(hdr_buffer_.get_write_depth_image().imageView, nullptr,
                                       VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
   VkRenderingInfo newRenderInfo = vkinit::rendering_info({effect_size_, effect_size_},
                                                         &newColorAttachment,
@@ -271,7 +271,7 @@ void hdr_pass::execute_blur_y(const VkCommandBuffer cmd) {
 
   writer.clear();
   writer.write_image(
-      10, hdr_buffer_.get_read_buffer().color_image.imageView,
+      10, hdr_buffer_.get_read_color_image().imageView,
       resource_manager_->get_database().get_sampler(0), // todo default_sampler_nearest
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.update_set(gpu_.device, blur_y_.descriptor_set_);
@@ -297,17 +297,17 @@ void hdr_pass::execute(const VkCommandBuffer cmd) {
       gpu_.device, bright_pass_.descriptor_layouts_.at(0));
   renderer_->frame_buffer_.switch_buffers();
 
-  vkutil::transition_image(cmd, renderer_->frame_buffer_.get_read_buffer().color_image.image,
+  vkutil::transition_image(cmd, renderer_->frame_buffer_.get_read_color_image().image,
                            VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  vkutil::transition_image(cmd, hdr_buffer_.get_write_buffer().color_image.image,
+  vkutil::transition_image(cmd, hdr_buffer_.get_write_color_image().image,
                            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-  vkutil::transition_image(cmd, hdr_buffer_.get_write_buffer().depth_image.image,
+  vkutil::transition_image(cmd, hdr_buffer_.get_write_depth_image().image,
                            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
   VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
-      hdr_buffer_.get_write_buffer().color_image.imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+      hdr_buffer_.get_write_color_image().imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
   VkRenderingAttachmentInfo newDepthAttachment
-      = vkinit::depth_attachment_info(hdr_buffer_.get_write_buffer().depth_image.imageView, nullptr,
+      = vkinit::depth_attachment_info(hdr_buffer_.get_write_depth_image().imageView, nullptr,
                                       VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
   VkRenderingInfo newRenderInfo = vkinit::rendering_info({effect_size_, effect_size_},
                                                          &newColorAttachment, &newDepthAttachment);
@@ -315,7 +315,7 @@ void hdr_pass::execute(const VkCommandBuffer cmd) {
 
   writer.clear();
   writer.write_image(
-      10, renderer_->frame_buffer_.get_read_buffer().color_image.imageView,
+      10, renderer_->frame_buffer_.get_read_color_image().imageView,
       resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.update_set(gpu_.device, bright_pass_.descriptor_set_);
@@ -348,18 +348,18 @@ void hdr_pass::execute(const VkCommandBuffer cmd) {
 
   hdr_buffer_.switch_buffers();
 
-  vkutil::transition_image(cmd, hdr_buffer_.get_read_buffer().color_image.image,
+  vkutil::transition_image(cmd, hdr_buffer_.get_read_color_image().image,
                            VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-  vkutil::transition_image(cmd, renderer_->frame_buffer_.get_write_buffer().color_image.image,
+  vkutil::transition_image(cmd, renderer_->frame_buffer_.get_write_color_image().image,
                            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-  vkutil::transition_image(cmd, renderer_->frame_buffer_.get_write_buffer().depth_image.image,
+  vkutil::transition_image(cmd, renderer_->frame_buffer_.get_write_depth_image().image,
                            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
   newColorAttachment
-      = vkinit::attachment_info(renderer_->frame_buffer_.get_write_buffer().color_image.imageView,
+      = vkinit::attachment_info(renderer_->frame_buffer_.get_write_color_image().imageView,
                                 nullptr, VK_IMAGE_LAYOUT_GENERAL);
   newDepthAttachment = vkinit::depth_attachment_info(
-      renderer_->frame_buffer_.get_write_buffer().depth_image.imageView, nullptr,
+      renderer_->frame_buffer_.get_write_depth_image().imageView, nullptr,
       VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
   newRenderInfo = vkinit::rendering_info(renderer_->get_window().extent, &newColorAttachment,
                                          &newDepthAttachment);
@@ -367,11 +367,11 @@ void hdr_pass::execute(const VkCommandBuffer cmd) {
 
   writer.clear();
   writer.write_image(
-      10, renderer_->frame_buffer_.get_read_buffer().color_image.imageView,
+      10, renderer_->frame_buffer_.get_read_color_image().imageView,
       resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.write_image(
-      11, hdr_buffer_.get_read_buffer().color_image.imageView,
+      11, hdr_buffer_.get_read_color_image().imageView,
       resource_manager_->get_database().get_sampler(1),  // todo default_sampler_linear
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.update_set(gpu_.device, final_.descriptor_set_);

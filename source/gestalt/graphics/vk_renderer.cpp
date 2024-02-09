@@ -173,7 +173,7 @@ void vk_renderer::draw() {
 
   stats_.mesh_draw_time = elapsed.count() / 1000.f;
 
-  vkutil::transition_image(cmd, frame_buffer_.get_write_buffer().color_image.image,
+  vkutil::transition_image(cmd, frame_buffer_.get_write_color_image().image,
                            VK_IMAGE_LAYOUT_GENERAL,
                            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
   vkutil::transition_image(cmd, swapchain_->swapchain_images[swapchain_image_index_],
@@ -183,7 +183,7 @@ void vk_renderer::draw() {
   extent.height = window_.extent.height;
   extent.width = window_.extent.width;
 
-  vkutil::copy_image_to_image(cmd, frame_buffer_.get_write_buffer().color_image.image,
+  vkutil::copy_image_to_image(cmd, frame_buffer_.get_write_color_image().image,
                               swapchain_->swapchain_images[swapchain_image_index_], extent, extent);
   vkutil::transition_image(cmd, swapchain_->swapchain_images[swapchain_image_index_],
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,

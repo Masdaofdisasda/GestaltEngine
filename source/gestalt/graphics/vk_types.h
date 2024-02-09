@@ -20,12 +20,21 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
 
-struct AllocatedImage {
-  VkImage image;
-  VkImageView imageView;
-  VmaAllocation allocation;
-  VkExtent3D imageExtent;
-  VkFormat imageFormat;
+enum class image_type { color, depth };
+
+class AllocatedImage {
+public:
+  VkImage image = VK_NULL_HANDLE;
+  VkImageView imageView = VK_NULL_HANDLE;
+  VmaAllocation allocation = VK_NULL_HANDLE;
+  VkExtent3D imageExtent = {};
+  VkFormat imageFormat = VK_FORMAT_UNDEFINED;
+  image_type type;
+  VkImageLayout currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+  AllocatedImage(const image_type type = image_type::color) : type(type) {}
+
+  VkExtent2D getExtent2D() const { return {imageExtent.width, imageExtent.height}; }
 };
 
 struct AllocatedBuffer {
@@ -35,20 +44,56 @@ struct AllocatedBuffer {
 };
 
 struct frame_buffer {
-  AllocatedImage color_image;
-  AllocatedImage depth_image;
+
+  frame_buffer() = default;
+
+  void add_color_image(const AllocatedImage& image) {
+    assert(image.type == image_type::color);
+    color_image_ = image;
+  }
+
+  void add_depth_image(const AllocatedImage& image) {
+    assert(image.type == image_type::depth);
+    depth_image_ = image;
+  }
+
+  AllocatedImage& get_color_image() {
+    assert(color_image_.has_value());
+    return color_image_.value();
+  }
+
+  AllocatedImage& get_depth_image() {
+      assert(depth_image_.has_value());
+      return depth_image_.value();
+  }
+
+private:
+  std::optional<AllocatedImage> color_image_;
+  std::optional<AllocatedImage> depth_image_;
 };
+
 
 struct double_buffered_frame_buffer {
-  frame_buffer buffers[2];
-  int write_buffer = 0;
 
-  void switch_buffers() { write_buffer = (write_buffer + 1) % 2; }
+  void switch_buffers() { write_buffer_index_ = (write_buffer_index_ + 1) % buffers_.size(); }
 
-  frame_buffer& get_write_buffer() { return buffers[write_buffer]; }
+  frame_buffer& get_write_buffer() { return buffers_[write_buffer_index_]; }
+  AllocatedImage& get_write_color_image() { return buffers_[write_buffer_index_].get_color_image(); }
+  AllocatedImage& get_write_depth_image() { return buffers_[write_buffer_index_].get_depth_image(); }
 
-  frame_buffer& get_read_buffer() { return buffers[(write_buffer + 1) % 2]; }
+  frame_buffer& get_read_buffer() { return buffers_[(write_buffer_index_ + 1) % buffers_.size()]; }
+  AllocatedImage& get_read_color_image() {
+    return buffers_[(write_buffer_index_ + 1) % buffers_.size()].get_color_image();
+  }
+  AllocatedImage& get_read_depth_image() {
+    return buffers_[(write_buffer_index_ + 1) % buffers_.size()].get_depth_image();
+  }
+
+private:
+  std::array<frame_buffer, 2> buffers_;
+  size_t write_buffer_index_ = 0;
 };
+
 
 struct per_frame_data {
   glm::mat4 view;
