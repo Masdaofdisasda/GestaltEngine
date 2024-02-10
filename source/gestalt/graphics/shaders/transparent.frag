@@ -9,7 +9,6 @@ layout (location = 0) in vec3 inNormal;
 layout (location = 1) in vec3 inPosition;
 layout (location = 2) in vec2 inUV;
 layout (location = 3) flat in int inMaterialIndex;
-layout (location = 4) flat in int inMaterialConst;
 
 layout (location = 0) out vec4 outFragColor;
 
@@ -273,27 +272,45 @@ vec3 perturbNormal(vec3 n, vec3 v, vec3 normalSample, vec2 uv)
 
 void main() {
 
-	uint albedoIndex =			inMaterialIndex;
-	uint metalicRoughIndex =	inMaterialIndex + 1;
-	uint normalIndex =			inMaterialIndex + 2;
-	uint emissiveIndex =		inMaterialIndex + 3;
-	uint occlusionIndex =		inMaterialIndex + 4;
+	uint albedoIndex =			materialData[nonuniformEXT(inMaterialIndex)].albedo_tex_index;
+	uint metalicRoughIndex =	materialData[nonuniformEXT(inMaterialIndex)].metal_rough_tex_index;
+	uint normalIndex =			materialData[nonuniformEXT(inMaterialIndex)].normal_tex_index;
+	uint emissiveIndex =		materialData[nonuniformEXT(inMaterialIndex)].emissive_tex_index;
+	uint occlusionIndex =		materialData[nonuniformEXT(inMaterialIndex)].occlusion_tex_index;
 
     vec2 UV = inUV;
 
-    vec4 Kd = texture(nonuniformEXT(textures[albedoIndex]), UV);
+	vec4 Kd = materialData[nonuniformEXT(inMaterialIndex)].albedo_factor;
+	if(albedoIndex != uint(-1)) {
+		Kd = texture(nonuniformEXT(textures[albedoIndex]), UV);
+    }
 	Kd.rgb = sRGBToLinear(Kd.rgb);
 
-    vec3 normal_sample = texture(nonuniformEXT(textures[normalIndex]), UV).rgb;
+	vec3 n = normalize(inNormal);
 	vec3 viewPos = -normalize(vec3(sceneData.view[0][2], sceneData.view[1][2], sceneData.view[2][2]));
-    vec3 n = perturbNormal(normalize(inNormal), normalize(viewPos - inPosition), normal_sample, UV);
+	if(normalIndex != uint(-1)) {
+		vec3 normal_sample = texture(nonuniformEXT(textures[normalIndex]), UV).rgb;
+		n = perturbNormal(n, normalize(viewPos - inPosition), normal_sample, UV);
+	}
 
-	vec4 Ke = texture(nonuniformEXT(textures[emissiveIndex]), UV);
-	Ke.rgb = sRGBToLinear(Ke.rgb);
+	vec4 Ke = vec4(0.0, 0.0, 0.0, 1.0);
+	if(emissiveIndex != uint(-1)) {
+		Ke = texture(nonuniformEXT(textures[emissiveIndex]), UV);
+		Ke.rgb *= materialData[nonuniformEXT(inMaterialIndex)].emissiveFactor;
+		Ke.rgb = sRGBToLinear(Ke.rgb);
+	}
 
-	float Kao = texture(nonuniformEXT(textures[occlusionIndex]), UV).r;
-
-	vec4 MeR = texture(nonuniformEXT(textures[metalicRoughIndex]), UV);
+	float Kao = 0.0;
+	if (occlusionIndex != uint(-1)) {
+		Kao = texture(nonuniformEXT(textures[occlusionIndex]), UV).r;
+	}
+	
+	vec4 MeR = vec4(Kao, 0.0, 0.0, 0.0);
+	if (metalicRoughIndex != uint(-1)) {
+		MeR = texture(nonuniformEXT(textures[metalicRoughIndex]), UV);
+	} else {
+		//MeR = vec4(Kao, materialData[nonuniformEXT(inMaterialIndex)].metal_rough_factor, 1.0);
+	}
 
 	PBRInfo pbrInputs;
 	

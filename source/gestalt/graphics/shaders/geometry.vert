@@ -9,7 +9,6 @@ layout (location = 0) out vec3 outNormal;
 layout (location = 1) out vec3 outPosition; //was color
 layout (location = 2) out vec2 outUV;
 layout (location = 3) flat out int outMaterialIndex;
-layout (location = 4) flat out int outMaterialConst;
 
 struct Vertex {
 
@@ -27,9 +26,8 @@ layout(buffer_reference, std430) readonly buffer VertexBuffer{
 //push constants block
 layout( push_constant ) uniform constants
 {
-	mat4 render_matrix;
+	mat4 model_matrix;
 	int materialIndex;
-	int materialConst;
 	VertexBuffer vertexBuffer;
 } PushConstants;
 
@@ -39,13 +37,12 @@ void main()
 	
 	vec4 position = vec4(v.position, 1.0f);
 
-	gl_Position =  sceneData.viewproj * PushConstants.render_matrix * position;
+	gl_Position =  sceneData.viewproj * PushConstants.model_matrix * position;
 
-	outNormal = (PushConstants.render_matrix * vec4(v.normal, 0.f)).xyz;
+	outNormal = mat3(transpose(inverse(PushConstants.model_matrix))) * v.normal;
 	//outColor = v.color.xyz * materialData.colorFactors.xyz;	
-	outPosition = vec3(PushConstants.render_matrix * vec4(v.position, 1.0));
+	outPosition = vec3(PushConstants.model_matrix * vec4(v.position, 1.0));
 	outUV.x = v.uv_x;
 	outUV.y = v.uv_y;
 	outMaterialIndex = PushConstants.materialIndex;
-	outMaterialConst = PushConstants.materialConst;
 }

@@ -141,7 +141,6 @@ struct gpu_mesh_buffers {
 struct GPUDrawPushConstants {
   glm::mat4 worldMatrix;
   int material_id;
-  int material_const_id;
   VkDeviceAddress vertexBuffer;
 };
 //< vbuf_types

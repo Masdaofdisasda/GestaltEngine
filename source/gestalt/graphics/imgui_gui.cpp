@@ -336,8 +336,9 @@ void imgui_gui::show_scene_hierarchy_window() {
             if (ImGui::TreeNode(material.name.c_str())) {
               auto& config = material.config;
 
+              //TODO update materials based on GUI changes
               if (ImGui::CollapsingHeader("Albedo", ImGuiTreeNodeFlags_DefaultOpen)) {
-                ImGui::DragFloat4("Factor", &config.constants.albedo_factor.x, 0.01f, 0.0f, 1.0f, "%.2f");
+                ImGui::DragFloat4("Albedo Color", &config.constants.albedo_factor.x, 0.01f, 0.0f, 1.0f, "%.2f");
                 ImGui::Checkbox("Use Texture", &config.use_albedo_tex);
                 if (config.use_albedo_tex) {
                   ImGui::Text("URI: %s", config.albedo_uri.c_str());
@@ -345,24 +346,24 @@ void imgui_gui::show_scene_hierarchy_window() {
               }
 
               if (ImGui::CollapsingHeader("Metallic-Roughness", ImGuiTreeNodeFlags_DefaultOpen)) {
-                ImGui::DragFloat2("Factor", &config.constants.metal_rough_factor.x, 0.01f, 0.0f, 1.0f,
+                ImGui::DragFloat2("Metal-Rough Factor", &config.constants.metal_rough_factor.x, 0.01f, 0.0f, 1.0f,
                                   "%.2f");
                 ImGui::Checkbox("Use Texture", &config.use_metal_rough_tex);
                 if (config.use_metal_rough_tex) {
                   ImGui::Text("URI: %s", config.metal_rough_uri.c_str());
                 }
               }
-
+              /*
               if (ImGui::CollapsingHeader("Normal Map", ImGuiTreeNodeFlags_DefaultOpen)) {
-                ImGui::DragFloat("Scale", &config.normal_scale, 0.01f, 0.0f, 10.0f, "%.2f");
+                ImGui::DragFloat("Scale", &config.constants.normal_scale, 0.01f, 0.0f, 10.0f, "%.2f");
                 ImGui::Checkbox("Use Texture", &config.use_normal_tex);
                 if (config.use_normal_tex) {
                   ImGui::Text("URI: %s", config.normal_uri.c_str());
                 }
-              }
+              }*/
 
               if (ImGui::CollapsingHeader("Emissive", ImGuiTreeNodeFlags_DefaultOpen)) {
-                ImGui::DragFloat3("Factor", &config.emissive_factor.x, 0.01f, 0.0f, 10.0f, "%.2f");
+                ImGui::DragFloat3("Emmissive Factor", &config.constants.emissiveFactor.x, 0.01f, 0.0f, 10.0f, "%.2f");
                 ImGui::Checkbox("Use Texture", &config.use_emissive_tex);
                 if (config.use_emissive_tex) {
                   ImGui::Text("URI: %s", config.emissive_uri.c_str());
@@ -370,7 +371,7 @@ void imgui_gui::show_scene_hierarchy_window() {
               }
 
               if (ImGui::CollapsingHeader("Occlusion", ImGuiTreeNodeFlags_DefaultOpen)) {
-                ImGui::DragFloat("Strength", &config.occlusion_strength, 0.01f, 0.0f, 10.0f,
+                ImGui::DragFloat("Occlusion Strength", &config.constants.occlusionStrength, 0.01f, 0.0f, 10.0f,
                                  "%.2f");
                 ImGui::Checkbox("Use Texture", &config.use_occlusion_tex);
                 if (config.use_occlusion_tex) {

@@ -65,6 +65,8 @@ private:
   float outerCone_;      // Used for spot lights
 };
 
+constexpr auto unused_texture = std::numeric_limits<uint32_t>::max();
+
 struct pbr_material {
   bool use_albedo_tex{false};
   std::string albedo_uri;
@@ -72,15 +74,12 @@ struct pbr_material {
   bool use_metal_rough_tex{false};
   std::string metal_rough_uri;
 
-  float normal_scale = 1.f;
   bool use_normal_tex{false};
   std::string normal_uri;
 
-  glm::vec3 emissive_factor{0.f};
   bool use_emissive_tex{false};
   std::string emissive_uri;
 
-  float occlusion_strength = 1.f;
   bool use_occlusion_tex{false};
   std::string occlusion_uri;
 
@@ -88,25 +87,21 @@ struct pbr_material {
   bool transparent{false};
 
   struct material_constants {
-    int albedo_tex_index = -1;
-    int metal_rough_tex_index = -1;
-    int normal_tex_index = -1;
-    int emissive_tex_index = -1;
+    uint32_t albedo_tex_index = unused_texture;
+    uint32_t metal_rough_tex_index = unused_texture;
+    uint32_t normal_tex_index = unused_texture;
+    uint32_t emissive_tex_index = unused_texture;
 
-    int occlusion_tex_index = -1;
-
-    int texture_flags = 0;
-
+    glm::vec4 albedo_factor{1.f};
+    glm::vec2 metal_rough_factor = {1.f, 0.f}; // roughness, metallic
+    float occlusionStrength{0.f};
     float alpha_cutoff{0.f};
-    glm::vec4 albedo_factor{0.f};
-    glm::vec2 metal_rough_factor{0.f};
-    glm::vec3 emissiveFactor{0.f};
-
+    glm::vec3 emissiveFactor{1.f};
+    uint32_t occlusion_tex_index = unused_texture;
     // float normalScale = 1.f;
-    // float occlusionStrength;
   } constants;
 
-  static_assert(sizeof(constants) == 64);
+  static_assert(sizeof(material_constants) == 64);
 
   struct material_resources {
     AllocatedImage albedo_image;

@@ -36,7 +36,7 @@ public:
   void add_camera_component(entity entity, const CameraComponent& camera);
   void add_light_component(entity entity, const LightComponent& light);
   size_t create_material(
-      const pbr_material& config = pbr_material{},
+      pbr_material& config,
       const std::string& name = "") const;
   void set_transform_component(entity entity, const glm::vec3& position,
                                const glm::quat& rotation = glm::quat(0.f, 0.f, 0.f, 0.f),

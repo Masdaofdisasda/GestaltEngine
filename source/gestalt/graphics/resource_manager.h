@@ -67,6 +67,6 @@ public:
   void create_framebuffer(const VkExtent3D& extent, double_buffered_frame_buffer& frame_buffer);
   AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
                               bool mipmapped = false, bool cubemap = false);
-  void write_material(const pbr_material& material, const uint32_t material_id);
+  void write_material(pbr_material& material, const uint32_t material_id);
   void destroy_image(const AllocatedImage& img);
 };

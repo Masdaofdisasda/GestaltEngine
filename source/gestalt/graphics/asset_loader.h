@@ -13,7 +13,7 @@ class asset_loader {
   std::optional<fastgltf::Asset> parse_gltf(const std::filesystem::path& file_path);
   void import_samplers(fastgltf::Asset& gltf);
   void import_textures(fastgltf::Asset& gltf) const;
-  size_t create_material(const pbr_material& config,
+  size_t create_material(pbr_material& config,
                          const std::string& name) const;
   std::tuple<AllocatedImage, VkSampler> get_textures(const fastgltf::Asset& gltf, const size_t& texture_index, const size_t& image_offset, const size_t&
                                                      sampler_offset) const;

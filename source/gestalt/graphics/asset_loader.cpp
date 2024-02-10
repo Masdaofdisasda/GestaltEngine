@@ -132,7 +132,7 @@ void asset_loader::import_textures(fastgltf::Asset& gltf) const {
   }
 }
 
-size_t asset_loader::create_material(const pbr_material& config,
+size_t asset_loader::create_material(pbr_material& config,
                                       const std::string& name) const {
   const size_t material_id = resource_manager_->get_database().get_materials_size();
   fmt::print("creating material {}, mat_id {}\n", name, material_id);
@@ -161,7 +161,7 @@ void asset_loader::import_albedo(const fastgltf::Asset& gltf, const size_t& samp
                                  pbr_material& pbr_config) const {
   if (mat.pbrData.baseColorTexture.has_value()) {
     pbr_config.use_albedo_tex = true;
-    pbr_config.constants.texture_flags |= 1;
+    pbr_config.constants.albedo_tex_index = 0;
     auto [image, sampler] = get_textures(gltf, mat.pbrData.baseColorTexture.value().textureIndex,
                                          image_offset, sampler_offset);
 
@@ -179,14 +179,16 @@ void asset_loader::import_metallic_roughness(
     const fastgltf::Material& mat, pbr_material& pbr_config) const {
   if (mat.pbrData.metallicRoughnessTexture.has_value()) {
     pbr_config.use_metal_rough_tex = true;
+    pbr_config.constants.metal_rough_tex_index = 0;
     auto [image, sampler] = get_textures(gltf, mat.pbrData.metallicRoughnessTexture.value().textureIndex,
                                          image_offset, sampler_offset);
 
     pbr_config.resources.metal_rough_image = image;
-    pbr_config.resources.metal_rough_sampler = sampler;
+    assert(image.image
+           != resource_manager_->get_database().default_material_.error_checkerboard_image.image);
   } else {
     pbr_config.constants.metal_rough_factor
-        = glm::vec2(mat.pbrData.metallicFactor, mat.pbrData.roughnessFactor);
+        = glm::vec2(mat.pbrData.roughnessFactor, mat.pbrData.metallicFactor); // r - occlusion, g - roughness, b - metallic
   }
 }
 
@@ -195,12 +197,13 @@ void asset_loader::import_normal(const fastgltf::Asset& gltf, const size_t& samp
                                  pbr_material& pbr_config) const {
   if (mat.normalTexture.has_value()) {
     pbr_config.use_normal_tex = true;
+    pbr_config.constants.normal_tex_index = 0;
     auto [image, sampler]
         = get_textures(gltf, mat.normalTexture.value().textureIndex, image_offset, sampler_offset);
 
     pbr_config.resources.normal_image = image;
     pbr_config.resources.normal_sampler = sampler;
-    pbr_config.normal_scale = 1.f;  // TODO
+    //pbr_config.normal_scale = 1.f;  // TODO
   }
 }
 
@@ -209,13 +212,17 @@ void asset_loader::import_emissive(const fastgltf::Asset& gltf, const size_t& sa
                                    pbr_material& pbr_config) const {
   if (mat.emissiveTexture.has_value()) {
     pbr_config.use_emissive_tex = true;
+    pbr_config.constants.emissive_tex_index = 0;
     auto [image, sampler] = get_textures(gltf, mat.emissiveTexture.value().textureIndex,
                                          image_offset, sampler_offset);
 
     pbr_config.resources.emissive_image = image;
     pbr_config.resources.emissive_sampler = sampler;
-    pbr_config.emissive_factor
+    glm::vec3 emissiveFactor
         = glm::vec3(mat.emissiveFactor.at(0), mat.emissiveFactor.at(1), mat.emissiveFactor.at(2));
+    if (length(emissiveFactor) > 0) {
+           pbr_config.constants.emissiveFactor = emissiveFactor;
+    }
   }
 }
 
@@ -224,12 +231,13 @@ void asset_loader::import_occlusion(const fastgltf::Asset& gltf, const size_t& s
                                     pbr_material& pbr_config) const {
   if (mat.occlusionTexture.has_value()) {
     pbr_config.use_occlusion_tex = true;
+    pbr_config.constants.occlusion_tex_index = 0;
     auto [image, sampler] = get_textures(gltf, mat.occlusionTexture.value().textureIndex,
                                          image_offset, sampler_offset);
 
     pbr_config.resources.occlusion_image = image;
     pbr_config.resources.occlusion_sampler = sampler;
-    pbr_config.occlusion_strength = 1.f;  // TODO
+    pbr_config.constants.occlusionStrength = 1.f;
   }
 }
 
@@ -271,6 +279,9 @@ void asset_loader::import_materials(fastgltf::Asset& gltf, size_t& sampler_offse
                                     size_t& image_offset) const {
   fmt::print("importing materials\n");
   for (fastgltf::Material& mat : gltf.materials) {
+    if (mat.name == "arch.002") {
+           mat.name = "material_" + std::to_string(resource_manager_->get_database().get_materials_size());
+    }
     import_material(gltf, sampler_offset, image_offset, mat);
   }
 }

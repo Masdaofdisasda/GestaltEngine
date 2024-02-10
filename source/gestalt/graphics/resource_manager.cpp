@@ -448,7 +448,7 @@ AllocatedImage resource_manager::create_cubemap(const void* imageData, VkExtent3
   return new_image;
 }
 
-void resource_manager::write_material(const pbr_material& material,
+void resource_manager::write_material(pbr_material& material,
                                       const uint32_t material_id) {
 
   writer.clear();
@@ -465,9 +465,27 @@ void resource_manager::write_material(const pbr_material& material,
          {material.resources.occlusion_sampler, material.resources.occlusion_image.imageView,
           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
 
-  writer.write_image_array(4, imageInfos, imageInfos.size() * material_id);
+  const uint32_t texture_start = imageInfos.size() * material_id;
+  writer.write_image_array(4, imageInfos, texture_start);
 
   writer.update_set(gpu_.device, material_data.resource_set);
+
+  if (material.constants.albedo_tex_index != unused_texture) {
+       material.constants.albedo_tex_index = texture_start;
+  }
+  if (material.constants.metal_rough_tex_index != unused_texture) {
+       material.constants.metal_rough_tex_index = texture_start + 1;
+  }
+  if (material.constants.normal_tex_index != unused_texture) {
+    material.constants.normal_tex_index = texture_start + 2;
+  }
+  if (material.constants.emissive_tex_index != unused_texture) {
+    material.constants.emissive_tex_index = texture_start + 3;
+  }
+  if (material.constants.occlusion_tex_index != unused_texture) {
+    material.constants.occlusion_tex_index = texture_start + 4;
+  }
+
 
   pbr_material::material_constants* mappedData;
   vmaMapMemory(gpu_.allocator, material_data.constants_buffer.allocation, (void**)&mappedData);

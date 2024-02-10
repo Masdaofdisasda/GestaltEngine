@@ -7,16 +7,15 @@ layout(set = 2, binding = 4) uniform sampler2D textures[];
 
 layout(std430, set = 3, binding = 5) readonly buffer MaterialConstants {
 
-    int albedo_tex_index;
-    int metal_rough_tex_index;
-    int normal_tex_index;
-    int emissive_tex_index;
-    int occlusion_tex_index;
+    uint albedo_tex_index;
+    uint metal_rough_tex_index;
+    uint normal_tex_index;
+    uint emissive_tex_index;
 
-    int texture_flags;
-
-	vec4 colorFactors;
-	vec2 metal_rough_factors;
-    vec3 emissiveFactor;
+    vec4 albedo_factor;
+    vec2 metal_rough_factor;
+    float occlusionStrength;
     float alpha_cutoff;
+    vec3 emissiveFactor;
+    uint occlusion_tex_index;
 } materialData[];
