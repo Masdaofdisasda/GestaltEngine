@@ -668,55 +668,41 @@ void resource_manager::load_and_process_cubemap(const std::string& file_path) {
       stbi_image_free((void*)img); 
     }
   } else {
-    // Load and process the original HDR file
     fmt::print("Loading HDR image from file: {}\n", file_path);
     int w, h, comp;
-    const float* img = stbi_loadf(file_path.c_str(), &w, &h, &comp, 3);
-    if (!img) {
+    float* original_img = stbi_loadf(file_path.c_str(), &w, &h, &comp, 3);
+    if (!original_img) {
       fmt::print("Failed to load image: {}\n", file_path);
       fflush(stdout);
       return;
     }
 
-    // Process the HDR image for both environment map and irradiance map
-    {
-      const int dstW = 1024;
-      const int dstH = 512;
-      std::vector<glm::vec3> out(dstW * dstH);
-      downsample_equirectangular_map((glm::vec3*)img, w, h, dstW, dstH, out.data());
-      stbi_write_hdr(env_file.c_str(), dstW, dstH, 3, (float*)out.data());
-      float* img = stbi_loadf(env_file.c_str(), &w, &h, &comp, 3);
-      std::vector<float> img32_env(w * h * 4);
-      float24to32(w, h, img, img32_env.data());
+    // Process the HDR image for the environment map
+    const int envDstW = 1024;
+    const int envDstH = 512;
+    std::vector<float> env_out(envDstW * envDstH * 3);  // Using float directly for simplicity
+    downsample_equirectangular_map((glm::vec3*)original_img, w, h, envDstW, envDstH,
+                                   (glm::vec3*)env_out.data());
+    stbi_write_hdr(env_file.c_str(), envDstW, envDstH, 3, env_out.data());
 
-      // Create environment map from HDR and save
-      fmt::print("Creating environment map from HDR\n");
-      ibl_data.environment_map = create_cubemap_from_HDR(img32_env, h, w);
-    }
+    std::vector<float> img32_env(envDstW * envDstH * 4);
+    float24to32(envDstW, envDstH, env_out.data(), img32_env.data());
+    ibl_data.environment_map = create_cubemap_from_HDR(img32_env, envDstH, envDstW);
 
-    // Convolution for irradiance map
-    fmt::print("Creating irradiance map from HDR\n");
-    const int dstW = 256;
-    const int dstH = 128;
-    std::vector<glm::vec3> out(dstW * dstH);
-    int numPoints = 1024;
-    convolveDiffuse((glm::vec3*)img, w, h, dstW, dstH, out.data(), numPoints);
-    stbi_image_free((void*)img);  // Free original HDR image memory
+    // Process the HDR image for the irradiance map
+    const int irrDstW = 256;
+    const int irrDstH = 128;
+    std::vector<float> irr_out(irrDstW * irrDstH * 3);  // Adjusted vector type
+    convolveDiffuse((glm::vec3*)original_img, w, h, irrDstW, irrDstH, (glm::vec3*)irr_out.data(),
+                    1024);
+    stbi_write_hdr(irr_file.c_str(), irrDstW, irrDstH, 3, irr_out.data());
 
-    // Save and reload irradiance map to ensure consistency
-    stbi_write_hdr(irr_file.c_str(), dstW, dstH, 3, (float*)out.data());
-    const float* filtered = stbi_loadf(irr_file.c_str(), &w, &h, &comp, 3);
-    if (!filtered) {
-      fmt::print("Failed to load image: {}\n", irr_file);
-      fflush(stdout);
-      return;
-    }
+    std::vector<float> img32_irr(irrDstW * irrDstH * 4);
+    float24to32(irrDstW, irrDstH, irr_out.data(), img32_irr.data());
+    ibl_data.environment_irradiance_map = create_cubemap_from_HDR(img32_irr, irrDstH, irrDstW);
 
-    std::vector<float> img32_irr(w * h * 4);
-    float24to32(w, h, filtered, img32_irr.data());
-    // Create irradiance map from HDR
-    ibl_data.environment_irradiance_map = create_cubemap_from_HDR(img32_irr, h, w);
-    stbi_image_free((void*)filtered);  // Free irradiance HDR image memory
+    // Cleanup
+    stbi_image_free(original_img);
 
   }
 
