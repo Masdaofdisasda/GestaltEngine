@@ -31,18 +31,6 @@ struct PBRInfo
 
 const float M_PI = 3.141592653589793;
 
-vec3 EnvBRDFApprox( //Todo
- vec3 specularColor, float roughness, float NoV )
-{
-  const vec4 c0 = vec4(-1, -0.0275, -0.572, 0.022);
-  const vec4 c1 = vec4( 1, 0.0425, 1.04, -0.04);
-  vec4 r = roughness * c0 + c1;
-  float a004 =
- min( r.x * r.x, exp2(-9.28 * NoV) ) * r.x + r.y;
-  vec2 AB = vec2( -1.04, 1.04 ) * a004 + r.zw;
-  return specularColor * AB.x + AB.y;
-}
-
 vec3 sRGBToLinear(vec3 color) {
     return mix(color / 12.92, pow((color + vec3(0.055)) / vec3(1.055), vec3(2.4)), step(vec3(0.04045), color));
 }
@@ -61,16 +49,13 @@ vec3 getIBLContribution(PBRInfo pbrInputs, vec3 n, vec3 reflection)
 	float lod = pbrInputs.perceptualRoughness * mipCount;
 	// retrieve a scale and bias to F0. See [1], Figure 3
 	vec2 brdfSamplePoint = clamp(vec2(pbrInputs.NdotV, 1.0-pbrInputs.perceptualRoughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
-	//vec3 brdf = textureLod(brdfLutTex, brdfSamplePoint, 0).rgb;
-	vec3 cm = vec3(1.0, 1.0, 1.0);
+	vec3 brdf = textureLod(texBdrfLut, brdfSamplePoint, 0).rgb;
 	// HDR envmaps are already linear
-	vec3 diffuseLight = texture(texEnvMapIrradiance, n.xyz * cm).rgb;
-	vec3 specularLight = textureLod(texEnvMap, reflection.xyz * cm, lod).rgb;
+	vec3 diffuseLight = texture(texEnvMapIrradiance, n.xyz).rgb;
+	vec3 specularLight = textureLod(texEnvMap, reflection.xyz, lod).rgb;
 
 	vec3 diffuse = diffuseLight * pbrInputs.diffuseColor;
-	//TODO vec3 specular = specularLight * (pbrInputs.specularColor * brdf.x + brdf.y);
-	vec3 specular = specularLight * EnvBRDFApprox(pbrInputs.specularColor, pbrInputs.perceptualRoughness, pbrInputs.NdotV);
-
+	vec3 specular = specularLight * (pbrInputs.specularColor * brdf.x + brdf.y);
 	return diffuse + specular ;
 }
 
@@ -311,11 +296,9 @@ void main() {
 		Kao = texture(nonuniformEXT(textures[occlusionIndex]), UV).r;
 	}
 	
-	vec4 MeR = vec4(Kao, 0.0, 0.0, 0.0);
+	vec4 MeR = vec4(Kao, materialData[nonuniformEXT(inMaterialIndex)].metal_rough_factor, 1.0);
 	if (metalicRoughIndex != uint(-1)) {
 		MeR = texture(nonuniformEXT(textures[metalicRoughIndex]), UV);
-	} else {
-		MeR = vec4(Kao, materialData[nonuniformEXT(inMaterialIndex)].metal_rough_factor, 1.0);
 	}
 
 

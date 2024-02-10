@@ -65,6 +65,7 @@ void resource_manager::init(const vk_gpu& gpu) {
       = descriptor_layout_builder()
             .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
             .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+            .add_binding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
             .build(gpu_.device);
 
   std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes
@@ -708,11 +709,15 @@ void resource_manager::load_and_process_cubemap(const std::string& file_path) {
   sampl.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
   vkCreateSampler(gpu_.device, &sampl, nullptr, &ibl_data.cube_map_sampler);
 
+  ibl_data.bdrfLUT = load_image("../../assets/bdrf_lut.png").value();
+
   writer.clear();
   writer.write_image(1, ibl_data.environment_map.imageView, ibl_data.cube_map_sampler,
                      VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.write_image(2, ibl_data.environment_irradiance_map.imageView, ibl_data.cube_map_sampler,
                      VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+  writer.write_image(3, ibl_data.bdrfLUT.imageView, get_database().default_material_.default_sampler_linear ,
+      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.update_set(gpu_.device, ibl_data.IblSet);
 }
 

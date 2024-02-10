@@ -93,8 +93,8 @@ struct pbr_material {
     uint32_t emissive_tex_index = unused_texture;
 
     glm::vec4 albedo_factor{1.f};
-    glm::vec2 metal_rough_factor = {1.f, 0.f}; // roughness, metallic
-    float occlusionStrength{0.f};
+    glm::vec2 metal_rough_factor = {.5f, 0.f}; // roughness, metallic
+    float occlusionStrength{1.f};
     float alpha_cutoff{0.f};
     glm::vec3 emissiveFactor{1.f};
     uint32_t occlusion_tex_index = unused_texture;

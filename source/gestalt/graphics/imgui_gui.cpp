@@ -324,6 +324,12 @@ void imgui_gui::show_scene_hierarchy_window() {
         if (ImGui::DragFloat3("Rotation", &euler.x, 0.1f)) {
           transform.rotation = glm::quat(euler);
         }
+        float uniform_scale
+            = (transform.scale.x + transform.scale.y + transform.scale.z)
+              / 3.0f;
+        if (ImGui::DragFloat("Uniform Scale", &uniform_scale, 0.1f)) {
+          transform.scale = glm::vec3(uniform_scale, uniform_scale, uniform_scale);
+        }
         ImGui::DragFloat3("Scale", &transform.scale.x, 0.1f);
         transform.is_dirty = true;
       }

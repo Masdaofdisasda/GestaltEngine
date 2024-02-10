@@ -305,11 +305,9 @@ void main() {
 		Kao = texture(nonuniformEXT(textures[occlusionIndex]), UV).r;
 	}
 	
-	vec4 MeR = vec4(Kao, 0.0, 0.0, 0.0);
+	vec4 MeR = vec4(Kao, materialData[nonuniformEXT(inMaterialIndex)].metal_rough_factor, 1.0);
 	if (metalicRoughIndex != uint(-1)) {
 		MeR = texture(nonuniformEXT(textures[metalicRoughIndex]), UV);
-	} else {
-		//MeR = vec4(Kao, materialData[nonuniformEXT(inMaterialIndex)].metal_rough_factor, 1.0);
 	}
 
 	PBRInfo pbrInputs;

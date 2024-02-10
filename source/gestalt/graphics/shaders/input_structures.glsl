@@ -1,7 +1,7 @@
 
 layout(set = 1, binding = 1) uniform samplerCube texEnvMap;
 layout(set = 1, binding = 2) uniform samplerCube texEnvMapIrradiance;
-//layout(set = 1, binding = 3) uniform samplerCube texBdrfLut;
+layout(set = 1, binding = 3) uniform sampler2D texBdrfLut;
 
 layout(set = 2, binding = 4) uniform sampler2D textures[];
 
