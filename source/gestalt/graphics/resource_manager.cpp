@@ -623,50 +623,42 @@ static void float24to32(int w, int h, const float* img24, float* img32) {
   }
 }
 
+void resource_manager::load_and_create_cubemap(const std::string& file_path, AllocatedImage& cubemap) {
+  int w, h, comp;
+  float* img = stbi_loadf(file_path.c_str(), &w, &h, &comp, 3);
+  if (!img) {
+    fmt::print("Failed to load image: {}\n", file_path);
+    fflush(stdout);
+  }
+
+  std::vector<float> img32(w * h * 4);
+  float24to32(w, h, img, img32.data());  // Convert HDR format as needed
+
+  cubemap
+      = create_cubemap_from_HDR(img32, h, w);  // Assume this function initializes cubemap correctly
+  stbi_image_free(img);
+}
 
 void resource_manager::load_and_process_cubemap(const std::string& file_path) {
-  std::string env_file = "../../assets/san_giuseppe_bridge_4k_environment.hdr";
-  std::string irr_file = "../../assets/san_giuseppe_bridge_4k_irradiance.hdr";
+
+  size_t lastDotIndex = file_path.find_last_of('.');
+  if (lastDotIndex == std::string::npos) {
+      fmt::print("Failed to find file extension in file path: {}\n", file_path);
+    return;
+  }
+  std::string base_path = file_path.substr(0, lastDotIndex);
+  std::string extension = file_path.substr(lastDotIndex);  // Includes the dot
+
+
+  std::string env_file = base_path + "_environment" + extension;
+  std::string irr_file = base_path + "_irradiance" + extension;
 
   if (std::filesystem::exists(env_file) && std::filesystem::exists(irr_file)) {
-    // load environment map
     fmt::print("Loading environment map from file: {}\n", env_file);
-    int w, h, comp;
-    float* img = stbi_loadf(env_file.c_str(), &w, &h, &comp, 3);
+    load_and_create_cubemap(env_file, ibl_data.environment_map);
 
-    if (!img) {
-      fmt::print("Failed to load image: {}\n", env_file);
-      fflush(stdout);
-      return;
-    }
-
-    {
-      std::vector<float> img32(w * h * 4);
-
-      float24to32(w, h, img, img32.data());
-
-      ibl_data.environment_map = create_cubemap_from_HDR(img32, h, w);
-      stbi_image_free((void*)img);
-    }
-
-    // load irradiance map
     fmt::print("Loading irradiance map from file: {}\n", irr_file);
-    img = stbi_loadf(irr_file.c_str(), &w, &h, &comp, 3);
-
-    if (!img) {
-      fmt::print("Failed to load image: {}\n", irr_file);
-      fflush(stdout);
-      return;
-    }
-
-    {
-      std::vector<float> img32(w * h * 4);
-
-      float24to32(w, h, img, img32.data());
-
-      ibl_data.environment_irradiance_map = create_cubemap_from_HDR(img32, h, w);
-      stbi_image_free((void*)img); 
-    }
+    load_and_create_cubemap(irr_file, ibl_data.environment_irradiance_map);
   } else {
     fmt::print("Loading HDR image from file: {}\n", file_path);
     int w, h, comp;

@@ -11,6 +11,7 @@ class resource_manager {
   std::unique_ptr<database> database_ = std::make_unique<database>();
 
 
+  void load_and_create_cubemap(const std::string& file_path, AllocatedImage& cubemap);
 public:
   gpu_mesh_buffers scene_geometry_;
 
