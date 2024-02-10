@@ -60,7 +60,7 @@ class hdr_pass final : public render_pass {
   double_buffered_frame_buffer hdr_buffer_;
   AllocatedImage streak_pattern;
 
-  uint32_t effect_size_ = 256;
+  uint32_t effect_size_ = 512;
 
   VkPushConstantRange push_constant_range{
       .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,

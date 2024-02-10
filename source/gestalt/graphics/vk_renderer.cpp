@@ -40,7 +40,7 @@ void vk_renderer::init(const vk_gpu& gpu, const sdl_window& window,
   
   per_frame_data_.ambientColor = glm::vec4(0.1f);
   per_frame_data_.sunlightColor = glm::vec4(1.f);
-  per_frame_data_.sunlightDirection = glm::vec4(0.1, 0.5, 0.1, 1.5f);
+  per_frame_data_.sunlightDirection = glm::vec4(0.1, 0.5, 0.1, 20.f);
 
   for (int i = 0; i < FRAME_OVERLAP; i++) {
     // create a descriptor pool

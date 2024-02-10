@@ -22,8 +22,8 @@ const vec4 gaussFilter[11] = vec4[11](
 
 void main()
 {
-	const float texScaler =  2.0 / 256.0;
-	const float texOffset = -0.5 / 256.0;
+	const float texScaler =  2.0 / 512.0;
+	const float texOffset = -0.5 / 512.0;
 
 	vec4 Color = vec4( 0.0, 0.0, 0.0, 0.0 );
 	for ( int i = 0; i < 11; i++ )

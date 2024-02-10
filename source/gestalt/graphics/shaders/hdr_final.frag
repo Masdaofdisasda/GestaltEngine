@@ -96,17 +96,22 @@ vec3 ApplyLiftGammaGain(vec3 color, vec3 lift, vec3 gamma, vec3 gain) {
     return color;
 }
 
+vec3 linearToSrgb(vec3 linearColor) {
+    return mix(12.92 * linearColor, 1.055 * pow(linearColor, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, linearColor));
+}
+
+
 void main() {
     vec3 sceneColor = texture(texScene, uv).rgb;
     vec3 bloomColor = texture(texBloom, uv).rgb * params.bloomStrength;
 
-    if (params.showBloom) {
-        outColor = vec4(bloomColor, 1.0);
-        return;
-    }
-
-    // Apply exposure to scene color
     sceneColor *= params.exposure;
+
+    if (params.showBloom) {
+        sceneColor = bloomColor;
+    } else {
+		sceneColor += bloomColor;
+	}
 
     // Tone mapping
     if (params.toneMappingOption == 0) {
@@ -122,8 +127,7 @@ void main() {
     // Color grading
     sceneColor = ApplyLiftGammaGain(sceneColor, params.lift.rgb, params.gamma.rgb, params.gain.rgb);
 
-    // Combine scene color with bloom
-    vec3 finalColor = sceneColor + bloomColor;
-
+    vec3 finalColor = linearToSrgb(sceneColor);
     outColor = vec4(finalColor, 1.0);
+
 }

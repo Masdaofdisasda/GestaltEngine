@@ -195,7 +195,7 @@ struct render_config {
   struct hdr_params {
     float exposure{1.f};
     float maxWhite{1.35f};
-    float bloomStrength{0.25f};
+    float bloomStrength{0.1f};
     float adaptationSpeed{1.f};
     glm::vec4 lift{0.f};
     glm::vec4 gamma{1.f};

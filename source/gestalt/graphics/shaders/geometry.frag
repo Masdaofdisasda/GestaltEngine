@@ -291,7 +291,7 @@ void main() {
 		Ke.rgb = sRGBToLinear(Ke.rgb);
 	}
 
-	float Kao = 0.0;
+	float Kao = 1.0;
 	if (occlusionIndex != uint(-1)) {
 		Kao = texture(nonuniformEXT(textures[occlusionIndex]), UV).r;
 	}
@@ -307,7 +307,7 @@ void main() {
 	vec3 color = vec3(0.0);
 
 	// IBL contribution
-	color = calculatePBRInputsMetallicRoughness(Kd, n, viewPos.xyz, inPosition, MeR, pbrInputs);
+	color = calculatePBRInputsMetallicRoughness(Kd, n, viewPos.xyz, inPosition, MeR, pbrInputs) * Kao;
 
 	// directional light contribution
 	color *= calculatePBRLightContributionDir(pbrInputs);
@@ -315,8 +315,7 @@ void main() {
 	
   	color += calculatePBRLightContributionPoint(pbrInputs);
 
-	color = color * (Kao < 0.01 ? 1.0 : Kao);
-	color = pow(Ke.rgb + color, vec3(1.0/2.2) ) ;
+	color += Ke.rgb;
 
     outFragColor = vec4(color, 1.0);
 }
