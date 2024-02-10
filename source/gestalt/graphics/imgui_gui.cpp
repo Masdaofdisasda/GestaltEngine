@@ -255,7 +255,7 @@ void imgui_gui::render_settings() {
 }
 
 
-void imgui_gui::display_scene_hierarchy(const entity_component& node) {
+void imgui_gui::display_scene_hierarchy(entity_component& node) {
   if (node.is_valid()) {
 
     ImGuiTreeNodeFlags node_flags = ImGuiTreeNodeFlags_OpenOnArrow;
@@ -266,15 +266,24 @@ void imgui_gui::display_scene_hierarchy(const entity_component& node) {
     }
 
     // Check if the node is the selected node
-    if (node.entity == selected_node_.entity) {
+    if (node.entity == selected_node_->entity) {
       node_flags |= ImGuiTreeNodeFlags_Selected;
     }
 
+    ImGui::PushID(node.entity);
+
     bool node_open = ImGui::TreeNodeEx(node.name.c_str(), node_flags);
+
+    // Render checkbox next to the node name
+    ImGui::SameLine();
+    ImGui::Checkbox("visible", &node.visible);
+
+    // Pop ID to avoid conflicts with other elements
+    ImGui::PopID();
 
     // Check for item selection
     if (ImGui::IsItemClicked()) {
-        selected_node_ = node;
+        selected_node_ = &node;
     }
 
     // Recursively display children if the node is open
@@ -293,10 +302,11 @@ void imgui_gui::show_scene_hierarchy_window() {
 
   // Child window for the scrollable scene hierarchy
   if (ImGui::BeginChild("HierarchyTree", childSize, true)) {
-    const entity_component& root = actions_.get_scene_root();
-    for (const auto child_entity : root.children) {
-      display_scene_hierarchy(actions_.get_scene_object(child_entity));
+    entity_component& root = actions_.get_scene_root();
+    if (selected_node_ == nullptr) {
+      selected_node_ = &root;
     }
+    display_scene_hierarchy(actions_.get_scene_object(root.entity));
   }
   ImGui::EndChild();
 
@@ -304,11 +314,11 @@ void imgui_gui::show_scene_hierarchy_window() {
 
   childSize = ImVec2(0, windowAvail.y - childSize.y);  // Remaining space for the selected node
   if (ImGui::BeginChild("SelectedNodeDetails", childSize, false)) {
-    if (selected_node_.is_valid()) {
-      ImGui::Text(selected_node_.name.c_str());
+    if (selected_node_->is_valid()) {
+      ImGui::Text(selected_node_->name.c_str());
 
       if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_None)) {
-        auto& transform = actions_.get_transform_component(selected_node_.transform);
+        auto& transform = actions_.get_transform_component(selected_node_->transform);
         ImGui::DragFloat3("Position", &transform.position.x, 0.1f);
         glm::vec3 euler = eulerAngles(transform.rotation);
         if (ImGui::DragFloat3("Rotation", &euler.x, 0.1f)) {
@@ -317,9 +327,9 @@ void imgui_gui::show_scene_hierarchy_window() {
         ImGui::DragFloat3("Scale", &transform.scale.x, 0.1f);
         transform.is_dirty = true;
       }
-      if (selected_node_.has_mesh()) {
+      if (selected_node_->has_mesh()) {
         if (ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_None)) {
-          auto& mesh = actions_.get_mesh_component(selected_node_.mesh);
+          auto& mesh = actions_.get_mesh_component(selected_node_->mesh);
           for (auto surface_index : mesh.surfaces) {
             auto& surface = actions_.get_surface(surface_index);
             auto& material = actions_.get_material(surface.material);

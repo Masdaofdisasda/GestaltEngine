@@ -11,6 +11,10 @@
 void scene_manager::init(const vk_gpu& gpu,const std::shared_ptr <resource_manager>& resource_manager) {
   gpu_ = gpu;
   resource_manager_ = resource_manager;
+
+  scene_graph_.reserve(1000);
+  get_scene_object_by_entity(create_entity().entity).value().get().name = "root";
+
   asset_loader_->init(gpu_, resource_manager_);
 
   resource_manager_->init_default_data();
@@ -18,8 +22,8 @@ void scene_manager::init(const vk_gpu& gpu,const std::shared_ptr <resource_manag
   size_t mesh_offset = resource_manager_->get_database().get_meshes_size();
 
   //load_scene_from_gltf(R"(..\..\assets\Models\MetalRoughSpheres\glTF-Binary\MetalRoughSpheres.glb)");
-  const auto nodes = asset_loader_->load_scene_from_gltf(R"(..\..\assets\sponza_pestana.glb)");
-  //const auto nodes = asset_loader_->load_scene_from_gltf(R"(..\..\assets\awesome-3d-meshes\McGuire\Amazon Lumberyard Bistro\gltf\Bistro.glb)");
+  //const auto nodes = asset_loader_->load_scene_from_gltf(R"(..\..\assets\sponza_pestana.glb)");
+  const auto nodes = asset_loader_->load_scene_from_gltf(R"(..\..\assets\awesome-3d-meshes\McGuire\Amazon Lumberyard Bistro\gltf\Bistro.glb)");
   //load_scene_from_gltf(R"(..\..\assets\structure.glb)");
 
   build_scene_graph(nodes, mesh_offset);
@@ -52,7 +56,7 @@ void scene_manager::build_hierarchy(std::vector<fastgltf::Node> nodes, const siz
     auto& scene_object = get_scene_object_by_entity(node_offset + i).value().get();
 
     for (auto& c : node.children) {
-      auto child = get_scene_object_by_entity(node_offset + c).value().get();
+      auto& child = get_scene_object_by_entity(node_offset + c).value().get();
       scene_object.children.push_back(child.entity);
       child.parent = scene_object.entity;
     }
@@ -61,8 +65,13 @@ void scene_manager::build_hierarchy(std::vector<fastgltf::Node> nodes, const siz
 
 void scene_manager::link_orphans_to_root() {
   for (auto& node : scene_graph_) {
+    if (node.entity == get_root().entity) {
+           continue;
+    }
+
     if (node.parent == invalid_entity) {
-      root_.children.push_back(node.entity);
+           get_root().children.push_back(node.entity);
+           node.parent = get_root().entity;
     }
   }
 }
@@ -154,15 +163,18 @@ const std::vector<entity>& scene_manager::get_children(entity entity) {
 
 void scene_manager::update_scene(draw_context& draw_context) {
   constexpr glm::mat4 identity = glm::mat4(1.0f);
-  for (const auto& root_node_entity : root_.children) {
-    traverse_scene(root_node_entity, identity, draw_context);
-  }
-}
+
+  traverse_scene(get_root().entity, identity, draw_context);
+ }
 
 void scene_manager::traverse_scene(const entity entity, const glm::mat4& parent_transform,
                                       draw_context& draw_context) {
   assert(entity != invalid_entity);
   const auto& object = get_scene_object_by_entity(entity).value().get();
+  if (!object.visible) {
+    return;
+  }
+
   const auto& transform = resource_manager_->get_database().get_transform(object.transform);
   if (transform.is_dirty) {
 
@@ -176,6 +188,7 @@ void scene_manager::traverse_scene(const entity entity, const glm::mat4& parent_
 
     for (const auto surface_index : mesh.surfaces) {
       const auto& surface = resource_manager_->get_database().get_surface(surface_index);
+
       const auto& material = resource_manager_->get_database().get_material(surface.material);
 
       render_object def;

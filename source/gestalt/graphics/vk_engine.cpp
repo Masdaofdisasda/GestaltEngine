@@ -65,7 +65,7 @@ void render_engine::register_gui_actions() {
   gui_actions_.get_stats = [this]() -> engine_stats& { return stats_; };
   gui_actions_.get_scene_data = [this]() -> per_frame_data& { return renderer_->per_frame_data_; };
   gui_actions_.get_scene_root
-      = [this]() -> const entity_component& { return scene_manager_->get_root(); };
+      = [this]() -> entity_component& { return scene_manager_->get_root(); };
   gui_actions_.get_scene_object = [this](const entity entity) -> entity_component& {
     return scene_manager_->get_scene_object_by_entity(entity).value();
   };

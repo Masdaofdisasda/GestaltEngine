@@ -155,6 +155,8 @@ struct entity_component {
   size_t camera = no_component;
   size_t light = no_component;
 
+  bool visible{true};
+
   bool is_valid() const { return entity != invalid_entity; }
   bool has_mesh() const { return mesh != no_component; }
 };

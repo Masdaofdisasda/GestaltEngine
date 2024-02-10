@@ -14,13 +14,13 @@ class imgui_gui {
   gui_actions actions_;
   vk_deletion_service deletion_service_ = {};
 
-  entity_component selected_node_;
+  entity_component* selected_node_ = nullptr;
 
   void menu_bar();
   void stats();
   void lights();
   void scene_graph();
-  void display_scene_hierarchy(const entity_component& node);
+  void display_scene_hierarchy(entity_component& node);
   void show_scene_hierarchy_window();
   void render_settings();
 

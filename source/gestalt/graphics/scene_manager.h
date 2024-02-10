@@ -22,9 +22,6 @@ class scene_manager {
   void link_orphans_to_root();
 
   std::vector<entity_component> scene_graph_;
-  entity_component root_ = {"root", invalid_entity, {}, invalid_entity};
-
-  // Next available entity ID
   entity next_entity_id_ = 0;
 
 public:
@@ -45,7 +42,7 @@ public:
                                const glm::quat& rotation = glm::quat(0.f, 0.f, 0.f, 0.f),
                                const glm::vec3& scale = glm::vec3(1.f));
 
-  const entity_component& get_root() { return root_; } //TODO add to scene graph
+  entity_component& get_root() { return scene_graph_.front(); }
   const std::vector<entity>& get_children(entity entity);
   std::optional<std::reference_wrapper<entity_component>> get_scene_object_by_entity(entity entity);
 };
