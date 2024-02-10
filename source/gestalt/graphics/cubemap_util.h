@@ -106,5 +106,7 @@ inline Bitmap convertEquirectangularMapToCubeMapFaces(const Bitmap& b) {
   return convertVerticalCrossToCubeMapFaces(convertEquirectangularMapToVerticalCross(b));
 }
 
+void downsample_equirectangular_map(const glm::vec3* data, int srcW, int srcH, int dstW, int dstH,
+                                    glm::vec3* output);
 void convolveDiffuse(const glm::vec3* data, int srcW, int srcH, int dstW, int dstH,
                      glm::vec3* output, int numMonteCarloSamples);

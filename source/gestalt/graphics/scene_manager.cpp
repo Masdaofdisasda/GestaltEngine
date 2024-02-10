@@ -22,8 +22,8 @@ void scene_manager::init(const vk_gpu& gpu,const std::shared_ptr <resource_manag
   size_t mesh_offset = resource_manager_->get_database().get_meshes_size();
 
   //const auto nodes = asset_loader_->load_scene_from_gltf(R"(..\..\assets\Models\MetalRoughSpheres\glTF-Binary\MetalRoughSpheres.glb)");
-  const auto nodes = asset_loader_->load_scene_from_gltf(R"(..\..\assets\Models\MetalRoughSpheresNoTextures\glTF-Binary\MetalRoughSpheresNoTextures.glb)");
-  //const auto nodes = asset_loader_->load_scene_from_gltf(R"(..\..\assets\sponza_pestana.glb)");
+  //const auto nodes = asset_loader_->load_scene_from_gltf(R"(..\..\assets\Models\MetalRoughSpheresNoTextures\glTF-Binary\MetalRoughSpheresNoTextures.glb)");
+  const auto nodes = asset_loader_->load_scene_from_gltf(R"(..\..\assets\sponza_pestana.glb)");
   //const auto nodes = asset_loader_->load_scene_from_gltf(R"(..\..\assets\Models\DamagedHelmet\glTF-Binary\DamagedHelmet.glb)");
   //const auto nodes = asset_loader_->load_scene_from_gltf(R"(..\..\assets\awesome-3d-meshes\McGuire\Amazon Lumberyard Bistro\gltf\Bistro.glb)");
   //const auto nodes = asset_loader_->load_scene_from_gltf(R"(..\..\assets\structure.glb)");

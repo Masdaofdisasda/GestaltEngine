@@ -335,5 +335,5 @@ void main() {
 	color = color * (Kao < 0.01 ? 1.0 : Kao);
 	color = pow(Ke.rgb + color, vec3(1.0/2.2) ) ;
 
-    outFragColor = vec4(vec3(1.0), 1.0);
+    outFragColor = vec4(color, 1.0);
 }

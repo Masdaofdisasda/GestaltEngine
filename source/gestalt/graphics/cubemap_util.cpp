@@ -43,6 +43,19 @@ vec2 hammersley2d(uint32_t i, uint32_t N) {
   return vec2(float(i) / float(N), radicalInverse_VdC(i));
 }
 
+void downsample_equirectangular_map(const vec3* data, int srcW, int srcH, int dstW, int dstH,
+                                  vec3* output) {
+  // only equirectangular maps are supported
+  assert(srcW == 2 * srcH);
+
+  if (srcW != 2 * srcH) return;
+
+  stbir_resize(reinterpret_cast<const float*>(data), srcW, srcH, 0,
+               reinterpret_cast<float*>(output), dstW, dstH, 0, STBIR_RGB, STBIR_TYPE_FLOAT,
+               STBIR_EDGE_CLAMP, STBIR_FILTER_CUBICBSPLINE);
+}
+
+
 void convolveDiffuse(const vec3* data, int srcW, int srcH, int dstW, int dstH, vec3* output,
                      int numMonteCarloSamples) {
   // only equirectangular maps are supported

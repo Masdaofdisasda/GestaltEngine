@@ -623,51 +623,104 @@ static void float24to32(int w, int h, const float* img24, float* img32) {
   }
 }
 
+
 void resource_manager::load_and_process_cubemap(const std::string& file_path) {
-  int w, h, comp;
-  const float* img = stbi_loadf(file_path.c_str(), &w, &h, &comp, 3);
+  std::string env_file = "../../assets/san_giuseppe_bridge_4k_environment.hdr";
+  std::string irr_file = "../../assets/san_giuseppe_bridge_4k_irradiance.hdr";
 
-  if (!img) {
+  if (std::filesystem::exists(env_file) && std::filesystem::exists(irr_file)) {
+    // load environment map
+    fmt::print("Loading environment map from file: {}\n", env_file);
+    int w, h, comp;
+    float* img = stbi_loadf(env_file.c_str(), &w, &h, &comp, 3);
+
+    if (!img) {
+      fmt::print("Failed to load image: {}\n", env_file);
+      fflush(stdout);
+      return;
+    }
+
+    {
+      std::vector<float> img32(w * h * 4);
+
+      float24to32(w, h, img, img32.data());
+
+      ibl_data.environment_map = create_cubemap_from_HDR(img32, h, w);
+      stbi_image_free((void*)img);
+    }
+
+    // load irradiance map
+    fmt::print("Loading irradiance map from file: {}\n", irr_file);
+    img = stbi_loadf(irr_file.c_str(), &w, &h, &comp, 3);
+
+    if (!img) {
+      fmt::print("Failed to load image: {}\n", irr_file);
+      fflush(stdout);
+      return;
+    }
+
+    {
+      std::vector<float> img32(w * h * 4);
+
+      float24to32(w, h, img, img32.data());
+
+      ibl_data.environment_irradiance_map = create_cubemap_from_HDR(img32, h, w);
+      stbi_image_free((void*)img); 
+    }
+  } else {
+    // Load and process the original HDR file
+    fmt::print("Loading HDR image from file: {}\n", file_path);
+    int w, h, comp;
+    const float* img = stbi_loadf(file_path.c_str(), &w, &h, &comp, 3);
+    if (!img) {
       fmt::print("Failed to load image: {}\n", file_path);
-    fflush(stdout);
-    return;
+      fflush(stdout);
+      return;
+    }
+
+    // Process the HDR image for both environment map and irradiance map
+    {
+      const int dstW = 1024;
+      const int dstH = 512;
+      std::vector<glm::vec3> out(dstW * dstH);
+      downsample_equirectangular_map((glm::vec3*)img, w, h, dstW, dstH, out.data());
+      stbi_write_hdr(env_file.c_str(), dstW, dstH, 3, (float*)out.data());
+      float* img = stbi_loadf(env_file.c_str(), &w, &h, &comp, 3);
+      std::vector<float> img32_env(w * h * 4);
+      float24to32(w, h, img, img32_env.data());
+
+      // Create environment map from HDR and save
+      fmt::print("Creating environment map from HDR\n");
+      ibl_data.environment_map = create_cubemap_from_HDR(img32_env, h, w);
+    }
+
+    // Convolution for irradiance map
+    fmt::print("Creating irradiance map from HDR\n");
+    const int dstW = 256;
+    const int dstH = 128;
+    std::vector<glm::vec3> out(dstW * dstH);
+    int numPoints = 1024;
+    convolveDiffuse((glm::vec3*)img, w, h, dstW, dstH, out.data(), numPoints);
+    stbi_image_free((void*)img);  // Free original HDR image memory
+
+    // Save and reload irradiance map to ensure consistency
+    stbi_write_hdr(irr_file.c_str(), dstW, dstH, 3, (float*)out.data());
+    const float* filtered = stbi_loadf(irr_file.c_str(), &w, &h, &comp, 3);
+    if (!filtered) {
+      fmt::print("Failed to load image: {}\n", irr_file);
+      fflush(stdout);
+      return;
+    }
+
+    std::vector<float> img32_irr(w * h * 4);
+    float24to32(w, h, filtered, img32_irr.data());
+    // Create irradiance map from HDR
+    ibl_data.environment_irradiance_map = create_cubemap_from_HDR(img32_irr, h, w);
+    stbi_image_free((void*)filtered);  // Free irradiance HDR image memory
+
   }
-  /*
-  {
-    std::vector<float> img32(w * h * 4);
 
-    float24to32(w, h, img, img32.data());
-
-    ibl_data.environment_map = create_cubemap_from_HDR(img32, h, w);
-  }*/
-
-  //TODO bdrf convolution
-
-  const int dstW = 256;
-  const int dstH = 128;
-
-  std::vector<glm::vec3> out(dstW * dstH);
-
-  int numPoints = 1024;
-  convolveDiffuse((glm::vec3*)img, w, h, dstW, dstH, out.data(), numPoints);
-
-  stbi_image_free((void*)img);
-  stbi_write_hdr("../../assets/filtered.hdr", dstW, dstH, 3, (float*)out.data());
-
-  const float* filtered = stbi_loadf("../../assets/filtered.hdr", &w, &h, &comp, 3);
-  std::vector<float> img32(w * h * 4);
-
-  float24to32(w, h, filtered, img32.data());
-
-  if (!filtered) {
-    fmt::print("Failed to load image: {}\n", "../../assets/filtered.hdr");
-    fflush(stdout);
-  }
-
-  stbi_image_free((void*)filtered);
-
-  ibl_data.environment_irradiance_map = create_cubemap_from_HDR(img32, h, w);
-  ibl_data.environment_map = ibl_data.environment_irradiance_map;
+  // Update the sampler and descriptor set for both maps
 
   VkSamplerCreateInfo sampl = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO, .pNext = nullptr};
   sampl.maxLod = VK_LOD_CLAMP_NONE;
@@ -681,8 +734,7 @@ void resource_manager::load_and_process_cubemap(const std::string& file_path) {
   writer.write_image(1, ibl_data.environment_map.imageView, ibl_data.cube_map_sampler,
                      VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.write_image(2, ibl_data.environment_irradiance_map.imageView, ibl_data.cube_map_sampler,
-                     VK_IMAGE_LAYOUT_GENERAL,
-                     VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+                     VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.update_set(gpu_.device, ibl_data.IblSet);
 }
 
