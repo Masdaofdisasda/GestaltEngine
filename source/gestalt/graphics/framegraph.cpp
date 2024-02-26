@@ -4,6 +4,7 @@
 #include <unordered_set>
 
 #include "geometry_pass.h"
+#include "transparent_pass.h"
 #include "vk_images.h"
 #include "vk_initializers.h"
 
@@ -21,6 +22,7 @@ void frame_graph::init(const vk_gpu& gpu, const sdl_window& window,
 
   render_passes_.push_back(std::make_unique<skybox_shader>());
   render_passes_.push_back(std::make_unique<geometry_shader>());
+  render_passes_.push_back(std::make_unique<transparent_shader>());
 
   create_resorces();
   // the shader pipelines need acccess to their resources to be created
@@ -322,7 +324,7 @@ void frame_graph::execute_passes() {
 
   vmaUnmapMemory(gpu_.allocator, resource_manager_->per_frame_data_buffer.allocation);
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_opaque_color");
+  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_transparent_color");
 
   vkutil::transition_image(cmd, color_image->image, color_image->currentLayout,
                            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -347,7 +349,9 @@ void frame_graph::execute_passes() {
 }
 
 void frame_graph::cleanup() {
-  // Clean up all the passes.
+  for (auto& pass : render_passes_) {
+    pass->cleanup();
+  }
 }
 
 void frame_graph::present(VkCommandBuffer cmd) {

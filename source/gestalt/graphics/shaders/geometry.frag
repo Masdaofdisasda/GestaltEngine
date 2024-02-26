@@ -317,5 +317,5 @@ void main() {
 
 	color += Ke.rgb;
 
-    outFragColor = vec4(n, 1.0);
+    outFragColor = vec4(n, 1.0); //TODO
 }
