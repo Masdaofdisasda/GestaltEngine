@@ -4,6 +4,7 @@
 #include <unordered_set>
 
 #include "geometry_pass.h"
+#include "ssao_pass.h"
 #include "transparent_pass.h"
 #include "vk_images.h"
 #include "vk_initializers.h"
@@ -23,8 +24,24 @@ void frame_graph::init(const vk_gpu& gpu, const sdl_window& window,
   render_passes_.push_back(std::make_unique<skybox_shader>());
   render_passes_.push_back(std::make_unique<geometry_shader>());
   render_passes_.push_back(std::make_unique<transparent_shader>());
+  render_passes_.push_back(std::make_unique<ssao_filter_shader>());
+  render_passes_.push_back(std::make_unique<ssao_blur_shader>());
+  render_passes_.push_back(std::make_unique<ssao_final_shader>());
 
-  create_resorces();
+  for (int i = 0; i < FRAME_OVERLAP; i++) {
+    // create a descriptor pool
+    std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> frame_sizes = {
+        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3},
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3},
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3},
+        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4},
+    };
+
+    frames_[i].descriptor_pool = DescriptorAllocatorGrowable{};
+    frames_[i].descriptor_pool.init(gpu_.device, 1000, frame_sizes);
+  }
+
+  create_resources();
   // the shader pipelines need acccess to their resources to be created
   resource_manager_->direct_original_mapping = direct_original_mapping_;
 
@@ -88,7 +105,7 @@ void frame_graph::calculate_resource_transform() {
   }
 }
 
-void frame_graph::create_resorces() {
+void frame_graph::create_resources() {
 
   for (auto [original, final] : resource_pairs_) {
     resource_manager_->update_resource_id(final, original);
@@ -252,6 +269,7 @@ void frame_graph::execute(size_t id, VkCommandBuffer cmd) {
     }
   }
 
+  fmt::print("Executing pass {}\n", id);
   render_passes_[id]->execute(cmd);
 
   for (const auto& writes = render_passes_[id]->get_dependencies().write_resources;
@@ -268,6 +286,7 @@ bool frame_graph::acquire_next_image() {
   VK_CHECK(vkWaitForFences(gpu_.device, 1, &get_current_frame().render_fence, true, 1000000000));
 
   get_current_frame().descriptor_pool.clear_pools(gpu_.device);
+  resource_manager_->descriptor_pool = &get_current_frame().descriptor_pool;
 
   VkResult e = vkAcquireNextImageKHR(gpu_.device, swapchain_->swapchain, 1000000000,
                                      get_current_frame().swapchain_semaphore, nullptr,
@@ -294,7 +313,7 @@ VkCommandBuffer frame_graph::start_draw() {
 }
 
 void frame_graph::execute_passes() {
-  create_resorces();
+  create_resources();
 
   build_graph();
 
@@ -324,7 +343,7 @@ void frame_graph::execute_passes() {
 
   vmaUnmapMemory(gpu_.allocator, resource_manager_->per_frame_data_buffer.allocation);
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_transparent_color");
+  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_ssao");
 
   vkutil::transition_image(cmd, color_image->image, color_image->currentLayout,
                            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);

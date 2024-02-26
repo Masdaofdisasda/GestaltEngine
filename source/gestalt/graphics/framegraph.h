@@ -57,7 +57,7 @@ public:
             imgui_gui);
   std::string get_final_transformation(const std::string& original);
   void calculate_resource_transform();
-  void create_resorces();
+  void create_resources();
 
   void execute_passes();
 

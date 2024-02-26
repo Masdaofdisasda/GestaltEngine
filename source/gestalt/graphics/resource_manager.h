@@ -65,7 +65,9 @@ public:
   return true;
   }
 
-  DescriptorAllocatorGrowable descriptorPool;
+  DescriptorAllocatorGrowable* descriptor_pool;
+
+  DescriptorAllocatorGrowable descriptorPool; //TODO hide this
   descriptor_writer writer;
 
   database& get_database() const { return *database_; }
