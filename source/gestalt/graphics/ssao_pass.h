@@ -4,7 +4,7 @@
 #include "render_pass.h"
 #include "vk_descriptors.h"
 
-class ssao_filter_shader final : public shader_pass {
+class ssao_filter_pass final : public render_pass {
   std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
   std::string fragment_shader_source_ = "../shaders/ssao_filter.frag.spv";
 
@@ -52,7 +52,7 @@ public:
   shader_pass_dependency_info& get_dependencies() override { return deps_; }
 };
 
-class ssao_blur_shader final : public shader_pass {
+class ssao_blur_pass final : public render_pass {
   std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
   std::string fragment_blur_x = "../shaders/ssao_blur_x.frag.spv";
   std::string fragment_blur_y = "../shaders/ssao_blur_y.frag.spv";
@@ -97,7 +97,7 @@ public:
   shader_pass_dependency_info& get_dependencies() override { return deps_; }
 };
 
-class ssao_final_shader final : public shader_pass {
+class ssao_final_pass final : public render_pass {
   std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
   std::string fragment_shader_source_ = "../shaders/ssao_final.frag.spv";
 

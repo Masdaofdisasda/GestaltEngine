@@ -5,7 +5,7 @@
 
 #include "render_pass.h"
 
-class geometry_shader final : public shader_pass {
+class geometry_pass final : public render_pass {
   std::string vertex_shader_source_ = "../shaders/geometry.vert.spv";
   std::string fragment_shader_source_ = "../shaders/geometry.frag.spv";
 
@@ -27,7 +27,7 @@ public:
   shader_pass_dependency_info& get_dependencies() override { return deps_; }
 };
 
-class transparent_shader final : public shader_pass {
+class transparent_pass final : public render_pass {
   std::string vertex_shader_source_ = "../shaders/geometry.vert.spv";
   std::string fragment_shader_source_ = "../shaders/transparent.frag.spv";
 

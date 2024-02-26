@@ -4,7 +4,7 @@
 #include "vk_initializers.h"
 #include "vk_pipelines.h"
 
-void geometry_shader::prepare() {
+void geometry_pass::prepare() {
 
   descriptor_layouts_.push_back(resource_manager_->per_frame_data_layout);
   descriptor_layouts_.push_back(resource_manager_->ibl_data.IblLayout);
@@ -51,11 +51,11 @@ void geometry_shader::prepare() {
   vkDestroyShaderModule(gpu_.device, meshVertexShader, nullptr);
 }
 
-void geometry_shader::cleanup() {
+void geometry_pass::cleanup() {
   vkDestroyPipeline(gpu_.device, pipeline_, nullptr);
 }
 
-void geometry_shader::execute(VkCommandBuffer cmd) {
+void geometry_pass::execute(VkCommandBuffer cmd) {
   const auto color_image = resource_manager_->get_resource<AllocatedImage>("skybox_color");
   const auto depth_image = resource_manager_->get_resource<AllocatedImage>("skybox_depth");
 
@@ -135,7 +135,7 @@ void geometry_shader::execute(VkCommandBuffer cmd) {
 
   vkCmdEndRendering(cmd);
 }
-void transparent_shader::prepare() {
+void transparent_pass::prepare() {
   descriptor_layouts_.push_back(resource_manager_->per_frame_data_layout);
   descriptor_layouts_.push_back(resource_manager_->ibl_data.IblLayout);
   descriptor_layouts_.push_back(resource_manager_->material_data.resource_layout);
@@ -180,7 +180,7 @@ void transparent_shader::prepare() {
   vkDestroyShaderModule(gpu_.device, meshVertexShader, nullptr);
 }
 
-void transparent_shader::execute(VkCommandBuffer cmd) {
+void transparent_pass::execute(VkCommandBuffer cmd) {
   const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_opaque_color");
   const auto depth_image = resource_manager_->get_resource<AllocatedImage>("scene_opaque_depth");
 
@@ -254,4 +254,4 @@ void transparent_shader::execute(VkCommandBuffer cmd) {
   vkCmdEndRendering(cmd);
 }
 
-void transparent_shader::cleanup() { vkDestroyPipeline(gpu_.device, pipeline_, nullptr); }
+void transparent_pass::cleanup() { vkDestroyPipeline(gpu_.device, pipeline_, nullptr); }

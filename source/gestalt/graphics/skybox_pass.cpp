@@ -4,7 +4,7 @@
 #include "vk_initializers.h"
 #include "vk_pipelines.h"
 
-void skybox_shader::prepare() {
+void skybox_pass::prepare() {
 
   descriptor_layouts_.push_back(resource_manager_->per_frame_data_layout);
   descriptor_layouts_.push_back(resource_manager_->ibl_data.IblLayout);
@@ -45,7 +45,7 @@ void skybox_shader::prepare() {
   vkDestroyShaderModule(gpu_.device, fragment_shader, nullptr);
 }
 
-void skybox_shader::execute(const VkCommandBuffer cmd) {
+void skybox_pass::execute(const VkCommandBuffer cmd) {
   const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_color");
   const auto depth_image = resource_manager_->get_resource<AllocatedImage>("scene_depth");
 
@@ -103,7 +103,7 @@ void skybox_shader::execute(const VkCommandBuffer cmd) {
   vkCmdEndRendering(cmd);
 }
 
-void skybox_shader::cleanup() {
+void skybox_pass::cleanup() {
   vkDestroyPipelineLayout(gpu_.device, pipeline_layout_, nullptr);
   vkDestroyPipeline(gpu_.device, pipeline_, nullptr);
 }

@@ -6,7 +6,7 @@
 #include "render_pass.h"
 #include "resource_manager.h"
 
-class skybox_shader final : public shader_pass {
+class skybox_pass final : public render_pass {
   std::string vertex_shader_source_ = "../shaders/skybox.vert.spv";
   std::string fragment_shader_source_ = "../shaders/skybox.frag.spv";
 

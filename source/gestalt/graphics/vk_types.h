@@ -204,6 +204,13 @@ struct render_config {
     int toneMappingOption{2};
   } hdr{};
 
+  struct streaks_params {
+    float intensity{1.f};
+    float attenuation{0.5f};
+    int streak_samples{7};
+    int num_streaks{4};
+  } streaks{};
+
   bool enable_shadows{true};
   // todo : more settings
 };

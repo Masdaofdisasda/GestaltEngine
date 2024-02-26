@@ -3,6 +3,7 @@
 #include "vk_types.h"
 #include "render_pass.h"
 #include "vk_descriptors.h"
+#include "vk_types.h"
 
 /*
   struct adaptation {
@@ -22,7 +23,7 @@
   } streaks_;*/
 
 
-class bright_pass_shader final : public shader_pass {
+class bright_pass final : public render_pass {
   std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
   std::string fragment_shader_source_ = "../shaders/hdr_bright_pass.frag.spv";
 
@@ -66,7 +67,7 @@ public:
   shader_pass_dependency_info& get_dependencies() override { return deps_; }
 };
 
-class bloom_blur_shader final : public shader_pass {
+class bloom_blur_pass final : public render_pass {
   std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
   std::string fragment_blur_x = "../shaders/hdr_bloom_x.frag.spv";
   std::string fragment_blur_y = "../shaders/hdr_bloom_y.frag.spv";
@@ -111,7 +112,53 @@ public:
   shader_pass_dependency_info& get_dependencies() override { return deps_; }
 };
 
-class tonemap_pass_shader final : public shader_pass {
+class streaks_pass final : public render_pass {
+  std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
+  std::string fragment_shader_source_ = "../shaders/hdr_streaks.frag.spv";
+
+  uint32_t effect_size_ = 512;
+  VkExtent2D extent_{effect_size_, effect_size_};
+
+  VkPushConstantRange push_constant_range_{
+      .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+      .offset = 0,
+      .size = sizeof(render_config::streaks_params),
+  };
+
+  VkViewport viewport_{
+      .x = 0,
+      .y = 0,
+      .width = static_cast<float>(effect_size_),
+      .height = static_cast<float>(effect_size_),
+      .minDepth = 0.f,
+      .maxDepth = 1.f,
+  };
+  VkRect2D scissor_{
+      .offset = {0, 0},
+      .extent = extent_,
+  };
+
+  shader_pass_dependency_info deps_
+      = {.read_resources = {{std::make_shared<color_image_resource>("scene_bloom", extent_)}},
+         .write_resources
+         = {{"scene_streak", std::make_shared<color_image_resource>("bloom_blurred_intermediate", 1.0f)}}};
+
+  AllocatedImage streak_pattern;
+  descriptor_writer writer;
+
+  VkPipeline pipeline_ = nullptr;
+  VkPipelineLayout pipeline_layout_ = nullptr;
+  std::vector<VkDescriptorSetLayout> descriptor_layouts_;
+  VkDescriptorSet descriptor_set_ = nullptr;
+
+public:
+  void prepare() override;
+  void cleanup() override;
+  void execute(VkCommandBuffer cmd) override;
+  shader_pass_dependency_info& get_dependencies() override { return deps_; }
+};
+
+class tonemap_pass final : public render_pass {
   std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
   std::string fragment_shader_source_ = "../shaders/hdr_final.frag.spv";
 
@@ -135,7 +182,7 @@ class tonemap_pass_shader final : public shader_pass {
   };
 
   shader_pass_dependency_info deps_
-      = {.read_resources = {{std::make_shared<color_image_resource>("scene_bloom", extent_)},
+      = {.read_resources = {{std::make_shared<color_image_resource>("scene_streak", extent_)},
                             {std::make_shared<color_image_resource>("scene_ssao", extent_)}},
          .write_resources
          = {{"scene_final", std::make_shared<color_image_resource>("hdr_final", 1.0f)}}};

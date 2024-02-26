@@ -244,6 +244,13 @@ void imgui_gui::render_settings() {
       ImGui::ColorPicker4("Gain", &config.hdr.gain[0], ImGuiColorEditFlags_Float);
     }
 
+    if (ImGui::CollapsingHeader("Streak Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+      ImGui::SliderFloat("Intensity", &config.streaks.intensity, 0.0f, 2.0f);
+      ImGui::SliderFloat("Attenuation", &config.streaks.attenuation, 0.0f, 2.0f);
+      ImGui::SliderInt("Streak Samples", &config.streaks.streak_samples, 1, 10);
+      ImGui::SliderInt("Number of Streaks", &config.streaks.num_streaks, 1, 10);
+    }
+
     if (ImGui::CollapsingHeader("Shadow Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
       ImGui::Checkbox("Enable Shadows", &config.enable_shadows);
     }

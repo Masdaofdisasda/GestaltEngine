@@ -20,7 +20,7 @@ class frame_graph {
   std::unique_ptr<vk_command> commands_ = std::make_unique<vk_command>();
   std::unique_ptr<vk_sync> sync_ = std::make_unique<vk_sync>();
 
-  std::vector<std::unique_ptr<shader_pass>> render_passes_;
+  std::vector<std::unique_ptr<render_pass>> render_passes_;
   // Maps each shader pass to indices of passes it depends on (those that write resources it reads).
   std::unordered_map<size_t, std::vector<size_t>> graph_;
   // Tracks how many passes each pass depends on.

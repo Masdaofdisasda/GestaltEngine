@@ -24,15 +24,16 @@ void frame_graph::init(const vk_gpu& gpu, const sdl_window& window,
   commands_->init(gpu_, frames_);
   sync_->init(gpu_, frames_);
 
-  render_passes_.push_back(std::make_unique<skybox_shader>());
-  render_passes_.push_back(std::make_unique<geometry_shader>());
-  render_passes_.push_back(std::make_unique<transparent_shader>());
-  render_passes_.push_back(std::make_unique<ssao_filter_shader>());
-  render_passes_.push_back(std::make_unique<ssao_blur_shader>());
-  render_passes_.push_back(std::make_unique<ssao_final_shader>());
-  render_passes_.push_back(std::make_unique<bright_pass_shader>());
-  render_passes_.push_back(std::make_unique<bloom_blur_shader>());
-  render_passes_.push_back(std::make_unique<tonemap_pass_shader>());
+  render_passes_.push_back(std::make_unique<skybox_pass>());
+  render_passes_.push_back(std::make_unique<geometry_pass>());
+  render_passes_.push_back(std::make_unique<transparent_pass>());
+  render_passes_.push_back(std::make_unique<ssao_filter_pass>());
+  render_passes_.push_back(std::make_unique<ssao_blur_pass>());
+  render_passes_.push_back(std::make_unique<ssao_final_pass>());
+  render_passes_.push_back(std::make_unique<bright_pass>());
+  render_passes_.push_back(std::make_unique<bloom_blur_pass>());
+  render_passes_.push_back(std::make_unique<streaks_pass>());
+  render_passes_.push_back(std::make_unique<tonemap_pass>());
 
   for (int i = 0; i < FRAME_OVERLAP; i++) {
     std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> frame_sizes = {

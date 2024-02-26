@@ -4,7 +4,7 @@
 #include "vk_initializers.h"
 #include "vk_pipelines.h"
 
-void ssao_filter_shader::prepare() {
+void ssao_filter_pass::prepare() {
   rotation_pattern = resource_manager_->load_image("../../assets/rot_texture.bmp").value();
 
   descriptor_layouts_.emplace_back(
@@ -45,7 +45,7 @@ void ssao_filter_shader::prepare() {
 }
 
 
-void ssao_filter_shader::execute(VkCommandBuffer cmd) {
+void ssao_filter_pass::execute(VkCommandBuffer cmd) {
 
   descriptor_set_ = resource_manager_->descriptor_pool->allocate(
       gpu_.device, descriptor_layouts_.at(0));
@@ -83,13 +83,13 @@ void ssao_filter_shader::execute(VkCommandBuffer cmd) {
   vkCmdEndRendering(cmd);
 }
 
-void ssao_filter_shader::cleanup() {
+void ssao_filter_pass::cleanup() {
    vkDestroyPipelineLayout(gpu_.device, pipeline_layout_, nullptr);
   vkDestroyPipeline(gpu_.device, pipeline_, nullptr);
 }
 
 
-void ssao_blur_shader::prepare() {
+void ssao_blur_pass::prepare() {
   descriptor_layouts_.emplace_back(
       descriptor_layout_builder()
           .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -127,7 +127,7 @@ void ssao_blur_shader::prepare() {
   blur_y_pipeline_ = builder.set_shaders(vertex_shader, ssao_blur_y_shader).build_pipeline(gpu_.device);
 }
 
-void ssao_blur_shader::execute(VkCommandBuffer cmd) {
+void ssao_blur_pass::execute(VkCommandBuffer cmd) {
   const auto image_x = resource_manager_->get_resource<AllocatedImage>("color_ssao_filtered");
   const auto image_y = resource_manager_->get_resource<AllocatedImage>("ssao_blur_y");
 
@@ -191,13 +191,13 @@ void ssao_blur_shader::execute(VkCommandBuffer cmd) {
   }
 }
 
-void ssao_blur_shader::cleanup() {
+void ssao_blur_pass::cleanup() {
   vkDestroyPipelineLayout(gpu_.device, pipeline_layout_, nullptr);
   vkDestroyPipeline(gpu_.device, blur_x_pipeline_, nullptr);
   vkDestroyPipeline(gpu_.device, blur_y_pipeline_, nullptr);
 }
 
-void ssao_final_shader::prepare() {
+void ssao_final_pass::prepare() {
   descriptor_layouts_.emplace_back(
       descriptor_layout_builder()
           .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -235,7 +235,7 @@ void ssao_final_shader::prepare() {
             .build_pipeline(gpu_.device);
 }
 
-void ssao_final_shader::execute(VkCommandBuffer cmd) {
+void ssao_final_pass::execute(VkCommandBuffer cmd) {
   descriptor_set_ = resource_manager_->descriptor_pool->allocate(
       gpu_.device, descriptor_layouts_.at(0));
 
@@ -275,7 +275,7 @@ void ssao_final_shader::execute(VkCommandBuffer cmd) {
   vkCmdEndRendering(cmd);
 }
 
-void ssao_final_shader::cleanup() {
+void ssao_final_pass::cleanup() {
   vkDestroyPipelineLayout(gpu_.device, pipeline_layout_, nullptr);
   vkDestroyPipeline(gpu_.device, pipeline_, nullptr);
 }

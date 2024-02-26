@@ -64,7 +64,7 @@ struct shader_pass_dependency_info {
   std::vector<std::pair<std::string, std::shared_ptr<shader_resource>>> write_resources;
 };
 
-class shader_pass {
+class render_pass {
   public:
   void init(const vk_gpu& gpu,
                  const std::shared_ptr<resource_manager>& resource_manager) {
@@ -73,7 +73,7 @@ class shader_pass {
 
     prepare();
   }
-  virtual ~shader_pass() = default;
+  virtual ~render_pass() = default;
 
   virtual void execute(VkCommandBuffer cmd) = 0;
   virtual shader_pass_dependency_info& get_dependencies() = 0;
