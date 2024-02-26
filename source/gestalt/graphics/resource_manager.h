@@ -43,11 +43,16 @@ public:
   resources_[id] = resource;
   }
 
+  std::unordered_map<std::string, std::string> direct_original_mapping;
   template <typename T> std::shared_ptr<T> get_resource(const std::string& id) {
-    if (const auto it = resources_.find(id); it != resources_.end()) {
+  if (const auto it = resources_.find(id); it != resources_.end()) {
     return std::dynamic_pointer_cast<T>(it->second);
   }
-  return nullptr; 
+  const std::string original_id = direct_original_mapping[id];
+  if (const auto it = resources_.find(original_id); it != resources_.end()) {
+    return std::dynamic_pointer_cast<T>(it->second);
+  }
+  return nullptr;
   }
 
   bool update_resource_id(const std::string& oldId, const std::string& newId) {

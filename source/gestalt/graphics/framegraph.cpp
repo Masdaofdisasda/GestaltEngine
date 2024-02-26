@@ -16,28 +16,21 @@ void frame_graph::init(const vk_gpu& gpu, const sdl_window& window,
   imgui_ = imgui_gui;
 
   swapchain_->init(gpu_, {window_.extent.width, window_.extent.height, 1});
-  /*
-  auto scene_color_image = std::make_shared<AllocatedImage>(image_type::color);
-  resource_manager->create_color_frame_buffer({window_.extent.width, window_.extent.height, 1},
-                                              *scene_color_image.get());
-
-  auto scene_depth_image = std::make_shared<AllocatedImage>(image_type::depth);
-  resource_manager->create_depth_frame_buffer({window_.extent.width, window_.extent.height, 1},
-                                              *scene_depth_image.get());
-
-  resource_manager_->add_resource("scene_color", scene_color_image);
-  resource_manager_->add_resource("scene_depth", scene_depth_image);*/
-
   commands_->init(gpu_, frames_);
   sync_->init(gpu_, frames_);
 
   render_passes_.push_back(std::make_unique<skybox_shader>());
+  render_passes_.push_back(std::make_unique<geometry_shader>());
 
   create_resorces();
+  // the shader pipelines need acccess to their resources to be created
+  resource_manager_->direct_original_mapping = direct_original_mapping_;
 
   for (auto& pass : render_passes_) {
     pass->init(gpu_, resource_manager_);
   }
+
+  resource_manager_->direct_original_mapping.clear();
 }
 
 std::string frame_graph::get_final_transformation(const std::string& original) {
@@ -50,12 +43,27 @@ std::string frame_graph::get_final_transformation(const std::string& original) {
 
 void frame_graph::calculate_resource_transform() {
   resource_transformations_.clear();
+  std::unordered_map<std::string, std::string> resource_predecessors;
 
   for (auto& pass : render_passes_) {
     auto t = pass->get_dependencies();
     for (auto& r : t.write_resources) {
       resource_transformations_[r.second->getId()] = r.first;
+      resource_predecessors[r.first] = r.second->getId();
     }
+  }
+
+  for (const auto& pair : resource_predecessors) {
+    std::string originalId = pair.second;  // Start with the immediate predecessor
+    std::string currentId = pair.first;
+
+    // Trace back to the original source
+    while (resource_predecessors.find(originalId) != resource_predecessors.end()) {
+      originalId = resource_predecessors[originalId];
+    }
+
+    // Now, originalId is the original source for currentId
+    direct_original_mapping_[currentId] = originalId;
   }
 
   std::unordered_set<std::string> values;
@@ -74,6 +82,7 @@ void frame_graph::calculate_resource_transform() {
   resource_pairs_.clear();
   for (const auto& key : originalKeys) {
     resource_pairs_.emplace_back(key, get_final_transformation(key));
+    direct_original_mapping_[key] = key;
   }
 }
 
@@ -83,28 +92,29 @@ void frame_graph::create_resorces() {
     resource_manager_->update_resource_id(final, original);
   }
 
-  struct shader_resource_ptr_comp {
-    bool operator()(const std::shared_ptr<shader_resource>& lhs,
-                    const std::shared_ptr<shader_resource>& rhs) const {
-      return lhs->getId() < rhs->getId();
-    }
-  };
-
-  std::set<std::shared_ptr<shader_resource>, shader_resource_ptr_comp> resources;
+  std::unordered_map<std::string, std::shared_ptr<shader_resource>> resource_map;
 
   for (auto& pass : render_passes_) {
     auto t = pass->get_dependencies();
     for (auto& r : t.read_resources) {
-      resources.insert(r);
+      resource_map[r->getId()] = r;
     }
     for (auto& r : t.write_resources) {
-      resources.insert(r.second);
+      resource_map[r.second->getId()] = r.second;
     }
   }
 
   calculate_resource_transform();
 
-  for (auto& r : resources) {
+  for (const auto& original_id : resource_pairs_ | std::views::keys) {
+    auto id = original_id;
+    while (resource_transformations_.contains(id)) {
+      id = resource_transformations_[id];
+      resource_map.erase(id);
+    }
+  }
+
+  for (auto& r : resource_map | std::views::values) {
     if (auto image_resource = std::dynamic_pointer_cast<color_image_resource>(r)) {
       if (resource_manager_->get_resource<AllocatedImage>(image_resource->getId())) {
         continue;
@@ -282,7 +292,6 @@ VkCommandBuffer frame_graph::start_draw() {
 }
 
 void frame_graph::execute_passes() {
-
   create_resorces();
 
   build_graph();
@@ -298,7 +307,7 @@ void frame_graph::execute_passes() {
 
   VkCommandBuffer cmd = start_draw();
 
-  void* mapped_data;
+  void* mapped_data; //TODO assumes skybox pass is always first
   VmaAllocation allocation = resource_manager_->per_frame_data_buffer.allocation;
   VK_CHECK(vmaMapMemory(gpu_.allocator, allocation, &mapped_data));
   const auto scene_uniform_data = static_cast<per_frame_data*>(mapped_data);
@@ -308,13 +317,12 @@ void frame_graph::execute_passes() {
     execute(index, cmd);
   }
 
-    resource_manager_->main_draw_context_.opaque_surfaces.clear();
-    resource_manager_->main_draw_context_.transparent_surfaces.clear();
+  resource_manager_->main_draw_context_.opaque_surfaces.clear();
+  resource_manager_->main_draw_context_.transparent_surfaces.clear();
 
   vmaUnmapMemory(gpu_.allocator, resource_manager_->per_frame_data_buffer.allocation);
 
-  
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("skybox_color");
+  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_opaque_color");
 
   vkutil::transition_image(cmd, color_image->image, color_image->currentLayout,
                            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -322,11 +330,9 @@ void frame_graph::execute_passes() {
   vkutil::transition_image(cmd, swapchain_->swapchain_images[swapchain_image_index_],
                            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-  vkutil::copy_image_to_image(
-      cmd, color_image->image,
+  vkutil::copy_image_to_image(cmd, color_image->image,
                               swapchain_->swapchain_images[swapchain_image_index_],
-                              color_image->getExtent2D(),
-                              get_window().extent);
+                              color_image->getExtent2D(), get_window().extent);
   vkutil::transition_image(cmd, swapchain_->swapchain_images[swapchain_image_index_],
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);

@@ -29,8 +29,10 @@ class frame_graph {
   // Tracks how many passes each pass depends on.
   std::unordered_map<size_t, size_t> in_degree_;
   std::vector<size_t> sorted_passes_;
-  
+
+  std::unordered_map<std::string, std::string> direct_original_mapping_;
   std::unordered_map<std::string, std::string> resource_transformations_;
+  // tracks the inital and final state of each written resource
   std::vector<std::pair<std::string, std::string>> resource_pairs_;
   
   bool resize_requested_{false};
