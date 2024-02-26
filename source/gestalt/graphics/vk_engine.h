@@ -8,13 +8,12 @@
 #include "sdl_window.h"
 #include "vk_gpu.h"
 #include "camera.h"
-#include "framegraph.h"
+#include "frame_graph.h"
 #include "time_tracking_service.h"
 #include "input_system.h"
 #include "resource_manager.h"
 #include "gui_actions.h"
 #include "imgui_gui.h"
-#include "vk_renderer.h"
 
 class render_engine {
 public:

@@ -35,8 +35,6 @@ vk_sync.cpp
 imgui_gui.h
 imgui_gui.cpp
 gui_actions.h
-vk_renderer.h
-vk_renderer.cpp
 scene_components.h
 cubemap_util.cpp
 cubemap_util.h
@@ -47,14 +45,12 @@ skybox_pass.cpp
 render_pass.h
 geometry_pass.h
 geometry_pass.cpp
-transparent_pass.h
-transparent_pass.cpp
 ssao_pass.h
 ssao_pass.cpp
 hdr_pass.h
 hdr_pass.cpp
-framegraph.h
-framegraph.cpp
+frame_graph.h
+frame_graph.cpp
 )
 
 target_compile_features(graphics PRIVATE cxx_std_20)

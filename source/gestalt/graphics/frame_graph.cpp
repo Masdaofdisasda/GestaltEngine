@@ -1,4 +1,4 @@
-﻿#include "framegraph.h"
+﻿#include "frame_graph.h"
 
 #include <queue>
 #include <set>
@@ -53,6 +53,10 @@ void frame_graph::init(const vk_gpu& gpu, const sdl_window& window,
   for (auto& pass : render_passes_) {
     pass->init(gpu_, resource_manager_);
   }
+
+  resource_manager_->per_frame_data_.ambientColor = glm::vec4(0.1f);
+  resource_manager_->per_frame_data_.sunlightColor = glm::vec4(1.f);
+  resource_manager_->per_frame_data_.sunlightDirection = glm::vec4(0.1, 0.5, 0.1, 20.f);
 
   resource_manager_->direct_original_mapping.clear();
 }
