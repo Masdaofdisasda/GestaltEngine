@@ -164,14 +164,13 @@ const std::vector<entity>& scene_manager::get_children(entity entity) {
  }
 
 
-void scene_manager::update_scene(draw_context& draw_context) {
+void scene_manager::update_scene() {
   constexpr glm::mat4 identity = glm::mat4(1.0f);
 
-  traverse_scene(get_root().entity, identity, draw_context);
+  traverse_scene(get_root().entity, identity);
  }
 
-void scene_manager::traverse_scene(const entity entity, const glm::mat4& parent_transform,
-                                      draw_context& draw_context) {
+void scene_manager::traverse_scene(const entity entity, const glm::mat4& parent_transform) {
   assert(entity != invalid_entity);
   const auto& object = get_scene_object_by_entity(entity).value().get();
   if (!object.visible) {
@@ -203,15 +202,15 @@ void scene_manager::traverse_scene(const entity entity, const glm::mat4& parent_
       def.vertex_buffer_address = resource_manager_->scene_geometry_.vertexBufferAddress;
 
       if (material.config.transparent) {
-        draw_context.transparent_surfaces.push_back(def);
+        resource_manager_->main_draw_context_.transparent_surfaces.push_back(def);
       } else {
-        draw_context.opaque_surfaces.push_back(def);
+        resource_manager_->main_draw_context_.opaque_surfaces.push_back(def);
       }
     }
   }
 
   // Process child nodes recursively, passing the current world transform
   for (const auto& childEntity : object.children) {
-    traverse_scene(childEntity, world_transform, draw_context);
+    traverse_scene(childEntity, world_transform);
   }
 }

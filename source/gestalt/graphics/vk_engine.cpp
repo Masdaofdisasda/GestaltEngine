@@ -37,12 +37,12 @@ void render_engine::init() {
 
   resource_manager_->init(gpu_);
 
-  renderer_->init(gpu_, window_, resource_manager_, imgui_, stats_);
+  frame_graph_->init(gpu_, window_, resource_manager_, imgui_);
 
   scene_manager_->init(gpu_, resource_manager_);
 
   register_gui_actions();
-  imgui_->init(gpu_, window_, renderer_->get_swapchain(), gui_actions_);
+  imgui_->init(gpu_, window_, frame_graph_->get_swapchain(), gui_actions_);
 
   for (auto& cam : camera_positioners_) {
     auto free_fly_camera_ptr = std::make_unique<free_fly_camera>();
@@ -63,7 +63,7 @@ void render_engine::register_gui_actions() {
     camera_positioners_.push_back(std::move(free_fly_camera_ptr));
   };
   gui_actions_.get_stats = [this]() -> engine_stats& { return stats_; };
-  gui_actions_.get_scene_data = [this]() -> per_frame_data& { return renderer_->per_frame_data_; };
+  gui_actions_.get_scene_data = [this]() -> per_frame_data& { return resource_manager_->per_frame_data_; };
   gui_actions_.get_scene_root
       = [this]() -> entity_component& { return scene_manager_->get_root(); };
   gui_actions_.get_scene_object = [this](const entity entity) -> entity_component& {
@@ -81,14 +81,14 @@ void render_engine::register_gui_actions() {
   gui_actions_.get_material = [this](const size_t material) -> material_component& {
     return resource_manager_->get_database().get_material(material);
   };
-  gui_actions_.get_render_config = [this]() -> render_config& { return renderer_->get_config(); };
+  gui_actions_.get_render_config = [this]() -> render_config& { return resource_manager_->config_; };
 }
 
 void render_engine::immediate_submit(std::function<void(VkCommandBuffer cmd)> function) {
-    VK_CHECK(vkResetFences(gpu_.device, 1, &renderer_->get_sync().imgui_fence));
-    VK_CHECK(vkResetCommandBuffer(renderer_->get_commands().imgui_command_buffer, 0));
+    VK_CHECK(vkResetFences(gpu_.device, 1, &frame_graph_->get_sync().imgui_fence));
+  VK_CHECK(vkResetCommandBuffer(frame_graph_->get_commands().imgui_command_buffer, 0));
 
-    VkCommandBuffer cmd = renderer_->get_commands().imgui_command_buffer;
+    VkCommandBuffer cmd = frame_graph_->get_commands().imgui_command_buffer;
 
     VkCommandBufferBeginInfo cmdBeginInfo
         = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -105,9 +105,10 @@ void render_engine::immediate_submit(std::function<void(VkCommandBuffer cmd)> fu
 
     // submit command buffer to the queue and execute it.
     //  _renderFence will now block until the graphic commands finish execution
-    VK_CHECK(vkQueueSubmit2(gpu_.graphics_queue, 1, &submit, renderer_->get_sync().imgui_fence));
+    VK_CHECK(vkQueueSubmit2(gpu_.graphics_queue, 1, &submit, frame_graph_->get_sync().imgui_fence));
 
-    VK_CHECK(vkWaitForFences(gpu_.device, 1, &renderer_->get_sync().imgui_fence, true, 9999999999));
+    VK_CHECK(
+        vkWaitForFences(gpu_.device, 1, &frame_graph_->get_sync().imgui_fence, true, 9999999999));
 }
 
 void render_engine::cleanup() {
@@ -118,7 +119,7 @@ void render_engine::cleanup() {
 
       imgui_->cleanup();
       scene_manager_->cleanup();
-      renderer_->cleanup();
+      frame_graph_->cleanup();
       resource_manager_->cleanup();
       gpu_.cleanup();
       window_.cleanup();
@@ -138,12 +139,11 @@ void render_engine::update_scene() {
     // to opengl and gltf axis
     projection[1][1] *= -1;
 
-    renderer_->per_frame_data_.view = view;
-    renderer_->per_frame_data_.proj = projection;
-    renderer_->per_frame_data_.viewproj = projection * view;
+    resource_manager_->per_frame_data_.view = view;
+    resource_manager_->per_frame_data_.proj = projection;
+    resource_manager_->per_frame_data_.viewproj = projection * view;
 
-    scene_manager_->update_scene(renderer_->main_draw_context_);
-    //scene_manager_.loaded_scenes_["structure"]->Draw(glm::mat4{1.f}, renderer_.main_draw_context_);
+    scene_manager_->update_scene();
 }
 
 void render_engine::run()
@@ -185,7 +185,7 @@ void render_engine::run()
 
       update_scene();
 
-      renderer_->draw(); 
+      frame_graph_->execute_passes(); 
     }
 
     // get clock again, compare with start clock

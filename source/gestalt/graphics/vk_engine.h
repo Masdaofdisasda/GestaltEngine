@@ -8,6 +8,7 @@
 #include "sdl_window.h"
 #include "vk_gpu.h"
 #include "camera.h"
+#include "framegraph.h"
 #include "time_tracking_service.h"
 #include "input_system.h"
 #include "resource_manager.h"
@@ -30,7 +31,7 @@ private:
   vk_gpu gpu_ = {};
   void immediate_submit(std::function<void(VkCommandBuffer cmd)> function);
 
-  std::shared_ptr<vk_renderer> renderer_ = std::make_shared<vk_renderer>();
+  std::shared_ptr<frame_graph> frame_graph_ = std::make_shared<frame_graph>();
   std::shared_ptr<scene_manager> scene_manager_ = std::make_shared<scene_manager>();
 
   gui_actions gui_actions_;

@@ -53,6 +53,8 @@ ssao_pass.h
 ssao_pass.cpp
 hdr_pass.h
 hdr_pass.cpp
+framegraph.h
+framegraph.cpp
 )
 
 target_compile_features(graphics PRIVATE cxx_std_20)

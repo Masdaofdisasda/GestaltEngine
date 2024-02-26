@@ -9,6 +9,7 @@
 class resource_manager {
   vk_gpu gpu_ = {};
   std::unique_ptr<database> database_ = std::make_unique<database>();
+  std::unordered_map<std::string, std::shared_ptr<AllocatedImage>> resources_;
 
 
   void load_and_create_cubemap(const std::string& file_path, AllocatedImage& cubemap);
@@ -30,7 +31,7 @@ public:
   struct ibl_data {
   AllocatedImage environment_map;
   AllocatedImage environment_irradiance_map;
-  AllocatedImage bdrfLUT; // TODO generate this
+  AllocatedImage bdrfLUT;
 
   VkSampler cube_map_sampler;
 
@@ -38,10 +39,35 @@ public:
   VkDescriptorSetLayout IblLayout;
   } ibl_data;
 
+  template <typename T> void add_resource(const std::string& id, std::shared_ptr<T> resource) {
+  resources_[id] = resource;
+  }
+
+  template <typename T> std::shared_ptr<T> get_resource(const std::string& id) {
+    if (const auto it = resources_.find(id); it != resources_.end()) {
+    return std::dynamic_pointer_cast<T>(it->second);
+  }
+  return nullptr; 
+  }
+
+  bool update_resource_id(const std::string& oldId, const std::string& newId) {
+  auto it = resources_.find(oldId);
+  if (it == resources_.end()) {
+    return false;
+  }
+  resources_[newId] = it->second;
+  resources_.erase(it);
+  return true;
+  }
+
   DescriptorAllocatorGrowable descriptorPool;
   descriptor_writer writer;
 
   database& get_database() const { return *database_; }
+
+  draw_context main_draw_context_; //TODO cleanup
+  per_frame_data per_frame_data_;
+  render_config config_;
 
   void init(const vk_gpu& gpu);
 

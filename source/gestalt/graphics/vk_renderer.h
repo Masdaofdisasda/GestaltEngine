@@ -10,7 +10,7 @@
 #include "vk_swapchain.h"
 #include "vk_sync.h"
 
-constexpr unsigned int FRAME_OVERLAP = 2;
+constexpr unsigned int frame_overlap = 2;
 
 class vk_renderer {
   vk_gpu gpu_ = {};
@@ -24,7 +24,7 @@ class vk_renderer {
   bool resize_requested_{false};
   uint32_t swapchain_image_index_{0};
   uint32_t frame_number_{0};
-  std::vector<frame_data> frames_{FRAME_OVERLAP};
+  std::vector<frame_data> frames_{frame_overlap};
 
   std::unique_ptr<render_pass> skybox_pass_;
   std::unique_ptr<render_pass> geometry_pass_;
@@ -55,7 +55,7 @@ public:
   void draw();
 
   std::shared_ptr<vk_swapchain> get_swapchain() const { return swapchain_; }
-  frame_data& get_current_frame() { return frames_[frame_number_ % FRAME_OVERLAP]; }
+  frame_data& get_current_frame() { return frames_[frame_number_ % frame_overlap]; }
   vk_sync& get_sync() const { return *sync_; }
   vk_command& get_commands() const { return *commands_; }
   sdl_window& get_window() { return window_; }
