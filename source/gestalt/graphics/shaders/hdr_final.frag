@@ -19,7 +19,7 @@ layout( push_constant ) uniform constants
 
 layout(binding = 10) uniform sampler2D texScene;
 layout(binding = 11) uniform sampler2D texBloom;
-//layout(binding = 12) uniform sampler2D texLuminance; TODO
+layout(binding = 12) uniform sampler2D texLuminance;
 
 // Extended Reinhard tone mapping operator
 vec3 Reinhard2(vec3 x)
@@ -104,12 +104,17 @@ vec3 linearToSrgb(vec3 linearColor) {
 void main() {
     vec3 sceneColor = texture(texScene, uv).rgb;
     vec3 bloomColor = texture(texBloom, uv).rgb * params.bloomStrength;
+	float avgLuminance = texture(texLuminance, vec2(0.5, 0.5)).x;
 
-    sceneColor *= params.exposure;
+    float exposureAdjustment = 1.0 / max(avgLuminance, 0.0001);
+    sceneColor *= exposureAdjustment * params.exposure;
 
     if (params.showBloom) {
         sceneColor = bloomColor;
     } else {
+        float minLuminanceThreshold = 0.0001;
+        float maxLuminanceThreshold = 10.0; //TODO
+        bloomColor *= smoothstep(minLuminanceThreshold, maxLuminanceThreshold, avgLuminance);
 		sceneColor += bloomColor;
 	}
 
@@ -129,5 +134,4 @@ void main() {
 
     vec3 finalColor = linearToSrgb(sceneColor);
     outColor = vec4(finalColor, 1.0);
-
 }

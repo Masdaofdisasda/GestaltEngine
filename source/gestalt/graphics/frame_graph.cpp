@@ -33,6 +33,7 @@ void frame_graph::init(const vk_gpu& gpu, const sdl_window& window,
   render_passes_.push_back(std::make_unique<bright_pass>());
   render_passes_.push_back(std::make_unique<bloom_blur_pass>());
   render_passes_.push_back(std::make_unique<streaks_pass>());
+  render_passes_.push_back(std::make_unique<luminance_pass>());
   render_passes_.push_back(std::make_unique<tonemap_pass>());
 
   for (int i = 0; i < FRAME_OVERLAP; i++) {

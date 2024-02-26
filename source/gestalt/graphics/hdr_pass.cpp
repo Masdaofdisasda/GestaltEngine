@@ -267,11 +267,134 @@ void streaks_pass::cleanup() {
   vkDestroyPipeline(gpu_.device, pipeline_, nullptr);
 }
 
+void luminance_pass::prepare() {
+    descriptor_layouts_.emplace_back(
+      descriptor_layout_builder()
+          .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+          .build(gpu_.device));
+  VkPipelineLayoutCreateInfo pipeline_layout_create_info{
+       .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+       .pNext = nullptr,
+       .setLayoutCount = static_cast<uint32_t>(descriptor_layouts_.size()),
+       .pSetLayouts = descriptor_layouts_.data(),
+   };
+  VK_CHECK(vkCreatePipelineLayout(gpu_.device, &pipeline_layout_create_info, nullptr,
+                                       &pipeline_layout_));
+
+  VkShaderModule vertex_shader;
+  vkutil::load_shader_module(vertex_shader_source_.c_str(), gpu_.device, &vertex_shader);
+  VkShaderModule luminance_shader;
+  vkutil::load_shader_module(luminance_fragment_shader_source_.c_str(), gpu_.device, &luminance_shader);
+  VkShaderModule downscale_shader;
+  vkutil::load_shader_module(downscale_fragment_shader_source_.c_str(), gpu_.device,
+                             &downscale_shader);
+
+  const auto color_image = resource_manager_->get_resource<AllocatedImage>("lum_64");
+
+  auto builder = PipelineBuilder()
+                     .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+                     .set_polygon_mode(VK_POLYGON_MODE_FILL)
+                     .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
+                     .set_multisampling_none()
+                     .disable_blending()
+                     .disable_depthtest()
+                     .set_color_attachment_format(color_image->imageFormat)
+                     .set_pipeline_layout(pipeline_layout_);
+
+  luminance_pipeline_ = builder.set_shaders(vertex_shader, luminance_shader).build_pipeline(gpu_.device);
+  downscale_pipeline_ = builder.set_shaders(vertex_shader, downscale_shader).build_pipeline(gpu_.device);
+}
+
+void luminance_pass::cleanup() {
+  vkDestroyPipelineLayout(gpu_.device, pipeline_layout_, nullptr);
+  vkDestroyPipeline(gpu_.device, luminance_pipeline_, nullptr);
+  vkDestroyPipeline(gpu_.device, downscale_pipeline_, nullptr);
+}
+
+void luminance_pass::execute(VkCommandBuffer cmd) {
+  {
+    luminance_descriptor_set_
+        = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(0));
+
+    const auto scene_color = resource_manager_->get_resource<AllocatedImage>("scene_ssao");
+    const auto color_image = resource_manager_->get_resource<AllocatedImage>("lum_64");
+
+    vkutil::transition_read(cmd, *scene_color);
+    vkutil::transition_write(cmd, *color_image);
+
+    VkRenderingAttachmentInfo newColorAttachment
+        = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+    VkRenderingInfo newRenderInfo
+        = vkinit::rendering_info(color_image->getExtent2D(), &newColorAttachment, nullptr);
+    vkCmdBeginRendering(cmd, &newRenderInfo);
+
+    writer.clear();
+    writer.write_image(
+        10, scene_color->imageView,
+        resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    writer.update_set(gpu_.device, luminance_descriptor_set_);
+
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
+                            &luminance_descriptor_set_, 0, nullptr);
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, luminance_pipeline_);
+
+    viewport_.width = static_cast<float>(color_image->getExtent2D().width);
+    viewport_.height = static_cast<float>(color_image->getExtent2D().height);
+    scissor_.extent = color_image->getExtent2D();
+    vkCmdSetViewport(cmd, 0, 1, &viewport_);
+    vkCmdSetScissor(cmd, 0, 1, &scissor_);
+    vkCmdDraw(cmd, 3, 1, 0, 0);
+    vkCmdEndRendering(cmd);
+  }
+
+  {
+    for (size_t i = 1; i < deps_.write_resources.size(); ++i) {
+      downscale_descriptor_set_
+          = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(0));
+      const auto scene_color = resource_manager_->get_resource<AllocatedImage>(
+          deps_.write_resources.at(i - 1).second->getId());
+      const auto color_image = resource_manager_->get_resource<AllocatedImage>(
+          deps_.write_resources.at(i).second->getId());
+
+      vkutil::transition_read(cmd, *scene_color);
+      vkutil::transition_write(cmd, *color_image);
+
+      VkRenderingAttachmentInfo newColorAttachment
+          = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+      VkRenderingInfo newRenderInfo
+          = vkinit::rendering_info(color_image->getExtent2D(), &newColorAttachment, nullptr);
+      vkCmdBeginRendering(cmd, &newRenderInfo);
+
+      writer.clear();
+      writer.write_image(
+          10, scene_color->imageView,
+          resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+      writer.update_set(gpu_.device, downscale_descriptor_set_);
+
+      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
+                              &downscale_descriptor_set_, 0, nullptr);
+      vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, downscale_pipeline_);
+
+      viewport_.width = static_cast<float>(color_image->getExtent2D().width);
+      viewport_.height = static_cast<float>(color_image->getExtent2D().height);
+      scissor_.extent = color_image->getExtent2D();
+      vkCmdSetViewport(cmd, 0, 1, &viewport_);
+      vkCmdSetScissor(cmd, 0, 1, &scissor_);
+      vkCmdDraw(cmd, 3, 1, 0, 0);
+      vkCmdEndRendering(cmd);
+    }
+  }
+} 
+
+
 void tonemap_pass::prepare() {
   descriptor_layouts_.emplace_back(
       descriptor_layout_builder()
           .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
           .add_binding(11, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+          .add_binding(12, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
           .build(gpu_.device));
   VkPipelineLayoutCreateInfo pipeline_layout_create_info{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -314,6 +437,7 @@ void tonemap_pass::execute(VkCommandBuffer cmd) {
       = resource_manager_->get_resource<AllocatedImage>("scene_ssao");
   const auto scene_bloom = resource_manager_->get_resource<AllocatedImage>("scene_streak");
   const auto color_image = resource_manager_->get_resource<AllocatedImage>("hdr_final");
+  const auto lum_image = resource_manager_->get_resource<AllocatedImage>("lum_1_final");
 
   VkRenderingAttachmentInfo newColorAttachment
       = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -328,6 +452,10 @@ void tonemap_pass::execute(VkCommandBuffer cmd) {
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.write_image(
       11, scene_bloom->imageView,
+      resource_manager_->get_database().get_sampler(1),  // todo default_sampler_linear
+      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+  writer.write_image(
+      12, lum_image->imageView,
       resource_manager_->get_database().get_sampler(1),  // todo default_sampler_linear
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.update_set(gpu_.device, descriptor_set_);

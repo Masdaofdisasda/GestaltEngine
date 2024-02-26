@@ -13,14 +13,7 @@
     std::vector<VkDescriptorSetLayout> descriptor_layouts_;
     VkDescriptorSet descriptor_set_;
   } adaptation_;
-
-  struct streaks {
-    std::string fragment = "../shaders/hdr_streaks.frag.spv";
-    VkPipeline pipeline_;
-    VkPipelineLayout pipeline_layout_;
-    std::vector<VkDescriptorSetLayout> descriptor_layouts_;
-    VkDescriptorSet descriptor_set_;
-  } streaks_;*/
+*/
 
 
 class bright_pass final : public render_pass {
@@ -158,6 +151,56 @@ public:
   shader_pass_dependency_info& get_dependencies() override { return deps_; }
 };
 
+class luminance_pass final : public render_pass {
+  std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
+  std::string downscale_fragment_shader_source_ = "../shaders/downscale2x2.frag.spv";
+  std::string luminance_fragment_shader_source_ = "../shaders/to_luminance.frag.spv";
+
+  VkExtent2D extent64_{64, 64};
+  VkExtent2D extent32_{32, 32};
+  VkExtent2D extent16_{16, 16};
+  VkExtent2D extent8_{8, 8};
+  VkExtent2D extent4_{4, 4};
+  VkExtent2D extent2_{2, 2};
+  VkExtent2D extent1_{1, 1};
+
+  VkViewport viewport_{
+      .x = 0,
+      .y = 0,
+      .minDepth = 0.f,
+      .maxDepth = 1.f,
+  };
+  VkRect2D scissor_{
+      .offset = {0, 0},
+  };
+
+  shader_pass_dependency_info deps_
+      = {.read_resources = {{std::make_shared<color_image_resource>("scene_ssao", 1.0f)}},
+         .write_resources
+         = {{"lum_64_final", std::make_shared<color_image_resource>("lum_64", extent64_)},
+            {"lum_32_final", std::make_shared<color_image_resource>("lum_32", extent32_)},
+            {"lum_16_final", std::make_shared<color_image_resource>("lum_16", extent16_)},
+            {"lum_8_final", std::make_shared<color_image_resource>("lum_8", extent8_)},
+            {"lum_4_final", std::make_shared<color_image_resource>("lum_4", extent4_)},
+            {"lum_2_final", std::make_shared<color_image_resource>("lum_2", extent2_)},
+            {"lum_1_final", std::make_shared<color_image_resource>("lum_1", extent1_)}}};
+
+  descriptor_writer writer;
+
+  VkPipeline downscale_pipeline_ = nullptr;
+  VkPipeline luminance_pipeline_ = nullptr;
+  VkPipelineLayout pipeline_layout_ = nullptr;
+  std::vector<VkDescriptorSetLayout> descriptor_layouts_;
+  VkDescriptorSet downscale_descriptor_set_ = nullptr;
+  VkDescriptorSet luminance_descriptor_set_ = nullptr;
+
+public:
+  void prepare() override;
+  void cleanup() override;
+  void execute(VkCommandBuffer cmd) override;
+  shader_pass_dependency_info& get_dependencies() override { return deps_; }
+};
+
 class tonemap_pass final : public render_pass {
   std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
   std::string fragment_shader_source_ = "../shaders/hdr_final.frag.spv";
@@ -183,7 +226,8 @@ class tonemap_pass final : public render_pass {
 
   shader_pass_dependency_info deps_
       = {.read_resources = {{std::make_shared<color_image_resource>("scene_streak", extent_)},
-                            {std::make_shared<color_image_resource>("scene_ssao", extent_)}},
+                            {std::make_shared<color_image_resource>("scene_ssao", extent_)},
+                            {std::make_shared<color_image_resource>("lum_1_final", 1.0f)}},
          .write_resources
          = {{"scene_final", std::make_shared<color_image_resource>("hdr_final", 1.0f)}}};
 

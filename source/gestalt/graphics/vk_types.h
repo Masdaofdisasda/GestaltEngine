@@ -205,9 +205,9 @@ struct render_config {
   } hdr{};
 
   struct streaks_params {
-    float intensity{1.f};
-    float attenuation{0.5f};
-    int streak_samples{7};
+    float intensity{.18f};
+    float attenuation{1.f};
+    int streak_samples{6};
     int num_streaks{4};
   } streaks{};
 
