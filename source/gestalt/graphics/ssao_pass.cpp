@@ -405,7 +405,6 @@ void ssao_filter_shader::execute(VkCommandBuffer cmd) {
   descriptor_set_ = resource_manager_->descriptor_pool->allocate(
       gpu_.device, descriptor_layouts_.at(0));
 
-
   const auto scene_depth = resource_manager_->get_resource<AllocatedImage>("scene_transparent_depth");
   const auto color_image = resource_manager_->get_resource<AllocatedImage>("color_ssao_filter");
 

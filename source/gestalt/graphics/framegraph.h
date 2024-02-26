@@ -1,13 +1,10 @@
 ﻿#pragma once
-#include <map>
 #include <memory>
-#include <queue>
 #include <string>
 #include <vector>
 
 #include "imgui_gui.h"
 #include "render_pass.h"
-#include "skybox_pass.h"
 #include "vk_swapchain.h"
 #include "vk_sync.h"
 
@@ -47,6 +44,9 @@ class frame_graph {
   void build_graph();
   void populate_graph();
   void topological_sort();
+  std::string get_final_transformation(const std::string& original);
+  void calculate_resource_transform();
+  void create_resources();
   VkCommandBuffer start_draw();
   void execute(size_t id, VkCommandBuffer cmd);
 
@@ -55,9 +55,6 @@ public:
   void init(const vk_gpu& gpu, const sdl_window& window,
             const std::shared_ptr<resource_manager>& resource_manager, const std::shared_ptr<imgui_gui>&
             imgui_gui);
-  std::string get_final_transformation(const std::string& original);
-  void calculate_resource_transform();
-  void create_resources();
 
   void execute_passes();
 

@@ -1,9 +1,12 @@
 ﻿#include "framegraph.h"
 
+#include <queue>
 #include <set>
 #include <unordered_set>
 
 #include "geometry_pass.h"
+#include "hdr_pass.h"
+#include "skybox_pass.h"
 #include "ssao_pass.h"
 #include "transparent_pass.h"
 #include "vk_images.h"
@@ -27,9 +30,11 @@ void frame_graph::init(const vk_gpu& gpu, const sdl_window& window,
   render_passes_.push_back(std::make_unique<ssao_filter_shader>());
   render_passes_.push_back(std::make_unique<ssao_blur_shader>());
   render_passes_.push_back(std::make_unique<ssao_final_shader>());
+  render_passes_.push_back(std::make_unique<bright_pass_shader>());
+  render_passes_.push_back(std::make_unique<bloom_blur_shader>());
+  render_passes_.push_back(std::make_unique<tonemap_pass_shader>());
 
   for (int i = 0; i < FRAME_OVERLAP; i++) {
-    // create a descriptor pool
     std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> frame_sizes = {
         {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3},
         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3},
@@ -269,7 +274,6 @@ void frame_graph::execute(size_t id, VkCommandBuffer cmd) {
     }
   }
 
-  fmt::print("Executing pass {}\n", id);
   render_passes_[id]->execute(cmd);
 
   for (const auto& writes = render_passes_[id]->get_dependencies().write_resources;
@@ -343,7 +347,7 @@ void frame_graph::execute_passes() {
 
   vmaUnmapMemory(gpu_.allocator, resource_manager_->per_frame_data_buffer.allocation);
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_ssao");
+  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_final");
 
   vkutil::transition_image(cmd, color_image->image, color_image->currentLayout,
                            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
