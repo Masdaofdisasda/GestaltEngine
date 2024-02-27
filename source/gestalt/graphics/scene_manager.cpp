@@ -32,6 +32,11 @@ void scene_manager::init(const vk_gpu& gpu,const std::shared_ptr <resource_manag
   build_scene_graph(nodes, mesh_offset);
 
   resource_manager_->load_and_process_cubemap(R"(..\..\assets\san_giuseppe_bridge_4k.hdr)");
+
+  //TODO fully integrate this into the scene manager
+  resource_manager_->get_database().add_light(
+      light_component{glm::vec3(1.f), 20.f, glm::vec3(-0.216, 0.941, -0.257)});
+  resource_manager_->get_database().add_camera(camera_component());
 }
 
 void scene_manager::create_entities(std::vector<fastgltf::Node> nodes, const size_t& mesh_offset) {
@@ -137,12 +142,12 @@ void scene_manager::add_mesh_component(const entity entity, size_t mesh_index) {
   object.mesh = mesh_index;
 }
 
-void scene_manager::add_camera_component(entity entity, const CameraComponent& camera) {
+void scene_manager::add_camera_component(entity entity, const camera_component& camera) {
   entity_component& object = get_scene_object_by_entity(entity).value().get();
   object.camera = resource_manager_->get_database().add_camera(camera);
 }
 
-void scene_manager::add_light_component(entity entity, const LightComponent& light) {
+void scene_manager::add_light_component(entity entity, const light_component& light) {
   entity_component& object = get_scene_object_by_entity(entity).value().get();
   object.camera = resource_manager_->get_database().add_light(light);
 }

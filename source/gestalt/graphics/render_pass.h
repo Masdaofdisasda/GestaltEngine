@@ -65,10 +65,9 @@ struct shader_pass_dependency_info {
 };
 
 class render_pass {
-  public:
-  void init(const vk_gpu& gpu,
-                 const std::shared_ptr<resource_manager>& resource_manager) {
-       gpu_ = gpu;
+public:
+  void init(const vk_gpu& gpu, const std::shared_ptr<resource_manager>& resource_manager) {
+    gpu_ = gpu;
     resource_manager_ = resource_manager;
 
     prepare();

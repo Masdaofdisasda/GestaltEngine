@@ -5,11 +5,16 @@
 #include "vk_pipelines.h"
 
 void geometry_pass::prepare() {
+  fmt::print("preparing geometry pass\n");
 
   descriptor_layouts_.push_back(resource_manager_->per_frame_data_layout);
   descriptor_layouts_.push_back(resource_manager_->ibl_data.IblLayout);
   descriptor_layouts_.push_back(resource_manager_->material_data.resource_layout);
   descriptor_layouts_.push_back(resource_manager_->material_data.constants_layout);
+  descriptor_layouts_.emplace_back(
+      descriptor_layout_builder()
+          .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+          .build(gpu_.device));
 
   VkShaderModule meshFragShader;
   vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &meshFragShader);
@@ -56,8 +61,13 @@ void geometry_pass::cleanup() {
 }
 
 void geometry_pass::execute(VkCommandBuffer cmd) {
+  descriptor_set_
+      = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(4));
+
   const auto color_image = resource_manager_->get_resource<AllocatedImage>("skybox_color");
   const auto depth_image = resource_manager_->get_resource<AllocatedImage>("skybox_depth");
+
+  const auto shadow_map = resource_manager_->get_resource<AllocatedImage>("directional_shadow_map");
 
   VkRenderingAttachmentInfo colorAttachment
       = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -86,31 +96,28 @@ void geometry_pass::execute(VkCommandBuffer cmd) {
                        VK_INDEX_TYPE_UINT32);
 
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
+
+  writer.clear();
+  writer.write_image(
+      10, shadow_map->imageView,
+      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+      VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+  writer.update_set(gpu_.device, descriptor_set_);
   VkDescriptorSet descriptorSets[]
       = {resource_manager_->ibl_data.IblSet, resource_manager_->material_data.resource_set,
-         resource_manager_->material_data.constants_set};
+         resource_manager_->material_data.constants_set, descriptor_set_};
 
   gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                                  &descriptor_write);
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 3,
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 4,
                           descriptorSets, 0, nullptr);
 
-  const VkViewport viewport = {
-      .x = 0,
-      .y = 0,
-      .width = static_cast<float>(color_image->getExtent2D().width),
-      .height = static_cast<float>(color_image->getExtent2D().height),
-      .minDepth = 0.f,
-      .maxDepth = 1.f,
-  };
-  vkCmdSetViewport(cmd, 0, 1, &viewport);
-
-  VkRect2D scissor = {};
-  scissor.offset.y = 0;
-  scissor.offset.x = 0;
-  scissor.extent.width = color_image->getExtent2D().width;
-  scissor.extent.height = color_image->getExtent2D().height;
-  vkCmdSetScissor(cmd, 0, 1, &scissor);
+ 
+  viewport_.width = static_cast<float>(depth_image->getExtent2D().width);
+  viewport_.height = static_cast<float>(depth_image->getExtent2D().height);
+  scissor_.extent = depth_image->getExtent2D();
+  vkCmdSetViewport(cmd, 0, 1, &viewport_);
+  vkCmdSetScissor(cmd, 0, 1, &scissor_);
 
   for (auto& r : resource_manager_->main_draw_context_.opaque_surfaces) {
     GPUDrawPushConstants push_constants;
@@ -135,7 +142,10 @@ void geometry_pass::execute(VkCommandBuffer cmd) {
 
   vkCmdEndRendering(cmd);
 }
+
 void transparent_pass::prepare() {
+  fmt::print("preparing transparent pass\n");
+
   descriptor_layouts_.push_back(resource_manager_->per_frame_data_layout);
   descriptor_layouts_.push_back(resource_manager_->ibl_data.IblLayout);
   descriptor_layouts_.push_back(resource_manager_->material_data.resource_layout);
@@ -214,22 +224,12 @@ void transparent_pass::execute(VkCommandBuffer cmd) {
       = {resource_manager_->ibl_data.IblSet, resource_manager_->material_data.resource_set,
          resource_manager_->material_data.constants_set};
 
-  const VkViewport viewport = {
-      .x = 0,
-      .y = 0,
-      .width = static_cast<float>(color_image->getExtent2D().width),
-      .height = static_cast<float>(color_image->getExtent2D().height),
-      .minDepth = 0.f,
-      .maxDepth = 1.f,
-  };
-  vkCmdSetViewport(cmd, 0, 1, &viewport);
-
-  VkRect2D scissor = {};
-  scissor.offset.y = 0;
-  scissor.offset.x = 0;
-  scissor.extent.width = color_image->getExtent2D().width;
-  scissor.extent.height = color_image->getExtent2D().height;
-  vkCmdSetScissor(cmd, 0, 1, &scissor);
+  
+  viewport_.width = static_cast<float>(depth_image->getExtent2D().width);
+  viewport_.height = static_cast<float>(depth_image->getExtent2D().height);
+  scissor_.extent = depth_image->getExtent2D();
+  vkCmdSetViewport(cmd, 0, 1, &viewport_);
+  vkCmdSetScissor(cmd, 0, 1, &scissor_);
 
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
@@ -237,9 +237,6 @@ void transparent_pass::execute(VkCommandBuffer cmd) {
                                  &descriptor_write);
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 3,
                           descriptorSets, 0, nullptr);
-
-  vkCmdSetViewport(cmd, 0, 1, &viewport);
-  vkCmdSetScissor(cmd, 0, 1, &scissor);
 
   for (auto& r : resource_manager_->main_draw_context_.transparent_surfaces) {
     GPUDrawPushConstants push_constants;

@@ -9,8 +9,11 @@ layout (location = 0) in vec3 inNormal;
 layout (location = 1) in vec3 inPosition;
 layout (location = 2) in vec2 inUV;
 layout (location = 3) flat in int inMaterialIndex;
+layout (location = 4) out vec4 inShadowPosition;
 
 layout (location = 0) out vec4 outFragColor;
+
+layout(set = 4, binding = 10) uniform sampler2D depthTex;
 
 struct PBRInfo
 {
@@ -37,6 +40,30 @@ vec3 sRGBToLinear(vec3 color) {
 
 vec3 linearTosRGB(vec3 color) {
     return mix(color * 12.92, 1.055 * pow(color, vec3(1.0 / 2.4)) - vec3(0.055), step(vec3(0.0031308), color));
+}
+
+
+float PCF(int kernelSize, vec2 shadowCoord, float depth)
+{
+	float size = 1.0 / float( textureSize(depthTex, 0 ).x );
+	float shadow = 0.0;
+	int range = kernelSize / 2;
+	for ( int v=-range; v<=range; v++ ) for ( int u=-range; u<=range; u++ )
+		shadow += (depth >= texture( depthTex, shadowCoord + size * vec2(u, v) ).r) ? 1.0 : 0.0;
+	return shadow / (kernelSize * kernelSize);
+}
+
+float shadowFactor(vec4 shadowCoord, float depthBias)
+{
+	vec4 shadowCoords4 = shadowCoord / shadowCoord.w;
+
+	if (shadowCoords4.z > -1.0 && shadowCoords4.z < 1.0)
+	{
+		float shadowSample = PCF( 13, shadowCoords4.xy, shadowCoords4.z + depthBias );
+		return mix(1.0, 0.3, shadowSample);
+	}
+
+	return 1.0; 
 }
 
 
@@ -159,7 +186,7 @@ vec3 calculatePBRLightContributionDir( inout PBRInfo pbrInputs)
 {
 	vec3 n = pbrInputs.n;
 	vec3 v = pbrInputs.v;
-	vec3 l = normalize(sceneData.sunlightDirection.xyz);	// Vector from surface point to light
+	vec3 l = normalize(sceneData.light_direction);	// Vector from surface point to light
 	vec3 h = normalize(l+v);					// Half vector between both l and v
 
 	float NdotV = pbrInputs.NdotV;
@@ -182,7 +209,7 @@ vec3 calculatePBRLightContributionDir( inout PBRInfo pbrInputs)
 	vec3 diffuseContrib = (1.0 - F) * diffuseBurley(pbrInputs);
 	vec3 specContrib = F * G * D / (4.0 * NdotL * NdotV);
 	// Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
-	vec3 color = NdotL * sceneData.sunlightDirection.w * 3.0f * (diffuseContrib + specContrib);
+	vec3 color = NdotL * sceneData.light_intensity * 3.0f * (diffuseContrib + specContrib);
 
 	return color;
 }
@@ -218,7 +245,7 @@ vec3 calculatePBRLightContributionPoint( inout PBRInfo pbrInputs)
 	// Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
     float distance = length(vec3(lightPos) - inPosition);
     float attenuation = 1.0 / (distance * distance);
-	vec3 color = NdotL * sceneData.sunlightDirection.w * attenuation * (diffuseContrib + specContrib);
+	vec3 color = NdotL * sceneData.light_intensity * attenuation * (diffuseContrib + specContrib);
 
 	return color;
 }
@@ -300,7 +327,9 @@ void main() {
 	if (metalicRoughIndex != uint(-1)) {
 		MeR = texture(nonuniformEXT(textures[metalicRoughIndex]), UV);
 	}
-
+	
+	//float shadow_bias = max(-0.001 * (1.0 - dot(n, sceneData.light_direction)), -0.0001);
+	float shadow =  shadowFactor(inShadowPosition, -0.001);
 
 	PBRInfo pbrInputs;
 	
@@ -310,7 +339,7 @@ void main() {
 	color = calculatePBRInputsMetallicRoughness(Kd, n, viewPos.xyz, inPosition, MeR, pbrInputs) * Kao;
 
 	// directional light contribution
-	color *= calculatePBRLightContributionDir(pbrInputs);
+	color *= calculatePBRLightContributionDir(pbrInputs) * shadow;
 
 	
   	color += calculatePBRLightContributionPoint(pbrInputs);

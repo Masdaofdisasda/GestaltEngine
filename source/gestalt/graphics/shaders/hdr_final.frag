@@ -114,7 +114,7 @@ void main() {
     } else {
         float minLuminanceThreshold = 0.0001;
         float maxLuminanceThreshold = 10.0; //TODO
-        //bloomColor *= smoothstep(minLuminanceThreshold, maxLuminanceThreshold, avgLuminance);
+        bloomColor *= avgLuminance;
 		sceneColor += bloomColor;
 	}
 

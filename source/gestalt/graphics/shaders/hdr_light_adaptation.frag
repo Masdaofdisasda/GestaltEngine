@@ -23,7 +23,6 @@ void main()
 
    float tau = (currentLum > adaptedLum) ? params.adaptation_speed_light2dark : params.adaptation_speed_dark2light;
 
-
    //https://google.github.io/filament/Filament.html#imagingpipeline/physicallybasedcamera/adaptation
    float newAdaptation = adaptedLum + (currentLum - adaptedLum) * (1.0 - exp(-params.delta_time * tau));
    

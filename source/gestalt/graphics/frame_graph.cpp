@@ -6,9 +6,9 @@
 
 #include "geometry_pass.h"
 #include "hdr_pass.h"
+#include "shadow_pass.h"
 #include "skybox_pass.h"
 #include "ssao_pass.h"
-#include "transparent_pass.h"
 #include "vk_images.h"
 #include "vk_initializers.h"
 
@@ -25,6 +25,7 @@ void frame_graph::init(const vk_gpu& gpu, const sdl_window& window,
   sync_->init(gpu_, frames_);
 
   render_passes_.push_back(std::make_unique<skybox_pass>());
+  render_passes_.push_back(std::make_unique<directional_depth_pass>()); //TODO investigate sorting
   render_passes_.push_back(std::make_unique<geometry_pass>());
   render_passes_.push_back(std::make_unique<transparent_pass>());
   render_passes_.push_back(std::make_unique<ssao_filter_pass>());
@@ -57,10 +58,6 @@ void frame_graph::init(const vk_gpu& gpu, const sdl_window& window,
   for (auto& pass : render_passes_) {
     pass->init(gpu_, resource_manager_);
   }
-
-  resource_manager_->per_frame_data_.ambientColor = glm::vec4(0.1f);
-  resource_manager_->per_frame_data_.sunlightColor = glm::vec4(1.f);
-  resource_manager_->per_frame_data_.sunlightDirection = glm::vec4(0.1, 0.5, 0.1, 20.f);
 
   resource_manager_->direct_original_mapping.clear();
 }
@@ -340,20 +337,12 @@ void frame_graph::execute_passes() {
 
   VkCommandBuffer cmd = start_draw();
 
-  void* mapped_data; //TODO assumes skybox pass is always first
-  VmaAllocation allocation = resource_manager_->per_frame_data_buffer.allocation;
-  VK_CHECK(vmaMapMemory(gpu_.allocator, allocation, &mapped_data));
-  const auto scene_uniform_data = static_cast<per_frame_data*>(mapped_data);
-  *scene_uniform_data = resource_manager_->per_frame_data_;
-
   for (const size_t index : sorted_passes_) {
     execute(index, cmd);
   }
 
   resource_manager_->main_draw_context_.opaque_surfaces.clear();
   resource_manager_->main_draw_context_.transparent_surfaces.clear();
-
-  vmaUnmapMemory(gpu_.allocator, resource_manager_->per_frame_data_buffer.allocation);
 
   const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_final");
 

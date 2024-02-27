@@ -51,6 +51,8 @@ hdr_pass.h
 hdr_pass.cpp
 frame_graph.h
 frame_graph.cpp
+shadow_pass.h
+shadow_pass.cpp
 )
 
 target_compile_features(graphics PRIVATE cxx_std_20)

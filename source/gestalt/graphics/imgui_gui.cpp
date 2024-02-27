@@ -155,12 +155,35 @@ void imgui_gui::stats() {
 
 void imgui_gui::lights() {
   if (ImGui::Begin("Light")) {
-    auto& scene_data = actions_.get_scene_data();
+    auto& light = actions_.get_directional_light();
 
-    ImGui::SliderFloat("Light X", &scene_data.sunlightDirection.x, -10.f, 10.f);
-    ImGui::SliderFloat("Light Y", &scene_data.sunlightDirection.y, -10.f, 10.f);
-    ImGui::SliderFloat("Light Z", &scene_data.sunlightDirection.z, -10.f, 10.f);
-    ImGui::SliderFloat("Light intensity", &scene_data.sunlightDirection.w, 0.f, 100.f);
+    // Convert light direction from Cartesian to spherical coordinates (azimuth, elevation)
+    float azimuth = atan2(light.direction.y, light.direction.x);
+    float elevation = atan2(light.direction.z, sqrt(light.direction.x * light.direction.x
+                                                    + light.direction.y * light.direction.y));
+
+    // Convert radians to degrees for ImGui slider
+    float azimuthDeg = glm::degrees(azimuth);
+    float elevationDeg = glm::degrees(elevation);
+
+    // Azimuth slider: Full circle
+    ImGui::SliderFloat("Azimuth", &azimuthDeg, -180.f, 180.f);
+
+    // Elevation slider: From straight down (-90 degrees) to straight up (+90 degrees)
+    ImGui::SliderFloat("Elevation", &elevationDeg, -90.f, 90.f);
+
+    // Update light direction based on slider values
+    // Convert degrees back to radians for calculation
+    azimuth = glm::radians(azimuthDeg);
+    elevation = glm::radians(elevationDeg);
+
+    // Convert spherical coordinates back to Cartesian coordinates
+    light.direction.x = cos(elevation) * cos(azimuth);
+    light.direction.y = cos(elevation) * sin(azimuth);
+    light.direction.z = sin(elevation);
+
+    // Light intensity slider
+    ImGui::SliderFloat("Light intensity", &light.intensity, 0.f, 100.f);
   }
   ImGui::End();
 }

@@ -106,12 +106,12 @@ private:
 
 
 struct per_frame_data {
-  glm::mat4 view;
-  glm::mat4 proj;
-  glm::mat4 viewproj;
-  glm::vec4 ambientColor;
-  glm::vec4 sunlightDirection;  // w for sun power
-  glm::vec4 sunlightColor;
+  glm::mat4 view{1.f};
+  glm::mat4 proj{1.f};
+  glm::mat4 viewproj{1.f};
+  glm::mat4 light_view_proj{1.f};
+  glm::vec3 dir_light_direction{1.f};
+  float dir_light_intensity{1.f};
 };
 
 //> mat_types

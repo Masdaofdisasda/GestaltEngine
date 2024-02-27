@@ -5,6 +5,7 @@
 #include "vk_pipelines.h"
 
 void ssao_filter_pass::prepare() {
+  fmt::print("Preparing ssao filter pass\n");
   rotation_pattern = resource_manager_->load_image("../../assets/rot_texture.bmp").value();
 
   descriptor_layouts_.emplace_back(
@@ -90,6 +91,8 @@ void ssao_filter_pass::cleanup() {
 
 
 void ssao_blur_pass::prepare() {
+  fmt::print("Preparing ssao blur pass\n");
+
   descriptor_layouts_.emplace_back(
       descriptor_layout_builder()
           .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -198,6 +201,8 @@ void ssao_blur_pass::cleanup() {
 }
 
 void ssao_final_pass::prepare() {
+  fmt::print("Preparing ssao final pass\n");
+
   descriptor_layouts_.emplace_back(
       descriptor_layout_builder()
           .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)

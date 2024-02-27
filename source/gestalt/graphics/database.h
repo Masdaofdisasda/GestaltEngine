@@ -6,8 +6,8 @@
 // Component storage types
 using entity_container = std::vector<entity>;
 using mesh_container = std::vector<mesh_component>;
-using camera_container = std::vector<CameraComponent>;
-using light_container = std::vector<LightComponent>;
+using camera_container = std::vector<camera_component>;
+using light_container = std::vector<light_component>;
 using material_container = std::vector<material_component>;
 using transform_container = std::vector<transform_component>;
 
@@ -67,11 +67,11 @@ public:
     components_.meshes_.push_back(mesh);
     return components_.meshes_.size() - 1;
   }
-  size_t add_camera(const CameraComponent& camera) {
+  size_t add_camera(const camera_component& camera) {
     components_.cameras_.push_back(camera);
     return components_.cameras_.size() - 1;
   }
-  size_t add_light(const LightComponent& light) {
+  size_t add_light(const light_component& light) {
     components_.lights_.push_back(light);
     return components_.lights_.size() - 1;
   }
@@ -85,8 +85,8 @@ public:
   }
 
   std::vector<mesh_component>& get_meshes() { return components_.meshes_; }
-  std::vector<CameraComponent>& get_cameras() { return components_.cameras_; }
-  std::vector<LightComponent>& get_lights() { return components_.lights_; }
+  std::vector<camera_component>& get_cameras() { return components_.cameras_; }
+  std::vector<light_component>& get_lights() { return components_.lights_; }
   std::vector<material_component>& get_materials() { return components_.materials_; }
   std::vector<transform_component>& get_transforms() { return components_.transforms_; }
 
@@ -97,8 +97,8 @@ public:
   size_t get_transforms_size() const { return components_.transforms_.size(); }
 
   mesh_component& get_mesh(const size_t mesh) { return components_.meshes_[mesh]; }
-  CameraComponent& get_camera(const size_t camera) { return components_.cameras_[camera]; }
-  LightComponent& get_light(const size_t light) { return components_.lights_[light]; }
+  camera_component& get_camera(const size_t camera) { return components_.cameras_[camera]; }
+  light_component& get_light(const size_t light) { return components_.lights_[light]; }
   material_component& get_material(const size_t material) {
     return components_.materials_[material];
   }

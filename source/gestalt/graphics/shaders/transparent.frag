@@ -159,7 +159,7 @@ vec3 calculatePBRLightContributionDir( inout PBRInfo pbrInputs)
 {
 	vec3 n = pbrInputs.n;
 	vec3 v = pbrInputs.v;
-	vec3 l = normalize(sceneData.sunlightDirection.xyz);	// Vector from surface point to light
+	vec3 l = normalize(sceneData.light_direction);	// Vector from surface point to light
 	vec3 h = normalize(l+v);					// Half vector between both l and v
 
 	float NdotV = pbrInputs.NdotV;
@@ -182,7 +182,7 @@ vec3 calculatePBRLightContributionDir( inout PBRInfo pbrInputs)
 	vec3 diffuseContrib = (1.0 - F) * diffuseBurley(pbrInputs);
 	vec3 specContrib = F * G * D / (4.0 * NdotL * NdotV);
 	// Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
-	vec3 color = NdotL * sceneData.sunlightDirection.w * 3.0f * (diffuseContrib + specContrib);
+	vec3 color = NdotL * sceneData.light_intensity * 3.0f * (diffuseContrib + specContrib);
 
 	return color;
 }
@@ -218,7 +218,7 @@ vec3 calculatePBRLightContributionPoint( inout PBRInfo pbrInputs)
 	// Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
     float distance = length(vec3(lightPos) - inPosition);
     float attenuation = 1.0 / (distance * distance);
-	vec3 color = NdotL * sceneData.sunlightDirection.w * attenuation * (diffuseContrib + specContrib);
+	vec3 color = NdotL * sceneData.light_intensity * attenuation * (diffuseContrib + specContrib);
 
 	return color;
 }

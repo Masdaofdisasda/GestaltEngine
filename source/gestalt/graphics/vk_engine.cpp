@@ -64,6 +64,7 @@ void render_engine::register_gui_actions() {
   };
   gui_actions_.get_stats = [this]() -> engine_stats& { return stats_; };
   gui_actions_.get_scene_data = [this]() -> per_frame_data& { return resource_manager_->per_frame_data_; };
+  gui_actions_.get_directional_light = [this]() -> light_component& { return resource_manager_->get_database().get_lights().at(0); };
   gui_actions_.get_scene_root
       = [this]() -> entity_component& { return scene_manager_->get_root(); };
   gui_actions_.get_scene_object = [this](const entity entity) -> entity_component& {
@@ -126,7 +127,16 @@ void render_engine::cleanup() {
     }
 }
 
+void printMat4(const glm::mat4& mat) {
+    for (int i = 0; i < 4; ++i) {
+      fmt::print("[{:>10.4f}, {:>10.4f}, {:>10.4f}, {:>10.4f}]\n", mat[i][0], mat[i][1], mat[i][2],
+                 mat[i][3]);
+    }
+}
+
 void render_engine::update_scene() {
+
+  //TODO move to camera system
 
     glm::mat4 view = active_camera_.get_view_matrix();
 
@@ -139,9 +149,19 @@ void render_engine::update_scene() {
     // to opengl and gltf axis
     projection[1][1] *= -1;
 
-    resource_manager_->per_frame_data_.view = view;
-    resource_manager_->per_frame_data_.proj = projection;
-    resource_manager_->per_frame_data_.viewproj = projection * view;
+    resource_manager_->get_database().get_camera(0).view_matrix = view;
+    resource_manager_->get_database().get_camera(0).projection_matrix = projection;
+
+  auto data = resource_manager_->per_frame_data_;
+
+   fmt::print("view");
+  printMat4(data.view);
+   fmt::print("proj");
+  printMat4(data.proj);
+   fmt::print("lightviewproj");
+  //printMat4(data.light_view_proj);
+  fmt::print("viewproj");
+  printMat4(data.viewproj);
 
     resource_manager_ ->config_.light_adaptation.delta_time = time_tracking_service_.get_delta_time();
 

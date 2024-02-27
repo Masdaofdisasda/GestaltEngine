@@ -25,44 +25,33 @@ struct mesh_component {
   std::vector<size_t> surfaces;
 };
 
-class CameraComponent {
-public:
-  CameraComponent(const glm::mat4& projectionMatrix);
-
-  // Getters and setters for camera properties
-  const glm::mat4& getProjectionMatrix() const;
-  void setProjectionMatrix(const glm::mat4& projectionMatrix);
-
-private:
-  glm::mat4 projectionMatrix_;
+struct camera_component {
+  glm::mat4 view_matrix{1.0f};
+  glm::mat4 projection_matrix{1.0};
 };
 
-enum class LightType { Directional, Point, Spot };
+enum class light_type { directional, point, spot };
 
-class LightComponent {
-public:
-  LightComponent(LightType type, const glm::vec3& color, float intensity);
+struct light_component {
+  light_component(const glm::vec3& color, const float intensity, const glm::vec3 direction)
+      : type(light_type::directional), color(color), intensity(intensity), direction(direction) {}
+  light_component(const glm::vec3& color, const float intensity)
+      : type(light_type::point), color(color), intensity(intensity) {}
+  light_component(const glm::vec3& color, const float intensity, const glm::vec3 direction,
+                  const float inner_cone, const float outer_cone)
+      : type(light_type::spot),
+        color(color),
+        intensity(intensity),
+        direction(direction),
+        inner_cone(inner_cone),
+        outer_cone(outer_cone) {}
 
-  void setType(LightType type);
-  void setColor(const glm::vec3& color);
-  void setIntensity(float intensity);
-  void setDirection(const glm::vec3& direction);
-  void setSpotProperties(float innerCone, float outerCone);
-
-  LightType getType() const;
-  const glm::vec3& getColor() const;
-  float getIntensity() const;
-  const glm::vec3& getDirection() const;
-  float getInnerCone() const;
-  float getOuterCone() const;
-
-private:
-  LightType type_;
-  glm::vec3 color_;
-  float intensity_;
-  glm::vec3 direction_;  // Used for directional and spot lights
-  float innerCone_;      // Used for spot lights
-  float outerCone_;      // Used for spot lights
+  light_type type = light_type::point;
+  glm::vec3 color = glm::vec3(1.f);
+  float intensity = 1.0f;
+  glm::vec3 direction = glm::vec3(0);  // Used for directional and spot lights
+  float inner_cone = 0.f;              // Used for spot lights
+  float outer_cone = 0.f;              // Used for spot lights
 };
 
 constexpr auto unused_texture = std::numeric_limits<uint32_t>::max();

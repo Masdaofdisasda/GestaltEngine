@@ -5,6 +5,8 @@
 #include "vk_pipelines.h"
 
 void bright_pass::prepare() {
+  fmt::print("Preparing bright pass\n");
+
   descriptor_layouts_.emplace_back(
       descriptor_layout_builder()
           .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -78,6 +80,8 @@ void bright_pass::cleanup() {
 
 
 void bloom_blur_pass::prepare() {
+  fmt::print("Preparing bloom blur pass\n");
+
   descriptor_layouts_.emplace_back(
       descriptor_layout_builder()
           .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -187,6 +191,8 @@ void bloom_blur_pass::cleanup() {
 }
 
 void streaks_pass::prepare() {
+  fmt::print("Preparing streaks pass\n");
+
   streak_pattern = resource_manager_->load_image("../../assets/StreaksRotationPattern.bmp").value();
 
   descriptor_layouts_.emplace_back(
@@ -268,6 +274,8 @@ void streaks_pass::cleanup() {
 }
 
 void luminance_pass::prepare() {
+  fmt::print("Preparing luminance pass\n");
+
     descriptor_layouts_.emplace_back(
       descriptor_layout_builder()
           .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -343,6 +351,8 @@ void luminance_pass::execute(VkCommandBuffer cmd) {
 }
 
 void luminance_downscale_pass::prepare() {
+  fmt::print("Preparing luminance downscale pass\n");
+
     descriptor_layouts_.emplace_back(
       descriptor_layout_builder()
           .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -430,6 +440,8 @@ void luminance_downscale_pass::execute(VkCommandBuffer cmd) {
 }
 
 void light_adaptation_pass::prepare() {
+  fmt::print("Preparing light adaptation pass\n");
+
   descriptor_layouts_.emplace_back(
       descriptor_layout_builder()
           .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -526,6 +538,8 @@ void light_adaptation_pass::execute(VkCommandBuffer cmd) {
 
 
 void tonemap_pass::prepare() {
+  fmt::print("Preparing tonemap pass\n");
+
   descriptor_layouts_.emplace_back(
       descriptor_layout_builder()
           .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)

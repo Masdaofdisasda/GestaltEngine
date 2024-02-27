@@ -9,6 +9,7 @@ layout (location = 0) out vec3 outNormal;
 layout (location = 1) out vec3 outPosition; //was color
 layout (location = 2) out vec2 outUV;
 layout (location = 3) flat out int outMaterialIndex;
+layout (location = 4) out vec4 outShadowPosition;
 
 struct Vertex {
 
@@ -31,6 +32,12 @@ layout( push_constant ) uniform constants
 	VertexBuffer vertexBuffer;
 } PushConstants;
 
+const mat4 scaleBias = mat4( 
+	0.5, 0.0, 0.0, 0.0,
+	0.0, 0.5, 0.0, 0.0,
+	0.0, 0.0, 1.0, 0.0,
+	0.5, 0.5, 0.0, 1.0);
+
 void main() 
 {
 	Vertex v = PushConstants.vertexBuffer.vertices[gl_VertexIndex];
@@ -45,4 +52,6 @@ void main()
 	outUV.x = v.uv_x;
 	outUV.y = v.uv_y;
 	outMaterialIndex = PushConstants.materialIndex;
+	
+	outShadowPosition = scaleBias * sceneData.lightViewProj * PushConstants.model_matrix * vec4(v.position, 1.0);
 }
