@@ -207,8 +207,8 @@ struct render_config {
   struct light_adaptation_params {
     float adaptation_speed{1.f};
     float delta_time{0.16f};
-    float min_luminance{0.03f};
-    float max_luminance{1.0f};
+    float min_luminance{0.01f};
+    float max_luminance{10.0f};
   } light_adaptation{};
 
   struct streaks_params {

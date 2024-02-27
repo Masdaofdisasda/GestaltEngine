@@ -21,8 +21,8 @@ void main()
    float adaptedLum = texture(adaptedLuminance, vec2(0.5, 0.5)).x;
 
    float newAdaptation = adaptedLum + (currentLum - adaptedLum) * (1.0 - exp(-params.delta_time * params.adaptation_speed));
-
-   newAdaptation = min(max(params.min_luminance, newAdaptation), min(params.max_luminance, newAdaptation));
+   
+   newAdaptation = clamp(newAdaptation, params.min_luminance, params.max_luminance);
 
    outColor = vec4(vec3(newAdaptation), 1.0);
 }
