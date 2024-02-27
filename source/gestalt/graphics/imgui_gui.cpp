@@ -229,7 +229,8 @@ void imgui_gui::render_settings() {
     }
 
     if (ImGui::CollapsingHeader("Light Adaptation Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
-      ImGui::SliderFloat("Adaption Speed", &config.light_adaptation.adaptation_speed, 0.001f, 2.0f, "%.2f");
+      ImGui::SliderFloat("Light Adaption Speed", &config.light_adaptation.adaptation_speed_dark2light, 0.001f, .1f, "%.2f");
+      ImGui::SliderFloat("Dark Adaption Speed", &config.light_adaptation.adaptation_speed_light2dark, 0.001f, .1f, "%.2f");
       ImGui::SliderFloat("Min Luminance", &config.light_adaptation.min_luminance, 0.0f, 1.0f, "%.2f");
       ImGui::SliderFloat("Max Luminance", &config.light_adaptation.max_luminance, 1.0f, 10.0f, "%.2f");
     }

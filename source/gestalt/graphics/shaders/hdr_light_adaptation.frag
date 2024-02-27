@@ -6,7 +6,8 @@ layout(location = 0) out vec4 outColor;
 
 layout( push_constant ) uniform constants
 {
-    float adaptation_speed;
+    float adaptation_speed_dark2light;
+    float adaptation_speed_light2dark;
     float delta_time;
     float min_luminance;
     float max_luminance;
@@ -20,7 +21,11 @@ void main()
    float currentLum = texture(currentLuminance, vec2(0.5, 0.5)).x;
    float adaptedLum = texture(adaptedLuminance, vec2(0.5, 0.5)).x;
 
-   float newAdaptation = adaptedLum + (currentLum - adaptedLum) * (1.0 - exp(-params.delta_time * params.adaptation_speed));
+   float tau = (currentLum > adaptedLum) ? params.adaptation_speed_light2dark : params.adaptation_speed_dark2light;
+
+
+   //https://google.github.io/filament/Filament.html#imagingpipeline/physicallybasedcamera/adaptation
+   float newAdaptation = adaptedLum + (currentLum - adaptedLum) * (1.0 - exp(-params.delta_time * tau));
    
    newAdaptation = clamp(newAdaptation, params.min_luminance, params.max_luminance);
 

@@ -473,59 +473,56 @@ void light_adaptation_pass::cleanup() {
 }
 
 void light_adaptation_pass::execute(VkCommandBuffer cmd) {
-   
-    descriptor_set_
-        = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(0));
+  descriptor_set_
+      = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(0));
 
-    const auto current_lum = resource_manager_->get_resource<AllocatedImage>("lum_1_final");
-    std::shared_ptr<AllocatedImage> avg_lum = resource_manager_->get_resource<
-      AllocatedImage>("lum_1_avg");
-    std::shared_ptr<AllocatedImage> new_lum = resource_manager_->get_resource<
-      AllocatedImage>("lum_1_new");
+  const auto current_lum = resource_manager_->get_resource<AllocatedImage>("lum_1_final");
+  std::shared_ptr<AllocatedImage> avg_lum
+      = resource_manager_->get_resource<AllocatedImage>("lum_1_avg");
+  std::shared_ptr<AllocatedImage> new_lum
+      = resource_manager_->get_resource<AllocatedImage>("lum_1_new");
 
-    vkutil::transition_read(cmd, *current_lum);
-    vkutil::transition_read(cmd, *avg_lum);
-    vkutil::transition_write(cmd, *new_lum);
+  vkutil::transition_read(cmd, *current_lum);
+  vkutil::transition_read(cmd, *avg_lum);
+  vkutil::transition_write(cmd, *new_lum);
 
-    VkRenderingAttachmentInfo newColorAttachment
-        = vkinit::attachment_info(new_lum->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
-    VkRenderingInfo newRenderInfo
-        = vkinit::rendering_info(new_lum->getExtent2D(), &newColorAttachment, nullptr);
-    vkCmdBeginRendering(cmd, &newRenderInfo);
+  VkRenderingAttachmentInfo newColorAttachment
+      = vkinit::attachment_info(new_lum->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+  VkRenderingInfo newRenderInfo
+      = vkinit::rendering_info(new_lum->getExtent2D(), &newColorAttachment, nullptr);
+  vkCmdBeginRendering(cmd, &newRenderInfo);
 
-    writer.clear();
-    writer.write_image(
-        10, current_lum->imageView,
-        resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    writer.write_image(
-        11, avg_lum->imageView,
-        resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    writer.update_set(gpu_.device, descriptor_set_);
+  writer.clear();
+  writer.write_image(
+      10, current_lum->imageView,
+      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+  writer.write_image(
+      11, avg_lum->imageView,
+      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+  writer.update_set(gpu_.device, descriptor_set_);
 
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
-                            &descriptor_set_, 0, nullptr);
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
+                          &descriptor_set_, 0, nullptr);
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
-    viewport_.width = static_cast<float>(new_lum->getExtent2D().width);
-    viewport_.height = static_cast<float>(new_lum->getExtent2D().height);
-    scissor_.extent = new_lum->getExtent2D();
-    vkCmdSetViewport(cmd, 0, 1, &viewport_);
-    vkCmdSetScissor(cmd, 0, 1, &scissor_);
-    vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                       sizeof(render_config::light_adaptation_params), &resource_manager_->config_.light_adaptation);
-    vkCmdDraw(cmd, 3, 1, 0, 0);
-    vkCmdEndRendering(cmd);
+  viewport_.width = static_cast<float>(new_lum->getExtent2D().width);
+  viewport_.height = static_cast<float>(new_lum->getExtent2D().height);
+  scissor_.extent = new_lum->getExtent2D();
+  vkCmdSetViewport(cmd, 0, 1, &viewport_);
+  vkCmdSetScissor(cmd, 0, 1, &scissor_);
+  vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                     sizeof(render_config::light_adaptation_params),
+                     &resource_manager_->config_.light_adaptation);
+  vkCmdDraw(cmd, 3, 1, 0, 0);
+  vkCmdEndRendering(cmd);
 
-    //TODO should not be done this way,simulate ping pong buffer
-    //std::swap(avg_lum, new_lum);
-
+  // TODO should not be done this way,simulate ping pong buffer
   resource_manager_->update_resource_id("lum_1_avg", "lum_1_temp");
   resource_manager_->update_resource_id("lum_1_new", "lum_1_avg");
   resource_manager_->update_resource_id("lum_1_temp", "lum_1_new");
-  
-} 
+}
 
 
 void tonemap_pass::prepare() {

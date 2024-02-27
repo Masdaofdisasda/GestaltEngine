@@ -205,7 +205,8 @@ struct render_config {
   } hdr{};
 
   struct light_adaptation_params {
-    float adaptation_speed{1.f};
+    float adaptation_speed_dark2light{.04f};
+    float adaptation_speed_light2dark{.02f};
     float delta_time{0.16f};
     float min_luminance{0.01f};
     float max_luminance{10.0f};
