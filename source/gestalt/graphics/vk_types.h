@@ -196,13 +196,20 @@ struct render_config {
     float exposure{1.f};
     float maxWhite{1.35f};
     float bloomStrength{0.1f};
-    float adaptationSpeed{1.f};
+    float padding{1.f};
     glm::vec4 lift{0.f};
     glm::vec4 gamma{1.f};
     glm::vec4 gain{1.f};
     bool show_bright_pass = false;
     int toneMappingOption{2};
   } hdr{};
+
+  struct light_adaptation_params {
+    float adaptation_speed{1.f};
+    float delta_time{0.16f};
+    float min_luminance{0.03f};
+    float max_luminance{1.0f};
+  } light_adaptation{};
 
   struct streaks_params {
     float intensity{.18f};

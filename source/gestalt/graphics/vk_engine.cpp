@@ -143,6 +143,8 @@ void render_engine::update_scene() {
     resource_manager_->per_frame_data_.proj = projection;
     resource_manager_->per_frame_data_.viewproj = projection * view;
 
+    resource_manager_ ->config_.light_adaptation.delta_time = time_tracking_service_.get_delta_time();
+
     scene_manager_->update_scene();
 }
 

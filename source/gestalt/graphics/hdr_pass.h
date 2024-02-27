@@ -4,6 +4,7 @@
 #include "render_pass.h"
 #include "vk_descriptors.h"
 #include "vk_types.h"
+#include "vk_types.h"
 
 /*
   struct adaptation {
@@ -153,8 +154,41 @@ public:
 
 class luminance_pass final : public render_pass {
   std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
-  std::string downscale_fragment_shader_source_ = "../shaders/downscale2x2.frag.spv";
-  std::string luminance_fragment_shader_source_ = "../shaders/to_luminance.frag.spv";
+  std::string fragment_shader_source_ = "../shaders/to_luminance.frag.spv";
+
+  VkExtent2D extent64_{64, 64};
+
+  VkViewport viewport_{
+      .x = 0,
+      .y = 0,
+      .minDepth = 0.f,
+      .maxDepth = 1.f,
+  };
+  VkRect2D scissor_{
+      .offset = {0, 0},
+  };
+
+  shader_pass_dependency_info deps_
+      = {.read_resources = {{std::make_shared<color_image_resource>("scene_ssao", 1.0f)}},
+         .write_resources
+         = {{"lum_64_final", std::make_shared<color_image_resource>("lum_64", extent64_)}}};
+
+  descriptor_writer writer;
+
+  VkPipeline pipeline_ = nullptr;
+  VkPipelineLayout pipeline_layout_ = nullptr;
+  std::vector<VkDescriptorSetLayout> descriptor_layouts_;
+  VkDescriptorSet descriptor_set_ = nullptr;
+
+public:
+  void prepare() override;
+  void cleanup() override;
+  void execute(VkCommandBuffer cmd) override;
+  shader_pass_dependency_info& get_dependencies() override { return deps_; }
+};
+class luminance_downscale_pass final : public render_pass {
+  std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
+  std::string fragment_shader_source_ = "../shaders/downscale2x2.frag.spv";
 
   VkExtent2D extent64_{64, 64};
   VkExtent2D extent32_{32, 32};
@@ -175,10 +209,10 @@ class luminance_pass final : public render_pass {
   };
 
   shader_pass_dependency_info deps_
-      = {.read_resources = {{std::make_shared<color_image_resource>("scene_ssao", 1.0f)}},
+      = {.read_resources
+         = {{std::make_shared<color_image_resource>("lum_64_final", extent64_)}},
          .write_resources
-         = {{"lum_64_final", std::make_shared<color_image_resource>("lum_64", extent64_)},
-            {"lum_32_final", std::make_shared<color_image_resource>("lum_32", extent32_)},
+         = {{"lum_32_final", std::make_shared<color_image_resource>("lum_32", extent32_)},
             {"lum_16_final", std::make_shared<color_image_resource>("lum_16", extent16_)},
             {"lum_8_final", std::make_shared<color_image_resource>("lum_8", extent8_)},
             {"lum_4_final", std::make_shared<color_image_resource>("lum_4", extent4_)},
@@ -187,12 +221,52 @@ class luminance_pass final : public render_pass {
 
   descriptor_writer writer;
 
-  VkPipeline downscale_pipeline_ = nullptr;
-  VkPipeline luminance_pipeline_ = nullptr;
+  VkPipeline pipeline_ = nullptr;
   VkPipelineLayout pipeline_layout_ = nullptr;
   std::vector<VkDescriptorSetLayout> descriptor_layouts_;
-  VkDescriptorSet downscale_descriptor_set_ = nullptr;
-  VkDescriptorSet luminance_descriptor_set_ = nullptr;
+  VkDescriptorSet descriptor_set_ = nullptr;
+
+public:
+  void prepare() override;
+  void cleanup() override;
+  void execute(VkCommandBuffer cmd) override;
+  shader_pass_dependency_info& get_dependencies() override { return deps_; }
+};
+class light_adaptation_pass final : public render_pass {
+  std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
+  std::string adaptation_fragment_shader_source_ = "../shaders/hdr_light_adaptation.frag.spv";
+
+  VkExtent2D extent1_{1, 1};
+
+  VkPushConstantRange push_constant_range_{
+      .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+      .offset = 0,
+      .size = sizeof(render_config::light_adaptation_params),
+  };
+
+  VkViewport viewport_{
+      .x = 0,
+      .y = 0,
+      .minDepth = 0.f,
+      .maxDepth = 1.f,
+  };
+  VkRect2D scissor_{
+      .offset = {0, 0},
+  };
+
+  shader_pass_dependency_info deps_
+      = {.read_resources
+         = {{std::make_shared<color_image_resource>("lum_1_final", extent1_)}},
+         .write_resources
+         = {{"lum_1_current", std::make_shared<color_image_resource>("lum_1_new", extent1_)},
+            {"lum_1_adapted", std::make_shared<color_image_resource>("lum_1_avg", extent1_)}}};
+
+  descriptor_writer writer;
+
+  VkPipeline pipeline_ = nullptr;
+  VkPipelineLayout pipeline_layout_ = nullptr;
+  std::vector<VkDescriptorSetLayout> descriptor_layouts_;
+  VkDescriptorSet descriptor_set_ = nullptr;
 
 public:
   void prepare() override;
@@ -227,7 +301,7 @@ class tonemap_pass final : public render_pass {
   shader_pass_dependency_info deps_
       = {.read_resources = {{std::make_shared<color_image_resource>("scene_streak", extent_)},
                             {std::make_shared<color_image_resource>("scene_ssao", extent_)},
-                            {std::make_shared<color_image_resource>("lum_1_final", 1.0f)}},
+                            {std::make_shared<color_image_resource>("lum_1_adapted", 1.0f)}},
          .write_resources
          = {{"scene_final", std::make_shared<color_image_resource>("hdr_final", 1.0f)}}};
 
