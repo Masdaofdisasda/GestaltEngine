@@ -72,28 +72,27 @@ void skybox_pass::execute(const VkCommandBuffer cmd) {
   resource_manager_->per_frame_data_.dir_light_intensity = light.intensity;
 
   // Define the dimensions of the orthographic projection
-  float left = -200.0f;
-  float right = 200.0f;
-  float bottom = -200.0f;
-  float top = 200.0f;
-  float near_plane = .1f;
-  float far_plane = 1000.0f;
+  auto config = resource_manager_->config_.shadow;
+  float left = config.left;
+  float right = config.right;
+  float bottom = config.bottom;
+  float top = config.top;
+  float near_plane = config.near;
+  float far_plane = config.far;
   glm::mat4 lightProjection = glm::ortho(left, right, bottom, top, near_plane, far_plane);
 
-  lightProjection[1][1] *= -1;
+  //lightProjection[1][1] *= -1;
   glm::vec3 direction = normalize(light.direction);  // Ensure the direction is normalized
-  glm::vec3 lightPos
-      = direction * (far_plane/2.f);  // Position the light in the opposite direction
 
   glm::vec3 up = glm::vec3(0, 1, 0);
   if (glm::abs(dot(up, direction)) > 0.999f) {
-    up = glm::vec3(1, 0, 0);  // Switch to a different up vector if the initial choice is parallel
+    //up = glm::vec3(1, 0, 0);  // Switch to a different up vector if the initial choice is parallel
   }
 
   // Create a view matrix for the light
-  glm::mat4 lightView = lookAt(lightPos, lightPos - direction, up);
+  glm::mat4 lightView = lookAt(direction * config.light_distance, glm::vec3(0.f), up);
 
-  resource_manager_->per_frame_data_.light_view_proj = projection * lightView;
+  resource_manager_->per_frame_data_.light_view_proj = lightProjection * lightView;
   //resource_manager_->per_frame_data_.proj = lightProjection;
   //resource_manager_->per_frame_data_.view = lightView;
   //resource_manager_->per_frame_data_.viewproj = lightProjection * lightView;

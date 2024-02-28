@@ -13,6 +13,7 @@ public:
   VkPipelineDepthStencilStateCreateInfo _depthStencil;
   VkPipelineRenderingCreateInfo _renderInfo;
   VkFormat _colorAttachmentformat;
+  std::vector<VkDynamicState> _dynamicStates;
 
   PipelineBuilder() { clear(); }
 
@@ -33,6 +34,7 @@ public:
   PipelineBuilder& set_depth_format(VkFormat format);
   PipelineBuilder& disable_depthtest();
   PipelineBuilder& enable_depthtest(bool depthWriteEnable, VkCompareOp op);
+  PipelineBuilder& enable_dynamic_depth_bias();
 
   PipelineBuilder& set_pipeline_layout(VkPipelineLayout layout);
 };

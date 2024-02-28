@@ -32,11 +32,11 @@ layout( push_constant ) uniform constants
 	VertexBuffer vertexBuffer;
 } PushConstants;
 
-const mat4 scaleBias = mat4( 
+const mat4 biasMat = mat4( 
 	0.5, 0.0, 0.0, 0.0,
 	0.0, 0.5, 0.0, 0.0,
 	0.0, 0.0, 1.0, 0.0,
-	0.5, 0.5, 0.0, 1.0);
+	0.5, 0.5, 0.0, 1.0 );
 
 void main() 
 {
@@ -48,10 +48,10 @@ void main()
 
 	outNormal = mat3(transpose(inverse(PushConstants.model_matrix))) * v.normal;
 	//outColor = v.color.xyz * materialData.colorFactors.xyz;	
-	outPosition = vec3(PushConstants.model_matrix * vec4(v.position, 1.0));
+	outPosition = vec3(PushConstants.model_matrix * position);
 	outUV.x = v.uv_x;
 	outUV.y = v.uv_y;
 	outMaterialIndex = PushConstants.materialIndex;
 	
-	outShadowPosition = scaleBias * sceneData.lightViewProj * PushConstants.model_matrix * vec4(v.position, 1.0);
+	outShadowPosition = biasMat * sceneData.lightViewProj * PushConstants.model_matrix * position;
 }

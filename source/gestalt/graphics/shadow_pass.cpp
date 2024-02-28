@@ -23,7 +23,6 @@ void directional_depth_pass::prepare() {
   VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
 
   const auto depth_image = resource_manager_->get_resource<AllocatedImage>("directional_depth");
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("directional_color");
 
   pipeline_ = PipelineBuilder()
                   .set_shaders(meshVertexShader, meshFragShader)
@@ -33,7 +32,7 @@ void directional_depth_pass::prepare() {
                   .set_multisampling_none()
                   .disable_blending()
                   .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-                  .set_color_attachment_format(color_image->imageFormat)    
+                  .enable_dynamic_depth_bias()
                   .set_depth_format(depth_image->imageFormat)
                   .set_pipeline_layout(pipeline_layout_)
                   .build_pipeline(gpu_.device);
@@ -45,17 +44,14 @@ void directional_depth_pass::prepare() {
 void directional_depth_pass::cleanup() { vkDestroyPipeline(gpu_.device, pipeline_, nullptr); }
 
 void directional_depth_pass::execute(VkCommandBuffer cmd) {
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("directional_color");
   const auto depth_image = resource_manager_->get_resource<AllocatedImage>("directional_depth");
 
-  VkRenderingAttachmentInfo newColorAttachment //TODO posibly remove this
-      = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
   VkClearValue depth_clear = {.depthStencil = {1.f, 0}};
   VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
       depth_image->imageView, &depth_clear, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
   VkRenderingInfo renderInfo
-      = vkinit::rendering_info(depth_image->getExtent2D(), &newColorAttachment, &depthAttachment);
+      = vkinit::rendering_info(depth_image->getExtent2D(), nullptr, &depthAttachment);
 
   vkCmdBeginRendering(cmd, &renderInfo);
 
@@ -76,10 +72,15 @@ void directional_depth_pass::execute(VkCommandBuffer cmd) {
                        VK_INDEX_TYPE_UINT32);
 
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
-
   gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                                  &descriptor_write);
 
+  // Depth bias (and slope) are used to avoid shadowing artifacts
+  // Constant depth bias factor (always applied)
+  float depthBiasConstant = resource_manager_->config_.shadow.shadow_bias;
+  // Slope depth bias factor, applied depending on polygon's slope
+  float depthBiasSlope = 1.75f;
+  vkCmdSetDepthBias(cmd, depthBiasConstant, 0.0f, depthBiasSlope);
   viewport_.width = static_cast<float>(depth_image->getExtent2D().width);
   viewport_.height = static_cast<float>(depth_image->getExtent2D().height);
   scissor_.extent = depth_image->getExtent2D();

@@ -13,9 +13,7 @@ class directional_depth_pass final : public render_pass {
   shader_pass_dependency_info deps_ = {
       .read_resources = {},
       .write_resources = {{"directional_shadow_map", std::make_shared<depth_image_resource>(
-                                                         "directional_depth", effect_size_)},
-                          {"directional_shadow_color", std::make_shared<color_image_resource>(
-                                                         "directional_color", effect_size_)}},
+                                                         "directional_depth", effect_size_)}},
   };
 
   VkPushConstantRange push_constant_range_{

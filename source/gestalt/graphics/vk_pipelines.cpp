@@ -46,13 +46,15 @@ VkPipeline PipelineBuilder::build_pipeline(VkDevice device) {
   pipelineInfo.pDepthStencilState = &_depthStencil;
   pipelineInfo.layout = _pipelineLayout;
 
-  VkDynamicState state[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+  std::vector<VkDynamicState> dynamicStates;
+  dynamicStates.append_range(_dynamicStates);
+  dynamicStates.push_back(VK_DYNAMIC_STATE_VIEWPORT);
+  dynamicStates.push_back(VK_DYNAMIC_STATE_SCISSOR);
 
   VkPipelineDynamicStateCreateInfo dynamicInfo
       = {.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
-  dynamicInfo.pDynamicStates = &state[0];
-  dynamicInfo.dynamicStateCount = 2;
-
+  dynamicInfo.pDynamicStates = dynamicStates.data();
+  dynamicInfo.dynamicStateCount = dynamicStates.size();
   pipelineInfo.pDynamicState = &dynamicInfo;
 
   // its easy to error out on create graphics pipeline, so we handle it a bit
@@ -193,6 +195,13 @@ PipelineBuilder& PipelineBuilder::enable_depthtest(bool depthWriteEnable, VkComp
   _depthStencil.back = {};
   _depthStencil.minDepthBounds = 0.f;
   _depthStencil.maxDepthBounds = 1.f;
+
+  return *this;
+}
+
+PipelineBuilder& PipelineBuilder::enable_dynamic_depth_bias() {
+
+  _dynamicStates.push_back(VK_DYNAMIC_STATE_DEPTH_BIAS);
 
   return *this;
 }

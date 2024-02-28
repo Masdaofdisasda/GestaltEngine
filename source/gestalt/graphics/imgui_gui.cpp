@@ -283,6 +283,23 @@ void imgui_gui::render_settings() {
 
     if (ImGui::CollapsingHeader("Shadow Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
       ImGui::Checkbox("Enable Shadows", &config.enable_shadows);
+
+      ImGui::SliderFloat("Shadow Bias", &config.shadow.shadow_bias, -1000.0f, 1000.0f,
+                                  "%.4f");
+      ImGui::SliderFloat("Top", &config.shadow.top, -1000.0f, 1000.0f,
+                                           "%.2f");
+      ImGui::SliderFloat("Bottom", &config.shadow.bottom, -1000.0f, 1000.0f,
+                                                    "%.2f");
+      ImGui::SliderFloat("Left", &config.shadow.left, -1000.0f, 1000.0f,
+                                                           "%.2f");
+      ImGui::SliderFloat("Right", &config.shadow.right, -1000.0f, 1000.0f,
+                                                                      "%.2f");
+      ImGui::SliderFloat("Near", &config.shadow.near, -1000.0f, 1000.0f,
+                                                            "%.2f");
+      ImGui::SliderFloat("Far", &config.shadow.far, -1000.0f, 1000.0f,
+                                                                  "%.2f");
+      ImGui::SliderFloat("Light Distance", &config.shadow.light_distance, -1000.0f, 1000.0f,
+                                                                           "%.2f");
     }
 
     // TODO: Add more sections for other settings as necessary

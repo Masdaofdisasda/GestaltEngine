@@ -301,6 +301,7 @@ class tonemap_pass final : public render_pass {
 
   shader_pass_dependency_info deps_
       = {.read_resources = {{std::make_shared<color_image_resource>("scene_streak", extent_)},
+                            {std::make_shared<color_image_resource>("directional_shadow_map", extent_)},
                             {std::make_shared<color_image_resource>("scene_ssao", extent_)},
                             {std::make_shared<color_image_resource>("lum_1_adapted", 1.0f)}},
          .write_resources

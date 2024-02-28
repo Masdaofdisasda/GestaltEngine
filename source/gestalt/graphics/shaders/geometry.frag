@@ -9,11 +9,11 @@ layout (location = 0) in vec3 inNormal;
 layout (location = 1) in vec3 inPosition;
 layout (location = 2) in vec2 inUV;
 layout (location = 3) flat in int inMaterialIndex;
-layout (location = 4) out vec4 inShadowPosition;
+layout (location = 4) in vec4 inShadowPosition;
 
 layout (location = 0) out vec4 outFragColor;
 
-layout(set = 4, binding = 10) uniform sampler2D depthTex;
+layout(set = 4, binding = 10) uniform sampler2D shadowMap;
 
 struct PBRInfo
 {
@@ -42,28 +42,15 @@ vec3 linearTosRGB(vec3 color) {
     return mix(color * 12.92, 1.055 * pow(color, vec3(1.0 / 2.4)) - vec3(0.055), step(vec3(0.0031308), color));
 }
 
+vec4 compareDepths(vec4 shadowCoord) {
+    vec3 projCoords = shadowCoord.xyz / shadowCoord.w;
 
-float PCF(int kernelSize, vec2 shadowCoord, float depth)
-{
-	float size = 1.0 / float( textureSize(depthTex, 0 ).x );
-	float shadow = 0.0;
-	int range = kernelSize / 2;
-	for ( int v=-range; v<=range; v++ ) for ( int u=-range; u<=range; u++ )
-		shadow += (depth >= texture( depthTex, shadowCoord + size * vec2(u, v) ).r) ? 1.0 : 0.0;
-	return shadow / (kernelSize * kernelSize);
-}
+    float shadowMapDepth = texture(shadowMap, projCoords.xy).r;
+    float currentDepth = projCoords.z;
 
-float shadowFactor(vec4 shadowCoord, float depthBias)
-{
-	vec4 shadowCoords4 = shadowCoord / shadowCoord.w;
-
-	if (shadowCoords4.z > -1.0 && shadowCoords4.z < 1.0)
-	{
-		float shadowSample = PCF( 13, shadowCoords4.xy, shadowCoords4.z + depthBias );
-		return mix(1.0, 0.3, shadowSample);
-	}
-
-	return 1.0; 
+    // Output the depth difference or use it for debugging
+    float depthDifference = abs(currentDepth - shadowMapDepth);
+    return vec4(depthDifference.rrr, 1.0); // Grayscale output
 }
 
 
@@ -328,8 +315,7 @@ void main() {
 		MeR = texture(nonuniformEXT(textures[metalicRoughIndex]), UV);
 	}
 	
-	//float shadow_bias = max(-0.001 * (1.0 - dot(n, sceneData.light_direction)), -0.0001);
-	float shadow =  shadowFactor(inShadowPosition, -0.001);
+	float shadow = compareDepths(inShadowPosition).r;
 
 	PBRInfo pbrInputs;
 	
@@ -346,5 +332,5 @@ void main() {
 
 	color += Ke.rgb;
 
-    outFragColor = vec4(color, 1.0);
+    outFragColor = vec4(color * shadow, 1.0);
 }

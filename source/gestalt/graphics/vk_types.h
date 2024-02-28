@@ -220,6 +220,17 @@ struct render_config {
   } streaks{};
 
   bool enable_shadows{true};
+  struct shadow_params {
+    float shadow_bias{0.005f};
+    float top{250};
+    float bottom{-200};
+    float left{-230.f};
+    float right{230};
+    float near{-700.f};
+    float far{300.f};
+    float light_distance{1.f};
+  } shadow{};
+
   // todo : more settings
 };
 

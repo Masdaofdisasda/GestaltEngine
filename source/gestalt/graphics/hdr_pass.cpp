@@ -545,6 +545,7 @@ void tonemap_pass::prepare() {
           .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
           .add_binding(11, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
           .add_binding(12, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+          .add_binding(13, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
           .build(gpu_.device));
   VkPipelineLayoutCreateInfo pipeline_layout_create_info{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -588,6 +589,7 @@ void tonemap_pass::execute(VkCommandBuffer cmd) {
   const auto scene_bloom = resource_manager_->get_resource<AllocatedImage>("scene_streak");
   const auto color_image = resource_manager_->get_resource<AllocatedImage>("hdr_final");
   const auto lum_image = resource_manager_->get_resource<AllocatedImage>("lum_1_adapted");
+  const auto depth_image = resource_manager_->get_resource<AllocatedImage>("directional_shadow_map");
 
   VkRenderingAttachmentInfo newColorAttachment
       = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -608,6 +610,11 @@ void tonemap_pass::execute(VkCommandBuffer cmd) {
       12, lum_image->imageView,
       resource_manager_->get_database().get_sampler(1),  // todo default_sampler_linear
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+  writer.update_set(gpu_.device, descriptor_set_);
+  writer.write_image(
+      13, depth_image->imageView,
+      resource_manager_->get_database().get_sampler(1),  // todo default_sampler_linear
+      VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.update_set(gpu_.device, descriptor_set_);
 
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,

@@ -20,6 +20,7 @@ layout( push_constant ) uniform constants
 layout(binding = 10) uniform sampler2D texScene;
 layout(binding = 11) uniform sampler2D texBloom;
 layout(binding = 12) uniform sampler2D texLuminance;
+layout(binding = 13) uniform sampler2D texShadow;
 
 // Extended Reinhard tone mapping operator
 vec3 Reinhard2(vec3 x)
@@ -133,5 +134,6 @@ void main() {
     sceneColor = ApplyLiftGammaGain(sceneColor, params.lift.rgb, params.gamma.rgb, params.gain.rgb);
 
     vec3 finalColor = linearToSrgb(sceneColor);
+    vec3 depth = texture(texShadow, uv).rgb;
     outColor = vec4(finalColor, 1.0);
 }
