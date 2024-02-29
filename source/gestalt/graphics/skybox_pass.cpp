@@ -83,8 +83,8 @@ void skybox_pass::execute(const VkCommandBuffer cmd) {
   // Create a view matrix for the light
   glm::mat4 lightView = lookAt(glm::vec3(0, 0, 0), -direction, glm::vec3(0, 0, 1));
 
-  glm::vec3 min{config.bottom};
-  glm::vec3 max{config.top};
+  glm::vec3 min{config.min_corner};
+  glm::vec3 max{config.max_corner};
 
   glm::vec3 corners[] = {
       glm::vec3(min.x, min.y, min.z), glm::vec3(min.x, max.y, min.z),

@@ -232,7 +232,7 @@ void imgui_gui::render_settings() {
       ImGui::Checkbox("Enable SSAO", &config.enable_ssao);
       ImGui::SliderInt("SSAO Quality", &config.ssao_quality, 1, 4);
       ImGui::Checkbox("Show SSAO", &config.ssao.show_ssao_only);
-      ImGui::SliderFloat("Scale", &config.ssao.scale, 0.0f, 2.0f,
+      ImGui::SliderFloat("Scale", &config.ssao.scale, 0.0f, 10.0f,
                          "%.3f");  
       ImGui::SliderFloat("Bias", &config.ssao.bias, 0.0f, 1.0f,
                          "%.3f");  
@@ -252,10 +252,32 @@ void imgui_gui::render_settings() {
     }
 
     if (ImGui::CollapsingHeader("Light Adaptation Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
-      ImGui::SliderFloat("Light Adaption Speed", &config.light_adaptation.adaptation_speed_dark2light, 0.001f, .1f, "%.2f");
-      ImGui::SliderFloat("Dark Adaption Speed", &config.light_adaptation.adaptation_speed_light2dark, 0.001f, .1f, "%.2f");
-      ImGui::SliderFloat("Min Luminance", &config.light_adaptation.min_luminance, 0.0f, 1.0f, "%.2f");
-      ImGui::SliderFloat("Max Luminance", &config.light_adaptation.max_luminance, 1.0f, 10.0f, "%.2f");
+      float logLightAdaptation = log10f(config.light_adaptation.adaptation_speed_dark2light);
+      if (ImGui::SliderFloat("Light Adaption Speed", &logLightAdaptation, log10f(0.0001f),
+                             log10f(100.0f),
+                             "Light: %.4f")) {
+        config.light_adaptation.adaptation_speed_dark2light = powf(10.0f, logLightAdaptation);
+      }
+
+      float logDarkAdaptation = log10f(config.light_adaptation.adaptation_speed_light2dark);
+      if (ImGui::SliderFloat("Dark Adaption Speed", &logDarkAdaptation, log10f(0.0001f),
+                             log10f(100.0f), "Dark: %.4f")) {
+        config.light_adaptation.adaptation_speed_light2dark = powf(10.0f, logDarkAdaptation);
+      }
+
+      float logMinLuminance = log10f(config.light_adaptation.min_luminance);
+      if (ImGui::SliderFloat("Log Min Luminance", &logMinLuminance,
+                             log10f(0.0001f), log10f(1.0f),
+                             "Min: %.4f")) {
+        config.light_adaptation.min_luminance = powf(10.0f, logMinLuminance);
+      }
+
+      float logMaxLuminance = log10f(config.light_adaptation.max_luminance);
+      if (ImGui::SliderFloat("Log Max Luminance", &logMaxLuminance,
+                             log10f(1.f), log10f(100.0f),
+                             "Max: %.4f")) {
+        config.light_adaptation.max_luminance = powf(10.0f, logMaxLuminance);
+      }
     }
 
     if (ImGui::CollapsingHeader("HDR Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -284,11 +306,13 @@ void imgui_gui::render_settings() {
     if (ImGui::CollapsingHeader("Shadow Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
       ImGui::Checkbox("Enable Shadows", &config.enable_shadows);
 
-      ImGui::SliderFloat("Shadow Bias", &config.shadow.shadow_bias, -1.0f, 1.0f,
+      ImGui::SliderFloat("Shadow Bias", &config.shadow.shadow_bias, 1.0f, 2.0f,
                                   "%.4f");
-      ImGui::SliderFloat("Top", &config.shadow.top, -1000.0f, 1000.0f,
+      ImGui::SliderFloat("Shadow Slope Bias", &config.shadow.shadow_slope_bias, 1.0f, 2.0f,
+                                  "%.4f");
+      ImGui::SliderFloat("Shadow Bounds max", &config.shadow.max_corner, 0.f, 1000.0f,
                                            "%.2f");
-      ImGui::SliderFloat("Bottom", &config.shadow.bottom, -1000.0f, 1000.0f,
+      ImGui::SliderFloat("Shadow Bounds min", &config.shadow.min_corner, -1000.0f, 0.f,
                                                     "%.2f");
     }
 

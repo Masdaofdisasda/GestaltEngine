@@ -16,12 +16,16 @@ layout( push_constant ) uniform constants
 layout(binding = 10) uniform sampler2D currentLuminance;
 layout(binding = 11) uniform sampler2D adaptedLuminance;
 
+float sigmoid(float x) {
+    return 1.0 / (1.0 + exp(-x));
+}
+
 void main()
 {
    float currentLum = texture(currentLuminance, vec2(0.5, 0.5)).x;
    float adaptedLum = texture(adaptedLuminance, vec2(0.5, 0.5)).x;
 
-   float tau = (currentLum > adaptedLum) ? params.adaptation_speed_light2dark : params.adaptation_speed_dark2light;
+   float tau = (currentLum < adaptedLum) ? params.adaptation_speed_light2dark : params.adaptation_speed_dark2light;
 
    //https://google.github.io/filament/Filament.html#imagingpipeline/physicallybasedcamera/adaptation
    float newAdaptation = adaptedLum + (currentLum - adaptedLum) * (1.0 - exp(-params.delta_time * tau));

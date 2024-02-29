@@ -22,6 +22,7 @@ void main()
 {
 	vec2 uv = vec2(texCoord1.x, 1.0 - texCoord1.y);
 	float ssao = clamp( texture(texSSAO,  uv).r + params.bias, 0.0, 1.0 );
+	ssao = pow(ssao, params.scale); 
 
 	if (params.show_ssao_only)
 	{
@@ -32,7 +33,7 @@ void main()
 	vec4 color = texture(texScene, texCoord1);
 
 	outColor = vec4(
-		mix(color, color * ssao, params.scale).rgb,
+		(color * ssao).rgb,
 		1.0
 	);
 }

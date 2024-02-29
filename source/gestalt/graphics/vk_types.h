@@ -205,10 +205,10 @@ struct render_config {
   } hdr{};
 
   struct light_adaptation_params {
-    float adaptation_speed_dark2light{.04f};
-    float adaptation_speed_light2dark{.02f};
+    float adaptation_speed_dark2light{.0560f};
+    float adaptation_speed_light2dark{.028f};
     float delta_time{0.16f};
-    float min_luminance{0.01f};
+    float min_luminance{0.002f};
     float max_luminance{10.0f};
   } light_adaptation{};
 
@@ -221,14 +221,10 @@ struct render_config {
 
   bool enable_shadows{true};
   struct shadow_params {
-    float shadow_bias{0.005f};
-    float top{250};
-    float bottom{-200};
-    float left{-230.f};
-    float right{230};
-    float near{.1f};
-    float far{1000.f};
-    float light_distance{1.f};
+    float shadow_bias{1.f};
+    float shadow_slope_bias{1.f};
+    float max_corner{250};
+    float min_corner{-200};
   } shadow{};
 
   // todo : more settings

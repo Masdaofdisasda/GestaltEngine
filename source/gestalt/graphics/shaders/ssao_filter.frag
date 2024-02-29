@@ -44,7 +44,7 @@ void main()
 	const float zFarMulzNear   = params.zFar * params.zNear;
 	const float zFarMinuszNear = params.zFar - params.zNear;
     
-	float size = 1.0 / 512.0; // float(textureSize(texDepth, 0 ).x);
+	float size = 1.0 / float(textureSize(texDepth, 0 ).x);
 
 	// get Z in eye space
 	float Z     = zFarMulzNear / ( texture( texDepth, uv ).x * zFarMinuszNear - params.zFar );

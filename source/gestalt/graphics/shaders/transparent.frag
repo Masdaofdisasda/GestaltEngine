@@ -71,7 +71,8 @@ void main() {
 		MeR = texture(nonuniformEXT(textures[metalicRoughIndex]), UV);
 	}
 	
-	float shadow = shadowFactor(inShadowPosition, shadowMap).r;
+	float bias = calculateDynamicBias(n, sceneData.light_direction);
+	float shadow = shadowFactor(inShadowPosition, shadowMap, bias).r;
 
 	PBRInfo pbrInputs;
 	
