@@ -137,7 +137,7 @@ void render_engine::update_scene() {
     glm::mat4 projection
         = glm::perspective(glm::radians(70.f),
                            (float)window_.extent.width / (float)window_.extent.height, .1f, 1000.f);
-
+    
     // invert the Y direction on projection matrix so that we are more similar
     // to opengl and gltf axis
     projection[1][1] *= -1;

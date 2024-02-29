@@ -226,8 +226,8 @@ struct render_config {
     float bottom{-200};
     float left{-230.f};
     float right{230};
-    float near{-700.f};
-    float far{300.f};
+    float near{.1f};
+    float far{1000.f};
     float light_distance{1.f};
   } shadow{};
 

@@ -73,15 +73,6 @@ void skybox_pass::execute(const VkCommandBuffer cmd) {
 
   // Define the dimensions of the orthographic projection
   auto config = resource_manager_->config_.shadow;
-  float left = config.left;
-  float right = config.right;
-  float bottom = config.bottom;
-  float top = config.top;
-  float near_plane = config.near;
-  float far_plane = config.far;
-  glm::mat4 lightProjection = glm::ortho(left, right, bottom, top, near_plane, far_plane);
-
-  //lightProjection[1][1] *= -1;
   glm::vec3 direction = normalize(light.direction);  // Ensure the direction is normalized
 
   glm::vec3 up = glm::vec3(0, 1, 0);
@@ -90,12 +81,31 @@ void skybox_pass::execute(const VkCommandBuffer cmd) {
   }
 
   // Create a view matrix for the light
-  glm::mat4 lightView = lookAt(direction * config.light_distance, glm::vec3(0.f), up);
+  glm::mat4 lightView = lookAt(glm::vec3(0, 0, 0), -direction, glm::vec3(0, 0, 1));
+
+  glm::vec3 min{config.bottom};
+  glm::vec3 max{config.top};
+
+  glm::vec3 corners[] = {
+      glm::vec3(min.x, min.y, min.z), glm::vec3(min.x, max.y, min.z),
+      glm::vec3(min.x, min.y, max.z), glm::vec3(min.x, max.y, max.z),
+      glm::vec3(max.x, min.y, min.z), glm::vec3(max.x, max.y, min.z),
+      glm::vec3(max.x, min.y, max.z), glm::vec3(max.x, max.y, max.z),
+  };
+  for (auto& v : corners) v = glm::vec3(lightView * glm::vec4(v, 1.0f));
+
+  glm::vec3 vmin(std::numeric_limits<float>::max());
+  glm::vec3 vmax(std::numeric_limits<float>::lowest());
+
+  for (auto& corner : corners) {
+    vmin = glm::min(vmin, corner);
+    vmax = glm::max(vmax, corner);
+  }
+  glm::mat4 lightProjection = glm::orthoRH_ZO(min.x, max.x, min.y, max.y, -max.z, -min.z);
+
+  lightProjection[1][1] *= -1;
 
   resource_manager_->per_frame_data_.light_view_proj = lightProjection * lightView;
-  //resource_manager_->per_frame_data_.proj = lightProjection;
-  //resource_manager_->per_frame_data_.view = lightView;
-  //resource_manager_->per_frame_data_.viewproj = lightProjection * lightView;
 
   void* mapped_data;
   VmaAllocation allocation = resource_manager_->per_frame_data_buffer.allocation;

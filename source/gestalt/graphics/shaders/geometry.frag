@@ -42,17 +42,27 @@ vec3 linearTosRGB(vec3 color) {
     return mix(color * 12.92, 1.055 * pow(color, vec3(1.0 / 2.4)) - vec3(0.055), step(vec3(0.0031308), color));
 }
 
-vec4 compareDepths(vec4 shadowCoord) {
-    vec3 projCoords = shadowCoord.xyz / shadowCoord.w;
+float PCF(int kernelSize, vec2 shadowCoord, float depth)
+{
+	//return (depth < texture( shadowMap, shadowCoord ).r) ? 1.0 : 0.0;
 
-    float shadowMapDepth = texture(shadowMap, projCoords.xy).r;
-    float currentDepth = projCoords.z;
-
-    // Output the depth difference or use it for debugging
-    float depthDifference = abs(currentDepth - shadowMapDepth);
-    return vec4(depthDifference.rrr, 1.0); // Grayscale output
+	float size = 1.0 / float( textureSize(shadowMap, 0 ).x );
+	float shadow = 0.0;
+	int range = kernelSize / 2;
+	for ( int v=-range; v<=range; v++ ) for ( int u=-range; u<=range; u++ )
+		shadow += (depth < texture( shadowMap, shadowCoord + size * vec2(u, v) ).r) ? 1.0 : 0.0;
+	return shadow / (kernelSize * kernelSize);
 }
 
+float shadowFactor(vec4 shadowCoord)
+{
+	vec3 shadowCoords = shadowCoord.xyz / shadowCoord.w;
+
+	float depthBias = -0.001;
+	float shadowSample = PCF( 13, shadowCoords.xy, shadowCoords.z + depthBias );
+
+	return mix(0.0005, 1.0, shadowSample);
+}
 
 // Calculation of the lighting contribution from an optional Image Based Light source.
 // Precomputed Environment Maps are required uniform inputs and are computed as outlined in [1].
@@ -315,7 +325,7 @@ void main() {
 		MeR = texture(nonuniformEXT(textures[metalicRoughIndex]), UV);
 	}
 	
-	float shadow = compareDepths(inShadowPosition).r;
+	float shadow = shadowFactor(inShadowPosition).r;
 
 	PBRInfo pbrInputs;
 	
@@ -332,5 +342,5 @@ void main() {
 
 	color += Ke.rgb;
 
-    outFragColor = vec4(color * shadow, 1.0);
+    outFragColor = vec4(color, 1.0);
 }

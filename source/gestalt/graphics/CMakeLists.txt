@@ -56,6 +56,7 @@ shadow_pass.cpp
 )
 
 target_compile_features(graphics PRIVATE cxx_std_20)
+target_compile_definitions(graphics PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
 target_include_directories(graphics PUBLIC 
     "${CMAKE_CURRENT_SOURCE_DIR}"
