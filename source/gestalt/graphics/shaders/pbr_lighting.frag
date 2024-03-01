@@ -30,6 +30,12 @@ vec3 ReconstructWorldPos(float depth, vec2 uv, mat4 invViewProj) {
     return worldSpacePosition.xyz / worldSpacePosition.w;
 }
 
+const mat4 biasMat = mat4( 
+	0.5, 0.0, 0.0, 0.0,
+	0.0, 0.5, 0.0, 0.0,
+	0.0, 0.0, 1.0, 0.0,
+	0.5, 0.5, 0.0, 1.0 );
+
 void main() {
 
     vec2 UV = texCoord;
@@ -49,13 +55,13 @@ void main() {
 					albedoMetal.a,
 					1.0);
 
-	vec2 uv = gl_FragCoord.xy / params.screenSize;
+	vec2 uv = UV;
     float depth = texture(depthBuffer, uv).r;
     vec3 worldPos = ReconstructWorldPos(depth, uv, params.invViewProj);
 	vec3 viewPos = -normalize(vec3(sceneData.view[0][2], sceneData.view[1][2], sceneData.view[2][2]));
 
     // Transform world position to light space
-    vec4 lightSpacePos = sceneData.lightViewProj * vec4(worldPos, 1.0);
+    vec4 lightSpacePos = biasMat * sceneData.lightViewProj * vec4(worldPos, 1.0);
 
 	float bias = calculateDynamicBias(n, sceneData.light_direction);
 	float shadow = shadowFactor(lightSpacePos, shadowMap, bias).r;
@@ -75,4 +81,15 @@ void main() {
 	color += Ke.rgb;
 
     outFragColor = vec4(color, 1.0);
+	
+	//outFragColor = vec4(normalize(worldPos) * 0.5 + 0.5, 1.0);
+
+	float normalizedDepth = depth * 2.0 - 1.0; // Assuming depth is in [0,1], map it to [-1,1]
+	//outFragColor = vec4(vec3(normalizedDepth), 1.0); // Visualize depth as grayscale color
+
+	vec3 normalizedLightSpacePos = lightSpacePos.xyz / lightSpacePos.w;
+	//outFragColor = vec4(normalize(normalizedLightSpacePos) * 0.5 + 0.5, 1.0);
+
+
+
 }
