@@ -13,9 +13,7 @@ class skybox_pass final : public render_pass {
   shader_pass_dependency_info deps_ = {
       .read_resources = {},
       .write_resources = {{"skybox_color", std::make_shared<color_image_resource>(
-                                               "scene_color", 1.f)},
-                          {"skybox_depth", std::make_shared<depth_image_resource>(
-                                               "scene_depth", 1.f)}},
+                                               "scene_color", 1.f)}},
   };
 
   VkPipeline pipeline_ = nullptr;

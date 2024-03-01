@@ -53,6 +53,8 @@ frame_graph.h
 frame_graph.cpp
 shadow_pass.h
 shadow_pass.cpp
+lighting_pass.cpp
+lighting_pass.h
 )
 
 target_compile_features(graphics PRIVATE cxx_std_20)

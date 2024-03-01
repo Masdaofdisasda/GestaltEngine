@@ -227,6 +227,11 @@ struct render_config {
     float min_corner{-200};
   } shadow{};
 
+  struct lighting_params {
+    glm::mat4 invViewProj;
+    glm::vec2 screenSize;
+  } lighting{};
+
   // todo : more settings
 };
 

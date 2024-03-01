@@ -183,6 +183,24 @@ VkRenderingInfo vkinit::rendering_info(VkExtent2D renderExtent, VkRenderingAttac
 
     return renderInfo;
 }
+VkRenderingInfo vkinit::rendering_info_for_gbuffer(VkExtent2D renderExtent,
+                                                   VkRenderingAttachmentInfo* colorAttachments,
+                                                   uint32_t colorAttachmentCount,
+    VkRenderingAttachmentInfo* depthAttachment) {
+    VkRenderingInfo renderInfo{};
+    renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    renderInfo.pNext = nullptr;
+
+    renderInfo.renderArea = VkRect2D{VkOffset2D{0, 0}, renderExtent};
+    renderInfo.layerCount = 1;
+    // For multiple color attachments
+    renderInfo.colorAttachmentCount = colorAttachmentCount;
+    renderInfo.pColorAttachments = colorAttachments;
+    renderInfo.pDepthAttachment = depthAttachment;
+    renderInfo.pStencilAttachment = nullptr;
+
+    return renderInfo;
+}
 //< render_info
 //> subresource
 VkImageSubresourceRange vkinit::image_subresource_range(VkImageAspectFlags aspectMask)

@@ -25,7 +25,6 @@ void skybox_pass::prepare() {
   vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &fragment_shader);
 
   const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_color");
-  const auto depth_image = resource_manager_->get_resource<AllocatedImage>("scene_depth");
 
   pipeline_ = PipelineBuilder()
                   .set_shaders(vertex_shader, fragment_shader)
@@ -36,7 +35,7 @@ void skybox_pass::prepare() {
                   .disable_blending()
                   .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
                   .set_color_attachment_format(color_image->imageFormat)
-                  .set_depth_format(depth_image->imageFormat)
+                  .disable_depthtest()
                   .set_pipeline_layout(pipeline_layout_)
                   .build_pipeline(gpu_.device);
 
@@ -47,17 +46,13 @@ void skybox_pass::prepare() {
 
 void skybox_pass::execute(const VkCommandBuffer cmd) {
   const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_color");
-  const auto depth_image = resource_manager_->get_resource<AllocatedImage>("scene_depth");
 
   VkRenderingAttachmentInfo colorAttachment
       = vkinit::attachment_info(color_image->imageView, nullptr, color_image->currentLayout);
-  VkClearValue depth_clear = {.depthStencil = {1.f, 0}};
-  VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
-      depth_image->imageView, &depth_clear, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
   VkRenderingInfo renderInfo
       = vkinit::rendering_info(color_image->getExtent2D(),
-                               &colorAttachment, &depthAttachment);
+                               &colorAttachment, nullptr);
 
   vkCmdBeginRendering(cmd, &renderInfo);
 

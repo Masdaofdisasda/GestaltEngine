@@ -33,7 +33,7 @@ class ssao_filter_pass final : public render_pass {
   AllocatedImage rotation_pattern;
   shader_pass_dependency_info deps_ = {
       .read_resources
-      = {{std::make_shared<depth_image_resource>("scene_transparent_depth", 1.0f)}},
+      = {{std::make_shared<depth_image_resource>("gbuffer_depth", 1.0f)}},
       .write_resources
       = {{"color_ssao_filtered", std::make_shared<color_image_resource>("color_ssao_filter", extent_)}}
   };
@@ -121,7 +121,7 @@ class ssao_final_pass final : public render_pass {
   };
 
   shader_pass_dependency_info deps_ = {
-      .read_resources = {{std::make_shared<depth_image_resource>("scene_transparent_color", 1.f)},
+      .read_resources = {{std::make_shared<depth_image_resource>("scene_shaded", 1.f)},
                          {std::make_shared<depth_image_resource>("ssao_blurred_final", extent_)}},
       .write_resources = {{"scene_ssao",
                            std::make_shared<color_image_resource>("scene_ssao_final", 1.0f)}}};

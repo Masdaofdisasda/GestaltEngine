@@ -51,7 +51,7 @@ void ssao_filter_pass::execute(VkCommandBuffer cmd) {
   descriptor_set_ = resource_manager_->descriptor_pool->allocate(
       gpu_.device, descriptor_layouts_.at(0));
 
-  const auto scene_depth = resource_manager_->get_resource<AllocatedImage>("scene_transparent_depth");
+  const auto scene_depth = resource_manager_->get_resource<AllocatedImage>("gbuffer_depth");
   const auto color_image = resource_manager_->get_resource<AllocatedImage>("color_ssao_filter");
 
   VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -245,7 +245,7 @@ void ssao_final_pass::execute(VkCommandBuffer cmd) {
       gpu_.device, descriptor_layouts_.at(0));
 
   
-  const auto scene_color = resource_manager_->get_resource<AllocatedImage>("scene_transparent_color");
+  const auto scene_color = resource_manager_->get_resource<AllocatedImage>("scene_shaded");
   const auto scene_ssao = resource_manager_->get_resource<AllocatedImage>("scene_ssao_final");
   const auto ssao_blurred = resource_manager_->get_resource<AllocatedImage>("ssao_blurred_final");
 

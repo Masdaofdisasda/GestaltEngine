@@ -30,6 +30,10 @@ VkRenderingAttachmentInfo depth_attachment_info(
 
 VkRenderingInfo rendering_info(VkExtent2D renderExtent, VkRenderingAttachmentInfo* colorAttachment,
     VkRenderingAttachmentInfo* depthAttachment);
+VkRenderingInfo rendering_info_for_gbuffer(VkExtent2D renderExtent,
+                                           VkRenderingAttachmentInfo* colorAttachments,
+                                           uint32_t colorAttachmentCount,
+                                           VkRenderingAttachmentInfo* depthAttachment);
 
 VkImageSubresourceRange image_subresource_range(VkImageAspectFlags aspectMask);
 

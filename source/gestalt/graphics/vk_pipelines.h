@@ -7,12 +7,12 @@ public:
 
   VkPipelineInputAssemblyStateCreateInfo _inputAssembly;
   VkPipelineRasterizationStateCreateInfo _rasterizer;
-  VkPipelineColorBlendAttachmentState _colorBlendAttachment;
+  std::vector<VkPipelineColorBlendAttachmentState> _colorBlendAttachments;
   VkPipelineMultisampleStateCreateInfo _multisampling;
   VkPipelineLayout _pipelineLayout;
   VkPipelineDepthStencilStateCreateInfo _depthStencil;
   VkPipelineRenderingCreateInfo _renderInfo;
-  VkFormat _colorAttachmentformat;
+  std::vector<VkFormat> _colorAttachmentformats;
   std::vector<VkDynamicState> _dynamicStates;
 
   PipelineBuilder() { clear(); }
@@ -26,11 +26,12 @@ public:
   PipelineBuilder& set_polygon_mode(VkPolygonMode mode);
   PipelineBuilder& set_cull_mode(VkCullModeFlags cullMode, VkFrontFace frontFace);
   PipelineBuilder& set_multisampling_none();
-  PipelineBuilder& disable_blending();
+  PipelineBuilder& disable_blending(uint32_t count = 1);
   PipelineBuilder& enable_blending_additive();
   PipelineBuilder& enable_blending_alphablend();
 
   PipelineBuilder& set_color_attachment_format(VkFormat format);
+  PipelineBuilder& set_color_attachment_formats(const std::vector<VkFormat>& formats);
   PipelineBuilder& set_depth_format(VkFormat format);
   PipelineBuilder& disable_depthtest();
   PipelineBuilder& enable_depthtest(bool depthWriteEnable, VkCompareOp op);

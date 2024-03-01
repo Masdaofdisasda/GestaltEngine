@@ -6,6 +6,7 @@
 
 #include "geometry_pass.h"
 #include "hdr_pass.h"
+#include "lighting_pass.h"
 #include "shadow_pass.h"
 #include "skybox_pass.h"
 #include "ssao_pass.h"
@@ -26,8 +27,10 @@ void frame_graph::init(const vk_gpu& gpu, const sdl_window& window,
 
   render_passes_.push_back(std::make_unique<skybox_pass>());
   render_passes_.push_back(std::make_unique<directional_depth_pass>()); //TODO investigate sorting
-  render_passes_.push_back(std::make_unique<geometry_pass>());
-  render_passes_.push_back(std::make_unique<transparent_pass>());
+  render_passes_.push_back(std::make_unique<deferred_pass>());
+  render_passes_.push_back(std::make_unique<lighting_pass>());
+  //render_passes_.push_back(std::make_unique<geometry_pass>());
+  //render_passes_.push_back(std::make_unique<transparent_pass>());
   render_passes_.push_back(std::make_unique<ssao_filter_pass>());
   render_passes_.push_back(std::make_unique<ssao_blur_pass>());
   render_passes_.push_back(std::make_unique<ssao_final_pass>());

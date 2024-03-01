@@ -4,26 +4,20 @@
 #extension GL_GOOGLE_include_directive : require
 #include "per_frame_structs.glsl"
 #include "input_structures.glsl"
-#include "pbr.glsl"
 #include "normal_mapping.glsl"
-#include "shadow_mapping.glsl"
 
 layout (location = 0) in vec3 inNormal;
 layout (location = 1) in vec3 inPosition;
 layout (location = 2) in vec2 inUV;
 layout (location = 3) flat in int inMaterialIndex;
-layout (location = 4) in vec4 inShadowPosition;
 
-layout (location = 0) out vec4 outFragColor;
+layout(location = 0) out vec4 gBuffer1; // Albedo (RGB) + Metalness (A)
+layout(location = 1) out vec4 gBuffer2; // Normal (RG) + Roughness (A)
+layout(location = 2) out vec4 gBuffer3; // Emissive (RGB) + Occlusion (A)
 
-layout(set = 4, binding = 10) uniform sampler2D shadowMap;
 
 vec3 sRGBToLinear(vec3 color) {
     return mix(color / 12.92, pow((color + vec3(0.055)) / vec3(1.055), vec3(2.4)), step(vec3(0.04045), color));
-}
-
-vec3 linearTosRGB(vec3 color) {
-    return mix(color * 12.92, 1.055 * pow(color, vec3(1.0 / 2.4)) - vec3(0.055), step(vec3(0.0031308), color));
 }
 
 void main() {
@@ -41,6 +35,11 @@ void main() {
 		Kd = texture(nonuniformEXT(textures[albedoIndex]), UV);
     }
 	Kd.rgb = sRGBToLinear(Kd.rgb);
+
+	float alphaCutoff = materialData[nonuniformEXT(inMaterialIndex)].alpha_cutoff;
+    if (Kd.a < alphaCutoff) {
+        discard;
+    }
 
 	vec3 n = normalize(inNormal);
 	vec3 viewPos = -normalize(vec3(sceneData.view[0][2], sceneData.view[1][2], sceneData.view[2][2]));
@@ -66,24 +65,8 @@ void main() {
 		MeR = texture(nonuniformEXT(textures[metalicRoughIndex]), UV);
 	}
 	
-	float bias = calculateDynamicBias(n, sceneData.light_direction);
-	float shadow = shadowFactor(inShadowPosition, shadowMap, bias).r;
-
-	PBRInfo pbrInputs;
-	
-	vec3 color = vec3(0.0);
-	
-	// IBL contribution
-	color = calculatePBRInputsMetallicRoughness(Kd, n, viewPos.xyz, inPosition, MeR, pbrInputs, texEnvMap, texEnvMapIrradiance, texBdrfLut) * Kao;
-
-	// directional light contribution
-	color *= calculatePBRLightContributionDir(pbrInputs, sceneData.light_direction, sceneData.light_intensity) * shadow;
-
-	
-  	color += calculatePBRLightContributionPoint(pbrInputs, inPosition, sceneData.light_intensity);
-
-	color += Ke.rgb;
-
-	outFragColor = vec4(color.rgb, Kd.a);
+	gBuffer1 = vec4(Kd.rgb, MeR.b); // Albedo + Metalness
+    gBuffer2 = vec4(normalize(n) * 0.5 + 0.5, MeR.g); // Normal + Roughness
+    gBuffer3 = vec4(Ke.rgb, Kao); // Emissive + Occlusion
 
 }
