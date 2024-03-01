@@ -25,10 +25,10 @@ void frame_graph::init(const vk_gpu& gpu, const sdl_window& window,
   commands_->init(gpu_, frames_);
   sync_->init(gpu_, frames_);
 
-  render_passes_.push_back(std::make_unique<skybox_pass>());
   render_passes_.push_back(std::make_unique<directional_depth_pass>()); //TODO investigate sorting
   render_passes_.push_back(std::make_unique<deferred_pass>());
   render_passes_.push_back(std::make_unique<lighting_pass>());
+  render_passes_.push_back(std::make_unique<skybox_pass>());
   //render_passes_.push_back(std::make_unique<geometry_pass>());
   //render_passes_.push_back(std::make_unique<transparent_pass>());
   render_passes_.push_back(std::make_unique<ssao_filter_pass>());

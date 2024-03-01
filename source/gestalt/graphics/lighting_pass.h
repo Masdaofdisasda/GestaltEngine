@@ -18,7 +18,7 @@ class lighting_pass final : public render_pass {
           std::make_shared<depth_image_resource>("gbuffer_depth", 1.f),
           std::make_shared<depth_image_resource>("directional_shadow_map", 1.f)},
       .write_resources
-      = {{"scene_shaded", std::make_shared<color_image_resource>("skybox_color", 1.f)}},
+      = {{"scene_shaded", std::make_shared<color_image_resource>("gbuffer_shaded", 1.f)}},
   };
 
   VkPushConstantRange push_constant_range_{

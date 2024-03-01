@@ -32,7 +32,7 @@ void lighting_pass::prepare() {
 
   VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("skybox_color");
+  const auto color_image = resource_manager_->get_resource<AllocatedImage>("gbuffer_shaded");
 
   pipeline_ = PipelineBuilder()
                   .set_shaders(meshVertexShader, meshFragShader)
@@ -40,6 +40,7 @@ void lighting_pass::prepare() {
                   .set_polygon_mode(VK_POLYGON_MODE_FILL)
                   .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
                   .set_multisampling_none()
+                  .enable_depthtest(false, VK_COMPARE_OP_LESS_OR_EQUAL)     
                   .disable_blending()
                   .set_color_attachment_format(color_image->imageFormat)
                   .disable_depthtest()
@@ -58,7 +59,7 @@ void lighting_pass::execute(VkCommandBuffer cmd) {
   descriptor_set_
       = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(2));
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("skybox_color");
+  const auto color_image = resource_manager_->get_resource<AllocatedImage>("gbuffer_shaded");
 
   const auto gbuffer_1 = resource_manager_->get_resource<AllocatedImage>("gbuffer_1_final");
   const auto gbuffer_2 = resource_manager_->get_resource<AllocatedImage>("gbuffer_2_final");

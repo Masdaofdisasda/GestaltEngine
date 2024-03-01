@@ -56,7 +56,7 @@ class deferred_pass final : public render_pass {
       = {{"gbuffer_1_final", std::make_shared<color_image_resource>("gbuffer_1", 1.f)},
          {"gbuffer_2_final", std::make_shared<color_image_resource>("gbuffer_2", 1.f)},
          {"gbuffer_3_final", std::make_shared<color_image_resource>("gbuffer_3", 1.f)},
-         {"gbuffer_depth", std::make_shared<depth_image_resource>("scene_depth", 1.f)}},
+         {"gbuffer_depth", std::make_shared<depth_image_resource>("gbuffer_d", 1.f)}},
   };
 
   VkPushConstantRange push_constant_range_{

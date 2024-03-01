@@ -164,7 +164,7 @@ void deferred_pass::prepare() {
   const auto gbuffer_1 = resource_manager_->get_resource<AllocatedImage>("gbuffer_1");
   const auto gbuffer_2 = resource_manager_->get_resource<AllocatedImage>("gbuffer_2");
   const auto gbuffer_3 = resource_manager_->get_resource<AllocatedImage>("gbuffer_3");
-  const auto depth_image = resource_manager_->get_resource<AllocatedImage>("scene_depth");
+  const auto depth_image = resource_manager_->get_resource<AllocatedImage>("gbuffer_d");
 
   pipeline_ = PipelineBuilder()
                   .set_shaders(meshVertexShader, meshFragShader)
@@ -193,7 +193,7 @@ void deferred_pass::execute(VkCommandBuffer cmd) {
   const auto gbuffer_1 = resource_manager_->get_resource<AllocatedImage>("gbuffer_1");
   const auto gbuffer_2 = resource_manager_->get_resource<AllocatedImage>("gbuffer_2");
   const auto gbuffer_3 = resource_manager_->get_resource<AllocatedImage>("gbuffer_3");
-  const auto depth_image = resource_manager_->get_resource<AllocatedImage>("scene_depth");
+  const auto depth_image = resource_manager_->get_resource<AllocatedImage>("gbuffer_d");
 
   VkClearValue depth_clear = {.depthStencil = {1.f, 0}};
   VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(

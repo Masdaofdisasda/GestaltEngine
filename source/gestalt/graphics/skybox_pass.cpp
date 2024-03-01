@@ -24,7 +24,8 @@ void skybox_pass::prepare() {
   VkShaderModule fragment_shader;
   vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &fragment_shader);
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_color");
+  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_shaded");
+  const auto depth_image = resource_manager_->get_resource<AllocatedImage>("gbuffer_depth");
 
   pipeline_ = PipelineBuilder()
                   .set_shaders(vertex_shader, fragment_shader)
@@ -33,9 +34,9 @@ void skybox_pass::prepare() {
                   .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
                   .set_multisampling_none()
                   .disable_blending()
-                  .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
+                  .enable_depthtest(false, VK_COMPARE_OP_LESS_OR_EQUAL)
                   .set_color_attachment_format(color_image->imageFormat)
-                  .disable_depthtest()
+                  .set_depth_format(depth_image->imageFormat)
                   .set_pipeline_layout(pipeline_layout_)
                   .build_pipeline(gpu_.device);
 
@@ -45,17 +46,21 @@ void skybox_pass::prepare() {
 }
 
 void skybox_pass::execute(const VkCommandBuffer cmd) {
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_color");
+  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_shaded");
+  const auto depth_image = resource_manager_->get_resource<AllocatedImage>("gbuffer_depth");
 
   VkRenderingAttachmentInfo colorAttachment
       = vkinit::attachment_info(color_image->imageView, nullptr, color_image->currentLayout);
 
+  VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
+      depth_image->imageView, nullptr, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+
   VkRenderingInfo renderInfo
-      = vkinit::rendering_info(color_image->getExtent2D(),
-                               &colorAttachment, nullptr);
+      = vkinit::rendering_info(color_image->getExtent2D(), &colorAttachment, &depthAttachment);
 
   vkCmdBeginRendering(cmd, &renderInfo);
 
+  //TODO this should be done elsewhere
   auto view = resource_manager_->get_database().get_camera(0).view_matrix;
   auto projection = resource_manager_->get_database().get_camera(0).projection_matrix;
   resource_manager_->per_frame_data_.proj = projection;
