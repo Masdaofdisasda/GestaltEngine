@@ -21,6 +21,7 @@ layout( push_constant ) uniform constants
 {	
 	mat4 invViewProj;
 	vec2 screenSize;
+	float density;
 } params;
 
 // Function to reconstruct world position from depth
@@ -79,6 +80,33 @@ void main() {
   	color += calculatePBRLightContributionPoint(pbrInputs, worldPos, sceneData.light_intensity);
 
 	color += Ke.rgb;
+    
+    vec3 viewDir = normalize(worldPos - viewPos);
+    float volumetricIntensity = 0.0;
+    vec3 accumulatedLight = vec3(0.0);
+	float numSamples = 16.0;
+	float lightRayLength = 100.0;
+
+
+    // Sample along the view direction towards the light source
+    for (int i = 0; i < numSamples; ++i) { // Number of samples can be adjusted for performance/quality tradeoff
+		float weight = float(i) / (numSamples - 1.0);
+		float offset = pow(weight, 2.0) * lightRayLength;
+
+        vec3 samplePos = worldPos + viewDir * offset;
+        vec4 lightSpacePos = biasMat * sceneData.lightViewProj * vec4(samplePos, 1.0);
+        vec3 ndcPos = lightSpacePos.xyz / lightSpacePos.w;
+        ndcPos = ndcPos * 0.5 + 0.5; // Transform to [0, 1] range
+
+        float shadow = texture(shadowMap, ndcPos.xy).r;
+        float occlusion = shadow >= ndcPos.z ? 0.0 : 1.0; // Basic shadow test
+
+		accumulatedLight += occlusion * sceneData.light_intensity / (1.0 + params.density * offset * offset);
+    }
+
+    volumetricIntensity = length(accumulatedLight) / numSamples; // Average the accumulated light
+
+	color += volumetricIntensity * params.density;
 
     outFragColor = vec4(color, 1.0);
 	

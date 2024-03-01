@@ -314,6 +314,8 @@ void imgui_gui::render_settings() {
                                            "%.2f");
       ImGui::SliderFloat("Shadow Bounds min", &config.shadow.min_corner, -1000.0f, 0.f,
                                                     "%.2f");
+      ImGui::SliderFloat("Volume Density", &config.lighting.density, 0.001f, 0.01f,
+                                  "%.2f");
     }
 
     // TODO: Add more sections for other settings as necessary

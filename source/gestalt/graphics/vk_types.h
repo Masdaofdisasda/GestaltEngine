@@ -230,6 +230,7 @@ struct render_config {
   struct lighting_params {
     glm::mat4 invViewProj;
     glm::vec2 screenSize;
+    float density{0.001f};
   } lighting{};
 
   // todo : more settings
