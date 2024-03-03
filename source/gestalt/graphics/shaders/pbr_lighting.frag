@@ -22,6 +22,8 @@ layout( push_constant ) uniform constants
 	mat4 invViewProj;
 	vec2 screenSize;
 	float density;
+	float attenuation;
+	int debugMode;
 } params;
 
 // Function to reconstruct world position from depth
@@ -82,9 +84,9 @@ void main() {
 	color += Ke.rgb;
     
     vec3 viewDir = normalize(worldPos - viewPos);
-    float volumetricIntensity = 0.0;
+    vec3 volumetricIntensity = vec3(0.0);
     vec3 accumulatedLight = vec3(0.0);
-	float numSamples = 16.0;
+	float numSamples = 64.0;
 	float lightRayLength = 100.0;
 
 
@@ -96,27 +98,44 @@ void main() {
         vec3 samplePos = worldPos + viewDir * offset;
         vec4 lightSpacePos = biasMat * sceneData.lightViewProj * vec4(samplePos, 1.0);
         vec3 ndcPos = lightSpacePos.xyz / lightSpacePos.w;
-        ndcPos = ndcPos * 0.5 + 0.5; // Transform to [0, 1] range
 
-        float shadow = texture(shadowMap, ndcPos.xy).r;
-        float occlusion = shadow >= ndcPos.z ? 0.0 : 1.0; // Basic shadow test
+		float occlusion = PCF(5, ndcPos.xy, ndcPos.z, shadowMap);
 
-		accumulatedLight += occlusion * sceneData.light_intensity / (1.0 + params.density * offset * offset);
+		accumulatedLight += occlusion * sceneData.light_intensity / (1.0 + params.attenuation  * offset * offset);
     }
 
-    volumetricIntensity = length(accumulatedLight) / numSamples; // Average the accumulated light
+    volumetricIntensity = accumulatedLight / numSamples; // Average the accumulated light
 
 	color += volumetricIntensity * params.density;
 
-    outFragColor = vec4(color, 1.0);
-	
-	//outFragColor = vec4(normalize(worldPos) * 0.5 + 0.5, 1.0);
+	if (params.debugMode == 0) {
+		outFragColor = vec4(color, 1.0);
 
-	float normalizedDepth = depth * 2.0 - 1.0; // Assuming depth is in [0,1], map it to [-1,1]
-	//outFragColor = vec4(vec3(normalizedDepth), 1.0); // Visualize depth as grayscale color
+	} else if (params.debugMode == 1) {
+		outFragColor = vec4(Kd.rgb, 1.0);
+	} else if (params.debugMode == 2) {
+		outFragColor = vec4(n, 1.0);
+	} else if (params.debugMode == 3) {
+		outFragColor = vec4(Ke.rgb, 1.0);
+	} else if (params.debugMode == 4) {
+		outFragColor = vec4(MeR.rgb, 1.0);
+	} else if (params.debugMode == 5) {
+		outFragColor = vec4(MeR.rrr, 1.0);
+	} else if (params.debugMode == 6) {
+		outFragColor = vec4(0.0, MeR.g, 0.0, 1.0);
+	} else if (params.debugMode == 7) {
+		outFragColor = vec4(0.0, 0.0, MeR.b, 1.0);
+	} else if (params.debugMode == 8) {
+		outFragColor = vec4(normalize(worldPos) * 0.5 + 0.5, 1.0);
+	} else if (params.debugMode == 9) {
+		float normalizedDepth = depth * 2.0 - 1.0; // Assuming depth is in [0,1], map it to [-1,1]
+		outFragColor = vec4(vec3(normalizedDepth), 1.0); // Visualize depth as grayscale color
+	} else if (params.debugMode == 10) {
+		vec3 normalizedLightSpacePos = lightSpacePos.xyz / lightSpacePos.w;
+		outFragColor = vec4(normalize(normalizedLightSpacePos) * 0.5 + 0.5, 1.0);
+	}
 
-	vec3 normalizedLightSpacePos = lightSpacePos.xyz / lightSpacePos.w;
-	//outFragColor = vec4(normalize(normalizedLightSpacePos) * 0.5 + 0.5, 1.0);
+
 
 
 

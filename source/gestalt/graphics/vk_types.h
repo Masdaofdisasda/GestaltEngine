@@ -231,6 +231,8 @@ struct render_config {
     glm::mat4 invViewProj;
     glm::vec2 screenSize;
     float density{0.001f};
+    float attenuation{0.1f};
+    int debug_mode{0};
   } lighting{};
 
   // todo : more settings

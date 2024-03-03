@@ -15,7 +15,7 @@ float shadowFactor(vec4 shadowCoord, sampler2D shadowMap, float depthBias)
 
 	float shadowSample = PCF( 13, shadowCoords.xy, shadowCoords.z - depthBias, shadowMap);
 
-	return mix(0.0007, 1.0, shadowSample);
+	return mix(0.01, 1.0, shadowSample);
 }
 
 float calculateDynamicBias(vec3 normal, vec3 lightDir) {

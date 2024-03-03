@@ -316,6 +316,26 @@ void imgui_gui::render_settings() {
                                                     "%.2f");
       ImGui::SliderFloat("Volume Density", &config.lighting.density, 0.001f, 0.01f,
                                   "%.2f");
+      ImGui::SliderFloat("Light Attenuation", &config.lighting.attenuation, 0.01f, 1.0f,
+                                  "%.2f");
+
+      const char* debug_mode_options[]
+          = {"None",
+            "Albedo",
+            "Normals",
+            "Emissive",
+            "Occlusion/Rough/Metal",
+            "Occlusion",
+            "Rough",
+            "Metal",
+            "World Position",
+            "Depth",
+            "Light Space Position",};
+      int current_debug_mode = config.lighting.debug_mode; 
+      if (ImGui::Combo("Debug Mode", &current_debug_mode, debug_mode_options,
+                   IM_ARRAYSIZE(debug_mode_options))) {
+        config.lighting.debug_mode = current_debug_mode;
+      }
     }
 
     // TODO: Add more sections for other settings as necessary
