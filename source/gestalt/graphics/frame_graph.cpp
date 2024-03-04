@@ -29,6 +29,7 @@ void frame_graph::init(const vk_gpu& gpu, const sdl_window& window,
   render_passes_.push_back(std::make_unique<deferred_pass>());
   render_passes_.push_back(std::make_unique<lighting_pass>());
   render_passes_.push_back(std::make_unique<skybox_pass>());
+  render_passes_.push_back(std::make_unique<infinite_grid_pass>());
   //render_passes_.push_back(std::make_unique<geometry_pass>());
   //render_passes_.push_back(std::make_unique<transparent_pass>());
   render_passes_.push_back(std::make_unique<ssao_filter_pass>());
