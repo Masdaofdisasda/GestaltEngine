@@ -133,7 +133,7 @@ float microfacetDistribution(PBRInfo pbrInputs)
 	return roughnessSq / (M_PI * f * f);
 }
 
-vec3 calculatePBRLightContributionDir( inout PBRInfo pbrInputs, vec3 lightDir, float lightIntensity)
+vec3 calculatePBRLightContributionDir( inout PBRInfo pbrInputs, vec3 lightColor, vec3 lightDir, float lightIntensity)
 {
 	vec3 n = pbrInputs.n;
 	vec3 v = pbrInputs.v;
@@ -160,15 +160,13 @@ vec3 calculatePBRLightContributionDir( inout PBRInfo pbrInputs, vec3 lightDir, f
 	vec3 diffuseContrib = (1.0 - F) * diffuseBurley(pbrInputs);
 	vec3 specContrib = F * G * D / (4.0 * NdotL * NdotV);
 	// Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
-	vec3 color = NdotL * lightIntensity * 3.0f * (diffuseContrib + specContrib);
+	vec3 color = NdotL * lightColor * lightIntensity * 3.0f * (diffuseContrib + specContrib);
 
 	return color;
 }
 
-vec3 calculatePBRLightContributionPoint( inout PBRInfo pbrInputs, vec3 position, float lightIntensity)
+vec3 calculatePBRLightContributionPoint( inout PBRInfo pbrInputs, vec3 position, vec3 lightColor, vec3 lightPos, float lightIntensity)
 {
-	vec3 lightPos = vec3(0.0, 0.0, 0.0);
-
 	vec3 n = pbrInputs.n;
 	vec3 v = pbrInputs.v;
 	vec3 l = normalize(lightPos - position);	// Vector from surface point to light
@@ -196,7 +194,7 @@ vec3 calculatePBRLightContributionPoint( inout PBRInfo pbrInputs, vec3 position,
 	// Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
     float distance = length(vec3(lightPos) - position);
     float attenuation = 1.0 / (distance * distance);
-	vec3 color = NdotL * lightIntensity * attenuation * (diffuseContrib + specContrib);
+	vec3 color = NdotL * lightColor * lightIntensity * attenuation * (diffuseContrib + specContrib);
 
 	return color;
 }

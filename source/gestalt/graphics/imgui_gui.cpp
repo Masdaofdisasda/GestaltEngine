@@ -154,15 +154,18 @@ void imgui_gui::stats() {
 }
 
 void imgui_gui::lights() {
-  if (ImGui::Begin("Light")) {
-    auto& light = actions_.get_directional_light();
+  if (ImGui::Begin("Lights")) {
+
+    
+    ImGui::Text("Directional Light Controls");
+    std::vector<std::reference_wrapper<light_component>> dirLights = actions_.
+        get_directional_lights();
+    auto& light = dirLights[0].get();
 
     // Convert light direction from Cartesian to spherical coordinates (azimuth, elevation)
     float azimuth = atan2(light.direction.y, light.direction.x);
     float elevation = atan2(light.direction.z, sqrt(light.direction.x * light.direction.x
                                                     + light.direction.y * light.direction.y));
-
-    // Convert radians to degrees for ImGui slider
     float azimuthDeg = glm::degrees(azimuth);
     float elevationDeg = glm::degrees(elevation);
 
@@ -172,8 +175,6 @@ void imgui_gui::lights() {
     // Elevation slider: From straight down (-90 degrees) to straight up (+90 degrees)
     ImGui::SliderFloat("Elevation", &elevationDeg, -90.f, 90.f);
 
-    // Update light direction based on slider values
-    // Convert degrees back to radians for calculation
     azimuth = glm::radians(azimuthDeg);
     elevation = glm::radians(elevationDeg);
 
@@ -184,6 +185,46 @@ void imgui_gui::lights() {
 
     // Light intensity slider
     ImGui::SliderFloat("Light intensity", &light.intensity, 0.f, 100.f);
+
+    ImGui::Separator();
+
+    ImGui::Text("Point Light Controls");
+    std::vector<std::reference_wrapper<light_component>> pointLights = actions_.get_point_lights();
+    if (!pointLights.empty()) {
+      static int selectedLightIndex = 0;        // Static to maintain selected item across frames
+      std::vector<std::string> lightNamesStr;   // Vector to hold the complete names as std::string
+      std::vector<const char*> lightNamesCStr;  // Vector of const char* for ImGui
+
+      // Populate light names for dropdown
+      std::string prefix = "Point Light ";
+      for (int i = 0; i < pointLights.size(); ++i) {
+        lightNamesStr.push_back(prefix + std::to_string(i));  // Store the full name as std::string
+      }
+
+      // Now fill the vector of const char* with pointers to the c_str() of the stored std::string
+      // objects
+      for (const auto& nameStr : lightNamesStr) {
+        lightNamesCStr.push_back(nameStr.c_str());
+      }
+
+      // Dropdown to select the point light index
+      ImGui::Combo("Point Light Index", &selectedLightIndex, lightNamesCStr.data(),
+                   lightNamesCStr.size());
+
+      // Assuming selectedLightIndex is valid
+      if (selectedLightIndex >= 0 && selectedLightIndex < pointLights.size()) {
+        auto& pointLight = pointLights[selectedLightIndex].get();
+
+        // Color picker for point light
+        ImGui::ColorEdit3("Color", &pointLight.color.x);
+
+        // Light intensity slider for point light
+        ImGui::SliderFloat("Intensity", &pointLight.intensity, 0.f, 100.f);
+
+        // Position input for point light
+        ImGui::InputFloat3("Position", &pointLight.position.x);
+      }
+    }
   }
   ImGui::End();
 }

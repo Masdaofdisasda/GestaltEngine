@@ -10,7 +10,7 @@ struct descriptor_layout_builder {
   std::vector<VkDescriptorBindingFlags> binding_flags;
 
   descriptor_layout_builder& add_binding(uint32_t binding, VkDescriptorType type,
-                                         VkShaderStageFlags shader_stages, bool bindless = false);
+                                         VkShaderStageFlags shader_stages, bool bindless = false, uint32_t descriptor_count = 1);
   void clear();
   VkDescriptorSetLayout build(VkDevice device, bool is_push_descriptor = false);
 };

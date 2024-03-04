@@ -7,7 +7,8 @@
 layout(location = 0) in vec3 TexCoords;
 layout(location = 0) out vec4 FragColor;
 
-
 void main() {
-    FragColor = texture(texEnvMap, TexCoords);
+    vec3 skyColor = texture(texEnvMap, TexCoords).rgb;
+
+    FragColor = vec4(skyColor, 1.0);
 }

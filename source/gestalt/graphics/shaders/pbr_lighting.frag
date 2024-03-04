@@ -16,6 +16,18 @@ layout(set = 2, binding = 11) uniform sampler2D gbuffer2;
 layout(set = 2, binding = 12) uniform sampler2D gbuffer3;
 layout(set = 2, binding = 13) uniform sampler2D depthBuffer;
 layout(set = 2, binding = 14) uniform sampler2D shadowMap;
+layout(set = 2, binding = 15) uniform DirLight{
+	vec3 color;
+	float intensity;
+	vec3 direction;
+	bool enabled;
+} dirLight;
+layout(set = 2, binding = 16) buffer PointLight{
+	vec3 color;
+	float intensity;
+	vec3 position;
+	bool enabled;
+} pointLight[256];
 
 layout( push_constant ) uniform constants
 {	
@@ -66,7 +78,7 @@ void main() {
     // Transform world position to light space
     vec4 lightSpacePos = biasMat * sceneData.lightViewProj * vec4(worldPos, 1.0);
 
-	float bias = calculateDynamicBias(n, sceneData.light_direction);
+	float bias = calculateDynamicBias(n, dirLight.direction);
 	float shadow = shadowFactor(lightSpacePos, shadowMap, bias).r;
 
 	PBRInfo pbrInputs;
@@ -77,9 +89,11 @@ void main() {
 	color = calculatePBRInputsMetallicRoughness(Kd, n, viewPos.xyz, worldPos, MeR, pbrInputs, texEnvMap, texEnvMapIrradiance, texBdrfLut) * MeR.r;
 
 	// directional light contribution
-	color *= calculatePBRLightContributionDir(pbrInputs, sceneData.light_direction, sceneData.light_intensity) * shadow;
+	color *= calculatePBRLightContributionDir(pbrInputs, dirLight.color, dirLight.direction, dirLight.intensity) * shadow;
 
-  	color += calculatePBRLightContributionPoint(pbrInputs, worldPos, sceneData.light_intensity);
+	for (int i = 0; i < 100; ++i) {
+  		color += calculatePBRLightContributionPoint(pbrInputs, worldPos, pointLight[i].color, pointLight[i].position, pointLight[i].intensity);
+	}
 
 	color += Ke.rgb;
     
@@ -101,7 +115,7 @@ void main() {
 
 		float occlusion = PCF(5, ndcPos.xy, ndcPos.z, shadowMap);
 
-		accumulatedLight += occlusion * sceneData.light_intensity / (1.0 + params.attenuation  * offset * offset);
+		accumulatedLight += occlusion * dirLight.intensity / (1.0 + params.attenuation  * offset * offset);
     }
 
     volumetricIntensity = accumulatedLight / numSamples; // Average the accumulated light

@@ -64,7 +64,13 @@ void render_engine::register_gui_actions() {
   };
   gui_actions_.get_stats = [this]() -> engine_stats& { return stats_; };
   gui_actions_.get_scene_data = [this]() -> per_frame_data& { return resource_manager_->per_frame_data_; };
-  gui_actions_.get_directional_light = [this]() -> light_component& { return resource_manager_->get_database().get_lights().at(0); };
+  gui_actions_.get_point_lights = [this]() -> std::vector<std::reference_wrapper<light_component>> {
+    return resource_manager_->get_database().get_lights(light_type::point);
+  };
+  gui_actions_.get_directional_lights
+      = [this]() -> std::vector<std::reference_wrapper<light_component>> {
+    return resource_manager_->get_database().get_lights(light_type::directional);
+  };
   gui_actions_.get_scene_root
       = [this]() -> entity_component& { return scene_manager_->get_root(); };
   gui_actions_.get_scene_object = [this](const entity entity) -> entity_component& {

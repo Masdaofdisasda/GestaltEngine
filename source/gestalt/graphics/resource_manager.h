@@ -39,6 +39,11 @@ public:
   VkDescriptorSetLayout IblLayout;
   } ibl_data;
 
+  struct light_data {
+    AllocatedBuffer dir_light_buffer;
+    AllocatedBuffer point_light_buffer;
+  } light_data;
+
   template <typename T> void add_resource(const std::string& id, std::shared_ptr<T> resource) {
   resources_[id] = resource;
   }

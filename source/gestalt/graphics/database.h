@@ -86,7 +86,15 @@ public:
 
   std::vector<mesh_component>& get_meshes() { return components_.meshes_; }
   std::vector<camera_component>& get_cameras() { return components_.cameras_; }
-  std::vector<light_component>& get_lights() { return components_.lights_; }
+  std::vector<std::reference_wrapper<light_component>> get_lights(light_type type) { 
+      std::vector<std::reference_wrapper<light_component>> lights;
+      for (auto& light : components_.lights_) {
+        if (light.type == type) {
+          lights.push_back(std::ref(light));
+        }
+      }
+      return lights;
+  }
   std::vector<material_component>& get_materials() { return components_.materials_; }
   std::vector<transform_component>& get_transforms() { return components_.transforms_; }
 

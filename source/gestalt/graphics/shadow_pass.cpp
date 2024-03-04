@@ -55,6 +55,63 @@ void directional_depth_pass::execute(VkCommandBuffer cmd) {
 
   vkCmdBeginRendering(cmd, &renderInfo);
 
+  {
+    // TODO this should be done elsewhere
+    auto view = resource_manager_->get_database().get_camera(0).view_matrix;
+    auto projection = resource_manager_->get_database().get_camera(0).projection_matrix;
+    resource_manager_->per_frame_data_.proj = projection;
+    resource_manager_->per_frame_data_.view = view;
+    resource_manager_->per_frame_data_.viewproj = projection * view;
+
+    auto& light = resource_manager_->get_database().get_light(0);
+    resource_manager_->per_frame_data_.dir_light_direction = light.direction;
+    resource_manager_->per_frame_data_.dir_light_intensity = light.intensity;
+
+    // Define the dimensions of the orthographic projection
+    auto config = resource_manager_->config_.shadow;
+    glm::vec3 direction = normalize(light.direction);  // Ensure the direction is normalized
+
+    glm::vec3 up = glm::vec3(0, 1, 0);
+    if (glm::abs(dot(up, direction)) > 0.999f) {
+      // up = glm::vec3(1, 0, 0);  // Switch to a different up vector if the initial choice is
+      // parallel
+    }
+
+    // Create a view matrix for the light
+    glm::mat4 lightView = lookAt(glm::vec3(0, 0, 0), -direction, glm::vec3(0, 0, 1));
+
+    glm::vec3 min{config.min_corner};
+    glm::vec3 max{config.max_corner};
+
+    glm::vec3 corners[] = {
+        glm::vec3(min.x, min.y, min.z), glm::vec3(min.x, max.y, min.z),
+        glm::vec3(min.x, min.y, max.z), glm::vec3(min.x, max.y, max.z),
+        glm::vec3(max.x, min.y, min.z), glm::vec3(max.x, max.y, min.z),
+        glm::vec3(max.x, min.y, max.z), glm::vec3(max.x, max.y, max.z),
+    };
+    for (auto& v : corners) v = glm::vec3(lightView * glm::vec4(v, 1.0f));
+
+    glm::vec3 vmin(std::numeric_limits<float>::max());
+    glm::vec3 vmax(std::numeric_limits<float>::lowest());
+
+    for (auto& corner : corners) {
+      vmin = glm::min(vmin, corner);
+      vmax = glm::max(vmax, corner);
+    }
+    glm::mat4 lightProjection = glm::orthoRH_ZO(min.x, max.x, min.y, max.y, -max.z, -min.z);
+
+    lightProjection[1][1] *= -1;
+
+    resource_manager_->per_frame_data_.light_view_proj = lightProjection * lightView;
+
+    void* mapped_data;
+    VmaAllocation allocation = resource_manager_->per_frame_data_buffer.allocation;
+    VK_CHECK(vmaMapMemory(gpu_.allocator, allocation, &mapped_data));
+    const auto scene_uniform_data = static_cast<per_frame_data*>(mapped_data);
+    *scene_uniform_data = resource_manager_->per_frame_data_;
+    vmaUnmapMemory(gpu_.allocator, resource_manager_->per_frame_data_buffer.allocation);
+  }
+
   VkDescriptorBufferInfo buffer_info;
   buffer_info.buffer = resource_manager_->per_frame_data_buffer.buffer;
   buffer_info.offset = 0;

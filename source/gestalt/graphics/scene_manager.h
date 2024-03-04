@@ -6,7 +6,7 @@
 #include "scene_components.h"
 
 #include "resource_manager.h"
-#include "vk_descriptors.h"
+#include "scene_systems.h"
 
 /**
  * @brief Class responsible for managing scenes, entities, and their components.
@@ -15,6 +15,7 @@ class scene_manager {
   vk_gpu gpu_ = {};
   std::shared_ptr<resource_manager> resource_manager_;
   std::unique_ptr<asset_loader> asset_loader_ = std::make_unique<asset_loader>();
+  std::vector<std::unique_ptr<scene_system>> systems_;
 
   void build_scene_graph(const std::vector<fastgltf::Node>& nodes, const size_t& mesh_offset);
   void create_entities(std::vector<fastgltf::Node> nodes, const size_t& mesh_offset);

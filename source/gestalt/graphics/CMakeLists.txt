@@ -55,6 +55,8 @@ shadow_pass.h
 shadow_pass.cpp
 lighting_pass.cpp
 lighting_pass.h
+scene_systems.h
+scene_systems.cpp
 )
 
 target_compile_features(graphics PRIVATE cxx_std_20)

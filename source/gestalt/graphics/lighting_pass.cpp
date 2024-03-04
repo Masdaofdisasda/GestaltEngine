@@ -16,6 +16,8 @@ void lighting_pass::prepare() {
           .add_binding(12, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
           .add_binding(13, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
           .add_binding(14, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+          .add_binding(15, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
+          .add_binding(16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,false, 256)
           .build(gpu_.device));
 
   VkShaderModule meshFragShader;
@@ -112,9 +114,26 @@ void lighting_pass::execute(VkCommandBuffer cmd) {
       14, shadow_map->imageView,
       resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
       VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+  writer.write_buffer(15, resource_manager_->light_data.dir_light_buffer.buffer, 32, 0,
+                      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+
+  for (int i = 0; i < 256; i++) {
+       writer.write_buffer(16, resource_manager_->light_data.point_light_buffer.buffer, 32, 32 * i,
+                                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+  }
+
+  std::vector<VkDescriptorBufferInfo> bufferInfos;
+  for (int i = 0; i < 256; ++i) {
+       VkDescriptorBufferInfo bufferInfo = {};
+       bufferInfo.buffer = resource_manager_->light_data.point_light_buffer.buffer;
+       bufferInfo.offset = 32 * i;
+       bufferInfo.range = 32;
+       bufferInfos.push_back(bufferInfo);
+  }
+  writer.write_buffer_array(16, bufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
+
   writer.update_set(gpu_.device, descriptor_set_);
-  VkDescriptorSet descriptorSets[]
-      = {resource_manager_->ibl_data.IblSet, descriptor_set_};
+  VkDescriptorSet descriptorSets[] = {resource_manager_->ibl_data.IblSet, descriptor_set_};
 
   gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                                  &descriptor_write);
@@ -128,9 +147,10 @@ void lighting_pass::execute(VkCommandBuffer cmd) {
   scissor_.extent.height = color_image->getExtent2D().height;
   vkCmdSetViewport(cmd, 0, 1, &viewport_);
   vkCmdSetScissor(cmd, 0, 1, &scissor_);
-  resource_manager_->config_.lighting.screenSize = glm::vec2(color_image->getExtent2D().width,
-                                                                 color_image->getExtent2D().height);
-  resource_manager_->config_.lighting.invViewProj = inverse(resource_manager_->per_frame_data_.viewproj);
+  resource_manager_->config_.lighting.screenSize
+      = glm::vec2(color_image->getExtent2D().width, color_image->getExtent2D().height);
+  resource_manager_->config_.lighting.invViewProj
+      = inverse(resource_manager_->per_frame_data_.viewproj);
 
   vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                      sizeof(render_config::lighting_params), &resource_manager_->config_.lighting);

@@ -2,9 +2,10 @@
 
 descriptor_layout_builder& descriptor_layout_builder::add_binding(
     uint32_t binding, VkDescriptorType type, VkShaderStageFlags shader_stages,
-    bool bindless) {
+                                                                  bool bindless,
+                                                                  uint32_t descriptor_count) {
 
-  uint32_t descriptorCount = bindless ? 4096 : 1;
+  uint32_t descriptorCount = bindless ? 4096 : descriptor_count; //TODO rethink this design
 
   bindings.emplace_back(VkDescriptorSetLayoutBinding{
       .binding = binding,
