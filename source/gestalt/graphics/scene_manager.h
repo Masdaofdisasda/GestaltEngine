@@ -35,10 +35,10 @@ public:
   entity_component& create_entity();
   void add_mesh_component(entity entity, size_t mesh_index);
   void add_camera_component(entity entity, const camera_component& camera);
-  void add_light_component(entity entity, const light_component& light);
   size_t create_material(
       pbr_material& config,
       const std::string& name = "") const;
+  size_t create_light(const light_component& light);
   void set_transform_component(entity entity, const glm::vec3& position,
                                const glm::quat& rotation = glm::quat(0.f, 0.f, 0.f, 0.f),
                                const glm::vec3& scale = glm::vec3(1.f));

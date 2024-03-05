@@ -16,12 +16,13 @@ layout(set = 2, binding = 11) uniform sampler2D gbuffer2;
 layout(set = 2, binding = 12) uniform sampler2D gbuffer3;
 layout(set = 2, binding = 13) uniform sampler2D depthBuffer;
 layout(set = 2, binding = 14) uniform sampler2D shadowMap;
-layout(set = 2, binding = 15) uniform DirLight{
+layout(set = 2, binding = 15) buffer DirLight{
 	vec3 color;
 	float intensity;
 	vec3 direction;
 	bool enabled;
-} dirLight;
+} dirLight[2];
+
 layout(set = 2, binding = 16) buffer PointLight{
 	vec3 color;
 	float intensity;
@@ -32,10 +33,12 @@ layout(set = 2, binding = 16) buffer PointLight{
 layout( push_constant ) uniform constants
 {	
 	mat4 invViewProj;
-	vec2 screenSize;
-	float density;
-	float attenuation;
-	int debugMode;
+    int debugMode;
+    int num_dir_lights;
+    int num_point_lights;
+    int shading_mode;
+    int shadow_mode;
+    int ibl_mode;
 } params;
 
 // Function to reconstruct world position from depth
@@ -78,25 +81,45 @@ void main() {
     // Transform world position to light space
     vec4 lightSpacePos = biasMat * sceneData.lightViewProj * vec4(worldPos, 1.0);
 
-	float bias = calculateDynamicBias(n, dirLight.direction);
-	float shadow = shadowFactor(lightSpacePos, shadowMap, bias).r;
-
-	PBRInfo pbrInputs;
-	
-	vec3 color = vec3(0.0);
-
-	// IBL contribution
-	color = calculatePBRInputsMetallicRoughness(Kd, n, viewPos.xyz, worldPos, MeR, pbrInputs, texEnvMap, texEnvMapIrradiance, texBdrfLut) * MeR.r;
-
-	// directional light contribution
-	color *= calculatePBRLightContributionDir(pbrInputs, dirLight.color, dirLight.direction, dirLight.intensity) * shadow;
-
-	for (int i = 0; i < 100; ++i) {
-  		color += calculatePBRLightContributionPoint(pbrInputs, worldPos, pointLight[i].color, pointLight[i].position, pointLight[i].intensity);
+	float shadow = 1.0;
+	if (params.shadow_mode == 0) {
+		float bias = calculateDynamicBias(n, dirLight[0].direction);
+		shadow = shadowFactor(lightSpacePos, shadowMap, bias).r;
 	}
 
+	PBRInfo pbrInputs;
+	calculatePBRInputsMetallicRoughness(Kd, n, viewPos.xyz, worldPos, MeR, pbrInputs, texEnvMap, texEnvMapIrradiance, texBdrfLut);
+
+	vec3 color = vec3(0.0);
+
+	// Calculate lighting contribution from image based lighting source (IBL)
+	vec3 diffuseIbl, specularIbl;
+	getIBLContribution(pbrInputs, n, pbrInputs.reflection, texEnvMap, texEnvMapIrradiance, texBdrfLut, diffuseIbl, specularIbl);
+
+	if (params.ibl_mode == 0) {
+		color = (diffuseIbl + specularIbl) * MeR.r * shadow;
+	} else if (params.ibl_mode == 1) {
+		color = diffuseIbl * MeR.r * shadow;
+	} else if (params.ibl_mode == 2) {
+		color = specularIbl * MeR.r * shadow;
+	}
+
+	// directional light contribution
+	if (params.shading_mode == 0 || params.shading_mode == 1) {
+		for (int i = 0; i < params.num_dir_lights; ++i) {
+			color += calculatePBRLightContributionDir(pbrInputs, dirLight[i].color, dirLight[i].direction, dirLight[i].intensity) * shadow;
+		}
+	}
+
+	if (params.shading_mode == 0 || params.shading_mode == 2) {
+		for (int i = 0; i < params.num_point_lights; ++i) {
+  			color += calculatePBRLightContributionPoint(pbrInputs, worldPos, pointLight[i].color, pointLight[i].position, pointLight[i].intensity);
+		}
+	}
+	
 	color += Ke.rgb;
     
+	/*
     vec3 viewDir = normalize(worldPos - viewPos);
     vec3 volumetricIntensity = vec3(0.0);
     vec3 accumulatedLight = vec3(0.0);
@@ -115,12 +138,13 @@ void main() {
 
 		float occlusion = PCF(5, ndcPos.xy, ndcPos.z, shadowMap);
 
-		accumulatedLight += occlusion * dirLight.intensity / (1.0 + params.attenuation  * offset * offset);
+		accumulatedLight += occlusion * dirLight[0].intensity / (1.0 + params.attenuation  * offset * offset);
     }
 
     volumetricIntensity = accumulatedLight / numSamples; // Average the accumulated light
 
 	color += volumetricIntensity * params.density;
+	*/
 
 	if (params.debugMode == 0) {
 		outFragColor = vec4(color, 1.0);

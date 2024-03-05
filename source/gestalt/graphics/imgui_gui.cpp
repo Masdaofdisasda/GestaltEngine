@@ -121,10 +121,10 @@ void imgui_gui::menu_bar() {
 
       if (ImGui::BeginMenu("Add Light Source")) {
         if (ImGui::MenuItem("Point Light")) {
-          // Code to add an Orbit Camera
+            current_action_ = action::add_point_light;
         }
         if (ImGui::MenuItem("Directional Light")) {
-          // Code to add an Orbit Camera
+            current_action_ = action::add_directional_light;
         }
         if (ImGui::MenuItem("Spot Light")) {
           // Code to add an Orbit Camera
@@ -137,6 +137,61 @@ void imgui_gui::menu_bar() {
     // Add other menus like "Edit", "View", etc. here
 
     ImGui::EndMainMenuBar();
+  }
+
+  // Depending on the action, display appropriate controls
+  if (current_action_ == action::add_point_light) {
+    if (ImGui::Begin("Add Point Light", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+      static glm::vec3 color = glm::vec3(1.0f);  // Default to white
+      static float intensity = 1.0f;
+      static glm::vec3 position = glm::vec3(0.0f);
+
+      ImGui::ColorEdit3("Color", &color.x);
+      ImGui::SliderFloat("Intensity", &intensity, 0.0f, 100.0f, "%.3f",
+                         ImGuiSliderFlags_Logarithmic);
+      ImGui::InputFloat3("Position", &position.x);
+
+      if (ImGui::Button("Add Light")) {
+        // Add the point light to the scene
+        auto newLight = light_component::PointLight(color, intensity, position);
+        // Code to integrate newLight into your scene
+        const size_t entity = actions_.add_light(newLight);
+
+        selected_node_ = &actions_.get_scene_object(entity);
+
+        // Reset fields or close the window
+        current_action_ = action::none;
+      }
+
+      ImGui::End();
+    }
+  }
+
+  if (current_action_ == action::add_directional_light) {
+    if (ImGui::Begin("Add Directional Light", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+      static glm::vec3 color = glm::vec3(1.0f);  // Default to white
+      static float intensity = 1.0f;
+      static glm::vec3 direction = glm::vec3(0.0f, -1.0f, 0.0f);  // Default pointing downwards
+
+      ImGui::ColorEdit3("Color", &color.x);
+      ImGui::SliderFloat("Intensity", &intensity, 0.0f, 100.0f, "%.3f",
+                         ImGuiSliderFlags_Logarithmic);
+      ImGui::InputFloat3("Direction", &direction.x);
+
+      if (ImGui::Button("Add Light")) {
+        // Add the directional light to the scene
+        auto newLight = light_component::DirectionalLight(color, intensity, direction);
+        // Code to integrate newLight into your scene
+        const size_t entity = actions_.add_light(newLight);
+
+        selected_node_ = &actions_.get_scene_object(entity);
+
+        // Reset fields or close the window
+        current_action_ = action::none;
+      }
+
+      ImGui::End();
+    }
   }
 }
 
@@ -344,8 +399,14 @@ void imgui_gui::render_settings() {
     }
 
 
-    if (ImGui::CollapsingHeader("Shadow Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
-      ImGui::Checkbox("Enable Shadows", &config.enable_shadows);
+    if (ImGui::CollapsingHeader("Shading Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+      const char* shadow_mode_options[]
+          = {"On", "Off"};
+      int current_shadow_mode = config.lighting.shadow_mode;
+      if (ImGui::Combo("Shadow Mode", &current_shadow_mode, shadow_mode_options,
+                       IM_ARRAYSIZE(shadow_mode_options))) {
+        config.lighting.shadow_mode = current_shadow_mode;
+      }
 
       ImGui::SliderFloat("Shadow Bias", &config.shadow.shadow_bias, 1.0f, 2.0f,
                                   "%.4f");
@@ -355,10 +416,24 @@ void imgui_gui::render_settings() {
                                            "%.2f");
       ImGui::SliderFloat("Shadow Bounds min", &config.shadow.min_corner, -1000.0f, 0.f,
                                                     "%.2f");
-      ImGui::SliderFloat("Volume Density", &config.lighting.density, 0.001f, 0.01f,
-                                  "%.2f");
-      ImGui::SliderFloat("Light Attenuation", &config.lighting.attenuation, 0.01f, 1.0f,
-                                  "%.2f");
+
+      const char* shading_mode_options[] = {
+          "All",  "Only Directional Light", "Only Point Light", "Only Spot Light", "None"
+      };
+      int current_shading_mode = config.lighting.shading_mode;
+      if (ImGui::Combo("Shading Mode", &current_shading_mode, shading_mode_options,
+                       IM_ARRAYSIZE(shading_mode_options))) {
+        config.lighting.shading_mode = current_shading_mode;
+      }
+
+      const char* ibl_mode_options[] = {
+          "Full",  "Only Diffuse", "Only Specular", "Off"
+      };
+      int current_ibl_mode = config.lighting.ibl_mode;
+      if (ImGui::Combo("IBL Mode", &current_ibl_mode, ibl_mode_options,
+                       IM_ARRAYSIZE(ibl_mode_options))) {
+        config.lighting.ibl_mode = current_ibl_mode;
+      }
 
       const char* debug_mode_options[]
           = {"None",
@@ -522,6 +597,43 @@ void imgui_gui::show_scene_hierarchy_window() {
 
               ImGui::TreePop();
             }
+          }
+        }
+      }
+
+      if (selected_node_->has_light()) {
+         if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen)) {
+          auto& light = actions_.get_light(selected_node_->light);
+
+          ImGui::ColorEdit3("Color", &light.color.x);
+          ImGui::SliderFloat("Intensity", &light.intensity, 0.0f, 1000.0f);
+          if (light.type == light_type::point) {
+                       ImGui::DragFloat3("Position", &light.position.x, 0.1f);
+          }
+          if (light.type == light_type::directional) {
+                       // Convert light direction from Cartesian to spherical coordinates (azimuth,
+                       // elevation)
+                       float azimuth = atan2(light.direction.y, light.direction.x);
+                       float elevation = atan2(light.direction.z,
+                                               sqrt(light.direction.x * light.direction.x
+                                                    + light.direction.y * light.direction.y));
+                       float azimuthDeg = glm::degrees(azimuth);
+                       float elevationDeg = glm::degrees(elevation);
+
+                       // Azimuth slider: Full circle
+                       ImGui::SliderFloat("Azimuth", &azimuthDeg, -180.f, 180.f);
+
+                       // Elevation slider: From straight down (-90 degrees) to straight up (+90
+                       // degrees)
+                       ImGui::SliderFloat("Elevation", &elevationDeg, -90.f, 90.f);
+
+                       azimuth = glm::radians(azimuthDeg);
+                       elevation = glm::radians(elevationDeg);
+
+                       // Convert spherical coordinates back to Cartesian coordinates
+                       light.direction.x = cos(elevation) * cos(azimuth);
+                       light.direction.y = cos(elevation) * sin(azimuth);
+                       light.direction.z = sin(elevation);
           }
         }
       }

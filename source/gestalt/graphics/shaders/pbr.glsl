@@ -14,14 +14,14 @@ struct PBRInfo
 	vec3 specularColor;           // color contribution from specular lighting
 	vec3 n;							// normal at surface point
 	vec3 v;							// vector from surface point to camera
+	vec3 reflection;
 };
 
 const float M_PI = 3.141592653589793;
 
 // Calculation of the lighting contribution from an optional Image Based Light source.
-// Precomputed Environment Maps are required uniform inputs and are computed as outlined in [1].
-// See our README.md on Environment Maps [3] for additional discussion.
-vec3 getIBLContribution(PBRInfo pbrInputs, vec3 n, vec3 reflection, samplerCube texEnvMap, samplerCube texEnvMapIrradiance, sampler2D texBdrfLut)
+void getIBLContribution(PBRInfo pbrInputs, vec3 n, vec3 reflection, samplerCube texEnvMap, samplerCube texEnvMapIrradiance, sampler2D texBdrfLut,
+	out vec3 diffuse, out vec3 specular)
 {
 	float mipCount = float(textureQueryLevels(texEnvMap));
 	float lod = pbrInputs.perceptualRoughness * mipCount;
@@ -32,12 +32,11 @@ vec3 getIBLContribution(PBRInfo pbrInputs, vec3 n, vec3 reflection, samplerCube 
 	vec3 diffuseLight = texture(texEnvMapIrradiance, n.xyz).rgb;
 	vec3 specularLight = textureLod(texEnvMap, reflection.xyz, lod).rgb;
 
-	vec3 diffuse = diffuseLight * pbrInputs.diffuseColor;
-	vec3 specular = specularLight * (pbrInputs.specularColor * brdf.x + brdf.y);
-	return diffuse + specular ;
+	diffuse = diffuseLight * pbrInputs.diffuseColor;
+	specular = specularLight * (pbrInputs.specularColor * brdf.x + brdf.y);
 }
 
-vec3 calculatePBRInputsMetallicRoughness( vec4 albedo, vec3 normal, vec3 cameraPos, vec3 worldPos, vec4 mrSample, out PBRInfo pbrInputs, samplerCube texEnvMap, samplerCube texEnvMapIrradiance, sampler2D texBdrfLut)
+void calculatePBRInputsMetallicRoughness( vec4 albedo, vec3 normal, vec3 cameraPos, vec3 worldPos, vec4 mrSample, out PBRInfo pbrInputs, samplerCube texEnvMap, samplerCube texEnvMapIrradiance, sampler2D texBdrfLut)
 {
 	float perceptualRoughness = 1.0;
 	float metallic = 1.0;
@@ -85,11 +84,7 @@ vec3 calculatePBRInputsMetallicRoughness( vec4 albedo, vec3 normal, vec3 cameraP
 	pbrInputs.specularColor = specularColor;
 	pbrInputs.n = n;
 	pbrInputs.v = v;
-
-	// Calculate lighting contribution from image based lighting source (IBL)
-	vec3 color = getIBLContribution(pbrInputs, n, reflection, texEnvMap, texEnvMapIrradiance, texBdrfLut);
-
-	return color;
+	pbrInputs.reflection = reflection;
 }
 
 // Disney Implementation of diffuse from Physically-Based Shading at Disney by Brent Burley. See Section 5.3.

@@ -7,6 +7,12 @@
 #include "gui_actions.h"
 #include "scene_manager.h"
 
+enum class action {
+  none,
+  add_directional_light,
+  add_point_light,
+};
+
 class imgui_gui {
   vk_gpu gpu_ = {};
   sdl_window window_;
@@ -14,6 +20,7 @@ class imgui_gui {
   gui_actions actions_;
   vk_deletion_service deletion_service_ = {};
 
+  action current_action_ = action::none;
   entity_component* selected_node_ = nullptr;
 
   void menu_bar();

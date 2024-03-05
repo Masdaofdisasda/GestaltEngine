@@ -24,7 +24,6 @@ protected:
 };
 
 class light_system final : public scene_system {
-    const uint32_t max_point_lights_ = 256;
 
 public:
   void prepare() override;

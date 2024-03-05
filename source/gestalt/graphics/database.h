@@ -95,6 +95,17 @@ public:
       }
       return lights;
   }
+  size_t max_lights(light_type type) {
+      if (type == light_type::directional) {
+        return 2;
+      } else if (type == light_type::point) {
+        return 256;
+      } else if (type == light_type::spot) {
+        return 0; //TDOO: Implement
+      } else {
+        return 0;
+      }
+  }
   std::vector<material_component>& get_materials() { return components_.materials_; }
   std::vector<transform_component>& get_transforms() { return components_.transforms_; }
 

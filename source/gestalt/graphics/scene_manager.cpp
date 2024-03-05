@@ -37,6 +37,32 @@ void scene_manager::init(const vk_gpu& gpu,const std::shared_ptr <resource_manag
 
   resource_manager_->get_database().add_camera(camera_component());
 
+  create_light(light_component::DirectionalLight(glm::vec3(1.f, 0.957f, 0.917f), 20.f,
+                                                        glm::vec3(-0.216, 0.941, -0.257)));
+
+  constexpr int gridWidth = 5;
+  constexpr int gridHeight = 5;
+  constexpr int gridDepth = 5;
+  constexpr float spacing = 20.0f;  // Spacing between lights in the grid
+  constexpr glm::vec3 gridStart(-gridWidth * spacing / 2.0f, 0.0f,
+                                -gridHeight * spacing / 2.0f);  // Starting position of the grid
+
+  for (int x = 0; x < gridWidth; x++) {
+    for (int z = 0; z < gridHeight; z++) {
+      for (int y = 0; y < gridDepth; y++) {
+        // Calculate the position for each light based on its grid coordinates
+        glm::vec3 position = gridStart + glm::vec3(x * spacing, y * spacing, z * spacing);
+
+        // Generate a unique color for each light
+        // This example simply cycles through red, green, and blue colors
+        glm::vec3 color = glm::vec3(0.0f);
+        color[(x + z) % 3] = 1.0f;  // Simple way to alternate colors
+
+        create_light(light_component::PointLight(color, 50.0f, position));
+      }
+    }
+  }
+
   systems_.push_back(std::make_unique<light_system>());
 
   for (const auto& system : systems_) {
@@ -152,9 +178,23 @@ void scene_manager::add_camera_component(entity entity, const camera_component& 
   object.camera = resource_manager_->get_database().add_camera(camera);
 }
 
-void scene_manager::add_light_component(entity entity, const light_component& light) {
-  entity_component& object = get_scene_object_by_entity(entity).value().get();
-  object.camera = resource_manager_->get_database().add_light(light);
+size_t scene_manager::create_light(const light_component& light) {
+  auto& light_node = create_entity();
+  get_root().children.push_back(light_node.entity);
+  light_node.parent = get_root().entity;
+
+  size_t current_count = resource_manager_->get_database().get_lights(light.type).size();
+  if (current_count == resource_manager_->get_database().max_lights(light.type)) {
+    fmt::print("max lights reached\n");
+    return -1;
+  }
+
+  if (light.type == light_type::point || light.type == light_type::spot) {
+    set_transform_component(light_node.entity, light.position);
+  }
+  light_node.light = resource_manager_->get_database().add_light(light);
+
+  return light_node.entity;
 }
 
 const std::vector<entity>& scene_manager::get_children(entity entity) {

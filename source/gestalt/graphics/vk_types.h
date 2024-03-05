@@ -219,7 +219,6 @@ struct render_config {
     int num_streaks{4};
   } streaks{};
 
-  bool enable_shadows{true};
   struct shadow_params {
     float shadow_bias{1.f};
     float shadow_slope_bias{1.f};
@@ -229,11 +228,15 @@ struct render_config {
 
   struct lighting_params {
     glm::mat4 invViewProj;
-    glm::vec2 screenSize;
-    float density{0.001f};
-    float attenuation{0.1f};
     int debug_mode{0};
+    int num_dir_lights{0};
+    int num_point_lights{0};
+    int shading_mode{0};
+    int shadow_mode{0};
+    int ibl_mode{0};
   } lighting{};
+
+  static_assert(sizeof(lighting_params) <= 88);
 
   // todo : more settings
 };

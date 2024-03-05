@@ -11,6 +11,8 @@ struct gui_actions {
   std::function <per_frame_data&()> get_scene_data;
   std::function<std::vector<std::reference_wrapper<light_component>>()> get_directional_lights;
   std::function<std::vector<std::reference_wrapper<light_component>>()> get_point_lights;
+  std::function<light_component&(size_t)> get_light;
+  std::function<size_t(const light_component& light)> add_light;
   std::function <entity_component&()> get_scene_root;
   std::function <entity_component&(uint32_t)> get_scene_object;
   std::function<transform_component&(size_t)> get_transform_component;

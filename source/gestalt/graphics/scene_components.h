@@ -160,4 +160,6 @@ struct entity_component {
 
   bool is_valid() const { return entity != invalid_entity; }
   bool has_mesh() const { return mesh != no_component; }
+  bool has_light() const { return light != no_component; }
+  bool has_camera() const { return camera != no_component; }
 };
