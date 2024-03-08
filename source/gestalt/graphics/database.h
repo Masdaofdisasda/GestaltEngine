@@ -31,6 +31,10 @@ public:
     gpu_data_.matrices_.push_back(matrix);
     return gpu_data_.matrices_.size() - 1;
   }
+  size_t add_light_view_proj(const glm::mat4& matrix) {
+    gpu_data_.light_view_projections.push_back(matrix);
+    return gpu_data_.light_view_projections.size() - 1;
+  }
   size_t add_image(const AllocatedImage& image) {
     gpu_data_.images_.push_back(image);
     return gpu_data_.images_.size() - 1;
@@ -44,11 +48,15 @@ public:
   std::vector<uint32_t>& get_indices() { return gpu_data_.indices_; }
   std::vector<mesh_surface>& get_surfaces() { return gpu_data_.surfaces_; }
   std::vector<glm::mat4>& get_matrices() { return gpu_data_.matrices_; }
+  std::vector<glm::mat4>& get_light_view_projs() { return gpu_data_.light_view_projections; }
   std::vector<AllocatedImage>& get_images() { return gpu_data_.images_; }
   std::vector<VkSampler>& get_samplers() { return gpu_data_.samplers_; }
 
   void set_matrix(const size_t matrix, const glm::mat4& value) {
        gpu_data_.matrices_[matrix] = value;
+  }
+  void set_light_view_proj(const size_t matrix, const glm::mat4& value) {
+       gpu_data_.light_view_projections[matrix] = value;
   }
 
   size_t get_vertices_size() const { return gpu_data_.vertices_.size(); }
@@ -60,6 +68,7 @@ public:
 
   mesh_surface& get_surface(const size_t surface) { return gpu_data_.surfaces_[surface]; }
   glm::mat4& get_matrix(const size_t matrix) { return gpu_data_.matrices_[matrix]; }
+  glm::mat4& get_light_view_proj(const size_t matrix) { return gpu_data_.light_view_projections[matrix]; }
   AllocatedImage& get_image(const size_t image) { return gpu_data_.images_[image]; }
   VkSampler& get_sampler(const size_t sampler) { return gpu_data_.samplers_[sampler]; }
 
@@ -144,6 +153,7 @@ private:
     std::vector<uint32_t> indices_;
     std::vector<mesh_surface> surfaces_;
     std::vector<glm::mat4> matrices_;
+    std::vector<glm::mat4> light_view_projections;
     std::vector<AllocatedImage> images_;
     std::vector<VkSampler> samplers_;
   } gpu_data_ = {};

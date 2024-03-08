@@ -7,6 +7,12 @@
 void directional_depth_pass::prepare() {
   fmt::print("Preparing directional depth pass\n");
   descriptor_layouts_.push_back(resource_manager_->per_frame_data_layout);
+  descriptor_layouts_.emplace_back(
+      descriptor_layout_builder()
+          .add_binding(17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, false,
+                       resource_manager_->get_database().max_lights(light_type::directional)
+                           + resource_manager_->get_database().max_lights(light_type::point))
+          .build(gpu_.device));
 
   VkShaderModule meshFragShader;
   vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &meshFragShader);
@@ -44,6 +50,9 @@ void directional_depth_pass::prepare() {
 void directional_depth_pass::cleanup() { vkDestroyPipeline(gpu_.device, pipeline_, nullptr); }
 
 void directional_depth_pass::execute(VkCommandBuffer cmd) {
+  descriptor_set_
+      = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(1));
+
   const auto depth_image = resource_manager_->get_resource<AllocatedImage>("directional_depth");
 
   VkClearValue depth_clear = {.depthStencil = {1.f, 0}};
@@ -62,47 +71,6 @@ void directional_depth_pass::execute(VkCommandBuffer cmd) {
     resource_manager_->per_frame_data_.proj = projection;
     resource_manager_->per_frame_data_.view = view;
     resource_manager_->per_frame_data_.viewproj = projection * view;
-
-    auto& light = resource_manager_->get_database().get_light(0);
-    resource_manager_->per_frame_data_.dir_light_direction = light.direction;
-    resource_manager_->per_frame_data_.dir_light_intensity = light.intensity;
-
-    // Define the dimensions of the orthographic projection
-    auto config = resource_manager_->config_.shadow;
-    glm::vec3 direction = normalize(light.direction);  // Ensure the direction is normalized
-
-    glm::vec3 up = glm::vec3(0, 1, 0);
-    if (glm::abs(dot(up, direction)) > 0.999f) {
-      // up = glm::vec3(1, 0, 0);  // Switch to a different up vector if the initial choice is
-      // parallel
-    }
-
-    // Create a view matrix for the light
-    glm::mat4 lightView = lookAt(glm::vec3(0, 0, 0), -direction, glm::vec3(0, 0, 1));
-
-    glm::vec3 min{config.min_corner};
-    glm::vec3 max{config.max_corner};
-
-    glm::vec3 corners[] = {
-        glm::vec3(min.x, min.y, min.z), glm::vec3(min.x, max.y, min.z),
-        glm::vec3(min.x, min.y, max.z), glm::vec3(min.x, max.y, max.z),
-        glm::vec3(max.x, min.y, min.z), glm::vec3(max.x, max.y, min.z),
-        glm::vec3(max.x, min.y, max.z), glm::vec3(max.x, max.y, max.z),
-    };
-    for (auto& v : corners) v = glm::vec3(lightView * glm::vec4(v, 1.0f));
-
-    glm::vec3 vmin(std::numeric_limits<float>::max());
-    glm::vec3 vmax(std::numeric_limits<float>::lowest());
-
-    for (auto& corner : corners) {
-      vmin = glm::min(vmin, corner);
-      vmax = glm::max(vmax, corner);
-    }
-    glm::mat4 lightProjection = glm::orthoRH_ZO(min.x, max.x, min.y, max.y, -max.z, -min.z);
-
-    lightProjection[1][1] *= -1;
-
-    resource_manager_->per_frame_data_.light_view_proj = lightProjection * lightView;
 
     void* mapped_data;
     VmaAllocation allocation = resource_manager_->per_frame_data_buffer.allocation;
@@ -129,6 +97,24 @@ void directional_depth_pass::execute(VkCommandBuffer cmd) {
                        VK_INDEX_TYPE_UINT32);
 
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
+  writer.clear();
+
+  std::vector<VkDescriptorBufferInfo> lightViewProjBufferInfos;
+  for (int i = 0; i < resource_manager_->get_database().max_lights(light_type::directional)
+                          + resource_manager_->get_database().max_lights(light_type::point);
+       ++i) {
+    VkDescriptorBufferInfo bufferInfo = {};
+    bufferInfo.buffer = resource_manager_->light_data.view_proj_matrices.buffer;
+    bufferInfo.offset = 64 * i;
+    bufferInfo.range = 64;
+    lightViewProjBufferInfos.push_back(bufferInfo);
+  }
+  writer.write_buffer_array(17, lightViewProjBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
+
+  writer.update_set(gpu_.device, descriptor_set_);
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 1,
+                          &descriptor_set_, 0, nullptr);
+
   gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                                  &descriptor_write);
 

@@ -42,6 +42,7 @@ public:
   struct light_data {
     AllocatedBuffer dir_light_buffer;
     AllocatedBuffer point_light_buffer;
+    AllocatedBuffer view_proj_matrices;
   } light_data;
 
   template <typename T> void add_resource(const std::string& id, std::shared_ptr<T> resource) {

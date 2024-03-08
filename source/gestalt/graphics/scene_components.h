@@ -56,6 +56,8 @@ struct light_component {
   glm::vec3 direction;  // Used for directional and spot lights
   float inner_cone;     // Used for spot lights
   float outer_cone;     // Used for spot lights
+  std::vector<size_t> light_view_projections;
+  bool isDirty;
 
 private:
   // Make the constructor private to force using factory methods

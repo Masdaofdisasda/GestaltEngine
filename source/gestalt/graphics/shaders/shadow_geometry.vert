@@ -5,6 +5,10 @@
 
 #include "per_frame_structs.glsl"
 
+layout(set = 1, binding = 17) buffer LightViewProj{
+	mat4 viewProj;
+} lightViewProj[256 + 2];
+
 struct Vertex {
 
 	vec3 position;
@@ -32,5 +36,6 @@ void main()
 	
 	vec4 position = vec4(v.position, 1.0f);
 	
-    gl_Position = sceneData.lightViewProj * PushConstants.model_matrix * position;
+	mat4 lightViewProj = lightViewProj[0].viewProj;
+    gl_Position = lightViewProj * PushConstants.model_matrix * position;
 }

@@ -20,6 +20,10 @@ void lighting_pass::prepare() {
                        resource_manager_->get_database().max_lights(light_type::directional))
           .add_binding(16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
                        resource_manager_->get_database().max_lights(light_type::point))
+          .add_binding(17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
+                       resource_manager_->get_database()
+                           .max_lights(light_type::directional) +
+                       resource_manager_->get_database().max_lights(light_type::point))
           .build(gpu_.device));
 
   VkShaderModule meshFragShader;
@@ -135,6 +139,19 @@ void lighting_pass::execute(VkCommandBuffer cmd) {
        pointBufferInfos.push_back(bufferInfo);
   }
   writer.write_buffer_array(16, pointBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
+
+  std::vector<VkDescriptorBufferInfo> lightViewProjBufferInfos;
+  for (int i = 0; i < resource_manager_->get_database()
+                          .max_lights(light_type::directional)  + resource_manager_->get_database()
+                          .max_lights(light_type::point);
+       ++i) {
+       VkDescriptorBufferInfo bufferInfo = {};
+       bufferInfo.buffer = resource_manager_->light_data.view_proj_matrices.buffer;
+       bufferInfo.offset = 64 * i;
+       bufferInfo.range = 64;
+       lightViewProjBufferInfos.push_back(bufferInfo);
+  }
+  writer.write_buffer_array(17, lightViewProjBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
 
   writer.update_set(gpu_.device, descriptor_set_);
   VkDescriptorSet descriptorSets[] = {resource_manager_->ibl_data.IblSet, descriptor_set_};

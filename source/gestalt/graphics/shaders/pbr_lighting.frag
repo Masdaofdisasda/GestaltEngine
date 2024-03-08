@@ -16,11 +16,12 @@ layout(set = 2, binding = 11) uniform sampler2D gbuffer2;
 layout(set = 2, binding = 12) uniform sampler2D gbuffer3;
 layout(set = 2, binding = 13) uniform sampler2D depthBuffer;
 layout(set = 2, binding = 14) uniform sampler2D shadowMap;
+
 layout(set = 2, binding = 15) buffer DirLight{
 	vec3 color;
 	float intensity;
 	vec3 direction;
-	bool enabled;
+	int viewProjIndex;
 } dirLight[2];
 
 layout(set = 2, binding = 16) buffer PointLight{
@@ -29,6 +30,10 @@ layout(set = 2, binding = 16) buffer PointLight{
 	vec3 position;
 	bool enabled;
 } pointLight[256];
+
+layout(set = 2, binding = 17) buffer LightViewProj{
+	mat4 viewProj;
+} lightViewProj[256 + 2];
 
 layout( push_constant ) uniform constants
 {	
@@ -79,7 +84,8 @@ void main() {
 	vec3 viewPos = -normalize(vec3(sceneData.view[0][2], sceneData.view[1][2], sceneData.view[2][2]));
 
     // Transform world position to light space
-    vec4 lightSpacePos = biasMat * sceneData.lightViewProj * vec4(worldPos, 1.0);
+	mat4 lightViewProj = lightViewProj[dirLight[0].viewProjIndex].viewProj;
+    vec4 lightSpacePos = biasMat * lightViewProj * vec4(worldPos, 1.0);
 
 	float shadow = 1.0;
 	if (params.shadow_mode == 0) {

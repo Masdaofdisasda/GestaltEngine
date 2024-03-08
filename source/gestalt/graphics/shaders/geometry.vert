@@ -9,7 +9,6 @@ layout (location = 0) out vec3 outNormal;
 layout (location = 1) out vec3 outPosition; //was color
 layout (location = 2) out vec2 outUV;
 layout (location = 3) flat out int outMaterialIndex;
-layout (location = 4) out vec4 outShadowPosition;
 
 struct Vertex {
 
@@ -52,6 +51,4 @@ void main()
 	outUV.x = v.uv_x;
 	outUV.y = v.uv_y;
 	outMaterialIndex = PushConstants.materialIndex;
-	
-	outShadowPosition = biasMat * sceneData.lightViewProj * PushConstants.model_matrix * position;
 }

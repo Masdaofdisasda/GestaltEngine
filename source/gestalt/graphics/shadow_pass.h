@@ -32,9 +32,12 @@ class directional_depth_pass final : public render_pass {
       .offset = {0, 0},
   };
 
+  descriptor_writer writer;
+
   VkPipeline pipeline_ = nullptr;
   VkPipelineLayout pipeline_layout_ = nullptr;
   std::vector<VkDescriptorSetLayout> descriptor_layouts_;
+  VkDescriptorSet descriptor_set_ = nullptr;
 
 public:
   void prepare() override;

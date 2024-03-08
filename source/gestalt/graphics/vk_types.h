@@ -109,9 +109,7 @@ struct per_frame_data {
   glm::mat4 view{1.f};
   glm::mat4 proj{1.f};
   glm::mat4 viewproj{1.f};
-  glm::mat4 light_view_proj{1.f};
-  glm::vec3 dir_light_direction{1.f};
-  float dir_light_intensity{1.f};
+  glm::mat4 inv_viewproj{1.f};
 };
 
 //> mat_types

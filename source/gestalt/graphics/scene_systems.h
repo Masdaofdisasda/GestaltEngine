@@ -13,7 +13,7 @@ public:
   }
   virtual ~scene_system() = default;
 
-  virtual void update() = 0;
+  virtual void update(std::vector<entity_component> entities) = 0;
   virtual void cleanup() = 0;
 
 protected:
@@ -24,9 +24,12 @@ protected:
 };
 
 class light_system final : public scene_system {
+  glm::mat4 calculate_sun_view_proj(const light_component& light);
+  void update_directional_lights(const std::vector<std::reference_wrapper<light_component>>& lights);
+  void update_point_lights(const std::vector<std::reference_wrapper<light_component>>& lights);
 
 public:
   void prepare() override;
-  void update() override;
+  void update(std::vector<entity_component> entities) override;
   void cleanup() override;
 };
