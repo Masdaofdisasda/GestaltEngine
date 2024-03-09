@@ -21,13 +21,13 @@ class imgui_gui {
   vk_deletion_service deletion_service_ = {};
 
   action current_action_ = action::none;
-  entity_component* selected_node_ = nullptr;
+  entity selected_entity_ = invalid_entity;
 
   void menu_bar();
   void stats();
   void lights();
   void scene_graph();
-  void display_scene_hierarchy(entity_component& node);
+  void display_scene_hierarchy(entity entity);
   void show_scene_hierarchy_window();
   void render_settings();
 

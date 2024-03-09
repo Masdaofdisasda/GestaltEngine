@@ -125,24 +125,10 @@ void light_system::update_point_lights(
   resource_manager_->config_.lighting.num_point_lights = point_lights.size();
 }
 
-void light_system::update(const std::vector<entity_component> entities) {
+void light_system::update() {
 
-  std::vector<std::reference_wrapper<light_component>> directional_lights;
-  std::vector<std::reference_wrapper<light_component>> points_lights;
-
-  for (const auto& entity : entities) {
-    if (entity.has_light()) {
-      light_component& light = resource_manager_->get_database().get_light(entity.light);
-      if (light.type == light_type::directional) {
-        directional_lights.push_back(std::ref(light));
-      } else if (light.type == light_type::point) {
-        points_lights.push_back(std::ref(light));
-      }
-    }
-  }
-
-  update_directional_lights(directional_lights);
-  update_point_lights(points_lights);
+  update_directional_lights(resource_manager_->get_database().get_lights(light_type::directional));
+  update_point_lights(resource_manager_->get_database().get_lights(light_type::point));
 
   const auto& light_data = resource_manager_->light_data;
   const auto& matrices = resource_manager_->get_database().get_light_view_projs();

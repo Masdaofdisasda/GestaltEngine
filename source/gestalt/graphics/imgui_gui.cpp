@@ -152,14 +152,13 @@ void imgui_gui::menu_bar() {
       ImGui::InputFloat3("Position", &position.x);
 
       if (ImGui::Button("Add Light")) {
-        // Add the point light to the scene
+
         auto newLight = light_component::PointLight(color, intensity, position);
-        // Code to integrate newLight into your scene
-        const size_t entity = actions_.add_light(newLight);
 
-        selected_node_ = &actions_.get_scene_object(entity);
+        //TODO
+        //const size_t entity = actions_.get_database().add_light(???);
+        //selected_node_ = &actions_.get_database().get_node(entity);
 
-        // Reset fields or close the window
         current_action_ = action::none;
       }
 
@@ -179,14 +178,13 @@ void imgui_gui::menu_bar() {
       ImGui::InputFloat3("Direction", &direction.x);
 
       if (ImGui::Button("Add Light")) {
-        // Add the directional light to the scene
+
         auto newLight = light_component::DirectionalLight(color, intensity, direction);
-        // Code to integrate newLight into your scene
-        const size_t entity = actions_.add_light(newLight);
 
-        selected_node_ = &actions_.get_scene_object(entity);
+        // TODO
+        // const size_t entity = actions_.get_database().add_light(???);
+        // selected_node_ = &actions_.get_database().get_node(entity);
 
-        // Reset fields or close the window
         current_action_ = action::none;
       }
 
@@ -213,8 +211,7 @@ void imgui_gui::lights() {
 
     
     ImGui::Text("Directional Light Controls");
-    std::vector<std::reference_wrapper<light_component>> dirLights = actions_.
-        get_directional_lights();
+    std::vector<std::reference_wrapper<light_component>> dirLights = actions_.get_database().get_lights(light_type::directional);
     auto& light = dirLights[0].get();
 
     // Convert light direction from Cartesian to spherical coordinates (azimuth, elevation)
@@ -244,7 +241,8 @@ void imgui_gui::lights() {
     ImGui::Separator();
 
     ImGui::Text("Point Light Controls");
-    std::vector<std::reference_wrapper<light_component>> pointLights = actions_.get_point_lights();
+    std::vector<std::reference_wrapper<light_component>> pointLights
+        = actions_.get_database().get_lights(light_type::point);
     if (!pointLights.empty()) {
       static int selectedLightIndex = 0;        // Static to maintain selected item across frames
       std::vector<std::string> lightNamesStr;   // Vector to hold the complete names as std::string
@@ -461,10 +459,13 @@ void imgui_gui::render_settings() {
 }
 
 
-void imgui_gui::display_scene_hierarchy(entity_component& node) {
-  if (node.is_valid()) {
+void imgui_gui::display_scene_hierarchy(const entity entity) {
+  const auto& node_optional = actions_.get_database().get_node_component(entity);
+  if (node_optional.has_value()) {
+    node_component& node = node_optional.value().get();
 
-    ImGuiTreeNodeFlags node_flags = ImGuiTreeNodeFlags_OpenOnArrow;
+        ImGuiTreeNodeFlags node_flags
+        = ImGuiTreeNodeFlags_OpenOnArrow;
 
     // If the node has no children, make it a leaf node
     if (node.children.empty()) {
@@ -472,11 +473,11 @@ void imgui_gui::display_scene_hierarchy(entity_component& node) {
     }
 
     // Check if the node is the selected node
-    if (node.entity == selected_node_->entity) {
+    if (entity == selected_entity_) {
       node_flags |= ImGuiTreeNodeFlags_Selected;
     }
 
-    ImGui::PushID(node.entity);
+    ImGui::PushID(entity);
 
     bool node_open = ImGui::TreeNodeEx(node.name.c_str(), node_flags);
 
@@ -489,13 +490,13 @@ void imgui_gui::display_scene_hierarchy(entity_component& node) {
 
     // Check for item selection
     if (ImGui::IsItemClicked()) {
-        selected_node_ = &node;
+      selected_entity_ = entity;
     }
 
     // Recursively display children if the node is open
     if (node_open && !node.children.empty()) {
       for (const auto child_entity : node.children) {
-        display_scene_hierarchy(actions_.get_scene_object(child_entity));
+        display_scene_hierarchy(child_entity);
       }
       ImGui::TreePop();
     }
@@ -508,11 +509,11 @@ void imgui_gui::show_scene_hierarchy_window() {
 
   // Child window for the scrollable scene hierarchy
   if (ImGui::BeginChild("HierarchyTree", childSize, true)) {
-    entity_component& root = actions_.get_scene_root();
-    if (selected_node_ == nullptr) {
-      selected_node_ = &root;
+    constexpr entity root_entity = 0; //TODO get root entity
+    if (selected_entity_ == invalid_entity) {
+      selected_entity_ = root_entity;
     }
-    display_scene_hierarchy(actions_.get_scene_object(root.entity));
+    display_scene_hierarchy(root_entity);
   }
   ImGui::EndChild();
 
@@ -520,11 +521,12 @@ void imgui_gui::show_scene_hierarchy_window() {
 
   childSize = ImVec2(0, windowAvail.y - childSize.y);  // Remaining space for the selected node
   if (ImGui::BeginChild("SelectedNodeDetails", childSize, false)) {
-    if (selected_node_->is_valid()) {
-      ImGui::Text(selected_node_->name.c_str());
+    if (selected_entity_ != invalid_entity) {
+      auto& selected_node = actions_.get_database().get_node_component(selected_entity_)->get();
+      ImGui::Text(selected_node.name.c_str());
 
       if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_None)) {
-        auto& transform = actions_.get_transform_component(selected_node_->transform);
+        auto& transform = actions_.get_database().get_transform_component(selected_entity_)->get();
         ImGui::DragFloat3("Position", &transform.position.x, 0.1f);
         glm::vec3 euler = eulerAngles(transform.rotation);
         if (ImGui::DragFloat3("Rotation", &euler.x, 0.1f)) {
@@ -539,12 +541,13 @@ void imgui_gui::show_scene_hierarchy_window() {
         ImGui::DragFloat3("Scale", &transform.scale.x, 0.1f);
         transform.is_dirty = true;
       }
-      if (selected_node_->has_mesh()) {
+      const auto& mesh_component = actions_.get_database().get_mesh_component(selected_entity_);
+      if (mesh_component.has_value()) {
         if (ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_None)) {
-          auto& mesh = actions_.get_mesh_component(selected_node_->mesh);
+          auto& mesh = actions_.get_database().get_mesh(selected_entity_);
           for (auto surface_index : mesh.surfaces) {
-            auto& surface = actions_.get_surface(surface_index);
-            auto& material = actions_.get_material(surface.material);
+            auto& surface = actions_.get_database().get_surface(surface_index);
+            auto& material = actions_.get_database().get_material(surface.material);
             if (ImGui::TreeNode(material.name.c_str())) {
               auto& config = material.config;
 
@@ -601,9 +604,10 @@ void imgui_gui::show_scene_hierarchy_window() {
         }
       }
 
-      if (selected_node_->has_light()) {
+      const auto& light_optional = actions_.get_database().get_light_component(selected_entity_);
+      if (light_optional.has_value()) {
          if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen)) {
-          auto& light = actions_.get_light(selected_node_->light);
+          auto& light = light_optional.value().get();
 
           ImGui::ColorEdit3("Color", &light.color.x);
           ImGui::SliderFloat("Intensity", &light.intensity, 0.0f, 1000.0f);

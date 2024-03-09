@@ -21,11 +21,20 @@ struct mesh_surface {
 };
 
 struct mesh_component {
+  size_t mesh;
+};
+
+struct mesh {
   std::string name;
   std::vector<size_t> surfaces;
 };
 
 struct camera_component {
+  size_t camera_data;
+  //TODO : add more camera settings
+};
+
+struct camera_data {
   glm::mat4 view_matrix{1.0f};
   glm::mat4 projection_matrix{1.0};
 };
@@ -126,6 +135,10 @@ struct pbr_material {
 };
 
 struct material_component {
+  size_t material;
+};
+
+struct material {
   std::string name;
   pbr_material config;
 };
@@ -143,25 +156,13 @@ struct transform_component {
   glm::vec3 position;
   glm::quat rotation;
   glm::vec3 scale;
+  size_t matrix = no_component;
   mutable bool is_dirty = true;
 };
 
-struct entity_component {
-  std::string name;
+struct node_component {
+   std::string name;
   entity parent = invalid_entity;
   std::vector<entity> children;
-
-  entity entity = invalid_entity;
-  size_t transform = no_component;
-
-  size_t mesh = no_component;
-  size_t camera = no_component;
-  size_t light = no_component;
-
-  bool visible{true};
-
-  bool is_valid() const { return entity != invalid_entity; }
-  bool has_mesh() const { return mesh != no_component; }
-  bool has_light() const { return light != no_component; }
-  bool has_camera() const { return camera != no_component; }
+  bool visible = true;
 };

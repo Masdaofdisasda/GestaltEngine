@@ -4,12 +4,8 @@
 #include "scene_components.h"
 
 // Component storage types
-using entity_container = std::vector<entity>;
-using mesh_container = std::vector<mesh_component>;
-using camera_container = std::vector<camera_component>;
-using light_container = std::vector<light_component>;
-using material_container = std::vector<material_component>;
-using transform_container = std::vector<transform_component>;
+template <typename component_type> using component_container
+    = std::unordered_map<entity, component_type>;
 
 class database {
 public:
@@ -43,6 +39,18 @@ public:
     gpu_data_.samplers_.push_back(sampler);
     return gpu_data_.samplers_.size() - 1;
   }
+  size_t add_material(const material& material) {
+    gpu_data_.materials_.push_back(material);
+    return gpu_data_.materials_.size() - 1;
+  }
+  size_t add_mesh(const mesh& mesh) {
+    gpu_data_.meshes_.push_back(mesh);
+    return gpu_data_.meshes_.size() - 1;
+  }
+  size_t add_camera(const camera_data& camera) {
+       gpu_data_.cameras_.push_back(camera);
+    return gpu_data_.cameras_.size() - 1;
+  }
 
   std::vector<Vertex>& get_vertices() { return gpu_data_.vertices_; }
   std::vector<uint32_t>& get_indices() { return gpu_data_.indices_; }
@@ -65,39 +73,44 @@ public:
   size_t get_matrices_size() const { return gpu_data_.matrices_.size(); }
   size_t get_images_size() const { return gpu_data_.images_.size(); }
   size_t get_samplers_size() const { return gpu_data_.samplers_.size(); }
+  size_t get_materials_size() const { return gpu_data_.materials_.size(); }
+  size_t get_meshes_size() const { return gpu_data_.meshes_.size(); }
+  size_t get_light_view_projs_size() const { return gpu_data_.light_view_projections.size(); }
 
   mesh_surface& get_surface(const size_t surface) { return gpu_data_.surfaces_[surface]; }
   glm::mat4& get_matrix(const size_t matrix) { return gpu_data_.matrices_[matrix]; }
   glm::mat4& get_light_view_proj(const size_t matrix) { return gpu_data_.light_view_projections[matrix]; }
   AllocatedImage& get_image(const size_t image) { return gpu_data_.images_[image]; }
   VkSampler& get_sampler(const size_t sampler) { return gpu_data_.samplers_[sampler]; }
+  mesh& get_mesh(const size_t mesh) { return gpu_data_.meshes_[mesh]; }
+  material& get_material(const size_t material) { return gpu_data_.materials_[material]; }
+  camera_data& get_camera(const size_t camera) { return gpu_data_.cameras_[camera]; }
 
-  size_t add_mesh(const mesh_component& mesh) {
-    components_.meshes_.push_back(mesh);
-    return components_.meshes_.size() - 1;
+  void add_node(const entity entity, const node_component& node) {
+       components_.scene_graph_.insert({entity, node});
   }
-  size_t add_camera(const camera_component& camera) {
-    components_.cameras_.push_back(camera);
-    return components_.cameras_.size() - 1;
+  void add_mesh(const entity entity, const mesh_component& mesh) {
+    components_.meshes_.insert({entity, mesh});
   }
-  size_t add_light(const light_component& light) {
-    components_.lights_.push_back(light);
-    return components_.lights_.size() - 1;
+  void add_camera(const entity entity, const camera_component& camera) {
+    components_.cameras_.insert({entity, camera});
   }
-  size_t add_material(const material_component& material) {
-    components_.materials_.push_back(material);
-    return components_.materials_.size() - 1;
+  void add_light(const entity entity, const light_component& light) {
+    components_.lights_.insert({entity, light});
   }
-  size_t add_transform(const transform_component& transform) {
-    components_.transforms_.push_back(transform);
-    return components_.transforms_.size() - 1;
+  void add_material(const entity entity, const material_component& material) {
+    components_.materials_.insert({entity, material});
+  }
+  void add_transform(const entity entity, const transform_component& transform) {
+    components_.transforms_.insert({entity, transform});
   }
 
-  std::vector<mesh_component>& get_meshes() { return components_.meshes_; }
-  std::vector<camera_component>& get_cameras() { return components_.cameras_; }
+  component_container<node_component>& get_scene_graph() { return components_.scene_graph_; }
+  component_container<mesh_component>& get_meshes() { return components_.meshes_; }
+  component_container<camera_component>& get_cameras() { return components_.cameras_; }
   std::vector<std::reference_wrapper<light_component>> get_lights(light_type type) { 
       std::vector<std::reference_wrapper<light_component>> lights;
-      for (auto& light : components_.lights_) {
+      for (auto& [entity, light] : components_.lights_) {
         if (light.type == type) {
           lights.push_back(std::ref(light));
         }
@@ -115,24 +128,72 @@ public:
         return 0;
       }
   }
-  std::vector<material_component>& get_materials() { return components_.materials_; }
-  std::vector<transform_component>& get_transforms() { return components_.transforms_; }
+  component_container<material_component>& get_materials() { return components_.materials_; }
+  component_container<transform_component>& get_transforms() { return components_.transforms_; }
 
-  size_t get_meshes_size() const { return components_.meshes_.size(); }
-  size_t get_cameras_size() const { return components_.cameras_.size(); }
-  size_t get_lights_size() const { return components_.lights_.size(); }
-  size_t get_materials_size() const { return components_.materials_.size(); }
-  size_t get_transforms_size() const { return components_.transforms_.size(); }
+  size_t get_mesh_components_size() const { return components_.meshes_.size(); }
+  size_t get_camera_components_size() const { return components_.cameras_.size(); }
+  size_t get_light_components_size() const { return components_.lights_.size(); }
+  size_t get_material_components_size() const { return components_.materials_.size(); }
+  size_t get_transform_components_size() const { return components_.transforms_.size(); }
 
-  mesh_component& get_mesh(const size_t mesh) { return components_.meshes_[mesh]; }
-  camera_component& get_camera(const size_t camera) { return components_.cameras_[camera]; }
-  light_component& get_light(const size_t light) { return components_.lights_[light]; }
-  material_component& get_material(const size_t material) {
-    return components_.materials_[material];
+  std::optional<std::reference_wrapper<mesh_component>> get_mesh_component(const size_t mesh) {
+      auto it = components_.meshes_.find(mesh);
+      if (it != components_.meshes_.end()) {
+        return std::ref(it->second);
+      } else {
+        return std::nullopt;
+      }
   }
-  transform_component& get_transform(const size_t transform) {
-    return components_.transforms_[transform];
+
+  std::optional<std::reference_wrapper<node_component>> get_node_component(const entity entity) {
+      auto it = components_.scene_graph_.find(entity);
+      if (it != components_.scene_graph_.end()) {
+        return std::ref(it->second);
+      } else {
+        return std::nullopt;
+      }
   }
+
+  std::optional<std::reference_wrapper<camera_component>> get_camera_component(
+      const entity entity) {
+      auto it = components_.cameras_.find(entity);
+      if (it != components_.cameras_.end()) {
+        return std::ref(it->second);
+      } else {
+        return std::nullopt;
+      }
+  }
+
+  std::optional<std::reference_wrapper<light_component>> get_light_component(const entity entity) {
+      auto it = components_.lights_.find(entity);
+      if (it != components_.lights_.end()) {
+        return std::ref(it->second);
+      } else {
+        return std::nullopt;
+      }
+  }
+
+  std::optional<std::reference_wrapper<material_component>> get_material_component(
+      const entity entity) {
+      auto it = components_.materials_.find(entity);
+      if (it != components_.materials_.end()) {
+        return std::ref(it->second);
+      } else {
+        return std::nullopt;
+      }
+  }
+
+  std::optional<std::reference_wrapper<transform_component>> get_transform_component(
+      const entity entity) {
+      auto it = components_.transforms_.find(entity);
+      if (it != components_.transforms_.end()) {
+        return std::ref(it->second);
+      } else {
+        return std::nullopt;
+      }
+  }
+
 
   struct default_material {
     AllocatedImage color_image;
@@ -156,13 +217,17 @@ private:
     std::vector<glm::mat4> light_view_projections;
     std::vector<AllocatedImage> images_;
     std::vector<VkSampler> samplers_;
+    std::vector<material> materials_;
+    std::vector<mesh> meshes_;
+    std::vector<camera_data> cameras_;
   } gpu_data_ = {};
 
-  struct component_container {
-    mesh_container meshes_;
-    camera_container cameras_;
-    light_container lights_;
-    material_container materials_;
-    transform_container transforms_;
+  struct component_containers {
+    component_container<node_component> scene_graph_;
+    component_container<material_component> materials_;
+    component_container<mesh_component> meshes_;
+    component_container<camera_component> cameras_;
+    component_container<light_component> lights_;
+    component_container<transform_component> transforms_;
   } components_ = {};
 };

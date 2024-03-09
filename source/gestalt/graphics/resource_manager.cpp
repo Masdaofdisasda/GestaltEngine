@@ -138,34 +138,34 @@ void resource_manager::init_default_data() {
   vkCreateSampler(gpu_.device, &sampler, nullptr, &default_material.default_sampler_linear);
   get_database().add_sampler(default_material.default_sampler_linear);
 
-  pbr_material material{};
-  material.constants.albedo_factor.x = 1.f;
-  material.constants.albedo_factor.y = 1.f;
-  material.constants.albedo_factor.z = 1.f;
-  material.constants.albedo_factor.w = 1.f;
+  pbr_material pbr_material{};
+  pbr_material.constants.albedo_factor.x = 1.f;
+  pbr_material.constants.albedo_factor.y = 1.f;
+  pbr_material.constants.albedo_factor.z = 1.f;
+  pbr_material.constants.albedo_factor.w = 1.f;
 
-  material.constants.metal_rough_factor.x = 0.f;
-  material.constants.metal_rough_factor.y = 0.f;
+  pbr_material.constants.metal_rough_factor.x = 0.f;
+  pbr_material.constants.metal_rough_factor.y = 0.f;
   // write material parameters to buffer
 
   // default the material textures
-  material.resources.albedo_image = default_material.color_image;
-  material.resources.albedo_sampler = default_material.default_sampler_linear;
-  material.resources.metal_rough_image = default_material.metallic_roughness_image;
-  material.resources.metal_rough_sampler = default_material.default_sampler_linear;
-  material.resources.normal_image = default_material.normal_image;
-  material.resources.normal_sampler = default_material.default_sampler_linear;
-  material.resources.emissive_image = default_material.emissive_image;
-  material.resources.emissive_sampler = default_material.default_sampler_linear;
-  material.resources.occlusion_image = default_material.occlusion_image;
-  material.resources.occlusion_sampler = default_material.default_sampler_nearest;
+  pbr_material.resources.albedo_image = default_material.color_image;
+  pbr_material.resources.albedo_sampler = default_material.default_sampler_linear;
+  pbr_material.resources.metal_rough_image = default_material.metallic_roughness_image;
+  pbr_material.resources.metal_rough_sampler = default_material.default_sampler_linear;
+  pbr_material.resources.normal_image = default_material.normal_image;
+  pbr_material.resources.normal_sampler = default_material.default_sampler_linear;
+  pbr_material.resources.emissive_image = default_material.emissive_image;
+  pbr_material.resources.emissive_sampler = default_material.default_sampler_linear;
+  pbr_material.resources.occlusion_image = default_material.occlusion_image;
+  pbr_material.resources.occlusion_sampler = default_material.default_sampler_nearest;
 
   {
     // build material
     const size_t material_id = get_database().get_materials_size();
     const std::string key = "default_material";
-    write_material(material, material_id);
-    get_database().add_material(material_component{.name = key, .config = material});
+    write_material(pbr_material, material_id);
+    get_database().add_material(material{.name = key, .config = pbr_material});
     fmt::print("creating material {}, mat_id {}\n", key, material_id);
   }
 

@@ -66,11 +66,12 @@ void directional_depth_pass::execute(VkCommandBuffer cmd) {
 
   {
     // TODO this should be done elsewhere
-    auto view = resource_manager_->get_database().get_camera(0).view_matrix;
-    auto projection = resource_manager_->get_database().get_camera(0).projection_matrix;
-    resource_manager_->per_frame_data_.proj = projection;
-    resource_manager_->per_frame_data_.view = view;
-    resource_manager_->per_frame_data_.viewproj = projection * view;
+    auto& cam = resource_manager_->get_database().get_camera(0);
+    resource_manager_->per_frame_data_.proj = cam.projection_matrix;
+    resource_manager_->per_frame_data_.view = cam.view_matrix;
+    resource_manager_->per_frame_data_.viewproj = cam.projection_matrix * cam.view_matrix;
+    resource_manager_->per_frame_data_.inv_viewproj
+        = inverse(cam.projection_matrix * cam.view_matrix);
 
     void* mapped_data;
     VmaAllocation allocation = resource_manager_->per_frame_data_buffer.allocation;

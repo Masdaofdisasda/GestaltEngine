@@ -13,7 +13,7 @@ public:
   }
   virtual ~scene_system() = default;
 
-  virtual void update(std::vector<entity_component> entities) = 0;
+  virtual void update() = 0;
   virtual void cleanup() = 0;
 
 protected:
@@ -30,6 +30,6 @@ class light_system final : public scene_system {
 
 public:
   void prepare() override;
-  void update(std::vector<entity_component> entities) override;
+  void update() override;
   void cleanup() override;
 };

@@ -64,37 +64,8 @@ void render_engine::register_gui_actions() {
   };
   gui_actions_.get_stats = [this]() -> engine_stats& { return stats_; };
   gui_actions_.get_scene_data = [this]() -> per_frame_data& { return resource_manager_->per_frame_data_; };
-  gui_actions_.get_point_lights = [this]() -> std::vector<std::reference_wrapper<light_component>> {
-    return resource_manager_->get_database().get_lights(light_type::point);
-  };
-  gui_actions_.get_directional_lights
-      = [this]() -> std::vector<std::reference_wrapper<light_component>> {
-    return resource_manager_->get_database().get_lights(light_type::directional);
-  };
-  gui_actions_.get_light = [this](const size_t light) -> light_component& {
-       return resource_manager_->get_database().get_light(light);
-  };
-  gui_actions_.add_light = [this](const light_component& light) -> size_t {
-       return scene_manager_->create_light(light);
-  };
-
-  gui_actions_.get_scene_root
-      = [this]() -> entity_component& { return scene_manager_->get_root(); };
-  gui_actions_.get_scene_object = [this](const entity entity) -> entity_component& {
-    return scene_manager_->get_scene_object_by_entity(entity).value();
-  };
-  gui_actions_.get_transform_component = [this](const size_t transform) -> transform_component& {
-    return resource_manager_->get_database().get_transform(transform);
-  };
-  gui_actions_.get_mesh_component = [this](const size_t mesh) -> mesh_component& {
-    return resource_manager_->get_database().get_mesh(mesh);
-  };
-  gui_actions_.get_surface = [this](const size_t surface) -> mesh_surface& {
-    return resource_manager_->get_database().get_surface(surface);
-  };
-  gui_actions_.get_material = [this](const size_t material) -> material_component& {
-    return resource_manager_->get_database().get_material(material);
-  };
+  
+  gui_actions_.get_database = [this]() -> database& { return resource_manager_->get_database(); };
   gui_actions_.get_render_config = [this]() -> render_config& { return resource_manager_->config_; };
 }
 
@@ -155,8 +126,9 @@ void render_engine::update_scene() {
     // to opengl and gltf axis
     projection[1][1] *= -1;
 
-    resource_manager_->get_database().get_camera(0).view_matrix = view;
-    resource_manager_->get_database().get_camera(0).projection_matrix = projection;
+    auto& camera = resource_manager_->get_database().get_camera(0);
+    camera.view_matrix = view;
+    camera.projection_matrix = projection;
 
     resource_manager_ ->config_.light_adaptation.delta_time = time_tracking_service_.get_delta_time();
 

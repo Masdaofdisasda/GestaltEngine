@@ -140,7 +140,7 @@ size_t asset_loader::create_material(pbr_material& config,
   const std::string key = name.empty() ? "material_" + std::to_string(material_id) : name;
   resource_manager_->write_material(config, material_id);
 
-  resource_manager_->get_database().add_material(material_component{.name = key, .config = config});
+  resource_manager_->get_database().add_material(material{.name = key, .config = config});
 
   return material_id;
 }
@@ -325,7 +325,7 @@ size_t asset_loader::create_surface(std::vector<Vertex>& vertices,
 size_t asset_loader::create_mesh(std::vector<size_t> surfaces, const std::string& name) const {
   size_t mesh_id = resource_manager_->get_database().get_meshes_size();
   const std::string key = name.empty() ? "mesh_" + std::to_string(mesh_id) : name;
-  mesh_id = resource_manager_->get_database().add_mesh(mesh_component{key, std::move(surfaces)});
+  mesh_id = resource_manager_->get_database().add_mesh(mesh{key, std::move(surfaces)});
   fmt::print("created mesh {}, mesh_id {}\n", key, mesh_id);
   return mesh_id;
 }

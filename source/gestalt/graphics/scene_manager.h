@@ -22,7 +22,6 @@ class scene_manager {
   void build_hierarchy(std::vector<fastgltf::Node> nodes, const size_t& node_offset);
   void link_orphans_to_root();
 
-  std::vector<entity_component> scene_graph_;
   entity next_entity_id_ = 0;
 
 public:
@@ -32,18 +31,18 @@ public:
   void update_scene();
   void traverse_scene(entity entity, const glm::mat4& parent_transform);
 
-  entity_component& create_entity();
+  std::pair<entity, std::reference_wrapper<node_component>> create_entity();
   void add_mesh_component(entity entity, size_t mesh_index);
   void add_camera_component(entity entity, const camera_component& camera);
   size_t create_material(
       pbr_material& config,
       const std::string& name = "") const;
-  size_t create_light(const light_component& light);
+  entity create_light(const light_component& light);
   void set_transform_component(entity entity, const glm::vec3& position,
                                const glm::quat& rotation = glm::quat(0.f, 0.f, 0.f, 0.f),
                                const glm::vec3& scale = glm::vec3(1.f));
 
-  entity_component& get_root() { return scene_graph_.front(); }
-  const std::vector<entity>& get_children(entity entity);
-  std::optional<std::reference_wrapper<entity_component>> get_scene_object_by_entity(entity entity);
+  node_component& get_root_node();
+  uint32_t get_root_entity() { return 0; }
+  void add_to_root(entity entity, node_component& node);
 };
