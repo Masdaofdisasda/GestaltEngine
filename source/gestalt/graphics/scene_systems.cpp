@@ -143,3 +143,100 @@ void light_system::cleanup() {
   resource_manager_->destroy_buffer(resource_manager_->light_data.point_light_buffer);
   resource_manager_->destroy_buffer(resource_manager_->light_data.view_proj_matrices);
 }
+
+glm::mat4 transform_system::get_model_matrix(const transform_component& transform) {
+
+    return translate(transform.position) * mat4_cast(transform.rotation) * glm::scale(transform.scale);
+}
+
+void transform_system::prepare() {
+  
+}
+
+void transform_system::update() {
+
+  for (auto& transform : resource_manager_->get_database().get_transforms() | std::views::values) {
+    if (transform.is_dirty) {
+      resource_manager_->get_database().set_matrix(transform.matrix, get_model_matrix(transform));
+
+      transform.is_dirty = false;
+    }
+  }
+}
+ void transform_system::cleanup() {
+  
+}
+
+void render_system::traverse_scene(const entity entity, const glm::mat4& parent_transform) {
+   assert(entity != invalid_entity);
+   const auto& node = resource_manager_->get_database().get_node_component(entity).value().get();
+   if (!node.visible) {
+     return;
+   }
+
+   const auto& transform = resource_manager_->get_database().get_transform_component(entity)->get();
+   const glm::mat4 world_transform
+       = parent_transform * resource_manager_->get_database().get_matrix(transform.matrix);
+
+   const auto& mesh_component = resource_manager_->get_database().get_mesh_component(entity);
+   if (mesh_component.has_value()) {
+     const auto& mesh = resource_manager_->get_database().get_mesh(mesh_component->get().mesh);
+
+     for (const auto surface_index : mesh.surfaces) {
+       const auto& surface = resource_manager_->get_database().get_surface(surface_index);
+
+       const auto& material = resource_manager_->get_database().get_material(surface.material);
+
+       render_object def;
+       def.index_count = surface.index_count;
+       def.first_index = surface.first_index;
+       def.material = surface.material;
+       def.bounds = surface.bounds;
+       def.transform = world_transform;
+       def.vertex_buffer_address = resource_manager_->scene_geometry_.vertexBufferAddress;
+
+       if (material.config.transparent) {
+         resource_manager_->main_draw_context_.transparent_surfaces.push_back(def);
+       } else {
+         resource_manager_->main_draw_context_.opaque_surfaces.push_back(def);
+       }
+     }
+   }
+
+   for (const auto& childEntity : node.children) {
+     traverse_scene(childEntity, world_transform);
+   }
+ }
+
+void render_system::prepare() {
+   const size_t initial_vertex_buffer_size = 184521 * sizeof(Vertex);
+   const size_t initial_index_buffer_size = 786801 * sizeof(uint32_t);
+
+   // Create initially empty vertex buffer
+   resource_manager_->scene_geometry_.vertexBuffer = resource_manager_->create_buffer(
+       initial_vertex_buffer_size,
+       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+           | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+       VMA_MEMORY_USAGE_GPU_ONLY);
+
+   // Create initially empty index buffer
+   resource_manager_->scene_geometry_.indexBuffer = resource_manager_->create_buffer(
+       initial_index_buffer_size,
+       VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+       VMA_MEMORY_USAGE_GPU_ONLY);
+ }
+
+void render_system::update() {
+   if (resource_manager_->get_database().get_meshes_size() != meshes_) {
+     meshes_ = resource_manager_->get_database().get_meshes_size();
+
+     /* TODO use this
+     resource_manager_->update_mesh(resource_manager_->get_database().get_indices(),
+                                    resource_manager_->get_database().get_vertices());*/
+     resource_manager_->upload_mesh();
+   }
+
+   constexpr glm::mat4 identity = glm::mat4(1.0f);
+
+   traverse_scene(0, identity);
+ }

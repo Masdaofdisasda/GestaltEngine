@@ -98,9 +98,6 @@ public:
   void add_light(const entity entity, const light_component& light) {
     components_.lights_.insert({entity, light});
   }
-  void add_material(const entity entity, const material_component& material) {
-    components_.materials_.insert({entity, material});
-  }
   void add_transform(const entity entity, const transform_component& transform) {
     components_.transforms_.insert({entity, transform});
   }
@@ -128,13 +125,11 @@ public:
         return 0;
       }
   }
-  component_container<material_component>& get_materials() { return components_.materials_; }
   component_container<transform_component>& get_transforms() { return components_.transforms_; }
 
   size_t get_mesh_components_size() const { return components_.meshes_.size(); }
   size_t get_camera_components_size() const { return components_.cameras_.size(); }
   size_t get_light_components_size() const { return components_.lights_.size(); }
-  size_t get_material_components_size() const { return components_.materials_.size(); }
   size_t get_transform_components_size() const { return components_.transforms_.size(); }
 
   std::optional<std::reference_wrapper<mesh_component>> get_mesh_component(const size_t mesh) {
@@ -168,16 +163,6 @@ public:
   std::optional<std::reference_wrapper<light_component>> get_light_component(const entity entity) {
       auto it = components_.lights_.find(entity);
       if (it != components_.lights_.end()) {
-        return std::ref(it->second);
-      } else {
-        return std::nullopt;
-      }
-  }
-
-  std::optional<std::reference_wrapper<material_component>> get_material_component(
-      const entity entity) {
-      auto it = components_.materials_.find(entity);
-      if (it != components_.materials_.end()) {
         return std::ref(it->second);
       } else {
         return std::nullopt;
@@ -224,7 +209,6 @@ private:
 
   struct component_containers {
     component_container<node_component> scene_graph_;
-    component_container<material_component> materials_;
     component_container<mesh_component> meshes_;
     component_container<camera_component> cameras_;
     component_container<light_component> lights_;

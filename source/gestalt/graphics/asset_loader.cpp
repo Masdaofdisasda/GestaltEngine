@@ -416,5 +416,4 @@ void asset_loader::import_meshes(fastgltf::Asset& gltf, const size_t material_of
     }
     create_mesh(surfaces, std::string(mesh.name));
   }
-  resource_manager_->upload_mesh();
 }

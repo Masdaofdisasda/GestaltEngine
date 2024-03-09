@@ -20,6 +20,7 @@
 
 #include <chrono>
 #include <thread>
+#include <utility>
 
 render_engine* loaded_engine = nullptr;
 
@@ -62,6 +63,7 @@ void render_engine::register_gui_actions() {
     free_fly_camera_ptr->init(glm::vec3(0, 0, 0), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
     camera_positioners_.push_back(std::move(free_fly_camera_ptr));
   };
+  gui_actions_.load_gltf = [this](std::string path) { scene_manager_->request_scene(std::move(path)); };
   gui_actions_.get_stats = [this]() -> engine_stats& { return stats_; };
   gui_actions_.get_scene_data = [this]() -> per_frame_data& { return resource_manager_->per_frame_data_; };
   

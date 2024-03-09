@@ -1,66 +1,15 @@
 message(STATUS "Configuring graphics module...")
 
+file(GLOB_RECURSE HEADER_FILES 
+     "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
+file(GLOB_RECURSE SOURCE_FILES 
+     "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
+
 add_library(graphics
-    vk_types.h
-    vk_initializers.cpp
-    vk_initializers.h
-    vk_images.h
-    vk_images.cpp 
-    vk_descriptors.h
-    vk_descriptors.cpp
-    vk_pipelines.h
-    vk_pipelines.cpp
-    vk_engine.h
-    vk_engine.cpp
-    scene_manager.h
-    scene_manager.cpp
-    camera.cpp
-    camera.h
-    time_tracking_service.h
-    input_system.h
-    input_system.cpp
-    resource_manager.h
-    resource_manager.cpp
-    sdl_window.h
-    sdl_window.cpp
-    vk_deletion_service.h
-    vk_gpu.h
-    vk_gpu.cpp
-	vk_swapchain.h
-vk_swapchain.cpp
-vk_commands.h
-vk_commands.cpp
-vk_sync.h
-vk_sync.cpp
-imgui_gui.h
-imgui_gui.cpp
-gui_actions.h
-scene_components.h
-cubemap_util.cpp
-cubemap_util.h
-asset_loader.cpp
-asset_loader.h
-skybox_pass.h
-skybox_pass.cpp
-render_pass.h
-geometry_pass.h
-geometry_pass.cpp
-ssao_pass.h
-ssao_pass.cpp
-hdr_pass.h
-hdr_pass.cpp
-frame_graph.h
-frame_graph.cpp
-shadow_pass.h
-shadow_pass.cpp
-lighting_pass.cpp
-lighting_pass.h
-scene_systems.h
-scene_systems.cpp
-)
+    ${HEADER_FILES}
+    ${SOURCE_FILES})
 
 target_compile_features(graphics PRIVATE cxx_std_20)
-target_compile_definitions(graphics PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
 target_include_directories(graphics PUBLIC 
     "${CMAKE_CURRENT_SOURCE_DIR}"

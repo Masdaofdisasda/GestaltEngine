@@ -33,3 +33,22 @@ public:
   void update() override;
   void cleanup() override;
 };
+
+class transform_system final : public scene_system {
+  static glm::mat4 get_model_matrix(const transform_component& transform);
+
+public:
+  void prepare() override;
+  void update() override;
+  void cleanup() override;
+};
+
+class render_system final : public scene_system {
+  size_t meshes_ = 0;
+  void traverse_scene(const entity entity, const glm::mat4& parent_transform);
+
+public:
+  void prepare() override;
+  void update() override;
+  void cleanup() override {}
+};

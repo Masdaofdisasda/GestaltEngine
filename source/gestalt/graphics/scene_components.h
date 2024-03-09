@@ -42,22 +42,6 @@ struct camera_data {
 enum class light_type { directional, point, spot };
 
 struct light_component {
-  static light_component DirectionalLight(const glm::vec3& color, const float intensity,
-                                                const glm::vec3& direction) {
-    return {light_type::directional, color, intensity, glm::vec3(0), direction, 0.f, 0.f};
-  }
-
-  static light_component PointLight(const glm::vec3& color, const float intensity,
-                                          const glm::vec3& position) {
-    return {light_type::point, color, intensity, position, glm::vec3(0), 0.f, 0.f};
-  }
-
-  static light_component SpotLight(const glm::vec3& color, const float intensity,
-                                         const glm::vec3& direction, const glm::vec3& position,
-                                         const float innerCone, const float outerCone) {
-    return {light_type::spot, color, intensity, position, direction, innerCone, outerCone};
-  }
-
   light_type type;
   glm::vec3 color;
   float intensity;
@@ -66,19 +50,7 @@ struct light_component {
   float inner_cone;     // Used for spot lights
   float outer_cone;     // Used for spot lights
   std::vector<size_t> light_view_projections;
-  bool isDirty;
-
-private:
-  // Make the constructor private to force using factory methods
-  light_component(light_type type, glm::vec3 color, float intensity, glm::vec3 position,
-                  glm::vec3 direction, float innerCone, float outerCone)
-      : type(type),
-        color(color),
-        intensity(intensity),
-        position(position),
-        direction(direction),
-        inner_cone(innerCone),
-        outer_cone(outerCone) {}
+  bool is_dirty = true;
 };
 
 
@@ -144,15 +116,6 @@ struct material {
 };
 
 struct transform_component {
-  explicit transform_component(const glm::vec3& position,
-                               const glm::quat& rotation = glm::quat(0.f, 0.f, 0.f, 0.f),
-                               const glm::vec3& scale = glm::vec3(1.f))
-      : position(position), rotation(rotation), scale(scale) {}
-
-  glm::mat4 get_model_matrix() const {
-    return translate(position) * mat4_cast(rotation) * glm::scale(scale);
-  }
-
   glm::vec3 position;
   glm::quat rotation;
   glm::vec3 scale;

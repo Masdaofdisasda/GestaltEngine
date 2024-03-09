@@ -105,6 +105,33 @@ void imgui_gui::menu_bar() {
       if (ImGui::MenuItem("Exit")) {
         actions_.exit();
       }
+
+      if (ImGui::BeginMenu("Import Scene")) {
+      if (ImGui::MenuItem("MetalRoughSpheres")) {
+          actions_.load_gltf(
+              R"(..\..\assets\Models\MetalRoughSpheres\glTF-Binary\MetalRoughSpheres.glb)");
+      }
+      if (ImGui::MenuItem("MetalRoughSpheresNoTextures")) {
+        actions_.load_gltf(
+            R"(..\..\assets\Models\MetalRoughSpheresNoTextures\glTF-Binary\MetalRoughSpheresNoTextures.glb)");
+      }
+      if (ImGui::MenuItem("DamagedHelmet")) {
+        actions_.load_gltf(R"(..\..\assets\Models\DamagedHelmet\glTF-Binary\DamagedHelmet.glb)");
+      }
+      if (ImGui::MenuItem("Bistro")) {
+        actions_.load_gltf(R"(..\..\assets\Bistro.glb)");
+      }
+      if (ImGui::MenuItem("bmw")) {
+        actions_.load_gltf(R"(..\..\assets\bmw.glb)");
+      }
+      if (ImGui::MenuItem("structure")) {
+        actions_.load_gltf(R"(..\..\assets\structure.glb)");
+      }
+      if (ImGui::MenuItem("Sponza Pestana")) {
+        actions_.load_gltf(R"(..\..\assets\sponza_pestana.glb)");
+      }
+        ImGui::EndMenu();
+      }
       // Add more menu items here if needed
       ImGui::EndMenu();
     }
@@ -153,7 +180,7 @@ void imgui_gui::menu_bar() {
 
       if (ImGui::Button("Add Light")) {
 
-        auto newLight = light_component::PointLight(color, intensity, position);
+        //auto newLight = light_component::PointLight(color, intensity, position);
 
         //TODO
         //const size_t entity = actions_.get_database().add_light(???);
@@ -179,7 +206,7 @@ void imgui_gui::menu_bar() {
 
       if (ImGui::Button("Add Light")) {
 
-        auto newLight = light_component::DirectionalLight(color, intensity, direction);
+        //auto newLight = light_component::DirectionalLight(color, intensity, direction);
 
         // TODO
         // const size_t entity = actions_.get_database().add_light(???);
