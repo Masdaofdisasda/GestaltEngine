@@ -5,7 +5,6 @@
 void vk_gpu::init(
     bool use_validation_layers, sdl_window& window,
     std::function<void(std::function<void(VkCommandBuffer)>)> immediate_submit_function) {
-
   immediate_submit = immediate_submit_function;
 
   // create the vulkan instance
@@ -27,10 +26,13 @@ void vk_gpu::init(
   // create the device
   window.create_surface(instance, &surface);
 
+  VkPhysicalDeviceFeatures device_features{};
+  device_features.fillModeNonSolid = true;
+
   // vulkan 1.3 features
-  VkPhysicalDeviceVulkan13Features features{};
-  features.dynamicRendering = true;
-  features.synchronization2 = true;
+  VkPhysicalDeviceVulkan13Features features13{};
+  features13.dynamicRendering = true;
+  features13.synchronization2 = true;
 
   // vulkan 1.2 features
   VkPhysicalDeviceVulkan12Features features12{};
@@ -48,8 +50,9 @@ void vk_gpu::init(
   vkb::PhysicalDeviceSelector selector{vkb_inst};
   vkb::PhysicalDevice physicalDevice
       = selector.set_minimum_version(1, 3)
-            .set_required_features_13(features)
+            .set_required_features_13(features13)
             .set_required_features_12(features12)
+            .set_required_features(device_features)
             .add_required_extension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME)
             .set_surface(surface)
             .select()
@@ -58,8 +61,7 @@ void vk_gpu::init(
   // create the final vulkan device
   vkb::DeviceBuilder deviceBuilder{physicalDevice};
 
-  vkb::Device vkbDevice
-      = deviceBuilder.build().value();
+  vkb::Device vkbDevice = deviceBuilder.build().value();
 
   // Get the VkDevice handle used in the rest of a vulkan application
   device = vkbDevice.device;

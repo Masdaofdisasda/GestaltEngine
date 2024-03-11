@@ -89,3 +89,50 @@ public:
   void execute(VkCommandBuffer cmd) override;
   shader_pass_dependency_info& get_dependencies() override { return deps_; }
 };
+
+class debug_aabb_pass final : public render_pass {
+  std::string vertex_shader_source_ = "../shaders/debug_aabb.vert.spv";
+  std::string fragment_shader_source_ = "../shaders/debug_aabb.frag.spv";
+
+  shader_pass_dependency_info deps_ = {
+      .read_resources = {},
+      .write_resources = {{"scene_debug_aabb",
+                           std::make_shared<color_image_resource>("scene_final", 1.f)},
+                          {"scene_debug_aabb_depth",
+                           std::make_shared<depth_image_resource>("grid_depth", 1.f)}},
+  };
+
+  struct aabb_debug_push_constants {
+    glm::vec4 min;
+    glm::vec4 max;
+  };
+
+  VkPushConstantRange push_constant_range_{
+      .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+      .offset = 0,
+      .size = sizeof(aabb_debug_push_constants),
+  };
+
+  VkViewport viewport_{
+      .x = 0,
+      .y = 0,
+      .minDepth = 0.f,
+      .maxDepth = 1.f,
+  };
+  VkRect2D scissor_{
+      .offset = {0, 0},
+  };
+
+  descriptor_writer writer;
+
+  VkPipeline pipeline_ = nullptr;
+  VkPipelineLayout pipeline_layout_ = nullptr;
+  std::vector<VkDescriptorSetLayout> descriptor_layouts_;
+  VkDescriptorSet descriptor_set_ = nullptr;
+
+public:
+  void prepare() override;
+  void cleanup() override;
+  void execute(VkCommandBuffer cmd) override;
+  shader_pass_dependency_info& get_dependencies() override { return deps_; }
+};

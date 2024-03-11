@@ -42,6 +42,7 @@ void frame_graph::init(const vk_gpu& gpu, const sdl_window& window,
   render_passes_.push_back(std::make_unique<luminance_downscale_pass>());
   render_passes_.push_back(std::make_unique<light_adaptation_pass>());
   render_passes_.push_back(std::make_unique<tonemap_pass>());
+  render_passes_.push_back(std::make_unique<debug_aabb_pass>());
 
   for (int i = 0; i < FRAME_OVERLAP; i++) {
     std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> frame_sizes = {
@@ -348,7 +349,7 @@ void frame_graph::execute_passes() {
   resource_manager_->main_draw_context_.opaque_surfaces.clear();
   resource_manager_->main_draw_context_.transparent_surfaces.clear();
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_final");
+  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_debug_aabb");
 
   vkutil::transition_image(cmd, color_image->image, color_image->currentLayout,
                            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
