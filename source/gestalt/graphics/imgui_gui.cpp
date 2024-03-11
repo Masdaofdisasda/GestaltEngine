@@ -437,10 +437,6 @@ void imgui_gui::render_settings() {
                                   "%.4f");
       ImGui::SliderFloat("Shadow Slope Bias", &config.shadow.shadow_slope_bias, 1.0f, 2.0f,
                                   "%.4f");
-      ImGui::SliderFloat("Shadow Bounds max", &config.shadow.max_corner, 0.f, 1000.0f,
-                                           "%.2f");
-      ImGui::SliderFloat("Shadow Bounds min", &config.shadow.min_corner, -1000.0f, 0.f,
-                                                    "%.2f");
 
       const char* shading_mode_options[] = {
           "All",  "Only Directional Light", "Only Point Light", "Only Spot Light", "None"
@@ -566,6 +562,9 @@ void imgui_gui::show_scene_hierarchy_window() {
           transform.scale = glm::vec3(uniform_scale, uniform_scale, uniform_scale);
         }
         ImGui::DragFloat3("Scale", &transform.scale.x, 0.1f);
+
+        ImGui::DragFloat3("AABB max", &selected_node.bounds.max.x);
+        ImGui::DragFloat3("AABB min", &selected_node.bounds.min.x);
         transform.is_dirty = true;
       }
       const auto& mesh_component = actions_.get_database().get_mesh_component(selected_entity_);

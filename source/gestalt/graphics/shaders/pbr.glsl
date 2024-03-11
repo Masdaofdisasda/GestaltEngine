@@ -30,7 +30,7 @@ void getIBLContribution(PBRInfo pbrInputs, vec3 n, vec3 reflection, samplerCube 
 	vec3 brdf = textureLod(texBdrfLut, brdfSamplePoint, 0).rgb;
 	// HDR envmaps are already linear
 	vec3 diffuseLight = texture(texEnvMapIrradiance, n.xyz).rgb;
-	vec3 specularLight = textureLod(texEnvMap, reflection.xyz, lod).rgb;
+	vec3 specularLight = textureLod(texEnvMap, vec3(reflection.x, -reflection.y, reflection.z), lod).rgb;
 
 	diffuse = diffuseLight * pbrInputs.diffuseColor;
 	specular = specularLight * (pbrInputs.specularColor * brdf.x + brdf.y);

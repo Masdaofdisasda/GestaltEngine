@@ -1,6 +1,11 @@
 ﻿#include "scene_systems.h"
 
-   struct DirectionalLight {
+#include "asset_loader.h"
+#include "asset_loader.h"
+#include "asset_loader.h"
+#include "asset_loader.h"
+
+struct DirectionalLight {
         glm::vec3 color;
         float intensity;
         glm::vec3 direction;
@@ -38,8 +43,6 @@ void light_system::prepare() {
 
 glm::mat4 light_system::calculate_sun_view_proj(const light_component& light) {
 
-  // Define the dimensions of the orthographic projection
-  auto config = resource_manager_->config_.shadow;
   glm::vec3 direction = normalize(light.direction);  // Ensure the direction is normalized
 
   glm::vec3 up = glm::vec3(0, 1, 0);
@@ -51,8 +54,8 @@ glm::mat4 light_system::calculate_sun_view_proj(const light_component& light) {
   // Create a view matrix for the light
   glm::mat4 lightView = lookAt(glm::vec3(0, 0, 0), -direction, glm::vec3(0, 0, 1));
 
-  glm::vec3 min{config.min_corner};
-  glm::vec3 max{config.max_corner};
+  auto& [min, max, is_dirty]
+      = resource_manager_->get_database().get_node_component(root_entity).value().get().bounds;
 
   glm::vec3 corners[] = {
       glm::vec3(min.x, min.y, min.z), glm::vec3(min.x, max.y, min.z),
@@ -69,7 +72,7 @@ glm::mat4 light_system::calculate_sun_view_proj(const light_component& light) {
     vmin = glm::min(vmin, corner);
     vmax = glm::max(vmax, corner);
   }
-  glm::mat4 lightProjection = glm::orthoRH_ZO(min.x, max.x, min.y, max.y, -max.z, -min.z);
+  glm::mat4 lightProjection = glm::orthoRH_ZO(vmin.x, vmax.x, vmin.y, vmax.y, vmin.z, vmax.z);
 
   lightProjection[1][1] *= -1;
 
@@ -153,16 +156,123 @@ void transform_system::prepare() {
   
 }
 
+void transform_system::mark_parent_dirty(entity entity) {
+  if (entity == invalid_entity) {
+    return;
+  }
+
+  auto& node = resource_manager_->get_database().get_node_component(entity).value().get();
+  if (node.bounds.is_dirty) {
+    return;
+  }
+
+  node.bounds.is_dirty = true;
+  mark_parent_dirty(node.parent);
+}
+
+void transform_system::mark_children_dirty(entity entity) {
+  if (entity == invalid_entity) {
+    return;
+  }
+
+  auto& node = resource_manager_->get_database().get_node_component(entity).value().get();
+  if (node.bounds.is_dirty) {
+    return;
+  }
+
+  node.bounds.is_dirty = true;
+  for (const auto& child : node.children) {
+       mark_children_dirty(child);
+  }
+}
+
+void transform_system::mark_as_dirty(entity entity) {
+  const auto& node = resource_manager_->get_database().get_node_component(entity).value().get();
+  node.bounds.is_dirty = true;
+  for (const auto& child : node.children) {
+       mark_children_dirty(child);
+  }
+  mark_parent_dirty(node.parent);
+}
+
+void transform_system::update_aabb(const entity entity, const glm::mat4& parent_transform) {
+  auto& node = resource_manager_->get_database().get_node_component(entity).value().get();
+  if (node.bounds.is_dirty) {
+    auto& transform
+        = resource_manager_->get_database().get_transform_component(entity).value().get();
+    const auto& mesh_optional = resource_manager_->get_database().get_mesh_component(entity);
+
+    AABB aabb;
+    auto& [min, max, is_dirty] = aabb;
+
+    if (mesh_optional.has_value()) {
+      const auto& mesh = resource_manager_->get_database().get_mesh(mesh_optional->get().mesh);
+      min.x = std::min(min.x, mesh.local_bounds.min.x);
+      min.y = std::min(min.y, mesh.local_bounds.min.y);
+      min.z = std::min(min.z, mesh.local_bounds.min.z);
+
+      max.x = std::max(max.x, mesh.local_bounds.max.x);
+      max.y = std::max(max.y, mesh.local_bounds.max.y);
+      max.z = std::max(max.z, mesh.local_bounds.max.z);
+    } else {
+      min = glm::vec3(0.0f);
+      max = glm::vec3(0.0f);
+    }
+
+    const glm::mat4 model_matrix
+        = parent_transform * resource_manager_->get_database().get_matrix(transform.matrix);
+    // Decompose model_matrix into translation (T) and 3x3 rotation matrix (M)
+    glm::vec3 T = glm::vec3(model_matrix[3]);  // Translation vector
+    glm::mat3 M = glm::mat3(model_matrix);     // Rotation matrix
+
+    AABB transformedAABB = {T, T};  // Start with a zero-volume AABB at T
+
+    // Applying Arvo's method to adjust AABB based on rotation and translation
+    // NOTE: does not work for non-uniform scaling
+    for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 3; ++j) {
+        float a = M[i][j] * min[j];
+        float b = M[i][j] * max[j];
+        transformedAABB.min[i] += a < b ? a : b;
+        transformedAABB.max[i] += a < b ? b : a;
+      }
+    }
+    min = transformedAABB.min;
+    max =  transformedAABB.max;
+
+    for (const auto& child : node.children) {
+      update_aabb(child, model_matrix);
+      const auto& child_aabb
+          = resource_manager_->get_database().get_node_component(child).value().get().bounds;
+      min.x = std::min(min.x, child_aabb.min.x);
+      min.y = std::min(min.y, child_aabb.min.y);
+      min.z = std::min(min.z, child_aabb.min.z);
+
+      max.x = std::max(max.x, child_aabb.max.x);
+      max.y = std::max(max.y, child_aabb.max.y);
+      max.z = std::max(max.z, child_aabb.max.z);
+    }
+
+    node.bounds = aabb;
+    node.bounds.is_dirty = false;
+  }
+}
+
 void transform_system::update() {
 
-  for (auto& transform : resource_manager_->get_database().get_transforms() | std::views::values) {
+  for (auto& [entity, transform] : resource_manager_->get_database().get_transforms()) {
     if (transform.is_dirty) {
+      mark_as_dirty(entity);
       resource_manager_->get_database().set_matrix(transform.matrix, get_model_matrix(transform));
-
       transform.is_dirty = false;
     }
   }
+
+  const glm::mat4 identity = glm::mat4(1.0f);
+
+  update_aabb(root_entity, identity);
 }
+
  void transform_system::cleanup() {
   
 }
@@ -191,7 +301,6 @@ void render_system::traverse_scene(const entity entity, const glm::mat4& parent_
        def.index_count = surface.index_count;
        def.first_index = surface.first_index;
        def.material = surface.material;
-       def.bounds = surface.bounds;
        def.transform = world_transform;
        def.vertex_buffer_address = resource_manager_->scene_geometry_.vertexBufferAddress;
 
@@ -240,3 +349,13 @@ void render_system::update() {
 
    traverse_scene(0, identity);
  }
+
+void hierarchy_system::prepare() {
+}
+
+void hierarchy_system::update() {
+}
+
+void hierarchy_system::cleanup() {
+}
+

@@ -6,6 +6,7 @@
 
 
 using entity = uint32_t;
+constexpr entity root_entity = 0;
 constexpr uint32_t invalid_entity = std::numeric_limits<uint32_t>::max();
 constexpr size_t no_component = std::numeric_limits<size_t>::max();
 constexpr size_t default_material = 0;
@@ -15,7 +16,7 @@ struct mesh_surface {
   uint32_t index_count;
   uint32_t first_index;
   uint32_t vertex_offset;
-  Bounds bounds;
+  AABB local_bounds;
 
   size_t material = default_material;
 };
@@ -27,6 +28,7 @@ struct mesh_component {
 struct mesh {
   std::string name;
   std::vector<size_t> surfaces;
+  AABB local_bounds;
 };
 
 struct camera_component {
@@ -127,5 +129,6 @@ struct node_component {
    std::string name;
   entity parent = invalid_entity;
   std::vector<entity> children;
+  AABB bounds;
   bool visible = true;
 };

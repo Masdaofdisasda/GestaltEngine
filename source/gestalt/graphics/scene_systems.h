@@ -37,6 +37,11 @@ public:
 class transform_system final : public scene_system {
   static glm::mat4 get_model_matrix(const transform_component& transform);
 
+  void mark_children_dirty(entity entity);
+  void mark_as_dirty(entity entity);
+  void update_aabb(unsigned entity, const glm::mat4& parent_transform);
+  void mark_parent_dirty(entity entity);
+
 public:
   void prepare() override;
   void update() override;
@@ -51,4 +56,16 @@ public:
   void prepare() override;
   void update() override;
   void cleanup() override {}
+};
+
+class hierarchy_system final : public scene_system {
+   void build_scene_graph(const std::vector<fastgltf::Node>& nodes, const size_t& mesh_offset);
+  void create_entities(std::vector<fastgltf::Node> nodes, const size_t& mesh_offset);
+  void build_hierarchy(std::vector<fastgltf::Node> nodes, const size_t& node_offset);
+  void link_orphans_to_root();
+
+public:
+  void prepare() override;
+  void update() override;
+  void cleanup() override;
 };

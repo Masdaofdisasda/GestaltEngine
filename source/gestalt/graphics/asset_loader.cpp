@@ -290,25 +290,25 @@ size_t asset_loader::create_surface(std::vector<Vertex>& vertices,
                                      std::vector<uint32_t>& indices) {
   assert(!vertices.empty() && !indices.empty());
 
-  glm::vec3 minpos = vertices.empty() ? glm::vec3(0) : vertices[0].position;
-  glm::vec3 maxpos = minpos;
-  for (const auto& vertice : vertices) {
-    minpos = min(minpos, vertice.position);
-    maxpos = max(maxpos, vertice.position);
+  AABB aabb;
+  for (const auto& [position, uv_x, normal, uv_y, color] : vertices) {
+    // Update the min and max coordinates
+    aabb.min.x = std::min(aabb.min.x, position.x);
+    aabb.min.y = std::min(aabb.min.y, position.y);
+    aabb.min.z = std::min(aabb.min.z, position.z);
+
+    aabb.max.x = std::max(aabb.max.x, position.x);
+    aabb.max.y = std::max(aabb.max.y, position.y);
+    aabb.max.z = std::max(aabb.max.z, position.z);
   }
-  glm::vec3 extents = (maxpos - minpos) / 2.f;
-  Bounds bounds{
-      .origin = (maxpos + minpos) / 2.f,
-      .extents = extents,
-      .sphereRadius = length(extents),
-  };
+  aabb.is_dirty = false;
 
   const mesh_surface surface{
       .vertex_count = static_cast<uint32_t>(vertices.size()),
       .index_count = static_cast<uint32_t>(indices.size()),
       .first_index = static_cast<uint32_t>(resource_manager_->get_database().get_indices_size()),
       .vertex_offset = static_cast<uint32_t>(resource_manager_->get_database().get_vertices_size()),
-      .bounds = bounds,
+      .local_bounds = aabb,
   };
 
   resource_manager_->get_database().add_vertices(vertices);
@@ -325,7 +325,19 @@ size_t asset_loader::create_surface(std::vector<Vertex>& vertices,
 size_t asset_loader::create_mesh(std::vector<size_t> surfaces, const std::string& name) const {
   size_t mesh_id = resource_manager_->get_database().get_meshes_size();
   const std::string key = name.empty() ? "mesh_" + std::to_string(mesh_id) : name;
-  mesh_id = resource_manager_->get_database().add_mesh(mesh{key, std::move(surfaces)});
+  AABB aabb;
+  for (size_t surface_index : surfaces) {
+    assert(surface_index <= resource_manager_->get_database().get_surfaces_size());
+    auto& surface_bounds = resource_manager_->get_database().get_surface(surface_index).local_bounds;
+    aabb.min.x = std::min(aabb.min.x, surface_bounds.min.x);
+    aabb.min.y = std::min(aabb.min.y, surface_bounds.min.y);
+    aabb.min.z = std::min(aabb.min.z, surface_bounds.min.z);
+
+    aabb.max.x = std::max(aabb.max.x, surface_bounds.max.x);
+    aabb.max.y = std::max(aabb.max.y, surface_bounds.max.y);
+    aabb.max.z = std::max(aabb.max.z, surface_bounds.max.z);
+  }
+  mesh_id = resource_manager_->get_database().add_mesh(mesh{key, std::move(surfaces), aabb});
   fmt::print("created mesh {}, mesh_id {}\n", key, mesh_id);
   return mesh_id;
 }

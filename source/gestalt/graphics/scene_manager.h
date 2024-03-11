@@ -47,7 +47,11 @@ class scene_manager {
   std::shared_ptr<resource_manager> resource_manager_;
   std::unique_ptr<asset_loader> asset_loader_ = std::make_unique<asset_loader>();
   std::unique_ptr<component_archetype_factory> component_factory_ = std::make_unique<component_archetype_factory>();
-  std::vector<std::unique_ptr<scene_system>> systems_;
+
+  std::unique_ptr<scene_system> light_system_;
+  std::unique_ptr<scene_system> transform_system_;
+  std::unique_ptr<scene_system> render_system_;
+
 
   void build_scene_graph(const std::vector<fastgltf::Node>& nodes, const size_t& mesh_offset);
   void create_entities(std::vector<fastgltf::Node> nodes, const size_t& mesh_offset);

@@ -124,33 +124,6 @@ void main() {
 	}
 	
 	color += Ke.rgb;
-    
-	/*
-    vec3 viewDir = normalize(worldPos - viewPos);
-    vec3 volumetricIntensity = vec3(0.0);
-    vec3 accumulatedLight = vec3(0.0);
-	float numSamples = 64.0;
-	float lightRayLength = 100.0;
-
-
-    // Sample along the view direction towards the light source
-    for (int i = 0; i < numSamples; ++i) { // Number of samples can be adjusted for performance/quality tradeoff
-		float weight = float(i) / (numSamples - 1.0);
-		float offset = pow(weight, 2.0) * lightRayLength;
-
-        vec3 samplePos = worldPos + viewDir * offset;
-        vec4 lightSpacePos = biasMat * sceneData.lightViewProj * vec4(samplePos, 1.0);
-        vec3 ndcPos = lightSpacePos.xyz / lightSpacePos.w;
-
-		float occlusion = PCF(5, ndcPos.xy, ndcPos.z, shadowMap);
-
-		accumulatedLight += occlusion * dirLight[0].intensity / (1.0 + params.attenuation  * offset * offset);
-    }
-
-    volumetricIntensity = accumulatedLight / numSamples; // Average the accumulated light
-
-	color += volumetricIntensity * params.density;
-	*/
 
 	if (params.debugMode == 0) {
 		outFragColor = vec4(color, 1.0);

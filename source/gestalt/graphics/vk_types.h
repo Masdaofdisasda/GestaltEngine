@@ -157,12 +157,18 @@ struct Bounds {
   float sphereRadius;
 };
 
+struct AABB {
+  glm::vec3 min{glm::vec3(std::numeric_limits<float>::max())};
+  glm::vec3 max{glm::vec3(std::numeric_limits<float>::lowest())};
+
+  mutable bool is_dirty = true;
+};
+
 struct render_object {
   uint32_t index_count;
   uint32_t first_index;
 
   uint32_t material;
-  Bounds bounds;
   glm::mat4 transform;
   VkDeviceAddress vertex_buffer_address;
 };
@@ -173,7 +179,7 @@ struct draw_context {
 };
 
 struct render_config {
-  bool always_opaque{false};
+  bool always_opaque{true};
 
   bool enable_ssao{true};
   int ssao_quality{1};
@@ -220,8 +226,6 @@ struct render_config {
   struct shadow_params {
     float shadow_bias{1.f};
     float shadow_slope_bias{1.f};
-    float max_corner{250};
-    float min_corner{-200};
   } shadow{};
 
   struct lighting_params {

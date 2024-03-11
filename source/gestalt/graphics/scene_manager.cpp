@@ -31,13 +31,13 @@ void scene_manager::init(const vk_gpu& gpu,
   component_factory_->create_point_light(glm::vec3(1.0f), 5.0f, glm ::vec3(0.0, 6.0, 0.0),
                                          get_root_entity());
 
-  systems_.push_back(std::make_unique<light_system>());
-  systems_.push_back(std::make_unique<transform_system>());
-  systems_.push_back(std::make_unique<render_system>());
+  light_system_ = std::make_unique<light_system>();
+  light_system_->init(gpu, resource_manager);
+  transform_system_ = std::make_unique<transform_system>();
+  transform_system_->init(gpu, resource_manager);
+  render_system_ = std::make_unique<render_system>();
+  render_system_->init(gpu, resource_manager);
 
-  for (const auto& system : systems_) {
-    system->init(gpu_, resource_manager_);
-  }
 }
 
 
@@ -295,9 +295,9 @@ void scene_manager::update_scene() {
     scene_path_.clear();
   }
 
-  for (const auto& system : systems_) {
-       system->update();
-  }
+  light_system_->update();
+  transform_system_->update();
+  render_system_->update();
  }
 
 void scene_manager::request_scene(const std::string& path) {
