@@ -187,9 +187,16 @@ vec3 calculatePBRLightContributionPoint( inout PBRInfo pbrInputs, vec3 position,
 	vec3 diffuseContrib = (1.0 - F) * diffuseBurley(pbrInputs);
 	vec3 specContrib = F * G * D / (4.0 * NdotL * NdotV);
 	// Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
-    float distance = length(vec3(lightPos) - position);
-    float attenuation = 1.0 / (distance * distance);
-	vec3 color = NdotL * lightColor * lightIntensity * attenuation * (diffuseContrib + specContrib);
+
+	float constantAttenuation = 0.032;
+	float linearAttenuation = 0.09;
+	float quadraticAttenuation = 1.0;
+    float distance = length(lightPos - position);
+    float attenuation = 1.0 / (constantAttenuation + linearAttenuation * distance + quadraticAttenuation * distance * distance);
+
+    // Calculate final light color
+    vec3 lightContribution = lightColor * lightIntensity * attenuation;
+    vec3 color = NdotL * lightContribution * (diffuseContrib + specContrib);
 
 	return color;
 }
