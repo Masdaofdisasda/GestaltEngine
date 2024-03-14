@@ -15,6 +15,7 @@ target_include_directories(graphics PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}"
     ${Vulkan_INCLUDE_DIRS}
 ${Stb_SOURCE_DIR}
+${vk-bootstrap_SOURCE_DIR}
+${fmt_SOURCE_DIR}
 )
 
-target_link_libraries(graphics PRIVATE fmt::fmt vk-bootstrap::vk-bootstrap)

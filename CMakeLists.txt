@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.28)
 
 project(GestaltEngine)
 
@@ -6,7 +6,11 @@ message(STATUS "Configuring GestaltEngine...")
 
 set(APPLICATION_NAME "GestaltApp")
 
-include(cmake/CPM.cmake)
+if(NOT EXISTS ${CMAKE_BINARY_DIR}/cmake/CPM.cmake)
+  file(DOWNLOAD https://github.com/cpm-cmake/CPM.cmake/releases/latest/download/CPM.cmake ${CMAKE_BINARY_DIR}/cmake/CPM.cmake)
+endif()
+include(${CMAKE_BINARY_DIR}/cmake/CPM.cmake)
+
 CPMAddPackage(
   NAME Format.cmake
   VERSION 1.8.0
@@ -22,20 +26,41 @@ CPMAddPackage(
   GIT_TAG master 
 )
 
+CPMAddPackage(
+  NAME glm
+  GITHUB_REPOSITORY g-truc/glm
+  GIT_TAG 1.0.1
+)
+
+CPMAddPackage(
+  NAME VMA
+  GITHUB_REPOSITORY GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
+  GIT_TAG v3.0.1
+)
+
+CPMAddPackage(
+  NAME vk-bootstrap
+  GITHUB_REPOSITORY charles-lunarg/vk-bootstrap
+  GIT_TAG v1.3.274
+)
+
+CPMAddPackage(
+  NAME fmt
+  GITHUB_REPOSITORY fmtlib/fmt
+  GIT_TAG 10.2.1
+  
+  OPTIONS
+      "FMT_TEST OFF"
+      "FMT_DOC OFF"
+)
+
+target_compile_definitions(fmt INTERFACE FMT_SHARED=1)
+
 find_package(Vulkan REQUIRED)
 message(STATUS "Vulkan found: INCLUDE_DIRS=${Vulkan_INCLUDE_DIRS}, LIBRARIES=${Vulkan_LIBRARIES}")
 find_package(SDL2 CONFIG REQUIRED)
-find_package(fmt CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(fastgltf CONFIG REQUIRED)
-
-include(FetchContent)
-FetchContent_Declare(
-    fetch_vk_bootstrap
-    GIT_REPOSITORY https://github.com/charles-lunarg/vk-bootstrap
-    GIT_TAG        v1.3.274
-)
-FetchContent_MakeAvailable(fetch_vk_bootstrap)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
