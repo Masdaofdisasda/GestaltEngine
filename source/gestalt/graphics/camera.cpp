@@ -1,6 +1,6 @@
 #include "camera.h"
 
-#include <include/fmt/core.h>
+#include <fmt/core.h>
 
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/quaternion.hpp>

@@ -1,6 +1,6 @@
 ﻿#include "vk_swapchain.h"
 
-#include <src/VkBootstrap.h>
+#include <VkBootstrap.h>
 
 void vk_swapchain::init(const vk_gpu& gpu, const VkExtent3D& extent) {
   gpu_ = gpu;

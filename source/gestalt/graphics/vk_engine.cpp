@@ -11,7 +11,7 @@
 #define VMA_VULKAN_VERSION 1003000
 #include <vma/vk_mem_alloc.h>
 
-#include <src/VkBootstrap.h>
+#include <VkBootstrap.h>
 
 #include <glm/gtx/transform.hpp>
 

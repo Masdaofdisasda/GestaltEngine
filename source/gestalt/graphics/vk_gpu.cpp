@@ -1,6 +1,6 @@
 #include "vk_gpu.h"
 
-#include <src/VkBootstrap.h>
+#include <VkBootstrap.h>
 
 void vk_gpu::init(
     bool use_validation_layers, sdl_window& window,

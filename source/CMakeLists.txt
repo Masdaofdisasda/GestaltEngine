@@ -8,11 +8,6 @@ add_subdirectory(gestalt/graphics)
 add_executable(${APPLICATION_NAME} gestalt/main.cpp)
 target_compile_features(${APPLICATION_NAME} PRIVATE cxx_std_20)
 
-target_include_directories(${APPLICATION_NAME} PUBLIC 
-${vk-bootstrap_SOURCE_DIR/src}
-${fmt_SOURCE_DIR/include}
-)
-
 target_link_libraries(${APPLICATION_NAME} PRIVATE SDL2::SDL2 Vulkan::Vulkan imgui::imgui fastgltf::fastgltf vk-bootstrap fmt::fmt application foundation graphics)
 
 find_program(GLSL_VALIDATOR glslangValidator HINTS /usr/bin /usr/local/bin $ENV{VULKAN_SDK}/Bin/ $ENV{VULKAN_SDK}/Bin32/)

@@ -1,6 +1,6 @@
 #include "input_system.h"
 
-#include <include/fmt/core.h>
+#include <fmt/core.h>
 
 
 void input_system::handle_event(const SDL_Event& e, uint32_t window_size_x,
