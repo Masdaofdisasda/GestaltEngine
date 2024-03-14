@@ -17,5 +17,6 @@ target_include_directories(graphics PUBLIC
 ${Stb_SOURCE_DIR}
 ${vk-bootstrap_SOURCE_DIR}
 ${fmt_SOURCE_DIR}
+    "${fastgltf_SOURCE_DIR}/include"
 )
 

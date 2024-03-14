@@ -53,14 +53,22 @@ CPMAddPackage(
       "FMT_TEST OFF"
       "FMT_DOC OFF"
 )
-
 target_compile_definitions(fmt INTERFACE FMT_SHARED=1)
+
+CPMAddPackage(
+  NAME fastgltf
+  GITHUB_REPOSITORY spnda/fastgltf
+  GIT_TAG v0.7.1
+  OPTIONS 
+		"FASTGLTF_ENABLE_TESTS NO"
+		"FASTGLTF_ENABLE_DOCS NO"
+		"FASTGLTF_COMPILE_AS_CPP20 YES"
+)
 
 find_package(Vulkan REQUIRED)
 message(STATUS "Vulkan found: INCLUDE_DIRS=${Vulkan_INCLUDE_DIRS}, LIBRARIES=${Vulkan_LIBRARIES}")
 find_package(SDL2 CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
-find_package(fastgltf CONFIG REQUIRED)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)

@@ -4,7 +4,7 @@
 #include "vk_types.h"
 
 #include <fastgltf/glm_element_traits.hpp>
-#include <fastgltf/parser.hpp>
+#include <fastgltf/core.hpp>
 
 #include <glm/gtx/matrix_decompose.hpp>
 
@@ -55,8 +55,9 @@ void scene_manager::create_entities(std::vector<fastgltf::Node> nodes, const siz
       component_factory_->add_mesh_component(entity, mesh_offset + *node.meshIndex);
     }
 
-    if (std::holds_alternative<fastgltf::Node::TRS>(node.transform)) {
-      const auto& trs = std::get<fastgltf::Node::TRS>(node.transform);
+    if (std::holds_alternative<fastgltf::TRS>(node.transform)) {
+      const auto& trs = std::get<fastgltf::TRS>(node.transform);
+
       glm::vec3 translation(trs.translation[0], trs.translation[1], trs.translation[2]);
       glm::quat rotation(trs.rotation[3], trs.rotation[0], trs.rotation[1], trs.rotation[2]);
       glm::vec3 scale(trs.scale[0], trs.scale[1], trs.scale[2]);

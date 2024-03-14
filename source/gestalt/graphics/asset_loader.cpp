@@ -1,7 +1,9 @@
 ﻿#include "asset_loader.h"
 
+#include <stb_image.h>
+
+#include <fastgltf/core.hpp>
 #include <fastgltf/glm_element_traits.hpp>
-#include <fastgltf/parser.hpp>
 
 #include "scene_manager.h"
 
@@ -62,10 +64,17 @@ VkSamplerMipmapMode asset_loader::extract_mipmap_mode(fastgltf::Filter filter) {
 }
 
 std::optional<fastgltf::Asset> asset_loader::parse_gltf(const std::filesystem::path& file_path) {
-  fastgltf::Parser parser{};
+  static constexpr auto gltf_extensions
+      = fastgltf::Extensions::KHR_lights_punctual
+        | fastgltf::Extensions::KHR_materials_emissive_strength
+        | fastgltf::Extensions::KHR_materials_clearcoat | fastgltf::Extensions::KHR_materials_ior
+        | fastgltf::Extensions::KHR_materials_sheen | fastgltf::Extensions::None;
+
+  fastgltf::Parser parser{gltf_extensions};
   constexpr auto gltf_options
       = fastgltf::Options::DontRequireValidAssetMember | fastgltf::Options::AllowDouble
         | fastgltf::Options::LoadGLBBuffers | fastgltf::Options::LoadExternalBuffers
+        | fastgltf::Options::LoadExternalImages
         | fastgltf::Options::DecomposeNodeMatrices | fastgltf::Options::None;
 
   fastgltf::GltfDataBuffer data;
@@ -74,24 +83,13 @@ std::optional<fastgltf::Asset> asset_loader::parse_gltf(const std::filesystem::p
     return std::nullopt; 
   }
 
-  std::filesystem::path path = file_path;
+  const std::filesystem::path& path = file_path;
 
-  auto type = determineGltfFileType(&data);
-  if (type == fastgltf::GltfType::glTF) {
-    auto loadResult = parser.loadGLTF(&data, path.parent_path(), gltf_options);
-    if (loadResult) {
-      return std::move(loadResult.get());
-    }
-    fmt::print("Failed to load glTF: {}\n", to_underlying(loadResult.error()));
-  } else if (type == fastgltf::GltfType::GLB) {
-    auto loadResult = parser.loadBinaryGLTF(&data, path.parent_path(), gltf_options);
-    if (loadResult) {
-      return std::move(loadResult.get()); 
-    }
-    fmt::print("Failed to load glTF: {}\n", to_underlying(loadResult.error()));
-  } else {
-    fmt::print("Failed to determine glTF container\n");
+  auto load_result = parser.loadGltf(&data, path.parent_path(), gltf_options);
+  if (load_result) {
+    return std::move(load_result.get());
   }
+  fmt::print("Failed to load glTF: {}\n", to_underlying(load_result.error()));
 
   return std::nullopt; 
 }
@@ -116,10 +114,75 @@ void asset_loader::import_samplers(fastgltf::Asset& gltf) {
   }
 }
 
+std::optional<AllocatedImage> asset_loader::load_image(fastgltf::Asset& asset,
+                                                       fastgltf::Image& image) const {
+  AllocatedImage newImage = {};
+  int width = 0, height = 0, nr_channels = 0;
+
+  const std::function<void(unsigned char*)> create_image = [&](unsigned char* data) {
+    if (data) {
+      newImage = resource_manager_->create_image(
+          data, VkExtent3D{static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1},
+          VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, true);
+
+      stbi_image_free(data);
+    }
+  };
+
+  const std::function<void(fastgltf::sources::URI&)> create_image_from_file
+      = [&](fastgltf::sources::URI& file_path) {
+          fmt::print("Loading image from file: {}\n", file_path.uri.string());
+          assert(file_path.fileByteOffset == 0);  // We don't support offsets with stbi.
+          assert(file_path.uri.isLocalPath());    // We're only capable of loading local files.
+
+          const std::string filename(file_path.uri.path().begin(), file_path.uri.path().end());
+          unsigned char* data = stbi_load(filename.c_str(), &width, &height, &nr_channels, 4);
+          create_image(data);
+        };
+
+  const std::function<void(fastgltf::sources::Array&)> create_image_from_vector
+      = [&](fastgltf::sources::Array& vector) {
+          unsigned char* data
+              = stbi_load_from_memory(vector.bytes.data(), static_cast<int>(vector.bytes.size()),
+                                      &width, &height, &nr_channels, 4);
+          create_image(data);
+        };
+
+  const std::function<void(fastgltf::sources::BufferView&)> create_image_from_buffer_view
+      = [&](fastgltf::sources::BufferView& view) {
+          const auto& buffer_view = asset.bufferViews[view.bufferViewIndex];
+          auto& buffer = asset.buffers[buffer_view.bufferIndex];
+
+          std::visit(fastgltf::visitor{[](auto& arg) {},
+                                       [&](fastgltf::sources::Array& vector) {
+                                         unsigned char* data = stbi_load_from_memory(
+                                             vector.bytes.data() + buffer_view.byteOffset,
+                                             static_cast<int>(buffer_view.byteLength), &width,
+                                             &height, &nr_channels, 4);
+                                         create_image(data);
+                                       }},
+                     buffer.data);
+        };
+
+  std::visit(
+      fastgltf::visitor{
+          [](auto& arg) {},
+          [&](fastgltf::sources::URI& file_path) { create_image_from_file(file_path); },
+          [&](fastgltf::sources::Array& vector) { create_image_from_vector(vector); },
+          [&](fastgltf::sources::BufferView& view) { create_image_from_buffer_view(view); },
+      },
+      image.data);
+
+  if (newImage.image == VK_NULL_HANDLE) {
+    return {};
+  }
+  return newImage;
+}
+
 void asset_loader::import_textures(fastgltf::Asset& gltf) const {
   fmt::print("importing textures\n");
   for (fastgltf::Image& image : gltf.images) {
-    std::optional<AllocatedImage> img = resource_manager_->load_image(gltf, image);
+    std::optional<AllocatedImage> img = load_image(gltf, image);
 
     if (img.has_value()) {
       size_t image_id = resource_manager_->get_database().add_image(img.value());

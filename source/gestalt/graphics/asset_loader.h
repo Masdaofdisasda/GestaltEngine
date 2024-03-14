@@ -12,6 +12,7 @@ class asset_loader {
   VkSamplerMipmapMode extract_mipmap_mode(fastgltf::Filter filter);
   std::optional<fastgltf::Asset> parse_gltf(const std::filesystem::path& file_path);
   void import_samplers(fastgltf::Asset& gltf);
+  std::optional<AllocatedImage> load_image(fastgltf::Asset& asset, fastgltf::Image& image) const;
   void import_textures(fastgltf::Asset& gltf) const;
   size_t create_material(pbr_material& config,
                          const std::string& name) const;

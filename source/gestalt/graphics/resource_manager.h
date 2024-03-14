@@ -97,7 +97,6 @@ public:
                               bool mipmapped = false);
   AllocatedImage create_cubemap(const void* imageData, VkExtent3D size, VkFormat format,
                                 VkImageUsageFlags usage, bool mipmapped = false);
-  std::optional<AllocatedImage> load_image(fastgltf::Asset& asset, fastgltf::Image& image);
   std::optional<AllocatedImage> load_image(const std::string& filepath);
   void init_default_data();
   void load_and_process_cubemap(const std::string& file_path);
