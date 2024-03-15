@@ -15,9 +15,9 @@ target_link_libraries(${APPLICATION_NAME} PRIVATE
 	vk-bootstrap 
 	fmt::fmt 
 	
-	application 
-	foundation 
-	graphics)
+	${APPLICATION_MODULE} 
+	${FOUNDATION_MODULE} 
+	${GRAPHICS_MODULE})
 
 find_program(GLSL_VALIDATOR glslangValidator HINTS /usr/bin /usr/local/bin $ENV{VULKAN_SDK}/Bin/ $ENV{VULKAN_SDK}/Bin32/)
 message(STATUS "GLSL Validator found: ${GLSL_VALIDATOR}")
@@ -37,7 +37,7 @@ file(GLOB_RECURSE GLSL_SOURCE_FILES
     "${SHADER_SOURCE_DIR}/*.frag"
     "${SHADER_SOURCE_DIR}/*.vert"
     "${SHADER_SOURCE_DIR}/*.comp"
-    "${SHADER_SOURCE_DIR}/*.glsl" # Include .glsl files
+    "${SHADER_SOURCE_DIR}/*.glsl"
 )
 
 source_group("Source" FILES ${GLSL_SOURCE_FILES})

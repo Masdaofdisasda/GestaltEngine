@@ -5,13 +5,13 @@ file(GLOB_RECURSE HEADER_FILES
 file(GLOB_RECURSE SOURCE_FILES 
      "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
 
-add_library(graphics
+add_library(${GRAPHICS_MODULE}
     ${HEADER_FILES}
     ${SOURCE_FILES})
 
-target_compile_features(graphics PRIVATE cxx_std_20)
+target_compile_features(${GRAPHICS_MODULE} PRIVATE cxx_std_20)
 
-target_include_directories(graphics PUBLIC 
+target_include_directories(${GRAPHICS_MODULE} PUBLIC 
     "${CMAKE_CURRENT_SOURCE_DIR}"
     ${Vulkan_INCLUDE_DIRS}
 	${Stb_SOURCE_DIR}
