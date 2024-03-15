@@ -2,7 +2,7 @@ import os
 import subprocess
 import configparser
 
-def create_vs_build(build_dir, cmake_path='..', vs_version='Visual Studio 17 2022', config_file='config.ini',  format_target='fix-format'):
+def create_vs_build(build_dir, cmake_path='..', vs_version='Visual Studio 17 2022',  format_target='fix-format'):
     """
     Creates a build directory, generates Visual Studio project files, and formats the code.
 
@@ -13,31 +13,21 @@ def create_vs_build(build_dir, cmake_path='..', vs_version='Visual Studio 17 202
     :param format_target: The CMake target for formatting the code.
     """
 
-    # Read the configuration file
-    config = configparser.ConfigParser()
-    config.read(config_file)
-    vcpkg_toolchain_file = config.get('vcpkg', 'toolchain_file')
-
-    # Create the build directory if it doesn't exist
     os.makedirs(build_dir, exist_ok=True)
 
     # Construct the CMake command
-    # cmake '..' -G 'Visual Studio 17 2022' -A 'x64' -DCMAKE_TOOLCHAIN_FILE='C:/src/vcpkg/scripts/buildsystems/vcpkg.cmake'
+    # cmake '..' -G 'Visual Studio 17 2022' -A 'x64'
     cmake_command = [
         'cmake',
         cmake_path,
         '-G', vs_version,
-        '-A', 'x64',  # Specify architecture
-        '-DCMAKE_TOOLCHAIN_FILE=' + vcpkg_toolchain_file  # Add vcpkg toolchain file
+        '-A', 'x64',
     ]
 
-    # Change to the build directory
     os.chdir(build_dir)
 
-    # Execute the CMake command
     subprocess.run(cmake_command)
     
-    # Run the format target
     format_command = ['cmake', '--build', '.', '--target', format_target]
     subprocess.run(format_command)
 
