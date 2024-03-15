@@ -13,8 +13,9 @@ target_compile_features(${GRAPHICS_MODULE} PRIVATE cxx_std_20)
 
 target_include_directories(${GRAPHICS_MODULE} PUBLIC 
     "${CMAKE_CURRENT_SOURCE_DIR}"
-    ${Vulkan_INCLUDE_DIRS}
-	${Stb_SOURCE_DIR}
+    "${Vulkan_INCLUDE_DIRS}"
+	"${Stb_SOURCE_DIR}"
+	"${glm_SOURCE_DIR}"
     "${fastgltf_SOURCE_DIR}/include"
     "${fmt_SOURCE_DIR}/include"
     "${vk-bootstrap_SOURCE_DIR}/src"

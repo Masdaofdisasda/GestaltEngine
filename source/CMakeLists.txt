@@ -9,7 +9,7 @@ target_compile_features(${APPLICATION_NAME} PRIVATE cxx_std_20)
 
 target_link_libraries(${APPLICATION_NAME} PRIVATE 
 	SDL2-static
-	Vulkan::Vulkan 
+	${VULKAN_LIBRARY} 
 	DearImGui 
 	fastgltf::fastgltf 
 	vk-bootstrap 
@@ -19,7 +19,7 @@ target_link_libraries(${APPLICATION_NAME} PRIVATE
 	${FOUNDATION_MODULE} 
 	${GRAPHICS_MODULE})
 
-find_program(GLSL_VALIDATOR glslangValidator HINTS /usr/bin /usr/local/bin $ENV{VULKAN_SDK}/Bin/ $ENV{VULKAN_SDK}/Bin32/)
+find_program(GLSL_VALIDATOR glslangValidator HINTS $ENV{VULKAN_SDK}/Bin/ $ENV{VULKAN_SDK}/Bin32/)
 message(STATUS "GLSL Validator found: ${GLSL_VALIDATOR}")
 
 set(SHADER_SOURCE_DIR "${PROJECT_SOURCE_DIR}/source/gestalt/graphics/shaders")

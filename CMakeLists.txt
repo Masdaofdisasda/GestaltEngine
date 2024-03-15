@@ -21,10 +21,7 @@ include(source/external/vma.cmake)
 include(source/external/vkb.cmake)
 include(source/external/fmt.cmake)
 include(source/external/fastgltf.cmake)
-
-find_package(Vulkan REQUIRED)
-message(STATUS "Vulkan found: INCLUDE_DIRS=${Vulkan_INCLUDE_DIRS}, LIBRARIES=${Vulkan_LIBRARIES}")
-
+include(source/external/vulkan.cmake)
 include(source/external/sdl2.cmake)
 include(source/external/imgui.cmake)
 
