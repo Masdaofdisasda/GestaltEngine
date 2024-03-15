@@ -1,6 +1,6 @@
 ﻿#pragma once
-#include <include/SDL_stdinc.h>
-#include <include/SDL_timer.h>
+#include <SDL_stdinc.h>
+#include <SDL_timer.h>
 
 class time_tracking_service {
 public:

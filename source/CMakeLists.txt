@@ -1,6 +1,5 @@
 message(STATUS "Configuring source...")
 
-add_subdirectory(external)
 add_subdirectory(gestalt/application)
 add_subdirectory(gestalt/foundation)
 add_subdirectory(gestalt/graphics)
@@ -8,7 +7,17 @@ add_subdirectory(gestalt/graphics)
 add_executable(${APPLICATION_NAME} gestalt/main.cpp)
 target_compile_features(${APPLICATION_NAME} PRIVATE cxx_std_20)
 
-target_link_libraries(${APPLICATION_NAME} PRIVATE SDL2-static Vulkan::Vulkan DearImGui fastgltf::fastgltf vk-bootstrap fmt::fmt application foundation graphics)
+target_link_libraries(${APPLICATION_NAME} PRIVATE 
+	SDL2-static
+	Vulkan::Vulkan 
+	DearImGui 
+	fastgltf::fastgltf 
+	vk-bootstrap 
+	fmt::fmt 
+	
+	application 
+	foundation 
+	graphics)
 
 find_program(GLSL_VALIDATOR glslangValidator HINTS /usr/bin /usr/local/bin $ENV{VULKAN_SDK}/Bin/ $ENV{VULKAN_SDK}/Bin32/)
 message(STATUS "GLSL Validator found: ${GLSL_VALIDATOR}")

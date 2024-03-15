@@ -7,3 +7,6 @@ CPMAddPackage(
 		"FASTGLTF_ENABLE_DOCS NO"
 		"FASTGLTF_COMPILE_AS_CPP20 YES"
 )
+
+
+set_property(TARGET fastgltf PROPERTY FOLDER "External/")

@@ -18,3 +18,6 @@ target_include_directories(DearImGui PUBLIC
 )
 
 target_link_libraries(DearImGui PRIVATE Vulkan::Vulkan SDL2-static)
+
+
+set_property(TARGET DearImGui PROPERTY FOLDER "External/")

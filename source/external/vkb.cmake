@@ -7,3 +7,5 @@ CPMAddPackage(
 		"DVK_BOOTSTRAP_TEST OFF"
         "DVK_BOOTSTRAP_INSTALL ON"
 )
+
+set_property(TARGET vk-bootstrap PROPERTY FOLDER "External/")

@@ -20,6 +20,6 @@ target_include_directories(graphics PUBLIC
     "${vk-bootstrap_SOURCE_DIR}/src"
     "${imgui_SOURCE_DIR}"
     "${imgui_SOURCE_DIR}/backends"
-    "${SDL2_SOURCE_DIR}"
+    "${SDL2_INCLUDE_DIR}"
 )
 

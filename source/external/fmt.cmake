@@ -8,3 +8,5 @@ CPMAddPackage(
       "FMT_DOC OFF"
 )
 target_compile_definitions(fmt INTERFACE FMT_SHARED=1)
+
+set_property(TARGET fmt PROPERTY FOLDER "External/")

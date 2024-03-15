@@ -8,6 +8,7 @@ CPMAddPackage(
         "SDL_STATIC ON"
         "SDL_STATIC_PIC ON"
         "SDL_WERROR OFF"
+		"TEST_TEST OFF"
 )
 file(GLOB SDL2_HEADERS "${SDL2_SOURCE_DIR}/include/*.h")
 
@@ -20,3 +21,6 @@ target_include_directories(SDL2-static INTERFACE "${CMAKE_BINARY_DIR}/SDLHeaders
 
 set (SDL2_INCLUDE_DIR ${SDL2_SOURCE_DIR}/include)
 include_directories(${SDL2_INCLUDE_DIR})
+
+set_property(TARGET SDL2-static PROPERTY FOLDER "External/SDL2")
+set_property(TARGET sdl_copy_headers_in_build_dir PROPERTY FOLDER "External/SDL2")
