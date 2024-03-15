@@ -18,7 +18,8 @@ target_include_directories(graphics PUBLIC
     "${fastgltf_SOURCE_DIR}/include"
     "${fmt_SOURCE_DIR}/include"
     "${vk-bootstrap_SOURCE_DIR}/src"
-    ${imgui_SOURCE_DIR}
-    ${imgui_SOURCE_DIR}/backends
+    "${imgui_SOURCE_DIR}"
+    "${imgui_SOURCE_DIR}/backends"
+    "${SDL2_SOURCE_DIR}"
 )
 

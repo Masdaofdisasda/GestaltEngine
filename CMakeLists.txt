@@ -72,7 +72,29 @@ CPMAddPackage(
 find_package(Vulkan REQUIRED)
 message(STATUS "Vulkan found: INCLUDE_DIRS=${Vulkan_INCLUDE_DIRS}, LIBRARIES=${Vulkan_LIBRARIES}")
 
-find_package(SDL2 CONFIG REQUIRED)
+CPMAddPackage(
+  NAME SDL2
+  GITHUB_REPOSITORY libsdl-org/SDL
+  GIT_TAG release-2.30.1
+	OPTIONS
+        "SDL2_DISABLE_INSTALL ON"
+        "SDL_SHARED OFF"
+        "SDL_STATIC ON"
+        "SDL_STATIC_PIC ON"
+        "SDL_WERROR OFF"
+)
+file(GLOB SDL2_HEADERS "${SDL2_SOURCE_DIR}/include/*.h")
+
+add_custom_target(sdl_copy_headers_in_build_dir
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${SDL2_SOURCE_DIR}/include" "${CMAKE_BINARY_DIR}/SDLHeaders/SDL2"
+        DEPENDS ${SDL2_HEADERS})
+		
+add_dependencies(SDL2-static sdl_copy_headers_in_build_dir)
+target_include_directories(SDL2-static INTERFACE "${CMAKE_BINARY_DIR}/SDLHeaders")
+
+set (SDL2_INCLUDE_DIR ${SDL2_SOURCE_DIR}/include)
+include_directories(${SDL2_INCLUDE_DIR})
+
 
 CPMAddPackage(
   NAME imgui
@@ -93,7 +115,7 @@ target_include_directories(DearImGui PUBLIC
     ${imgui_SOURCE_DIR}/backends
 )
 
-target_link_libraries(DearImGui PRIVATE Vulkan::Vulkan SDL2::SDL2)
+target_link_libraries(DearImGui PRIVATE Vulkan::Vulkan SDL2-static)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)

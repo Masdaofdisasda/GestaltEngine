@@ -1,7 +1,7 @@
 #pragma once
 
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_vulkan.h>
+#include <include/SDL.h>
+#include <include/SDL_vulkan.h>
 #include "vk_types.h"
 
 class sdl_window {
