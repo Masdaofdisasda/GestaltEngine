@@ -49,6 +49,12 @@ void imgui_gui::init(vk_gpu& gpu, sdl_window& window,
   // this initializes imgui for SDL
   ImGui_ImplSDL2_InitForVulkan(window_.handle);
 
+  VkPipelineRenderingCreateInfoKHR pipelineRenderingCreateInfo = {
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
+    .colorAttachmentCount = 1,
+    .pColorAttachmentFormats = &swapchain_->swapchain_image_format,
+  };
+
   // this initializes imgui for Vulkan
   ImGui_ImplVulkan_InitInfo init_info = {};
   init_info.Instance = gpu_.instance;
@@ -59,11 +65,11 @@ void imgui_gui::init(vk_gpu& gpu, sdl_window& window,
   init_info.MinImageCount = 3;
   init_info.ImageCount = 3;
   init_info.UseDynamicRendering = true;
-  init_info.ColorAttachmentFormat = swapchain_->swapchain_image_format;
+  init_info.PipelineRenderingCreateInfo = pipelineRenderingCreateInfo;
 
   init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 
-  ImGui_ImplVulkan_Init(&init_info, VK_NULL_HANDLE);
+  ImGui_ImplVulkan_Init(&init_info);
 
   // execute a gpu command to upload imgui font textures
   gpu_.immediate_submit([&](VkCommandBuffer cmd) { ImGui_ImplVulkan_CreateFontsTexture(); });
@@ -325,7 +331,7 @@ void imgui_gui::scene_graph() {
 
 void imgui_gui::new_frame() {
   ImGui_ImplVulkan_NewFrame();
-  ImGui_ImplSDL2_NewFrame(window_.handle);
+  ImGui_ImplSDL2_NewFrame();
   ImGui::NewFrame();
 
   menu_bar();
