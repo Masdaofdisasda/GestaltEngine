@@ -4,7 +4,10 @@
 #include <imgui_impl_sdl2.h>
 #include <imgui_impl_vulkan.h>
 
+#include <ImGuizmo.h>
+
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 #include "vk_initializers.h"
 
@@ -104,6 +107,43 @@ void imgui_gui::draw(VkCommandBuffer cmd, VkImageView target_image_view) {
 void imgui_gui::update(const SDL_Event& e) {
   ImGui_ImplSDL2_ProcessEvent(&e);
 }
+
+void imgui_gui::guizmo() {
+  auto& [viewCam, proj] = actions_.get_database().get_camera(0);
+  glm::mat4 identity = glm::mat4(1.0f);
+
+  // Convert glm matrices to arrays for ImGuizmo
+  float* view = glm::value_ptr(viewCam);
+  float* projection = glm::value_ptr(proj);
+  float* model = glm::value_ptr(identity);  // Using identity matrix for demonstration
+
+  // Setup for using Gizmo without a separate window
+  ImGuiIO& io = ImGui::GetIO();
+  ImGuizmo::SetDrawlist();
+
+  // Calculate position for view manipulator to be in the upper right corner
+  ImVec2 viewManipulatorPosition
+      = ImVec2(io.DisplaySize.x - 128 - 10,
+               10);  // 128x128 view manipulator size, 10 pixels padding from edges
+  ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+
+  // Draw the view manipulator directly
+  // Note: camDistance is a placeholder for how far away the view manipulator camera should be from
+  // its target point
+  float camDistance = 10.0f;  // Adjust this value as needed for your scene
+  ImGuizmo::ViewManipulate(view, camDistance, viewManipulatorPosition, ImVec2(128, 128),
+                           0x00000000);
+
+  // Example of drawing a grid directly without a separate window, for context (optional)
+  glm::mat4 gridMatrix = glm::mat4(1.0f);  // Grid positioned at the origin
+  ImGuizmo::DrawGrid(view, projection, glm::value_ptr(gridMatrix), 100.f);
+
+  // Example manipulation - if you want to manipulate objects, you can keep this
+  ImGuizmo::Manipulate(view, projection, ImGuizmo::TRANSLATE, ImGuizmo::LOCAL, model);
+}
+
+
+
 
 void imgui_gui::menu_bar() {
   if (ImGui::BeginMainMenuBar()) {
@@ -330,9 +370,13 @@ void imgui_gui::scene_graph() {
 }
 
 void imgui_gui::new_frame() {
+  ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
+
   ImGui_ImplVulkan_NewFrame();
   ImGui_ImplSDL2_NewFrame();
   ImGui::NewFrame();
+
+  guizmo();
 
   menu_bar();
 

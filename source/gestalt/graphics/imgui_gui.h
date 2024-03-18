@@ -41,5 +41,6 @@ public:
 
   void update(const SDL_Event& e);
 
+  void guizmo();
   void new_frame();
 };

@@ -21,6 +21,8 @@ target_include_directories(${GRAPHICS_MODULE} PUBLIC
     "${vk-bootstrap_SOURCE_DIR}/src"
     "${imgui_SOURCE_DIR}"
     "${imgui_SOURCE_DIR}/backends"
+    "${ImGuiFileDialog_SOURCE_DIR}"
+    "${ImGuizmo_SOURCE_DIR}"
     "${SDL2_INCLUDE_DIR}"
 )
 

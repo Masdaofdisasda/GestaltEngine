@@ -11,6 +11,8 @@ target_link_libraries(${APPLICATION_NAME} PRIVATE
 	SDL2-static
 	${VULKAN_LIBRARY} 
 	DearImGui 
+	ImGuiFileDialog
+	ImGuizmo
 	fastgltf::fastgltf 
 	vk-bootstrap 
 	fmt::fmt 
