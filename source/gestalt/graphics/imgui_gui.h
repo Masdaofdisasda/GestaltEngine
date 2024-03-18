@@ -25,7 +25,7 @@ class imgui_gui {
 
   bool show_scene_hierarchy_ = true;
   bool show_render_settings_ = true;
-  bool show_guizmo_ = false;
+  bool show_guizmo_ = true;
   bool show_stats_ = false;
   bool show_lights_ = false;
 

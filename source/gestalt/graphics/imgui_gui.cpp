@@ -110,37 +110,56 @@ void imgui_gui::update(const SDL_Event& e) {
 }
 
 void imgui_gui::guizmo() {
-  auto& [viewCam, proj] = actions_.get_database().get_camera(0);
+  ImGuizmo::BeginFrame();
+
+  auto [viewCam, proj] = actions_.get_database().get_camera(0);
+  proj[1][1] *= -1;  // Flip the Y-axis for opengl like system
   glm::mat4 identity = glm::mat4(1.0f);
 
   // Convert glm matrices to arrays for ImGuizmo
   float* view = glm::value_ptr(viewCam);
   float* projection = glm::value_ptr(proj);
-  float* model = glm::value_ptr(identity);  // Using identity matrix for demonstration
+  float model[16];
 
-  // Setup for using Gizmo without a separate window
-  ImGuiIO& io = ImGui::GetIO();
-  ImGuizmo::SetDrawlist();
+  const auto transform_component
+      = actions_.get_database().get_transform_component(selected_entity_);
+  if (transform_component.has_value()) {
+    auto& transform = transform_component.value().get();
 
-  // Calculate position for view manipulator to be in the upper right corner
-  ImVec2 viewManipulatorPosition
-      = ImVec2(io.DisplaySize.x - 128 - 10,
-               10);  // 128x128 view manipulator size, 10 pixels padding from edges
-  ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+    glm::vec3 t = transform.position;
+    glm::quat r = transform.rotation;
+    glm::vec3 s = transform.scale;
 
-  // Draw the view manipulator directly
-  // Note: camDistance is a placeholder for how far away the view manipulator camera should be from
-  // its target point
-  float camDistance = 10.0f;  // Adjust this value as needed for your scene
-  ImGuizmo::ViewManipulate(view, camDistance, viewManipulatorPosition, ImVec2(128, 128),
-                           0x00000000);
+    float* translation = &t.x;
+    float* rotation = &r.x;
+    float* scale = &s.x;
 
-  // Example of drawing a grid directly without a separate window, for context (optional)
-  glm::mat4 gridMatrix = glm::mat4(1.0f);  // Grid positioned at the origin
-  ImGuizmo::DrawGrid(view, projection, glm::value_ptr(gridMatrix), 100.f);
+    ImGuizmo::RecomposeMatrixFromComponents(translation, rotation, scale, model);
 
-  // Example manipulation - if you want to manipulate objects, you can keep this
-  ImGuizmo::Manipulate(view, projection, ImGuizmo::TRANSLATE, ImGuizmo::LOCAL, model);
+    // Setup for using Gizmo without a separate window
+    ImGuiIO& io = ImGui::GetIO();
+
+    ImVec2 viewManipulatorPosition = ImVec2(
+        10, io.DisplaySize.y - 128 - 10);  // Assuming 128x128 view manipulator size, 10
+                                           // pixels padding from the bottom and left edges.
+
+    ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+
+    // Draw the view manipulator
+    float camDistance = 10.0f;  // Adjust this value as needed for your scene
+    ImGuizmo::ViewManipulate(view, camDistance, viewManipulatorPosition, ImVec2(128, 128),
+                             0xB4101010);
+
+    if (ImGuizmo::Manipulate(view, projection, ImGuizmo::TRANSLATE, ImGuizmo::LOCAL, model)) {
+
+      // Convert the model matrix back to components
+      ImGuizmo::DecomposeMatrixToComponents(model, translation, rotation, scale);
+
+      transform.position
+          = glm::vec3(translation[0], translation[1], translation[2]);
+      transform.is_dirty = true;
+    }
+  }
 }
 
 void imgui_gui::check_file_dialog() {
@@ -175,6 +194,8 @@ void imgui_gui::menu_bar() {
         ImGui::EndMenu();
       }
 
+      ImGui::Separator();
+
       if (ImGui::MenuItem("Exit")) {
         actions_.exit();
       }
@@ -208,24 +229,16 @@ void imgui_gui::menu_bar() {
     }
 
     if (ImGui::BeginMenu("Window")) {
+      // Each MenuItem now directly toggles the boolean value and displays a checkbox automatically.
+      ImGui::MenuItem("Toggle Scene Graph", nullptr, &show_scene_hierarchy_);
+      ImGui::MenuItem("Toggle Light View", nullptr, &show_lights_);
+      ImGui::MenuItem("Toggle Stats", nullptr, &show_stats_);
+      ImGui::MenuItem("Toggle Guizmo", nullptr, &show_guizmo_);
+      ImGui::MenuItem("Toggle Scene Settings", nullptr, &show_render_settings_);
 
-      if (ImGui::MenuItem("Toggle Scene Graph")) {
-        show_scene_hierarchy_ = !show_scene_hierarchy_;
-      }
-      if (ImGui::MenuItem("Toggle Light View")) {
-          show_lights_ = !show_lights_;
-      }
-      if (ImGui::MenuItem("Toggle Stats")) {
-          show_stats_ = !show_stats_;
-      }
-      if (ImGui::MenuItem("Toggle Guizmo")) {
-          show_guizmo_ = !show_guizmo_;
-      }
-      if (ImGui::MenuItem("Toggle Scene Settings")) {
-          show_render_settings_ = !show_render_settings_;
-      }
       ImGui::EndMenu();
     }
+
 
     ImGui::EndMainMenuBar();
   }
@@ -373,8 +386,11 @@ void imgui_gui::lights() {
 
 void imgui_gui::scene_graph() {
   float windowWidth = 300.0f;                               // Width of the ImGui window
-  float windowHeight = window_.extent.height;                        // Full height of the application window
-  ImVec2 windowPos = ImVec2(window_.extent.width - windowWidth, 0);  // Position to the right
+  uint32_t menuBarHeight = 18;
+  float windowHeight
+      = window_.extent.height - menuBarHeight;  // Full height of the application window
+  ImVec2 windowPos
+      = ImVec2(window_.extent.width - windowWidth, menuBarHeight);  // Position to the right
   ImVec2 windowSize = ImVec2(windowWidth, windowHeight);    // Size of the ImGui window
 
   ImGui::SetNextWindowPos(windowPos);
@@ -392,12 +408,12 @@ void imgui_gui::new_frame() {
   ImGui_ImplSDL2_NewFrame();
   ImGui::NewFrame();
 
-
-  menu_bar();
-
   if (show_guizmo_) {
     guizmo();
   }
+
+  menu_bar();
+
 
   if (show_scene_hierarchy_) {
        scene_graph();
@@ -581,11 +597,27 @@ void imgui_gui::display_scene_hierarchy(const entity entity) {
 
     ImGui::PushID(entity);
 
+    // Start a horizontal group to align the tree node and the checkbox
+    ImGui::BeginGroup();
+
     bool node_open = ImGui::TreeNodeEx(node.name.c_str(), node_flags);
 
-    // Render checkbox next to the node name
-    ImGui::SameLine();
-    ImGui::Checkbox("visible", &node.visible);
+    // If the tree node is open, we need a way to click the node itself, not just the arrow
+    if (ImGui::IsItemClicked()) {
+      selected_entity_ = entity;
+    }
+
+    // Calculate position for the checkbox to align it to the right
+    float windowWidth = ImGui::GetWindowWidth();
+    float checkboxWidth = ImGui::GetFrameHeight();  // Approximate width of a checkbox
+    float offset = windowWidth - checkboxWidth
+                   - ImGui::GetStyle().ItemSpacing.x * 3.f;  // Adjust this as needed
+
+    // Move cursor and render checkbox
+    ImGui::SameLine(offset);
+    ImGui::Checkbox("##visible", &node.visible);  // ## to hide label but keep unique ID
+
+    ImGui::EndGroup();
 
     // Pop ID to avoid conflicts with other elements
     ImGui::PopID();
@@ -626,25 +658,27 @@ void imgui_gui::show_scene_hierarchy_window() {
     if (selected_entity_ != invalid_entity) {
       auto& selected_node = actions_.get_database().get_node_component(selected_entity_)->get();
       ImGui::Text(selected_node.name.c_str());
-
+      
       if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_None)) {
-        auto& transform = actions_.get_database().get_transform_component(selected_entity_)->get();
-        ImGui::DragFloat3("Position", &transform.position.x, 0.1f);
-        glm::vec3 euler = eulerAngles(transform.rotation);
-        if (ImGui::DragFloat3("Rotation", &euler.x, 0.1f)) {
-          transform.rotation = glm::quat(euler);
-        }
-        float uniform_scale
-            = (transform.scale.x + transform.scale.y + transform.scale.z)
-              / 3.0f;
-        if (ImGui::DragFloat("Uniform Scale", &uniform_scale, 0.1f)) {
-          transform.scale = glm::vec3(uniform_scale, uniform_scale, uniform_scale);
-        }
-        ImGui::DragFloat3("Scale", &transform.scale.x, 0.1f);
+        const auto transform_optional = actions_.get_database().get_transform_component(selected_entity_);
+        if (transform_optional.has_value()) {
+          auto& transform = transform_optional.value().get();
+          ImGui::DragFloat3("Position", &transform.position.x, 0.1f);
+          glm::vec3 euler = eulerAngles(transform.rotation);
+          if (ImGui::DragFloat3("Rotation", &euler.x, 0.1f)) {
+            transform.rotation = glm::quat(euler);
+          }
+          float uniform_scale = (transform.scale.x + transform.scale.y + transform.scale.z) / 3.0f;
+          if (ImGui::DragFloat("Uniform Scale", &uniform_scale, 0.1f)) {
+            transform.scale = glm::vec3(uniform_scale, uniform_scale, uniform_scale);
+          }
+          ImGui::DragFloat3("Scale", &transform.scale.x, 0.1f);
 
-        ImGui::DragFloat3("AABB max", &selected_node.bounds.max.x);
-        ImGui::DragFloat3("AABB min", &selected_node.bounds.min.x);
-        transform.is_dirty = true;
+          ImGui::DragFloat3("AABB max", &selected_node.bounds.max.x);
+          ImGui::DragFloat3("AABB min", &selected_node.bounds.min.x);
+          transform.is_dirty = true;
+        }
+
       }
       const auto& mesh_component = actions_.get_database().get_mesh_component(selected_entity_);
       if (mesh_component.has_value()) {
