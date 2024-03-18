@@ -23,6 +23,12 @@ class imgui_gui {
   action current_action_ = action::none;
   entity selected_entity_ = invalid_entity;
 
+  bool show_scene_hierarchy_ = true;
+  bool show_render_settings_ = true;
+  bool show_guizmo_ = false;
+  bool show_stats_ = false;
+  bool show_lights_ = false;
+
   void menu_bar();
   void stats();
   void lights();
@@ -30,6 +36,8 @@ class imgui_gui {
   void display_scene_hierarchy(entity entity);
   void show_scene_hierarchy_window();
   void render_settings();
+  void guizmo();
+  void check_file_dialog();
 
 public:
 
@@ -41,6 +49,5 @@ public:
 
   void update(const SDL_Event& e);
 
-  void guizmo();
   void new_frame();
 };

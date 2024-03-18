@@ -5,6 +5,7 @@
 #include <imgui_impl_vulkan.h>
 
 #include <ImGuizmo.h>
+#include <ImGuiFileDialog.h>
 
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -142,45 +143,44 @@ void imgui_gui::guizmo() {
   ImGuizmo::Manipulate(view, projection, ImGuizmo::TRANSLATE, ImGuizmo::LOCAL, model);
 }
 
+void imgui_gui::check_file_dialog() {
+  if (ImGuiFileDialog::Instance()->Display("ChooseGLTF")) {
 
+    // Check if user confirmed the selection
+    if (ImGuiFileDialog::Instance()->IsOk()) {
+      std::string filePathName = ImGuiFileDialog::Instance()->GetFilePathName();
+      std::string filePath = ImGuiFileDialog::Instance()->GetCurrentPath();
+
+      fmt::print("Importing File: {}\n", filePathName);
+      actions_.load_gltf(filePathName);
+    }
+
+    // Close the dialog after retrieval
+    ImGuiFileDialog::Instance()->Close();
+  }
+}
 
 
 void imgui_gui::menu_bar() {
   if (ImGui::BeginMainMenuBar()) {
     if (ImGui::BeginMenu("File")) {
+
+      if (ImGui::BeginMenu("Import")) {
+        if (ImGui::MenuItem("GLTF")) {
+          IGFD::FileDialogConfig config;
+          config.path = "../../assets";
+          ImGuiFileDialog::Instance()->OpenDialog("ChooseGLTF", "Choose File", ".glb,.gltf",
+                                                  config);
+        }
+        ImGui::EndMenu();
+      }
+
       if (ImGui::MenuItem("Exit")) {
         actions_.exit();
       }
-
-      if (ImGui::BeginMenu("Import Scene")) {
-      if (ImGui::MenuItem("MetalRoughSpheres")) {
-          actions_.load_gltf(
-              R"(..\..\assets\Models\MetalRoughSpheres\glTF-Binary\MetalRoughSpheres.glb)");
-      }
-      if (ImGui::MenuItem("MetalRoughSpheresNoTextures")) {
-        actions_.load_gltf(
-            R"(..\..\assets\Models\MetalRoughSpheresNoTextures\glTF-Binary\MetalRoughSpheresNoTextures.glb)");
-      }
-      if (ImGui::MenuItem("DamagedHelmet")) {
-        actions_.load_gltf(R"(..\..\assets\Models\DamagedHelmet\glTF-Binary\DamagedHelmet.glb)");
-      }
-      if (ImGui::MenuItem("Bistro")) {
-        actions_.load_gltf(R"(..\..\assets\Bistro.glb)");
-      }
-      if (ImGui::MenuItem("bmw")) {
-        actions_.load_gltf(R"(..\..\assets\bmw.glb)");
-      }
-      if (ImGui::MenuItem("structure")) {
-        actions_.load_gltf(R"(..\..\assets\structure.glb)");
-      }
-      if (ImGui::MenuItem("Sponza Pestana")) {
-        actions_.load_gltf(R"(..\..\assets\sponza_pestana.glb)");
-      }
-        ImGui::EndMenu();
-      }
-      // Add more menu items here if needed
       ImGui::EndMenu();
     }
+
     if (ImGui::BeginMenu("Edit")) {
       if (ImGui::BeginMenu("Add Camera")) {
         if (ImGui::MenuItem("Free Fly Camera")) {
@@ -194,20 +194,38 @@ void imgui_gui::menu_bar() {
 
       if (ImGui::BeginMenu("Add Light Source")) {
         if (ImGui::MenuItem("Point Light")) {
-            current_action_ = action::add_point_light;
+          current_action_ = action::add_point_light;
         }
         if (ImGui::MenuItem("Directional Light")) {
-            current_action_ = action::add_directional_light;
+          current_action_ = action::add_directional_light;
         }
         if (ImGui::MenuItem("Spot Light")) {
           // Code to add an Orbit Camera
         }
         ImGui::EndMenu();
       }
-      // Add more menu items here if needed
       ImGui::EndMenu();
     }
-    // Add other menus like "Edit", "View", etc. here
+
+    if (ImGui::BeginMenu("Window")) {
+
+      if (ImGui::MenuItem("Toggle Scene Graph")) {
+        show_scene_hierarchy_ = !show_scene_hierarchy_;
+      }
+      if (ImGui::MenuItem("Toggle Light View")) {
+          show_lights_ = !show_lights_;
+      }
+      if (ImGui::MenuItem("Toggle Stats")) {
+          show_stats_ = !show_stats_;
+      }
+      if (ImGui::MenuItem("Toggle Guizmo")) {
+          show_guizmo_ = !show_guizmo_;
+      }
+      if (ImGui::MenuItem("Toggle Scene Settings")) {
+          show_render_settings_ = !show_render_settings_;
+      }
+      ImGui::EndMenu();
+    }
 
     ImGui::EndMainMenuBar();
   }
@@ -225,12 +243,11 @@ void imgui_gui::menu_bar() {
       ImGui::InputFloat3("Position", &position.x);
 
       if (ImGui::Button("Add Light")) {
+        // auto newLight = light_component::PointLight(color, intensity, position);
 
-        //auto newLight = light_component::PointLight(color, intensity, position);
-
-        //TODO
-        //const size_t entity = actions_.get_database().add_light(???);
-        //selected_node_ = &actions_.get_database().get_node(entity);
+        // TODO
+        // const size_t entity = actions_.get_database().add_light(???);
+        // selected_node_ = &actions_.get_database().get_node(entity);
 
         current_action_ = action::none;
       }
@@ -251,8 +268,7 @@ void imgui_gui::menu_bar() {
       ImGui::InputFloat3("Direction", &direction.x);
 
       if (ImGui::Button("Add Light")) {
-
-        //auto newLight = light_component::DirectionalLight(color, intensity, direction);
+        // auto newLight = light_component::DirectionalLight(color, intensity, direction);
 
         // TODO
         // const size_t entity = actions_.get_database().add_light(???);
@@ -376,17 +392,30 @@ void imgui_gui::new_frame() {
   ImGui_ImplSDL2_NewFrame();
   ImGui::NewFrame();
 
-  guizmo();
 
   menu_bar();
 
-  stats();
+  if (show_guizmo_) {
+    guizmo();
+  }
 
-  lights();
+  if (show_scene_hierarchy_) {
+       scene_graph();
+  }
 
-  scene_graph();
+  if (show_stats_) {
+    stats();
+  }
 
-  render_settings();
+  if (show_lights_) {
+    lights();
+  }
+
+  if (show_render_settings_) {
+    render_settings();
+  }
+
+  check_file_dialog();
 
   ImGui::Render();
 }
