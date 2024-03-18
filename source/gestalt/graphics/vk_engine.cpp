@@ -47,7 +47,7 @@ void render_engine::init() {
 
   for (auto& cam : camera_positioners_) {
     auto free_fly_camera_ptr = std::make_unique<free_fly_camera>();
-    free_fly_camera_ptr->init(glm::vec3(0, 0,-15), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
+    free_fly_camera_ptr->init(glm::vec3(7, 1.8,-7), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
     cam = std::move(free_fly_camera_ptr);
   }
   active_camera_.init(*camera_positioners_.at(current_camera_positioner_index_));

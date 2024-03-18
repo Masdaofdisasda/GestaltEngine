@@ -66,7 +66,8 @@ void free_fly_camera::update(double delta_seconds, const movement& movement) {
 void free_fly_camera::set_position(const glm::vec3& pos) { camera_position_ = pos; }
 
 void free_fly_camera::set_up_vector(const glm::vec3& up) {
+  up_ = up;
   const glm::mat4 view = get_view_matrix();
   const glm::vec3 dir = -glm::vec3(view[0][2], view[1][2], view[2][2]);
-  camera_orientation_ = lookAt(camera_position_, camera_position_ + dir, up);
+  camera_orientation_ = lookAtRH(camera_position_, camera_position_ + dir, up);
 }

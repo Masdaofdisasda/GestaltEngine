@@ -47,9 +47,9 @@ class free_fly_camera final : public camera_positioner_interface {
 public:
 
   void init(const glm::vec3& pos, const glm::vec3& target, const glm::vec3& up) override {
-    camera_position_ = pos;
-    camera_orientation_ = quatLookAt(normalize(target - pos), up);
-    up_ = up;
+    set_position(pos);
+    set_orientation(target, up);
+    set_up_vector(up);
   }
 
   void update(double delta_seconds, const movement& movement) override;
@@ -63,6 +63,10 @@ public:
   glm::vec3 get_position() const override { return camera_position_; }
 
   void set_position(const glm::vec3& pos);
+  void set_orientation(const glm::vec3& target, const glm::vec3& up) {
+    glm::mat4 viewMatrix = lookAtRH(camera_position_, target, up);
+    camera_orientation_ = quat_cast(viewMatrix);
+  }
 
   void reset_mouse_position(const glm::vec2& p) { mouse_pos_ = p; }
 
