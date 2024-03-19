@@ -570,6 +570,14 @@ void imgui_gui::render_settings() {
       }
     }
 
+    if (ImGui::CollapsingHeader("Grid Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+      auto& grid_params = config.grid;
+      ImGui::SliderFloat("Major Line Width", &grid_params.majorLineWidth, 0.01f, 0.1f);
+      ImGui::SliderFloat("Minor Line Width", &grid_params.minorLineWidth, 0.01f, 0.1f);
+      ImGui::SliderFloat("Axis Line Width", &grid_params.axisLineWidth, 0.01f, 0.1f);
+      ImGui::SliderFloat( "Major Grid Division", &grid_params.majorGridDivision, 1.0f, 100.0f);
+    }
+
     // TODO: Add more sections for other settings as necessary
   }
 

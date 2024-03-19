@@ -17,6 +17,10 @@ void vk_gpu::init(
                       .require_api_version(1, 3, 0)
                       .build();
 
+  if ( !inst_ret.has_value() ) {
+    throw std::runtime_error("Could not create a Vulkan instance: " + inst_ret.error().message());
+  }
+
   vkb::Instance vkb_inst = inst_ret.value();
 
   // grab the instance
@@ -48,20 +52,30 @@ void vk_gpu::init(
   // We want a gpu that can write to the SDL surface and supports vulkan 1.3 with the correct
   // features
   vkb::PhysicalDeviceSelector selector{vkb_inst};
-  vkb::PhysicalDevice physicalDevice
-      = selector.set_minimum_version(1, 3)
-            .set_required_features_13(features13)
-            .set_required_features_12(features12)
-            .set_required_features(device_features)
-            .add_required_extension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME)
-            .set_surface(surface)
-            .select()
-            .value();
+  auto device_ret = selector.set_minimum_version(1, 3)
+                        .set_required_features_13(features13)
+                        .set_required_features_12(features12)
+                        .set_required_features(device_features)
+                        .add_required_extension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME)
+                        .set_surface(surface)
+                        .select();
+
+  if (!device_ret.has_value()) {
+       throw std::runtime_error("Could not select a Vulkan device: " + device_ret.error().message());
+  }
+
+  vkb::PhysicalDevice physicalDevice = device_ret.value();
 
   // create the final vulkan device
   vkb::DeviceBuilder deviceBuilder{physicalDevice};
 
-  vkb::Device vkbDevice = deviceBuilder.build().value();
+  auto dev_ret = deviceBuilder.build();
+
+  if (!dev_ret.has_value()) {
+       throw std::runtime_error("Could not create a Vulkan device: " + dev_ret.error().message());
+  }
+
+  vkb::Device vkbDevice = dev_ret.value();
 
   // Get the VkDevice handle used in the rest of a vulkan application
   device = vkbDevice.device;
@@ -69,7 +83,12 @@ void vk_gpu::init(
   vkGetPhysicalDeviceProperties(chosen_gpu, &device_properties);
 
   // use vkbootstrap to get a Graphics queue
-  graphics_queue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
+  auto graphics_queue_ret = vkbDevice.get_queue(vkb::QueueType::graphics);
+  
+  if (!graphics_queue_ret.has_value()) {
+       throw std::runtime_error("Could not get a graphics queue: " + graphics_queue_ret.error().message());
+  }
+  graphics_queue = graphics_queue_ret.value();
   graphics_queue_family = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
 
   // initialize the memory allocator

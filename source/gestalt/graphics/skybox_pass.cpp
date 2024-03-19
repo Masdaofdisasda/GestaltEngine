@@ -110,6 +110,8 @@ void infinite_grid_pass::prepare() {
       .pNext = nullptr,
       .setLayoutCount = static_cast<uint32_t>(descriptor_layouts_.size()),
       .pSetLayouts = descriptor_layouts_.data(),
+      .pushConstantRangeCount = 1,
+      .pPushConstantRanges = &push_constant_range,
   };
 
   VK_CHECK(vkCreatePipelineLayout(gpu_.device, &pipeline_layout_create_info, nullptr,
@@ -129,7 +131,7 @@ void infinite_grid_pass::prepare() {
                   .set_polygon_mode(VK_POLYGON_MODE_FILL)
                   .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
                   .set_multisampling_none()
-                  .enable_blending_additive()
+                  .disable_blending()
                   .enable_depthtest(false, VK_COMPARE_OP_LESS_OR_EQUAL)
                   .set_color_attachment_format(color_image->imageFormat)
                   .set_depth_format(depth_image->imageFormat)
@@ -170,8 +172,11 @@ void infinite_grid_pass::execute(const VkCommandBuffer cmd) {
   descriptor_write.pBufferInfo = &buffer_info;
 
   gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
-                            &descriptor_write);
+                                 &descriptor_write);
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
+  vkCmdPushConstants(cmd, pipeline_layout_,
+                     VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                     sizeof(render_config::grid_params), &resource_manager_->config_.grid);
   viewport_.width = static_cast<float>(color_image->getExtent2D().width);
   viewport_.height = static_cast<float>(color_image->getExtent2D().height);
   vkCmdSetViewport(cmd, 0, 1, &viewport_);

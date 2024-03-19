@@ -238,6 +238,15 @@ struct render_config {
     int ibl_mode{0};
   } lighting{};
 
+  struct grid_params {
+    float majorLineWidth = 0.02f;
+    float minorLineWidth = 0.01f;
+    float axisLineWidth = 0.04f;
+    float axisDashScale = 1.33f;
+    float majorGridDivision = 1.f;
+    float minorGridMult = 0.1;
+  } grid{};
+
   static_assert(sizeof(lighting_params) <= 88);
 
   // todo : more settings
