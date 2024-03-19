@@ -19,7 +19,6 @@ const int indices[6] = int[6](
 );
 
 layout (location=0) out vec4 uv;
-layout (location=1) out vec2 cameraPos;
 
 void main()
 {
@@ -29,7 +28,7 @@ void main()
 	vec3 position = pos[idx] * gridSize;
 
 	mat4 iview = inverse(sceneData.view);
-	cameraPos = vec2(iview[3][0], iview[3][2]);
+	vec2 cameraPos = vec2(iview[3][0], iview[3][2]);
 
 	position.x += cameraPos.x;
 	position.z += cameraPos.y;

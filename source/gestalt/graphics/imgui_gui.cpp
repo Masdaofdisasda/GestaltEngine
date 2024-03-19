@@ -576,6 +576,7 @@ void imgui_gui::render_settings() {
       ImGui::SliderFloat("Minor Line Width", &grid_params.minorLineWidth, 0.01f, 0.1f);
       ImGui::SliderFloat("Axis Line Width", &grid_params.axisLineWidth, 0.01f, 0.1f);
       ImGui::SliderFloat( "Major Grid Division", &grid_params.majorGridDivision, 1.0f, 100.0f);
+      ImGui::SliderFloat("Axis Dash Scale", &grid_params.axisDashScale, 1.0f, 2.0f);
     }
 
     // TODO: Add more sections for other settings as necessary

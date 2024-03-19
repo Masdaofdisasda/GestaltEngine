@@ -243,8 +243,7 @@ struct render_config {
     float minorLineWidth = 0.01f;
     float axisLineWidth = 0.04f;
     float axisDashScale = 1.33f;
-    float majorGridDivision = 1.f;
-    float minorGridMult = 0.1;
+    float majorGridDivision = 5.f;
   } grid{};
 
   static_assert(sizeof(lighting_params) <= 88);

@@ -12,11 +12,10 @@ layout( push_constant ) uniform constants
     float axisLineWidth;
     float axisDashScale;
     float majorGridDiv;
-    float minorGridMult;
 } params;
 
 vec4 umajorLineColor = vec4(1, 1, 1, 1);
-vec4 uminorLineColor = vec4(0.6, 0.6, 0.6, 1);
+vec4 uminorLineColor = vec4(0.7, 0.7, 0.7, 1);
 vec4 ubaseColor = vec4(0.1, 0.1, 0.1, 1);
 vec4 ucenterColor = vec4(1.0, 1.0, 1.0, 1);
 
@@ -24,14 +23,15 @@ vec4 uxAxisColor = vec4(1, 0, 0, 1);
 vec4 uyAxisColor = vec4(0, 1, 0, 1);
 vec4 uzAxisColor = vec4(0, 0, 1, 1);
 
-vec4 uxAxisDashColor = vec4(1, 0, 0, 1);
-vec4 uyAxisDashColor = vec4(0, 1, 0, 1);
-vec4 uzAxisDashColor = vec4(0, 0, 1, 1);
+vec4 uxAxisDashColor = vec4(0, 0, 0, 1);
+vec4 uyAxisDashColor = vec4(0, 0, 0, 1);
+vec4 uzAxisDashColor = vec4(0, 0, 0, 1);
 
 vec3 sRGBToLinear(vec3 color) {
     return mix(color / 12.92, pow((color + vec3(0.055)) / vec3(1.055), vec3(2.4)), step(vec3(0.04045), color));
 }
 
+// based on https://bgolus.medium.com/the-best-darn-grid-shader-yet-727f9278b9d8
 void main() {
 
     // Calculating derivative for anti-aliasing
@@ -42,8 +42,8 @@ void main() {
     float axisLineWidth  = max(params.majorLineWidth, params.axisLineWidth);
     vec2 axisDrawWidth = max(vec2(axisLineWidth), uvDeriv);
     vec2 axisLineAA = uvDeriv * 1.5;
-    vec2 axisLines = smoothstep(axisDrawWidth + axisLineAA, axisDrawWidth - axisLineAA, abs(uv.zw * 2.0 - 1.0));
-    axisLines *= clamp(axisLineWidth / axisDrawWidth.x, 0.0, 1.0);
+    vec2 axisLines = smoothstep(axisDrawWidth + axisLineAA, axisDrawWidth - axisLineAA, abs(uv.zw * 2.0));
+    axisLines *= clamp(axisLineWidth / axisDrawWidth, vec2(0.0), vec2(1.0));
 
     // Major grid lines
     float div = max(2.0, params.majorGridDiv);
@@ -52,6 +52,7 @@ void main() {
     vec2 majorDrawWidth = clamp(vec2(majorLineWidth), majorUVDeriv, vec2(0.5));
     vec2 majorLineAA = majorUVDeriv * 1.5;
     vec2 majorGridUV = 1.0 - abs(fract(uv.xy / div) * 2.0 - 1.0);
+
     vec2 majorAxisOffset =  (1.0 - clamp(abs(uv.zw / div * 2.0), vec2(0.0), vec2(1.0))) * 2.0;
     majorGridUV += majorAxisOffset; // adjust UVs so center axis line is skipped
     vec2 majorGrid = smoothstep(majorDrawWidth + majorLineAA, majorDrawWidth - majorLineAA, majorGridUV);
@@ -67,6 +68,7 @@ void main() {
     vec2 minorLineAA = uvDeriv * 1.5;
     vec2 minorGridUV = abs(fract(uv.xy) * 2.0 - 1.0);
     minorGridUV = minorInvertLine ? minorGridUV : 1.0 - minorGridUV;
+
     vec2 minorMajorOffset = (1.0 - clamp((1.0 - abs(fract(uv.zw / div) * 2.0 - 1.0)) * div, vec2(0.0), vec2(1.0))) * 2.0;
     minorGridUV += minorMajorOffset; // adjust UVs so major division lines are skipped
     vec2 minorGrid = smoothstep(minorDrawWidth + minorLineAA, minorDrawWidth - minorLineAA, minorGridUV);
@@ -74,7 +76,8 @@ void main() {
     minorGrid = clamp(minorGrid - axisLines, vec2(0.0), vec2(1.0)); // hack
     minorGrid = mix(minorGrid, vec2(minorTargetWidth), clamp(uvDeriv * 2.0 - 1.0, vec2(0.0), vec2(1.0)));
     minorGrid = minorInvertLine ? vec2(1.0) - minorGrid : minorGrid;
-    minorGrid = mix(minorGrid, vec2(0.5), step(vec2(0.0), -uv.zw));
+    minorGrid = step(vec2(0.5), abs(uv.zw)) * minorGrid;
+
 
     
     float minorGridF = mix(minorGrid.x, 1.0, minorGrid.y);
