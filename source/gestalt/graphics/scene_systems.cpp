@@ -149,7 +149,7 @@ void light_system::cleanup() {
 
 glm::mat4 transform_system::get_model_matrix(const transform_component& transform) {
 
-    return translate(transform.position) * mat4_cast(transform.rotation) * glm::scale(transform.scale);
+    return translate(transform.position) * mat4_cast(transform.rotation) * glm::scale(glm::vec3(transform.scale));
 }
 
 void transform_system::prepare() {
@@ -197,65 +197,67 @@ void transform_system::mark_as_dirty(entity entity) {
 
 void transform_system::update_aabb(const entity entity, const glm::mat4& parent_transform) {
   auto& node = resource_manager_->get_database().get_node_component(entity).value().get();
-  if (node.bounds.is_dirty) {
-    auto& transform
-        = resource_manager_->get_database().get_transform_component(entity).value().get();
-    const auto& mesh_optional = resource_manager_->get_database().get_mesh_component(entity);
-
-    AABB aabb;
-    auto& [min, max, is_dirty] = aabb;
-
-    if (mesh_optional.has_value()) {
-      const auto& mesh = resource_manager_->get_database().get_mesh(mesh_optional->get().mesh);
-      min.x = std::min(min.x, mesh.local_bounds.min.x);
-      min.y = std::min(min.y, mesh.local_bounds.min.y);
-      min.z = std::min(min.z, mesh.local_bounds.min.z);
-
-      max.x = std::max(max.x, mesh.local_bounds.max.x);
-      max.y = std::max(max.y, mesh.local_bounds.max.y);
-      max.z = std::max(max.z, mesh.local_bounds.max.z);
-    } else {
-      min = glm::vec3(0.0f);
-      max = glm::vec3(0.0f);
-    }
-
-    const glm::mat4 model_matrix
-        = parent_transform * resource_manager_->get_database().get_matrix(transform.matrix);
-    // Decompose model_matrix into translation (T) and 3x3 rotation matrix (M)
-    glm::vec3 T = glm::vec3(model_matrix[3]);  // Translation vector
-    glm::mat3 M = glm::mat3(model_matrix);     // Rotation matrix
-
-    AABB transformedAABB = {T, T};  // Start with a zero-volume AABB at T
-
-    // Applying Arvo's method to adjust AABB based on rotation and translation
-    // NOTE: does not work for non-uniform scaling
-    for (int i = 0; i < 3; ++i) {
-      for (int j = 0; j < 3; ++j) {
-        float a = M[i][j] * min[j];
-        float b = M[i][j] * max[j];
-        transformedAABB.min[i] += a < b ? a : b;
-        transformedAABB.max[i] += a < b ? b : a;
-      }
-    }
-    min = transformedAABB.min;
-    max =  transformedAABB.max;
-
-    for (const auto& child : node.children) {
-      update_aabb(child, model_matrix);
-      const auto& child_aabb
-          = resource_manager_->get_database().get_node_component(child).value().get().bounds;
-      min.x = std::min(min.x, child_aabb.min.x);
-      min.y = std::min(min.y, child_aabb.min.y);
-      min.z = std::min(min.z, child_aabb.min.z);
-
-      max.x = std::max(max.x, child_aabb.max.x);
-      max.y = std::max(max.y, child_aabb.max.y);
-      max.z = std::max(max.z, child_aabb.max.z);
-    }
-
-    node.bounds = aabb;
-    node.bounds.is_dirty = false;
+  if (!node.bounds.is_dirty) {
+    return;
   }
+  auto& transform = resource_manager_->get_database().get_transform_component(entity).value().get();
+  const auto& mesh_optional = resource_manager_->get_database().get_mesh_component(entity);
+
+  AABB aabb;
+  auto& [min, max, is_dirty] = aabb;
+
+  if (mesh_optional.has_value()) {
+    const auto& mesh = resource_manager_->get_database().get_mesh(mesh_optional->get().mesh);
+    min.x = std::min(min.x, mesh.local_bounds.min.x);
+    min.y = std::min(min.y, mesh.local_bounds.min.y);
+    min.z = std::min(min.z, mesh.local_bounds.min.z);
+
+    max.x = std::max(max.x, mesh.local_bounds.max.x);
+    max.y = std::max(max.y, mesh.local_bounds.max.y);
+    max.z = std::max(max.z, mesh.local_bounds.max.z);
+  } else {
+    // nodes without mesh components should still influence the bounds
+      min = glm::vec3(-0.0001f);
+      max = glm::vec3(0.0001f);
+  }
+
+  const glm::mat4 model_matrix
+      = parent_transform * resource_manager_->get_database().get_matrix(transform.matrix);
+  // Decompose model_matrix into translation (T) and 3x3 rotation matrix (M)
+  glm::vec3 T = glm::vec3(model_matrix[3]);  // Translation vector
+  glm::mat3 M = glm::mat3(model_matrix);     // Rotation matrix
+
+
+  AABB transformedAABB = {T, T};  // Start with a zero-volume AABB at T
+
+  // Applying Arvo's method to adjust AABB based on rotation and translation
+  // NOTE: does not work for non-uniform scaling
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      float a = M[i][j] * min[j];
+      float b = M[i][j] * max[j];
+      transformedAABB.min[i] += a < b ? a : b;
+      transformedAABB.max[i] += a < b ? b : a;
+    }
+  }
+  min = transformedAABB.min;
+  max = transformedAABB.max;
+
+  for (const auto& child : node.children) {
+    update_aabb(child, model_matrix);
+    const auto& child_aabb
+        = resource_manager_->get_database().get_node_component(child).value().get().bounds;
+    min.x = std::min(min.x, child_aabb.min.x);
+    min.y = std::min(min.y, child_aabb.min.y);
+    min.z = std::min(min.z, child_aabb.min.z);
+
+    max.x = std::max(max.x, child_aabb.max.x);
+    max.y = std::max(max.y, child_aabb.max.y);
+    max.z = std::max(max.z, child_aabb.max.z);
+  }
+
+  node.bounds = aabb;
+  node.bounds.is_dirty = false;
 }
 
 void transform_system::update() {

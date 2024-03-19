@@ -78,8 +78,6 @@ void main() {
     minorGrid = minorInvertLine ? vec2(1.0) - minorGrid : minorGrid;
     minorGrid = step(vec2(0.5), abs(uv.zw)) * minorGrid;
 
-
-    
     float minorGridF = mix(minorGrid.x, 1.0, minorGrid.y);
     float majorGridF = mix(majorGrid.x, 1.0, majorGrid.y);
 

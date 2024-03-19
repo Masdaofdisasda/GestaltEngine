@@ -60,9 +60,9 @@ void scene_manager::create_entities(std::vector<fastgltf::Node> nodes, const siz
 
       glm::vec3 translation(trs.translation[0], trs.translation[1], trs.translation[2]);
       glm::quat rotation(trs.rotation[3], trs.rotation[0], trs.rotation[1], trs.rotation[2]);
-      glm::vec3 scale(trs.scale[0], trs.scale[1], trs.scale[2]);
+      glm::vec3 scale(trs.scale[0], trs.scale[1], trs.scale[2]); //TODO handle non-uniform scale
 
-      component_factory_->update_transform_component(entity, translation, rotation, scale);
+      component_factory_->update_transform_component(entity, translation, rotation, trs.scale[0]);
     }
   }
 }
@@ -151,7 +151,7 @@ component_archetype_factory::create_entity_node(std::string node_name) {
 void component_archetype_factory::create_transform_component(const entity entity,
                                                           const glm::vec3& position,
                                                           const glm::quat& rotation,
-                                                          const glm::vec3& scale) const {
+                                                          const float& scale) const {
   resource_manager_->get_database().add_transform(entity,
                                                   transform_component(position, rotation, scale));
   auto& transform = resource_manager_->get_database().get_transform_component(entity)->get();
@@ -161,7 +161,7 @@ void component_archetype_factory::create_transform_component(const entity entity
 void component_archetype_factory::update_transform_component(const entity entity,
                                                           const glm::vec3& position,
                                                           const glm::quat& rotation,
-                                                          const glm::vec3& scale) {
+                                                          const float& scale) {
   const std::optional<std::reference_wrapper<transform_component>> transform_optional
       = resource_manager_->get_database().get_transform_component(entity);
 

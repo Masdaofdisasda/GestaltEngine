@@ -120,7 +120,7 @@ struct material {
 struct transform_component {
   glm::vec3 position;
   glm::quat rotation;
-  glm::vec3 scale;
+  float scale; // uniform scale for now
   size_t matrix = no_component;
   mutable bool is_dirty = true;
 };

@@ -31,12 +31,12 @@ public:
                             const glm::vec3& position, entity parent = 0);
 
   void link_entity_to_parent(entity child, entity parent);
-  void update_transform_component(entity entity, const glm::vec3& position,
+  void update_transform_component(const unsigned entity, const glm::vec3& position,
                                   const glm::quat& rotation = glm::quat(0.f, 0.f, 0.f, 0.f),
-                                  const glm::vec3& scale = glm::vec3(1.f));
-  void create_transform_component(entity entity, const glm::vec3& position,
+                                  const float& scale = 1.f);
+  void create_transform_component(const unsigned entity, const glm::vec3& position,
                                   const glm::quat& rotation = glm::quat(0.f, 0.f, 0.f, 0.f),
-                                  const glm::vec3& scale = glm::vec3(1.f)) const;
+                                  const float& scale = 1.f) const;
 };
 
 /**

@@ -128,7 +128,7 @@ void imgui_gui::guizmo() {
 
     glm::vec3 t = transform.position;
     glm::quat r = transform.rotation;
-    glm::vec3 s = transform.scale;
+    glm::vec3 s = glm::vec3(transform.scale);
 
     float* translation = &t.x;
     float* rotation = &r.x;
@@ -677,11 +677,10 @@ void imgui_gui::show_scene_hierarchy_window() {
           if (ImGui::DragFloat3("Rotation", &euler.x, 0.1f)) {
             transform.rotation = glm::quat(euler);
           }
-          float uniform_scale = (transform.scale.x + transform.scale.y + transform.scale.z) / 3.0f;
+          float uniform_scale = transform.scale;
           if (ImGui::DragFloat("Uniform Scale", &uniform_scale, 0.1f)) {
-            transform.scale = glm::vec3(uniform_scale, uniform_scale, uniform_scale);
+            transform.scale = uniform_scale;
           }
-          ImGui::DragFloat3("Scale", &transform.scale.x, 0.1f);
 
           ImGui::DragFloat3("AABB max", &selected_node.bounds.max.x);
           ImGui::DragFloat3("AABB min", &selected_node.bounds.min.x);
