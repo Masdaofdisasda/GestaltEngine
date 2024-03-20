@@ -24,6 +24,8 @@ protected:
 };
 
 class light_system final : public scene_system {
+  descriptor_writer writer;
+
   glm::mat4 calculate_sun_view_proj(const light_component& light);
   void update_directional_lights(const std::vector<std::reference_wrapper<light_component>>& lights);
   void update_point_lights(const std::vector<std::reference_wrapper<light_component>>& lights);

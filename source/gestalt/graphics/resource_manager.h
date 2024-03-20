@@ -43,6 +43,9 @@ public:
     AllocatedBuffer dir_light_buffer;
     AllocatedBuffer point_light_buffer;
     AllocatedBuffer view_proj_matrices;
+
+    VkDescriptorSet light_set = nullptr;
+    VkDescriptorSetLayout light_layout;
   } light_data;
 
   template <typename T> void add_resource(const std::string& id, std::shared_ptr<T> resource) {

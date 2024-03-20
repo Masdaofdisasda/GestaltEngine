@@ -181,6 +181,19 @@ struct draw_context {
 struct render_config {
   bool always_opaque{true};
 
+  struct skybox_params {
+    //float earthRadius = 6371e6;
+    //float atmosphereRadius = 6471e6;
+    glm::vec3 betaR = glm::vec3(5.8e-6, 13.5e-6, 33.1e-6);
+    float pad1;
+    glm::vec3 betaA = glm::vec3(0.000650, 0.001881, 0.000085);
+    float pad2;
+    glm::vec3 betaM = glm::vec3(21e-6);
+    float pad3;
+    //float Hr = 8000.0;
+    //float Hm = 1200.0;
+  } skybox{};
+
   bool enable_ssao{true};
   int ssao_quality{1};
   struct ssao_params {

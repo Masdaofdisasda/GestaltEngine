@@ -7,13 +7,15 @@
 void skybox_pass::prepare() {
   fmt::print("Preparing skybox pass\n");
   descriptor_layouts_.push_back(resource_manager_->per_frame_data_layout);
-  descriptor_layouts_.push_back(resource_manager_->ibl_data.IblLayout);
+  descriptor_layouts_.push_back(resource_manager_->light_data.light_layout);
 
   VkPipelineLayoutCreateInfo pipeline_layout_create_info{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
       .pNext = nullptr,
       .setLayoutCount = static_cast<uint32_t>(descriptor_layouts_.size()),
       .pSetLayouts = descriptor_layouts_.data(),
+      .pushConstantRangeCount = 1,
+      .pPushConstantRanges = &push_constant_range_,
   };
 
   VK_CHECK(vkCreatePipelineLayout(gpu_.device, &pipeline_layout_create_info, nullptr,
@@ -79,7 +81,7 @@ void skybox_pass::execute(const VkCommandBuffer cmd) {
 
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 1,
-                          &resource_manager_->ibl_data.IblSet, 0, nullptr);
+                          &resource_manager_->light_data.light_set, 0, nullptr);
 
   viewport_.width = static_cast<float>(color_image->getExtent2D().width);
   viewport_.height = static_cast<float>(color_image->getExtent2D().height);
@@ -91,6 +93,9 @@ void skybox_pass::execute(const VkCommandBuffer cmd) {
   scissor_.extent.height = color_image->getExtent2D().height;
 
   vkCmdSetScissor(cmd, 0, 1, &scissor_);
+
+  vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                     sizeof(render_config::skybox_params), &resource_manager_->config_.skybox);
   vkCmdDraw(cmd, 36, 1, 0, 0);  // 36 vertices for the cube
 
   vkCmdEndRendering(cmd);

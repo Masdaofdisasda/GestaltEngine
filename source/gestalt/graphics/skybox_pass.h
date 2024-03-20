@@ -5,7 +5,6 @@
 
 #include "render_pass.h"
 #include "resource_manager.h"
-#include "vk_types.h"
 
 class skybox_pass final : public render_pass {
   std::string vertex_shader_source_ = "../shaders/skybox.vert.spv";
@@ -16,6 +15,12 @@ class skybox_pass final : public render_pass {
       .write_resources = {{"skybox_color", std::make_shared<color_image_resource>(
                                                "scene_shaded", 1.f)},
          {"skybox_depth", std::make_shared<depth_image_resource>("gbuffer_depth", 1.f)}},
+  };
+
+  VkPushConstantRange push_constant_range_{
+      .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+      .offset = 0,
+      .size = sizeof(render_config::skybox_params),
   };
 
   VkViewport viewport_{

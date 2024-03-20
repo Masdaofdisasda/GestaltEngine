@@ -757,7 +757,7 @@ void imgui_gui::show_scene_hierarchy_window() {
           auto& light = light_optional.value().get();
 
           ImGui::ColorEdit3("Color", &light.color.x);
-          ImGui::SliderFloat("Intensity", &light.intensity, 0.0f, 1000.0f);
+          ImGui::SliderFloat("Intensity", &light.intensity, 0.0f, 100.0f);
           if (light.type == light_type::point) {
                        ImGui::DragFloat3("Position", &light.position.x, 0.1f);
           }

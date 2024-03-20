@@ -24,6 +24,10 @@ static_assert(sizeof(DirectionalLight) == 32);
 
 void light_system::prepare() {
         auto& light_data = resource_manager_->light_data;
+
+      light_data.light_set
+      = resource_manager_->descriptorPool.allocate(gpu_.device, light_data.light_layout);
+
         const size_t max_directional_lights
             = resource_manager_->get_database().max_lights(light_type::directional);
         const size_t max_point_lights
@@ -39,6 +43,7 @@ void light_system::prepare() {
         light_data.view_proj_matrices = resource_manager_->create_buffer(
             sizeof(glm::mat4) * max_lights, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
             VMA_MEMORY_USAGE_CPU_TO_GPU);
+
   }
 
 glm::mat4 light_system::calculate_sun_view_proj(const light_component& light) {
@@ -139,6 +144,42 @@ void light_system::update() {
   VK_CHECK(vmaMapMemory(gpu_.allocator, light_data.view_proj_matrices.allocation, &mapped_data));
   memcpy(mapped_data, matrices.data(), sizeof(glm::mat4) * matrices.size());
   vmaUnmapMemory(gpu_.allocator, light_data.view_proj_matrices.allocation);
+
+  //TODO optimize
+
+  writer.clear();
+  std::vector<VkDescriptorBufferInfo> dirBufferInfos;
+  for (int i = 0; i < resource_manager_->get_database().max_lights(light_type::directional); ++i) {
+    VkDescriptorBufferInfo bufferInfo = {};
+    bufferInfo.buffer = resource_manager_->light_data.dir_light_buffer.buffer;
+    bufferInfo.offset = 32 * i;
+    bufferInfo.range = 32;
+    dirBufferInfos.push_back(bufferInfo);
+  }
+  writer.write_buffer_array(15, dirBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
+
+  std::vector<VkDescriptorBufferInfo> pointBufferInfos;
+  for (int i = 0; i < resource_manager_->get_database().max_lights(light_type::point); ++i) {
+    VkDescriptorBufferInfo bufferInfo = {};
+    bufferInfo.buffer = resource_manager_->light_data.point_light_buffer.buffer;
+    bufferInfo.offset = 32 * i;
+    bufferInfo.range = 32;
+    pointBufferInfos.push_back(bufferInfo);
+  }
+  writer.write_buffer_array(16, pointBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
+
+  std::vector<VkDescriptorBufferInfo> lightViewProjBufferInfos;
+  for (int i = 0; i < resource_manager_->get_database().max_lights(light_type::directional)
+                          + resource_manager_->get_database().max_lights(light_type::point);
+       ++i) {
+    VkDescriptorBufferInfo bufferInfo = {};
+    bufferInfo.buffer = resource_manager_->light_data.view_proj_matrices.buffer;
+    bufferInfo.offset = 64 * i;
+    bufferInfo.range = 64;
+    lightViewProjBufferInfos.push_back(bufferInfo);
+  }
+  writer.write_buffer_array(17, lightViewProjBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
+  writer.update_set(gpu_.device, resource_manager_->light_data.light_set);
 }
 
 void light_system::cleanup() {

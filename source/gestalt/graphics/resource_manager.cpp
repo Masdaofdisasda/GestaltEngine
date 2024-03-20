@@ -80,6 +80,17 @@ void resource_manager::init(const vk_gpu& gpu) {
   material_data.constants_set
       = descriptorPool.allocate(gpu_.device, material_data.constants_layout, {max_materials});
   ibl_data.IblSet = descriptorPool.allocate(gpu_.device, ibl_data.IblLayout);
+
+  light_data.light_layout
+      = descriptor_layout_builder()
+            .add_binding(15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
+                         get_database().max_lights(light_type::directional))
+            .add_binding(16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
+                         get_database().max_lights(light_type::point))
+            .add_binding(17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
+                         get_database().max_lights(light_type::directional)
+                             + get_database().max_lights(light_type::point))
+            .build(gpu_.device);
 }
 
 void resource_manager::init_default_data() {

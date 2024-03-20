@@ -16,15 +16,8 @@ void lighting_pass::prepare() {
           .add_binding(12, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
           .add_binding(13, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
           .add_binding(14, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
-          .add_binding(15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
-                       resource_manager_->get_database().max_lights(light_type::directional))
-          .add_binding(16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
-                       resource_manager_->get_database().max_lights(light_type::point))
-          .add_binding(17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
-                       resource_manager_->get_database()
-                           .max_lights(light_type::directional) +
-                       resource_manager_->get_database().max_lights(light_type::point))
           .build(gpu_.device));
+  descriptor_layouts_.push_back(resource_manager_->light_data.light_layout);
 
   VkShaderModule meshFragShader;
   vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &meshFragShader);
@@ -119,46 +112,12 @@ void lighting_pass::execute(VkCommandBuffer cmd) {
       14, shadow_map->imageView,
       resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
       VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-
-  std::vector<VkDescriptorBufferInfo> dirBufferInfos;
-  for (int i = 0; i < resource_manager_->get_database().max_lights(light_type::directional); ++i) {
-       VkDescriptorBufferInfo bufferInfo = {};
-    bufferInfo.buffer = resource_manager_->light_data.dir_light_buffer.buffer;
-       bufferInfo.offset = 32 * i;
-       bufferInfo.range = 32;
-       dirBufferInfos.push_back(bufferInfo);
-  }
-  writer.write_buffer_array(15, dirBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
-
-  std::vector<VkDescriptorBufferInfo> pointBufferInfos;
-  for (int i = 0; i < resource_manager_->get_database().max_lights(light_type::point); ++i) {
-       VkDescriptorBufferInfo bufferInfo = {};
-       bufferInfo.buffer = resource_manager_->light_data.point_light_buffer.buffer;
-       bufferInfo.offset = 32 * i;
-       bufferInfo.range = 32;
-       pointBufferInfos.push_back(bufferInfo);
-  }
-  writer.write_buffer_array(16, pointBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
-
-  std::vector<VkDescriptorBufferInfo> lightViewProjBufferInfos;
-  for (int i = 0; i < resource_manager_->get_database()
-                          .max_lights(light_type::directional)  + resource_manager_->get_database()
-                          .max_lights(light_type::point);
-       ++i) {
-       VkDescriptorBufferInfo bufferInfo = {};
-       bufferInfo.buffer = resource_manager_->light_data.view_proj_matrices.buffer;
-       bufferInfo.offset = 64 * i;
-       bufferInfo.range = 64;
-       lightViewProjBufferInfos.push_back(bufferInfo);
-  }
-  writer.write_buffer_array(17, lightViewProjBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
-
   writer.update_set(gpu_.device, descriptor_set_);
-  VkDescriptorSet descriptorSets[] = {resource_manager_->ibl_data.IblSet, descriptor_set_};
+  VkDescriptorSet descriptorSets[] = {resource_manager_->ibl_data.IblSet, descriptor_set_, resource_manager_->light_data.light_set};
 
   gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                                  &descriptor_write);
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 2,
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 3,
                           descriptorSets, 0, nullptr);
 
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
