@@ -444,6 +444,36 @@ void imgui_gui::render_settings() {
       ImGui::Checkbox("Always Opaque", &config.always_opaque);
     }
 
+    // ImGui controls for atmosphere scattering parameters
+    if (ImGui::CollapsingHeader("Atmosphere Scattering Parameters",
+                                ImGuiTreeNodeFlags_DefaultOpen)) {
+
+      auto& [betaR, pad1, betaA, pad2, betaM, pad3] = config.skybox;
+
+      // Rayleigh Scattering Coefficients
+      ImGui::Text("Rayleigh Scattering Coefficients");
+      ImGui::SliderFloat("betaR.x", &betaR.x, 0.0f, 1e-5f, "%.8f",
+                         ImGuiSliderFlags_Logarithmic);
+      ImGui::SliderFloat("betaR.y", &betaR.y, 0.0f, 1e-5f, "%.8f", ImGuiSliderFlags_Logarithmic);
+      ImGui::SliderFloat("betaR.z", &betaR.z, 0.0f, 1e-5f, "%.8f", ImGuiSliderFlags_Logarithmic);
+
+      // Ozone Absorption Coefficients
+      ImGui::Text("Ozone Absorption Coefficients");
+      ImGui::SliderFloat("betaA.x", &betaA.x, 0.0f, 0.001f, "%.8f", ImGuiSliderFlags_Logarithmic);
+      ImGui::SliderFloat("betaA.y", &betaA.y, 0.0f, 0.002f, "%.8f", ImGuiSliderFlags_Logarithmic);
+      ImGui::SliderFloat("betaA.z", &betaA.z, 0.0f, 0.0001f, "%.8f", ImGuiSliderFlags_Logarithmic);
+
+      // Mie Scattering Coefficients
+      ImGui::Text("Mie Scattering Coefficients");
+      ImGui::SliderFloat(
+          "betaM", &betaM.x, 0.0f, 5e-5f, "%.8f",
+          ImGuiSliderFlags_Logarithmic);  // Assuming uniform Mie scattering for simplicity
+
+      // Padding variables (pad1, pad2, pad3) are typically not adjusted by users and thus do not
+      // need UI controls
+    }
+
+
     if (ImGui::CollapsingHeader("SSAO Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
       ImGui::Checkbox("Enable SSAO", &config.enable_ssao);
       ImGui::SliderInt("SSAO Quality", &config.ssao_quality, 1, 4);
