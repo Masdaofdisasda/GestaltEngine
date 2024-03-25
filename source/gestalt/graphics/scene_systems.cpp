@@ -1,5 +1,10 @@
 ﻿#include "scene_systems.h"
 
+#include <glm/detail/_noise.hpp>
+#include <glm/detail/_noise.hpp>
+
+#include "asset_loader.h"
+#include "asset_loader.h"
 #include "asset_loader.h"
 #include "asset_loader.h"
 #include "asset_loader.h"
@@ -82,9 +87,7 @@ void light_system::prepare() {
 
   }
 
-glm::mat4 light_system::calculate_sun_view_proj(const light_component& light) {
-
-  glm::vec3 direction = normalize(light.direction);  // Ensure the direction is normalized
+glm::mat4 light_system::calculate_sun_view_proj(const glm::vec3 direction) const {
 
   glm::vec3 up = glm::vec3(0, 1, 0);
   if (glm::abs(dot(up, direction)) > 0.999f) {
@@ -120,31 +123,32 @@ glm::mat4 light_system::calculate_sun_view_proj(const light_component& light) {
   return lightProjection * lightView;
 }
 
-bool has_dirty_light(const std::vector<std::reference_wrapper<light_component>>& lights) {
+bool has_dirty_light(const component_container<light_component>& lights) {
    return std::any_of(lights.begin(), lights.end(),
-                           [](const std::reference_wrapper<light_component>& light) { return light.get().is_dirty; });
+                           [](const std::pair<entity, light_component>& light) { return light.second.is_dirty; });
 } 
 
-void light_system::update_directional_lights(
-    const std::vector<std::reference_wrapper<light_component>>& lights) {
-
-  if (!has_dirty_light(lights)) {
-    return;
-  }
+void light_system::update_directional_lights(component_container<light_component>& lights) {
 
   auto& light_data = resource_manager_->light_data;
 
   std::vector<DirectionalLight> dir_lights;
-  for (const auto& light_source : lights) {
-    auto& light = light_source.get();
+  for (auto& light_source : lights) {
+    auto& [entity, light] = light_source;
+    if (light.type != light_type::directional) {
+      continue;
+    }
+
+    auto& position = resource_manager_->get_database().get_transform_component(entity).value().get().position;
+    glm::vec3 direction = normalize(-position);
 
     auto& view_proj = resource_manager_->get_database().get_light_view_proj(light.light_view_projections.at(0));
-    view_proj = calculate_sun_view_proj(light);
+    view_proj = calculate_sun_view_proj(direction);
 
     DirectionalLight dir_light = {};
     dir_light.color = light.color;
     dir_light.intensity = light.intensity;
-    dir_light.direction = light.direction;
+    dir_light.direction = direction;
     dir_light.viewProj = light.light_view_projections.at(0);
     dir_lights.push_back(dir_light);
 
@@ -159,22 +163,23 @@ void light_system::update_directional_lights(
 }
 
 void light_system::update_point_lights(
-    const std::vector<std::reference_wrapper<light_component>>& lights) {
-
-  if (!has_dirty_light(lights)) {
-    return;
-  }
+     component_container<light_component>& lights) {
 
   auto& light_data = resource_manager_->light_data;
 
   std::vector<PointLight> point_lights;
-  for (const auto& light_source : lights) {
-    auto& light = light_source.get();
+  for ( auto& light_source : lights) {
+    auto& [entity, light] = light_source;
+    if (light.type != light_type::point) {
+      continue;
+    }
+    auto& position
+        = resource_manager_->get_database().get_transform_component(entity).value().get().position;
 
     PointLight point_light = {};
     point_light.color = light.color;
     point_light.intensity = light.intensity;
-    point_light.position = light.position;
+    point_light.position = position;
     point_light.enabled = true;
     point_lights.push_back(point_light);
 
@@ -189,14 +194,12 @@ void light_system::update_point_lights(
 }
 
 void light_system::update() {
-  const auto directional_lights = resource_manager_->get_database().get_lights(light_type::directional);
-  if (has_dirty_light(directional_lights)) {
-    update_directional_lights(directional_lights);
-  }
 
-  const auto point_lights = resource_manager_->get_database().get_lights(light_type::point);
-  if (has_dirty_light(point_lights)) {
-    update_point_lights(point_lights);
+  auto& light_components = resource_manager_->get_database().get_lights();
+  if (has_dirty_light(light_components)) {
+    update_directional_lights(light_components);
+    update_point_lights(light_components);
+    
   }
 
   // changes in the scene graph can affect the light view-projection matrices

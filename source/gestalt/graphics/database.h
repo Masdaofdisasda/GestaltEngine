@@ -105,6 +105,7 @@ public:
   component_container<node_component>& get_scene_graph() { return components_.scene_graph_; }
   component_container<mesh_component>& get_meshes() { return components_.meshes_; }
   component_container<camera_component>& get_cameras() { return components_.cameras_; }
+  component_container<light_component>& get_lights() { return components_.lights_; }
   std::vector<std::reference_wrapper<light_component>> get_lights(light_type type) { 
       std::vector<std::reference_wrapper<light_component>> lights;
       for (auto& [entity, light] : components_.lights_) {

@@ -269,14 +269,14 @@ void imgui_gui::menu_bar() {
 
         current_action_ = action::none;
       }
-
+      ImGui::SameLine();
       if (ImGui::Button("Cancel")) {
         current_action_ = action::none;
       }
 
       ImGui::Separator();
 
-      static glm::vec3 min_bounds = glm::vec3(-10.0f);
+      static glm::vec3 min_bounds = glm::vec3(-10.0f); // todo default to scene bounds
       static glm::vec3 max_bounds = glm::vec3(10.0f);
       static glm::vec2 intensity_range = glm::vec2(1.f);
       static int light_count = 10;
@@ -343,7 +343,7 @@ void imgui_gui::stats() {
 void imgui_gui::lights() {
   if (ImGui::Begin("Lights")) {
 
-    
+    /*
     ImGui::Text("Directional Light Controls");
     std::vector<std::reference_wrapper<light_component>> dirLights = actions_.get_database().get_lights(light_type::directional);
     auto& light = dirLights[0].get();
@@ -411,7 +411,7 @@ void imgui_gui::lights() {
         // Position input for point light
         ImGui::InputFloat3("Position", &pointLight.position.x);
       }
-    }
+    }*/
   }
   ImGui::End();
 }
@@ -812,7 +812,7 @@ void imgui_gui::show_scene_hierarchy_window() {
           auto& light = light_optional.value().get();
 
           ImGui::ColorEdit3("Color", &light.color.x);
-          ImGui::SliderFloat("Intensity", &light.intensity, 0.0f, 100.0f);
+          ImGui::SliderFloat("Intensity", &light.intensity, 0.0f, 100.0f);/*
           if (light.type == light_type::point) {
                        ImGui::DragFloat3("Position", &light.position.x, 0.1f);
           }
@@ -840,7 +840,7 @@ void imgui_gui::show_scene_hierarchy_window() {
                        light.direction.x = cos(elevation) * cos(azimuth);
                        light.direction.y = cos(elevation) * sin(azimuth);
                        light.direction.z = sin(elevation);
-          }
+          }*/
            light.is_dirty = true;
         }
       }

@@ -47,8 +47,6 @@ struct light_component {
   light_type type;
   glm::vec3 color;
   float intensity;
-  glm::vec3 position;   // Used for point and spot lights
-  glm::vec3 direction;  // Used for directional and spot lights
   float inner_cone;     // Used for spot lights
   float outer_cone;     // Used for spot lights
   std::vector<size_t> light_view_projections;
