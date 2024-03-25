@@ -188,7 +188,7 @@ entity component_archetype_factory::create_directional_light(const glm::vec3& co
   node.get().name = "directional_light" + std::to_string(entity);
 
   auto& transform = resource_manager_->get_database().get_transform_component(entity).value().get();
-  transform.position = -direction;
+  transform.rotation = glm::quat(glm::lookAt(glm::vec3(0), direction, glm::vec3(0, 1, 0)));
 
   const light_component light{
       .type = light_type::directional,
@@ -215,12 +215,14 @@ entity component_archetype_factory::create_spot_light(const glm::vec3& color, co
 
   node.get().name = "spot_light" + std::to_string(entity);
 
+  auto& transform = resource_manager_->get_database().get_transform_component(entity).value().get();
+  transform.rotation = glm::quat(glm::lookAt(glm::vec3(0), direction, glm::vec3(0, 1, 0)));
+  transform.position = position;
+
    const light_component light{
        .type = light_type::spot,
        .color = color,
        .intensity = intensity,
-       //.position = position,
-       //.direction = direction,
        .inner_cone = innerCone,
        .outer_cone = outerCone,
    };

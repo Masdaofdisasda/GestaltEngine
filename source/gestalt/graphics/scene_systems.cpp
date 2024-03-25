@@ -139,8 +139,8 @@ void light_system::update_directional_lights(component_container<light_component
       continue;
     }
 
-    auto& position = resource_manager_->get_database().get_transform_component(entity).value().get().position;
-    glm::vec3 direction = normalize(-position);
+    auto& rotation = resource_manager_->get_database().get_transform_component(entity).value().get().rotation;
+    glm::vec3 direction = normalize(glm::vec3(0,0,-1.f) * rotation);
 
     auto& view_proj = resource_manager_->get_database().get_light_view_proj(light.light_view_projections.at(0));
     view_proj = calculate_sun_view_proj(direction);
