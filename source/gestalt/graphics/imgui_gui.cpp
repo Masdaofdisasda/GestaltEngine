@@ -9,6 +9,7 @@
 
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/random.hpp>
 
 #include "vk_initializers.h"
 
@@ -121,6 +122,20 @@ void imgui_gui::guizmo() {
   float* projection = glm::value_ptr(proj);
   float model[16];
 
+  // Setup for using Gizmo without a separate window
+  ImGuiIO& io = ImGui::GetIO();
+
+  ImVec2 viewManipulatorPosition
+      = ImVec2(10, io.DisplaySize.y - 128 - 10);  // Assuming 128x128 view manipulator size, 10
+                                                  // pixels padding from the bottom and left edges.
+
+  ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+
+  // Draw the view manipulator
+  float camDistance = 10.0f;  // Adjust this value as needed for your scene
+  ImGuizmo::ViewManipulate(view, camDistance, viewManipulatorPosition, ImVec2(128, 128),
+                           0xB4101010);
+
   const auto transform_component
       = actions_.get_database().get_transform_component(selected_entity_);
   if (transform_component.has_value()) {
@@ -136,21 +151,7 @@ void imgui_gui::guizmo() {
 
     ImGuizmo::RecomposeMatrixFromComponents(translation, rotation, scale, model);
 
-    // Setup for using Gizmo without a separate window
-    ImGuiIO& io = ImGui::GetIO();
-
-    ImVec2 viewManipulatorPosition = ImVec2(
-        10, io.DisplaySize.y - 128 - 10);  // Assuming 128x128 view manipulator size, 10
-                                           // pixels padding from the bottom and left edges.
-
-    ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
-
-    // Draw the view manipulator
-    float camDistance = 10.0f;  // Adjust this value as needed for your scene
-    ImGuizmo::ViewManipulate(view, camDistance, viewManipulatorPosition, ImVec2(128, 128),
-                             0xB4101010);
-
-    if (ImGuizmo::Manipulate(view, projection, ImGuizmo::TRANSLATE, ImGuizmo::LOCAL, model)) {
+    if (Manipulate(view, projection, ImGuizmo::TRANSLATE, ImGuizmo::LOCAL, model)) {
 
       // Convert the model matrix back to components
       ImGuizmo::DecomposeMatrixToComponents(model, translation, rotation, scale);
@@ -229,12 +230,20 @@ void imgui_gui::menu_bar() {
     }
 
     if (ImGui::BeginMenu("Window")) {
-      // Each MenuItem now directly toggles the boolean value and displays a checkbox automatically.
-      ImGui::MenuItem("Toggle Scene Graph", nullptr, &show_scene_hierarchy_);
-      ImGui::MenuItem("Toggle Light View", nullptr, &show_lights_);
-      ImGui::MenuItem("Toggle Stats", nullptr, &show_stats_);
-      ImGui::MenuItem("Toggle Guizmo", nullptr, &show_guizmo_);
-      ImGui::MenuItem("Toggle Scene Settings", nullptr, &show_render_settings_);
+      ImGui::MenuItem("Scene Graph", nullptr, &show_scene_hierarchy_);
+      ImGui::MenuItem("Light View", nullptr, &show_lights_);
+      ImGui::MenuItem("Stats", nullptr, &show_stats_);
+      ImGui::MenuItem("Guizmo", nullptr, &show_guizmo_);
+
+      if (ImGui::BeginMenu("Settings")) {
+        ImGui::MenuItem("Shading", nullptr, &show_shading_settings);
+        ImGui::MenuItem("HDR & Tonemapping", nullptr, &show_tone_map_settings);
+        ImGui::MenuItem("Light Adaptation", nullptr, &show_light_adapt_settings_);
+        ImGui::MenuItem("Sky & Atmosphere", nullptr, &show_sky_settings);
+        ImGui::MenuItem("Grid", nullptr, &show_grid_settings);
+
+        ImGui::EndMenu();
+      }
 
       ImGui::EndMenu();
     }
@@ -256,12 +265,35 @@ void imgui_gui::menu_bar() {
       ImGui::InputFloat3("Position", &position.x);
 
       if (ImGui::Button("Add Light")) {
-        // auto newLight = light_component::PointLight(color, intensity, position);
+        actions_.get_component_factory().create_point_light(color, intensity, position);
 
-        // TODO
-        // const size_t entity = actions_.get_database().add_light(???);
-        // selected_node_ = &actions_.get_database().get_node(entity);
+        current_action_ = action::none;
+      }
 
+      if (ImGui::Button("Cancel")) {
+        current_action_ = action::none;
+      }
+
+      ImGui::Separator();
+
+      static glm::vec3 min_bounds = glm::vec3(-10.0f);
+      static glm::vec3 max_bounds = glm::vec3(10.0f);
+      static glm::vec2 intensity_range = glm::vec2(1.f);
+      static int light_count = 10;
+
+      ImGui::InputFloat3("Min Bounds", &min_bounds.x);
+      ImGui::InputFloat3("Max Bounds", &max_bounds.x);
+      ImGui::InputFloat2("Intensity Range", &intensity_range.x);
+      ImGui::InputInt("Light Count", &light_count);
+
+      if (ImGui::Button("Generate")) {
+        for (int i = 0; i < light_count; ++i) {
+          glm::vec3 position = linearRand(min_bounds, max_bounds);
+          glm::vec3 color = linearRand(glm::vec3(0.0f), glm::vec3(1.0f));  // Random color
+          float intensity = glm::linearRand(intensity_range.x,intensity_range.y);  // Random intensity in range [0.5, 10.0]
+
+          actions_.get_component_factory().create_point_light(color, intensity, position);
+        }
         current_action_ = action::none;
       }
 
@@ -427,8 +459,24 @@ void imgui_gui::new_frame() {
     lights();
   }
 
-  if (show_render_settings_) {
-    render_settings();
+  if (show_light_adapt_settings_) {
+    light_adaptation_settings();
+  }
+
+  if (show_sky_settings) {
+       sky_settings();
+  }
+
+  if (show_grid_settings) {
+          grid_settings();
+  }
+
+  if (show_shading_settings) {
+       shading_settings();
+  }
+
+  if (show_tone_map_settings) {
+          tone_map_settings();
   }
 
   check_file_dialog();
@@ -436,183 +484,160 @@ void imgui_gui::new_frame() {
   ImGui::Render();
 }
 
-void imgui_gui::render_settings() {
-  if (ImGui::Begin("Rendering Settings")) {
+void imgui_gui::light_adaptation_settings() {
+  if (ImGui::Begin("Light Adaptation")) {
     render_config& config = actions_.get_render_config();
 
-    if (ImGui::CollapsingHeader("General Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
-      ImGui::Checkbox("Always Opaque", &config.always_opaque);
+    // Use ImGuiSliderFlags_Logarithmic to create a logarithmic slider.
+    // The slider's value directly represents the actual value being modified.
+    ImGui::SliderFloat("Light Adaption Speed", &config.light_adaptation.adaptation_speed_dark2light,
+                       0.0001f, 100.0f, "Light: %.4f", ImGuiSliderFlags_Logarithmic);
+
+    ImGui::SliderFloat("Dark Adaption Speed", &config.light_adaptation.adaptation_speed_light2dark,
+                       0.0001f, 100.0f, "Dark: %.4f", ImGuiSliderFlags_Logarithmic);
+
+    ImGui::SliderFloat("Min Luminance", &config.light_adaptation.min_luminance, 0.0001f, 1.0f,
+                       "Min: %.4f", ImGuiSliderFlags_Logarithmic);
+
+    ImGui::SliderFloat("Max Luminance", &config.light_adaptation.max_luminance, 1.0f, 100.0f,
+                       "Max: %.4f", ImGuiSliderFlags_Logarithmic);
+  }
+  ImGui::End();
+}
+
+
+void imgui_gui::sky_settings() {
+  if (ImGui::Begin("Sky & Atmosphere")) {
+    auto& [rayleighScattering, unused1, ozoneAbsorption, unused2, mieScattering, unused3]
+        = actions_.get_render_config().skybox;
+
+    // Rayleigh Scattering Coefficients
+    ImGui::Text("Rayleigh Scattering");
+    ImGui::SliderFloat("Rayleigh Red", &rayleighScattering.x, 0.0f, 1e-5f, "%.8f",
+                       ImGuiSliderFlags_Logarithmic);
+    ImGui::SliderFloat("Rayleigh Green", &rayleighScattering.y, 0.0f, 1e-5f, "%.8f",
+                       ImGuiSliderFlags_Logarithmic);
+    ImGui::SliderFloat("Rayleigh Blue", &rayleighScattering.z, 0.0f, 1e-5f, "%.8f",
+                       ImGuiSliderFlags_Logarithmic);
+
+    // Ozone Absorption Coefficients
+    ImGui::Text("Ozone Absorption");
+    ImGui::SliderFloat("Ozone Red", &ozoneAbsorption.x, 0.0f, 0.001f, "%.8f",
+                       ImGuiSliderFlags_Logarithmic);
+    ImGui::SliderFloat("Ozone Green", &ozoneAbsorption.y, 0.0f, 0.002f, "%.8f",
+                       ImGuiSliderFlags_Logarithmic);
+    ImGui::SliderFloat("Ozone Blue", &ozoneAbsorption.z, 0.0f, 0.0001f, "%.8f",
+                       ImGuiSliderFlags_Logarithmic);
+
+    // Mie Scattering Coefficients
+    ImGui::Text("Mie Scattering");
+    ImGui::SliderFloat("Mie Red", &mieScattering.x, 0.0f, 5e-5f, "%.8f",
+                       ImGuiSliderFlags_Logarithmic);
+    ImGui::SliderFloat("Mie Green", &mieScattering.y, 0.0f, 5e-5f, "%.8f",
+                       ImGuiSliderFlags_Logarithmic);
+    ImGui::SliderFloat("Mie Blue", &mieScattering.z, 0.0f, 5e-5f, "%.8f",
+                       ImGuiSliderFlags_Logarithmic);
+  }
+  ImGui::End();
+}
+
+void imgui_gui::grid_settings() {
+  if (ImGui::Begin("Sky & Atmosphere")) {
+    auto& grid_params = actions_.get_render_config().grid;
+
+    ImGui::SliderFloat("Major Line Width", &grid_params.majorLineWidth, 0.01f, 0.1f);
+    ImGui::SliderFloat("Minor Line Width", &grid_params.minorLineWidth, 0.01f, 0.1f);
+    ImGui::SliderFloat("Axis Line Width", &grid_params.axisLineWidth, 0.01f, 0.1f);
+    ImGui::SliderFloat("Major Grid Division", &grid_params.majorGridDivision, 1.0f, 10.0f);
+    ImGui::SliderFloat("Axis Dash Scale", &grid_params.axisDashScale, 1.0f, 2.0f);
+  }
+  ImGui::End();
+}
+
+void imgui_gui::shading_settings() {
+  if (ImGui::Begin("Shading")) {
+    auto& config = actions_.get_render_config();
+
+    ImGui::Checkbox("Always Opaque", &config.always_opaque);
+
+    const char* shadow_mode_options[] = {"On", "Off"};
+    int current_shadow_mode = config.lighting.shadow_mode;
+    if (ImGui::Combo("Shadow Mode", &current_shadow_mode, shadow_mode_options,
+                     IM_ARRAYSIZE(shadow_mode_options))) {
+      config.lighting.shadow_mode = current_shadow_mode;
     }
 
-    // ImGui controls for atmosphere scattering parameters
-    if (ImGui::CollapsingHeader("Atmosphere Scattering Parameters",
-                                ImGuiTreeNodeFlags_DefaultOpen)) {
+    ImGui::SliderFloat("Shadow Bias", &config.shadow.shadow_bias, 1.0f, 2.0f, "%.4f");
+    ImGui::SliderFloat("Shadow Slope Bias", &config.shadow.shadow_slope_bias, 1.0f, 2.0f, "%.4f");
 
-      auto& [betaR, pad1, betaA, pad2, betaM, pad3] = config.skybox;
-
-      // Rayleigh Scattering Coefficients
-      ImGui::Text("Rayleigh Scattering Coefficients");
-      ImGui::SliderFloat("betaR.x", &betaR.x, 0.0f, 1e-5f, "%.8f",
-                         ImGuiSliderFlags_Logarithmic);
-      ImGui::SliderFloat("betaR.y", &betaR.y, 0.0f, 1e-5f, "%.8f", ImGuiSliderFlags_Logarithmic);
-      ImGui::SliderFloat("betaR.z", &betaR.z, 0.0f, 1e-5f, "%.8f", ImGuiSliderFlags_Logarithmic);
-
-      // Ozone Absorption Coefficients
-      ImGui::Text("Ozone Absorption Coefficients");
-      ImGui::SliderFloat("betaA.x", &betaA.x, 0.0f, 0.001f, "%.8f", ImGuiSliderFlags_Logarithmic);
-      ImGui::SliderFloat("betaA.y", &betaA.y, 0.0f, 0.002f, "%.8f", ImGuiSliderFlags_Logarithmic);
-      ImGui::SliderFloat("betaA.z", &betaA.z, 0.0f, 0.0001f, "%.8f", ImGuiSliderFlags_Logarithmic);
-
-      // Mie Scattering Coefficients
-      ImGui::Text("Mie Scattering Coefficients");
-      ImGui::SliderFloat(
-          "betaM", &betaM.x, 0.0f, 5e-5f, "%.8f",
-          ImGuiSliderFlags_Logarithmic);  // Assuming uniform Mie scattering for simplicity
-
-      // Padding variables (pad1, pad2, pad3) are typically not adjusted by users and thus do not
-      // need UI controls
+    const char* shading_mode_options[]
+        = {"All", "Only Directional Light", "Only Point Light", "Only Spot Light", "None"};
+    int current_shading_mode = config.lighting.shading_mode;
+    if (ImGui::Combo("Shading Mode", &current_shading_mode, shading_mode_options,
+                     IM_ARRAYSIZE(shading_mode_options))) {
+      config.lighting.shading_mode = current_shading_mode;
     }
 
+    const char* ibl_mode_options[] = {"Full", "Only Diffuse", "Only Specular", "Off"};
+    int current_ibl_mode = config.lighting.ibl_mode;
+    if (ImGui::Combo("IBL Mode", &current_ibl_mode, ibl_mode_options,
+                     IM_ARRAYSIZE(ibl_mode_options))) {
+      config.lighting.ibl_mode = current_ibl_mode;
+    }
 
-    if (ImGui::CollapsingHeader("SSAO Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+    const char* debug_mode_options[] = {
+        "None",  "Albedo", "Normals",        "Emissive", "Occlusion/Rough/Metal", "Occlusion",
+        "Rough", "Metal",  "World Position", "Depth",    "Light Space Position",
+    };
+    int current_debug_mode = config.lighting.debug_mode;
+    if (ImGui::Combo("Debug Mode", &current_debug_mode, debug_mode_options,
+                     IM_ARRAYSIZE(debug_mode_options))) {
+      config.lighting.debug_mode = current_debug_mode;
+    }
+
+    if (ImGui::CollapsingHeader("SSAO Settings")) {
       ImGui::Checkbox("Enable SSAO", &config.enable_ssao);
       ImGui::SliderInt("SSAO Quality", &config.ssao_quality, 1, 4);
       ImGui::Checkbox("Show SSAO", &config.ssao.show_ssao_only);
-      ImGui::SliderFloat("Scale", &config.ssao.scale, 0.0f, 10.0f,
-                         "%.3f");  
-      ImGui::SliderFloat("Bias", &config.ssao.bias, 0.0f, 1.0f,
-                         "%.3f");  
-      ImGui::SliderFloat("Radius", &config.ssao.radius, 0.0f, .5f, 
-                         "%.2f");
-      ImGui::SliderFloat("Attenuation Scale", &config.ssao.attScale, 0.0f, 2.0f,
-                         "%.2f");  
-      ImGui::SliderFloat("Distance Scale", &config.ssao.distScale, 0.0f, 10.0f,
-                         "%.2f");
+      ImGui::SliderFloat("Scale", &config.ssao.scale, 0.0f, 10.0f, "%.3f");
+      ImGui::SliderFloat("Bias", &config.ssao.bias, 0.0f, 1.0f, "%.3f");
+      ImGui::SliderFloat("Radius", &config.ssao.radius, 0.0f, .5f, "%.2f");
+      ImGui::SliderFloat("Attenuation Scale", &config.ssao.attScale, 0.0f, 2.0f, "%.2f");
+      ImGui::SliderFloat("Distance Scale", &config.ssao.distScale, 0.0f, 10.0f, "%.2f");
+    }
+  }
+  ImGui::End();
+}
+
+void imgui_gui::tone_map_settings() {
+  render_config& config = actions_.get_render_config();
+
+  if (ImGui::CollapsingHeader("HDR Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+    ImGui::Checkbox("Enable HDR", &config.enable_hdr);
+    ImGui::SliderInt("Bloom Quality", &config.bloom_quality, 1, 4);
+    const char* toneMappingOptions[]
+        = {"Reinhard Extended", "Uncharted 2", "ACES approximation", "ACES fitted"};
+    int currentOption = config.hdr.toneMappingOption;
+    if (ImGui::Combo("Tone Mapping Option", &currentOption, toneMappingOptions,
+                     IM_ARRAYSIZE(toneMappingOptions))) {
+      config.hdr.toneMappingOption = currentOption;
     }
 
-    if (ImGui::CollapsingHeader("Streak Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
-      ImGui::SliderFloat("Intensity", &config.streaks.intensity, 0.0f, 2.0f);
-      ImGui::SliderFloat("Attenuation", &config.streaks.attenuation, 0.0f, 2.0f);
-      ImGui::SliderInt("Streak Samples", &config.streaks.streak_samples, 1, 10);
-      ImGui::SliderInt("Number of Streaks", &config.streaks.num_streaks, 1, 10);
-    }
-
-    if (ImGui::CollapsingHeader("Light Adaptation Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
-      float logLightAdaptation = log10f(config.light_adaptation.adaptation_speed_dark2light);
-      if (ImGui::SliderFloat("Light Adaption Speed", &logLightAdaptation, log10f(0.0001f),
-                             log10f(100.0f),
-                             "Light: %.4f")) {
-        config.light_adaptation.adaptation_speed_dark2light = powf(10.0f, logLightAdaptation);
-      }
-
-      float logDarkAdaptation = log10f(config.light_adaptation.adaptation_speed_light2dark);
-      if (ImGui::SliderFloat("Dark Adaption Speed", &logDarkAdaptation, log10f(0.0001f),
-                             log10f(100.0f), "Dark: %.4f")) {
-        config.light_adaptation.adaptation_speed_light2dark = powf(10.0f, logDarkAdaptation);
-      }
-
-      float logMinLuminance = log10f(config.light_adaptation.min_luminance);
-      if (ImGui::SliderFloat("Log Min Luminance", &logMinLuminance,
-                             log10f(0.0001f), log10f(1.0f),
-                             "Min: %.4f")) {
-        config.light_adaptation.min_luminance = powf(10.0f, logMinLuminance);
-      }
-
-      float logMaxLuminance = log10f(config.light_adaptation.max_luminance);
-      if (ImGui::SliderFloat("Log Max Luminance", &logMaxLuminance,
-                             log10f(1.f), log10f(100.0f),
-                             "Max: %.4f")) {
-        config.light_adaptation.max_luminance = powf(10.0f, logMaxLuminance);
-      }
-    }
-
-    if (ImGui::CollapsingHeader("HDR Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
-      ImGui::Checkbox("Enable HDR", &config.enable_hdr);
-      ImGui::SliderInt("Bloom Quality", &config.bloom_quality, 1, 4);
-      const char* toneMappingOptions[] = {"Reinhard Extended", "Uncharted 2", "ACES approximation", "ACES fitted"};
-      int currentOption = config.hdr.toneMappingOption; 
-      if (ImGui::Combo("Tone Mapping Option", &currentOption, toneMappingOptions,
-                       IM_ARRAYSIZE(toneMappingOptions))) {
-        config.hdr.toneMappingOption = currentOption;
-      }
-
-      ImGui::Checkbox("Show Bright Pass", &config.hdr.show_bright_pass);
-      ImGui::SliderFloat("Exposure", &config.hdr.exposure, 0.1f, 2.0f,
-                         "%.3f");  
-      ImGui::SliderFloat("Max White", &config.hdr.maxWhite, 0.1f, 2.5f,
-                         "%.3f");  
-      ImGui::SliderFloat("Bloom Strength", &config.hdr.bloomStrength, 0.0f, 2.f, 
-                         "%.2f");
-      ImGui::ColorPicker4("Lift", &config.hdr.lift[0], ImGuiColorEditFlags_Float);
-      ImGui::ColorPicker4("Gamma", &config.hdr.gamma[0], ImGuiColorEditFlags_Float);
-      ImGui::ColorPicker4("Gain", &config.hdr.gain[0], ImGuiColorEditFlags_Float);
-    }
-
-
-    if (ImGui::CollapsingHeader("Shading Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
-      const char* shadow_mode_options[]
-          = {"On", "Off"};
-      int current_shadow_mode = config.lighting.shadow_mode;
-      if (ImGui::Combo("Shadow Mode", &current_shadow_mode, shadow_mode_options,
-                       IM_ARRAYSIZE(shadow_mode_options))) {
-        config.lighting.shadow_mode = current_shadow_mode;
-      }
-
-      ImGui::SliderFloat("Shadow Bias", &config.shadow.shadow_bias, 1.0f, 2.0f,
-                                  "%.4f");
-      ImGui::SliderFloat("Shadow Slope Bias", &config.shadow.shadow_slope_bias, 1.0f, 2.0f,
-                                  "%.4f");
-
-      const char* shading_mode_options[] = {
-          "All",  "Only Directional Light", "Only Point Light", "Only Spot Light", "None"
-      };
-      int current_shading_mode = config.lighting.shading_mode;
-      if (ImGui::Combo("Shading Mode", &current_shading_mode, shading_mode_options,
-                       IM_ARRAYSIZE(shading_mode_options))) {
-        config.lighting.shading_mode = current_shading_mode;
-      }
-
-      const char* ibl_mode_options[] = {
-          "Full",  "Only Diffuse", "Only Specular", "Off"
-      };
-      int current_ibl_mode = config.lighting.ibl_mode;
-      if (ImGui::Combo("IBL Mode", &current_ibl_mode, ibl_mode_options,
-                       IM_ARRAYSIZE(ibl_mode_options))) {
-        config.lighting.ibl_mode = current_ibl_mode;
-      }
-
-      const char* debug_mode_options[]
-          = {"None",
-            "Albedo",
-            "Normals",
-            "Emissive",
-            "Occlusion/Rough/Metal",
-            "Occlusion",
-            "Rough",
-            "Metal",
-            "World Position",
-            "Depth",
-            "Light Space Position",};
-      int current_debug_mode = config.lighting.debug_mode; 
-      if (ImGui::Combo("Debug Mode", &current_debug_mode, debug_mode_options,
-                   IM_ARRAYSIZE(debug_mode_options))) {
-        config.lighting.debug_mode = current_debug_mode;
-      }
-    }
-
-    if (ImGui::CollapsingHeader("Grid Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
-      auto& grid_params = config.grid;
-      ImGui::SliderFloat("Major Line Width", &grid_params.majorLineWidth, 0.01f, 0.1f);
-      ImGui::SliderFloat("Minor Line Width", &grid_params.minorLineWidth, 0.01f, 0.1f);
-      ImGui::SliderFloat("Axis Line Width", &grid_params.axisLineWidth, 0.01f, 0.1f);
-      ImGui::SliderFloat( "Major Grid Division", &grid_params.majorGridDivision, 1.0f, 100.0f);
-      ImGui::SliderFloat("Axis Dash Scale", &grid_params.axisDashScale, 1.0f, 2.0f);
-    }
-
-    // TODO: Add more sections for other settings as necessary
+    ImGui::Checkbox("Show Bright Pass", &config.hdr.show_bright_pass);
+    ImGui::SliderFloat("Exposure", &config.hdr.exposure, 0.1f, 2.0f, "%.3f");
+    ImGui::SliderFloat("Max White", &config.hdr.maxWhite, 0.1f, 2.5f, "%.3f");
+    ImGui::SliderFloat("Bloom Strength", &config.hdr.bloomStrength, 0.0f, 2.f, "%.2f");
+    ImGui::ColorPicker4("Lift", &config.hdr.lift[0], ImGuiColorEditFlags_Float);
+    ImGui::ColorPicker4("Gamma", &config.hdr.gamma[0], ImGuiColorEditFlags_Float);
+    ImGui::ColorPicker4("Gain", &config.hdr.gain[0], ImGuiColorEditFlags_Float);
   }
 
-  ImGui::End();
+  if (ImGui::CollapsingHeader("Streak Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+    ImGui::SliderFloat("Intensity", &config.streaks.intensity, 0.0f, 2.0f);
+    ImGui::SliderFloat("Attenuation", &config.streaks.attenuation, 0.0f, 2.0f);
+    ImGui::SliderInt("Streak Samples", &config.streaks.streak_samples, 1, 10);
+    ImGui::SliderInt("Number of Streaks", &config.streaks.num_streaks, 1, 10);
+  }
 }
 
 
@@ -816,6 +841,7 @@ void imgui_gui::show_scene_hierarchy_window() {
                        light.direction.y = cos(elevation) * sin(azimuth);
                        light.direction.z = sin(elevation);
           }
+           light.is_dirty = true;
         }
       }
     }

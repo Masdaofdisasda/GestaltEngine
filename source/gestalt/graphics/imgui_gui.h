@@ -24,7 +24,11 @@ class imgui_gui {
   entity selected_entity_ = invalid_entity;
 
   bool show_scene_hierarchy_ = true;
-  bool show_render_settings_ = true;
+  bool show_light_adapt_settings_ = false;
+  bool show_sky_settings = false;
+  bool show_grid_settings = false;
+  bool show_shading_settings = false;
+  bool show_tone_map_settings = false;
   bool show_guizmo_ = true;
   bool show_stats_ = false;
   bool show_lights_ = false;
@@ -35,7 +39,11 @@ class imgui_gui {
   void scene_graph();
   void display_scene_hierarchy(entity entity);
   void show_scene_hierarchy_window();
-  void render_settings();
+  void light_adaptation_settings();
+  void sky_settings();
+  void grid_settings();
+  void shading_settings();
+  void tone_map_settings();
   void guizmo();
   void check_file_dialog();
 

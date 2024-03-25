@@ -182,16 +182,12 @@ struct render_config {
   bool always_opaque{true};
 
   struct skybox_params {
-    //float earthRadius = 6371e6;
-    //float atmosphereRadius = 6471e6;
-    glm::vec3 betaR = glm::vec3(5.8e-6, 13.5e-6, 33.1e-6);
+    glm::vec3 betaR = glm::vec3(5.22e-6, 9.19e-6, 33.1e-6);
     float pad1;
-    glm::vec3 betaA = glm::vec3(0.000650, 0.001881, 0.000085);
+    glm::vec3 betaA = glm::vec3(0.000425, 0.001881, 0.000085);
     float pad2;
-    glm::vec3 betaM = glm::vec3(21e-6);
+    glm::vec3 betaM = glm::vec3(5.61e-6, 2.1e-5, 2.1e-5);
     float pad3;
-    //float Hr = 8000.0;
-    //float Hm = 1200.0;
   } skybox{};
 
   bool enable_ssao{true};
@@ -222,8 +218,8 @@ struct render_config {
   } hdr{};
 
   struct light_adaptation_params {
-    float adaptation_speed_dark2light{.0560f};
-    float adaptation_speed_light2dark{.028f};
+    float adaptation_speed_dark2light{.01f};
+    float adaptation_speed_light2dark{.02f};
     float delta_time{0.16f};
     float min_luminance{0.002f};
     float max_luminance{10.0f};
@@ -252,9 +248,9 @@ struct render_config {
   } lighting{};
 
   struct grid_params {
-    float majorLineWidth = 0.02f;
-    float minorLineWidth = 0.01f;
-    float axisLineWidth = 0.04f;
+    float majorLineWidth = 0.065f;
+    float minorLineWidth = 0.015f;
+    float axisLineWidth = 0.080f;
     float axisDashScale = 1.33f;
     float majorGridDivision = 5.f;
   } grid{};

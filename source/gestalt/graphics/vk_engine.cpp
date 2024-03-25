@@ -68,6 +68,7 @@ void render_engine::register_gui_actions() {
   gui_actions_.get_scene_data = [this]() -> per_frame_data& { return resource_manager_->per_frame_data_; };
   
   gui_actions_.get_database = [this]() -> database& { return resource_manager_->get_database(); };
+  gui_actions_.get_component_factory = [this]() -> component_archetype_factory& { return scene_manager_->get_component_factory(); };
   gui_actions_.get_render_config = [this]() -> render_config& { return resource_manager_->config_; };
 }
 
@@ -122,7 +123,7 @@ void render_engine::update_scene() {
     // camera projection
     glm::mat4 projection
         = glm::perspective(glm::radians(70.f),
-                           (float)window_.extent.width / (float)window_.extent.height, .1f, 1000.f);
+                           (float)window_.extent.width / (float)window_.extent.height, 0.1f, 1000.f);
     
     // invert the Y direction on projection matrix so that we are more similar
     // to opengl and gltf axis

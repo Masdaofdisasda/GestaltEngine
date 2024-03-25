@@ -69,7 +69,7 @@ public:
   void update_scene();
 
   void request_scene(const std::string& path);
-  size_t create_material(pbr_material& config, const std::string& name = "") const;
+  component_archetype_factory& get_component_factory() const { return *component_factory_; }
   node_component& get_root_node();
   uint32_t get_root_entity() { return root_entity_; }
   void add_to_root(entity entity, node_component& node);

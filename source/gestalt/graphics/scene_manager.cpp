@@ -26,7 +26,7 @@ void scene_manager::init(const vk_gpu& gpu,
   resource_manager_->get_database().add_camera(component_factory_->create_entity_node().first,
                                                camera_component{camera_index});
 
-  component_factory_->create_directional_light(glm::vec3(1.f, 0.957f, 0.917f), 20.f,
+  component_factory_->create_directional_light(glm::vec3(1.f, 0.957f, 0.917f), 5.f,
                                                glm::vec3(-0.216, 0.941, -0.257), get_root_entity());
   component_factory_->create_point_light(glm::vec3(1.0f), 5.0f, glm ::vec3(0.0, 6.0, 0.0),
                                          get_root_entity());
@@ -108,20 +108,6 @@ void scene_manager::build_scene_graph(const std::vector<fastgltf::Node>& nodes, 
 void scene_manager::cleanup() {
 }
 
-size_t scene_manager::create_material(pbr_material& config,
-                                     const std::string& name) const {
-  const size_t material_id = resource_manager_->get_database().get_materials_size();
-
-  const std::string key = name.empty() ? "material_" + std::to_string(material_id) : name;
-  resource_manager_->write_material(config, material_id);
-
-  resource_manager_->get_database().add_material(
-      material{.name = key, .config = config});
-
-  fmt::print("creating material {}, mat_id {}\n", name, material_id);
-  return material_id;
-}
-
 entity component_archetype_factory::create_entity() {
   return next_entity_id_++;
 } 
@@ -199,6 +185,8 @@ entity component_archetype_factory::create_directional_light(const glm::vec3& co
   auto [entity, node] = create_entity_node();
   link_entity_to_parent(entity, parent);
 
+  node.get().name = "directional_light" + std::to_string(entity);
+
   const light_component light{
       .type = light_type::directional,
       .color = color,
@@ -222,6 +210,8 @@ entity component_archetype_factory::create_spot_light(const glm::vec3& color, co
                                                          const float innerCone, const float outerCone, entity parent) {
    auto [entity, node] = create_entity_node();
   link_entity_to_parent(entity, parent);
+
+  node.get().name = "spot_light" + std::to_string(entity);
 
    const light_component light{
        .type = light_type::spot,
@@ -249,6 +239,8 @@ entity component_archetype_factory::create_point_light(const glm::vec3& color,
                                                        const glm::vec3& position, entity parent) {
   auto [entity, node] = create_entity_node();
   link_entity_to_parent(entity, parent);
+
+  node.get().name = "point_light" + std::to_string(entity);
 
   const light_component light{
       .type = light_type::point,
