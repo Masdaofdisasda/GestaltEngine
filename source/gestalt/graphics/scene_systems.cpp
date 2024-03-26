@@ -1,13 +1,7 @@
 ﻿#include "scene_systems.h"
 
 #include <glm/detail/_noise.hpp>
-#include <glm/detail/_noise.hpp>
 
-#include "asset_loader.h"
-#include "asset_loader.h"
-#include "asset_loader.h"
-#include "asset_loader.h"
-#include "asset_loader.h"
 #include "asset_loader.h"
 
 struct DirectionalLight {
@@ -263,6 +257,9 @@ void transform_system::mark_as_dirty(entity entity) {
        mark_children_dirty(child);
   }
   mark_parent_dirty(node.parent);
+
+  // update the light view-projection matrix according to new scene bounds
+  resource_manager_->get_database().get_lights(light_type::directional).at(0).second.is_dirty = true;
 }
 
 void transform_system::update_aabb(const entity entity, const glm::mat4& parent_transform) {

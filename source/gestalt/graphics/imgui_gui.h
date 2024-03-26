@@ -38,6 +38,10 @@ class imgui_gui {
   void lights();
   void scene_graph();
   void display_scene_hierarchy(entity entity);
+  void show_transform_component(node_component& node, transform_component& transform);
+  void show_mesh_component(mesh_component& mesh_component);
+  void show_light_component(light_component& light, transform_component& transform);
+  void show_node_component();
   void show_scene_hierarchy_window();
   void light_adaptation_settings();
   void sky_settings();

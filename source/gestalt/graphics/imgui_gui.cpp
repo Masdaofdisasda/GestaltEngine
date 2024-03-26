@@ -343,75 +343,35 @@ void imgui_gui::stats() {
 void imgui_gui::lights() {
   if (ImGui::Begin("Lights")) {
 
-    /*
-    ImGui::Text("Directional Light Controls");
-    std::vector<std::reference_wrapper<light_component>> dirLights = actions_.get_database().get_lights(light_type::directional);
-    auto& light = dirLights[0].get();
+      const char* lightOptions[]
+        = {"Directional Light", "Point Light", "Spot Light"};
+    static int currentOption = 0; // default to directional light
+      ImGui::Combo("Select Type", &currentOption, lightOptions, IM_ARRAYSIZE(lightOptions));
 
-    // Convert light direction from Cartesian to spherical coordinates (azimuth, elevation)
-    float azimuth = atan2(light.direction.y, light.direction.x);
-    float elevation = atan2(light.direction.z, sqrt(light.direction.x * light.direction.x
-                                                    + light.direction.y * light.direction.y));
-    float azimuthDeg = glm::degrees(azimuth);
-    float elevationDeg = glm::degrees(elevation);
+    std::vector<std::pair<entity, light_component>> lights;
+    if (currentOption == 0) {
+       lights = actions_.get_database().
+          get_lights(light_type::directional);
+    } else if (currentOption == 1) {
+           lights = actions_.get_database().
+          get_lights(light_type::point);
+    } else if (currentOption == 2) {
+           lights = actions_.get_database().
+          get_lights(light_type::spot);
+    }
 
-    // Azimuth slider: Full circle
-    ImGui::SliderFloat("Azimuth", &azimuthDeg, -180.f, 180.f);
+    int selectedLightIndex = 0;  // Default to the first light
+    if (!lights.empty()) {
 
-    // Elevation slider: From straight down (-90 degrees) to straight up (+90 degrees)
-    ImGui::SliderFloat("Elevation", &elevationDeg, -90.f, 90.f);
+      ImGui::SliderInt("Select Light", &selectedLightIndex, 0, lights.size() -1);
 
-    azimuth = glm::radians(azimuthDeg);
-    elevation = glm::radians(elevationDeg);
+      auto& [entity, light_component] = lights[selectedLightIndex];
+      const auto transform_component
+          = actions_.get_database().get_transform_component(entity).value();
 
-    // Convert spherical coordinates back to Cartesian coordinates
-    light.direction.x = cos(elevation) * cos(azimuth);
-    light.direction.y = cos(elevation) * sin(azimuth);
-    light.direction.z = sin(elevation);
+      show_light_component(light_component, transform_component.get());
+    }
 
-    // Light intensity slider
-    ImGui::SliderFloat("Light intensity", &light.intensity, 0.f, 100.f);
-
-    ImGui::Separator();
-
-    ImGui::Text("Point Light Controls");
-    std::vector<std::reference_wrapper<light_component>> pointLights
-        = actions_.get_database().get_lights(light_type::point);
-    if (!pointLights.empty()) {
-      static int selectedLightIndex = 0;        // Static to maintain selected item across frames
-      std::vector<std::string> lightNamesStr;   // Vector to hold the complete names as std::string
-      std::vector<const char*> lightNamesCStr;  // Vector of const char* for ImGui
-
-      // Populate light names for dropdown
-      std::string prefix = "Point Light ";
-      for (int i = 0; i < pointLights.size(); ++i) {
-        lightNamesStr.push_back(prefix + std::to_string(i));  // Store the full name as std::string
-      }
-
-      // Now fill the vector of const char* with pointers to the c_str() of the stored std::string
-      // objects
-      for (const auto& nameStr : lightNamesStr) {
-        lightNamesCStr.push_back(nameStr.c_str());
-      }
-
-      // Dropdown to select the point light index
-      ImGui::Combo("Point Light Index", &selectedLightIndex, lightNamesCStr.data(),
-                   lightNamesCStr.size());
-
-      // Assuming selectedLightIndex is valid
-      if (selectedLightIndex >= 0 && selectedLightIndex < pointLights.size()) {
-        auto& pointLight = pointLights[selectedLightIndex].get();
-
-        // Color picker for point light
-        ImGui::ColorEdit3("Color", &pointLight.color.x);
-
-        // Light intensity slider for point light
-        ImGui::SliderFloat("Intensity", &pointLight.intensity, 0.f, 100.f);
-
-        // Position input for point light
-        ImGui::InputFloat3("Position", &pointLight.position.x);
-      }
-    }*/
   }
   ImGui::End();
 }
@@ -701,6 +661,143 @@ void imgui_gui::display_scene_hierarchy(const entity entity) {
   }
 }
 
+void imgui_gui::show_transform_component(node_component& node, transform_component& transform) {
+  ImGui::DragFloat3("Position", &transform.position.x, 0.1f);
+  glm::vec3 euler = eulerAngles(transform.rotation);
+  if (ImGui::DragFloat3("Rotation", &euler.x, 0.1f)) {
+    transform.rotation = glm::quat(euler);
+  }
+  float uniform_scale = transform.scale;
+  if (ImGui::DragFloat("Uniform Scale", &uniform_scale, 0.1f)) {
+    transform.scale = uniform_scale;
+  }
+
+  ImGui::DragFloat3("AABB max", &node.bounds.max.x);
+  ImGui::DragFloat3("AABB min", &node.bounds.min.x);
+  transform.is_dirty = true;
+}
+
+void imgui_gui::show_mesh_component(mesh_component& mesh_component) {
+  auto& mesh = actions_.get_database().get_mesh(mesh_component.mesh);
+
+  for (auto surface_index : mesh.surfaces) {
+    auto& surface = actions_.get_database().get_surface(surface_index);
+    auto& material = actions_.get_database().get_material(surface.material);
+    if (ImGui::TreeNode(material.name.c_str())) {
+      auto& config = material.config;
+
+      // TODO update materials based on GUI changes
+      if (ImGui::CollapsingHeader("Albedo", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::DragFloat4("Albedo Color", &config.constants.albedo_factor.x, 0.01f, 0.0f, 1.0f,
+                          "%.2f");
+        ImGui::Checkbox("Use Texture", &config.use_albedo_tex);
+        if (config.use_albedo_tex) {
+          ImGui::Text("URI: %s", config.albedo_uri.c_str());
+        }
+      }
+
+      if (ImGui::CollapsingHeader("Metallic-Roughness", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::DragFloat2("Metal-Rough Factor", &config.constants.metal_rough_factor.x, 0.01f, 0.0f,
+                          1.0f, "%.2f");
+        ImGui::Checkbox("Use Texture", &config.use_metal_rough_tex);
+        if (config.use_metal_rough_tex) {
+          ImGui::Text("URI: %s", config.metal_rough_uri.c_str());
+        }
+      }
+      /*
+      if (ImGui::CollapsingHeader("Normal Map", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::DragFloat("Scale", &config.constants.normal_scale, 0.01f, 0.0f, 10.0f, "%.2f");
+        ImGui::Checkbox("Use Texture", &config.use_normal_tex);
+        if (config.use_normal_tex) {
+          ImGui::Text("URI: %s", config.normal_uri.c_str());
+        }
+      }*/
+
+      if (ImGui::CollapsingHeader("Emissive", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::DragFloat3("Emmissive Factor", &config.constants.emissiveFactor.x, 0.01f, 0.0f,
+                          10.0f, "%.2f");
+        ImGui::Checkbox("Use Texture", &config.use_emissive_tex);
+        if (config.use_emissive_tex) {
+          ImGui::Text("URI: %s", config.emissive_uri.c_str());
+        }
+      }
+
+      if (ImGui::CollapsingHeader("Occlusion", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::DragFloat("Occlusion Strength", &config.constants.occlusionStrength, 0.01f, 0.0f,
+                         10.0f, "%.2f");
+        ImGui::Checkbox("Use Texture", &config.use_occlusion_tex);
+        if (config.use_occlusion_tex) {
+          ImGui::Text("URI: %s", config.occlusion_uri.c_str());
+        }
+      }
+
+      ImGui::Checkbox("Double Sided", &config.double_sided);
+      ImGui::Checkbox("Transparent", &config.transparent);
+      ImGui::DragFloat("Alpha Cutoff", &config.constants.alpha_cutoff, 0.01f, 0.0f, 1.0f, "%.2f");
+
+      ImGui::TreePop();
+    }
+  }
+}
+
+void imgui_gui::show_light_component(light_component& light, transform_component& transform) {
+  ImGui::ColorPicker3("Color", &light.color.x, ImGuiColorEditFlags_Float);
+  ImGui::SliderFloat("Intensity", &light.intensity, 0.0f, 100.0f, "%.3f",
+                     ImGuiSliderFlags_Logarithmic);
+  if (light.type == light_type::point) {
+    if (ImGui::DragFloat3("Position", &transform.position.x, 0.1f)) {
+      light.is_dirty = true;
+    }
+  }
+  if (light.type == light_type::directional) {
+    glm::vec3 euler_angles
+        = degrees(glm::eulerAngles(transform.rotation));  // Convert quaternion to Euler angles
+
+    float azimuth = euler_angles.y;    // Azimuth angle (yaw)
+    float elevation = -euler_angles.x;  // Elevation angle (pitch)
+
+    if (ImGui::SliderFloat("Azimuth", &azimuth, -89.f, 89.0f)) {
+      light.is_dirty = true;
+    }
+
+    if (ImGui::SliderFloat("Elevation", &elevation, 1.f, 179.f)) {
+      light.is_dirty = true;
+    }
+
+    // Update rotation quaternion based on user input
+    transform.rotation = glm::quat(radians(glm::vec3(-elevation, azimuth, 0.0f)));
+  }
+}
+
+void imgui_gui::show_node_component() {
+  if (selected_entity_ != invalid_entity) {
+    auto& selected_node = actions_.get_database().get_node_component(selected_entity_)->get();
+    ImGui::Text(selected_node.name.c_str());
+
+    const auto transform_optional
+        = actions_.get_database().get_transform_component(selected_entity_);
+    if (transform_optional.has_value()) {
+      if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_None)) {
+        show_transform_component(selected_node, transform_optional.value().get());
+      }
+    }
+
+    const auto& mesh_optional = actions_.get_database().get_mesh_component(selected_entity_);
+    if (mesh_optional.has_value()) {
+      if (ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_None)) {
+        show_mesh_component(mesh_optional.value().get());
+      }
+    }
+
+    const auto& light_optional = actions_.get_database().get_light_component(selected_entity_);
+    if (light_optional.has_value() && transform_optional.has_value()) {
+      if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen)) {
+        show_light_component(light_optional.value().get(), transform_optional.value().get());
+      }
+    }
+  }
+}
+
 void imgui_gui::show_scene_hierarchy_window() {
   ImVec2 windowAvail = ImGui::GetContentRegionAvail();
   ImVec2 childSize = ImVec2(0, windowAvail.y * 0.4f);
@@ -720,130 +817,7 @@ void imgui_gui::show_scene_hierarchy_window() {
   childSize = ImVec2(0, windowAvail.y - childSize.y);  // Remaining space for the selected node
   if (ImGui::BeginChild("SelectedNodeDetails", childSize, false)) {
     if (selected_entity_ != invalid_entity) {
-      auto& selected_node = actions_.get_database().get_node_component(selected_entity_)->get();
-      ImGui::Text(selected_node.name.c_str());
-      
-      if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_None)) {
-        const auto transform_optional = actions_.get_database().get_transform_component(selected_entity_);
-        if (transform_optional.has_value()) {
-          auto& transform = transform_optional.value().get();
-          ImGui::DragFloat3("Position", &transform.position.x, 0.1f);
-          glm::vec3 euler = eulerAngles(transform.rotation);
-          if (ImGui::DragFloat3("Rotation", &euler.x, 0.1f)) {
-            transform.rotation = glm::quat(euler);
-          }
-          float uniform_scale = transform.scale;
-          if (ImGui::DragFloat("Uniform Scale", &uniform_scale, 0.1f)) {
-            transform.scale = uniform_scale;
-          }
-
-          ImGui::DragFloat3("AABB max", &selected_node.bounds.max.x);
-          ImGui::DragFloat3("AABB min", &selected_node.bounds.min.x);
-          transform.is_dirty = true;
-        }
-
-      }
-      const auto& mesh_component = actions_.get_database().get_mesh_component(selected_entity_);
-      if (mesh_component.has_value()) {
-        if (ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_None)) {
-          auto& mesh = actions_.get_database().get_mesh(selected_entity_);
-          for (auto surface_index : mesh.surfaces) {
-            auto& surface = actions_.get_database().get_surface(surface_index);
-            auto& material = actions_.get_database().get_material(surface.material);
-            if (ImGui::TreeNode(material.name.c_str())) {
-              auto& config = material.config;
-
-              //TODO update materials based on GUI changes
-              if (ImGui::CollapsingHeader("Albedo", ImGuiTreeNodeFlags_DefaultOpen)) {
-                ImGui::DragFloat4("Albedo Color", &config.constants.albedo_factor.x, 0.01f, 0.0f, 1.0f, "%.2f");
-                ImGui::Checkbox("Use Texture", &config.use_albedo_tex);
-                if (config.use_albedo_tex) {
-                  ImGui::Text("URI: %s", config.albedo_uri.c_str());
-                }
-              }
-
-              if (ImGui::CollapsingHeader("Metallic-Roughness", ImGuiTreeNodeFlags_DefaultOpen)) {
-                ImGui::DragFloat2("Metal-Rough Factor", &config.constants.metal_rough_factor.x, 0.01f, 0.0f, 1.0f,
-                                  "%.2f");
-                ImGui::Checkbox("Use Texture", &config.use_metal_rough_tex);
-                if (config.use_metal_rough_tex) {
-                  ImGui::Text("URI: %s", config.metal_rough_uri.c_str());
-                }
-              }
-              /*
-              if (ImGui::CollapsingHeader("Normal Map", ImGuiTreeNodeFlags_DefaultOpen)) {
-                ImGui::DragFloat("Scale", &config.constants.normal_scale, 0.01f, 0.0f, 10.0f, "%.2f");
-                ImGui::Checkbox("Use Texture", &config.use_normal_tex);
-                if (config.use_normal_tex) {
-                  ImGui::Text("URI: %s", config.normal_uri.c_str());
-                }
-              }*/
-
-              if (ImGui::CollapsingHeader("Emissive", ImGuiTreeNodeFlags_DefaultOpen)) {
-                ImGui::DragFloat3("Emmissive Factor", &config.constants.emissiveFactor.x, 0.01f, 0.0f, 10.0f, "%.2f");
-                ImGui::Checkbox("Use Texture", &config.use_emissive_tex);
-                if (config.use_emissive_tex) {
-                  ImGui::Text("URI: %s", config.emissive_uri.c_str());
-                }
-              }
-
-              if (ImGui::CollapsingHeader("Occlusion", ImGuiTreeNodeFlags_DefaultOpen)) {
-                ImGui::DragFloat("Occlusion Strength", &config.constants.occlusionStrength, 0.01f, 0.0f, 10.0f,
-                                 "%.2f");
-                ImGui::Checkbox("Use Texture", &config.use_occlusion_tex);
-                if (config.use_occlusion_tex) {
-                  ImGui::Text("URI: %s", config.occlusion_uri.c_str());
-                }
-              }
-
-              ImGui::Checkbox("Double Sided", &config.double_sided);
-              ImGui::Checkbox("Transparent", &config.transparent);
-              ImGui::DragFloat("Alpha Cutoff", &config.constants.alpha_cutoff, 0.01f, 0.0f, 1.0f, "%.2f");
-
-              ImGui::TreePop();
-            }
-          }
-        }
-      }
-
-      const auto& light_optional = actions_.get_database().get_light_component(selected_entity_);
-      if (light_optional.has_value()) {
-         if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen)) {
-          auto& light = light_optional.value().get();
-
-          ImGui::ColorEdit3("Color", &light.color.x);
-          ImGui::SliderFloat("Intensity", &light.intensity, 0.0f, 100.0f);/*
-          if (light.type == light_type::point) {
-                       ImGui::DragFloat3("Position", &light.position.x, 0.1f);
-          }
-          if (light.type == light_type::directional) {
-                       // Convert light direction from Cartesian to spherical coordinates (azimuth,
-                       // elevation)
-                       float azimuth = atan2(light.direction.y, light.direction.x);
-                       float elevation = atan2(light.direction.z,
-                                               sqrt(light.direction.x * light.direction.x
-                                                    + light.direction.y * light.direction.y));
-                       float azimuthDeg = glm::degrees(azimuth);
-                       float elevationDeg = glm::degrees(elevation);
-
-                       // Azimuth slider: Full circle
-                       ImGui::SliderFloat("Azimuth", &azimuthDeg, -180.f, 180.f);
-
-                       // Elevation slider: From straight down (-90 degrees) to straight up (+90
-                       // degrees)
-                       ImGui::SliderFloat("Elevation", &elevationDeg, -90.f, 90.f);
-
-                       azimuth = glm::radians(azimuthDeg);
-                       elevation = glm::radians(elevationDeg);
-
-                       // Convert spherical coordinates back to Cartesian coordinates
-                       light.direction.x = cos(elevation) * cos(azimuth);
-                       light.direction.y = cos(elevation) * sin(azimuth);
-                       light.direction.z = sin(elevation);
-          }*/
-           light.is_dirty = true;
-        }
-      }
+            show_node_component();
     }
   }
   ImGui::EndChild();
