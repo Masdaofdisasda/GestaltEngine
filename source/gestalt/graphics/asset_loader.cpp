@@ -1,6 +1,4 @@
-﻿#include "asset_loader.h"
-
-#include <stb_image.h>
+﻿#include <stb_image.h>
 
 #include <fastgltf/core.hpp>
 #include <fastgltf/glm_element_traits.hpp>
@@ -9,9 +7,30 @@
 
 
 void asset_loader::init(const vk_gpu& gpu,
-                        const std::shared_ptr<resource_manager>& resource_manager) {
+                        const std::shared_ptr<resource_manager>& resource_manager,
+                        const std::shared_ptr<component_archetype_factory>& component_factory) {
   gpu_ = gpu;
   resource_manager_ = resource_manager;
+  component_factory_ = component_factory;
+}
+
+void asset_loader::import_lights(const fastgltf::Asset& gltf) {
+  fmt::print("importing lights\n");
+  for (auto& light : gltf.lights) {
+    if (light.type == fastgltf::LightType::Directional) {
+      component_factory_->create_directional_light(
+          glm::vec3(light.color.at(0), light.color.at(1), light.color.at(2)), light.intensity,
+          glm::vec3(0.f));
+
+    } else if (light.type == fastgltf::LightType::Point) {
+      component_factory_->create_point_light(
+          glm::vec3(light.color.at(0), light.color.at(1), light.color.at(2)), light.intensity,
+          glm::vec3(0.f));
+
+    } else if (light.type == fastgltf::LightType::Spot) {
+      // TODO;
+    }
+  }
 }
 
 std::vector<fastgltf::Node> asset_loader::load_scene_from_gltf(const std::string& file_path) {
@@ -29,6 +48,8 @@ std::vector<fastgltf::Node> asset_loader::load_scene_from_gltf(const std::string
   import_materials(gltf, sampler_offset, image_offset);
 
   import_meshes(gltf, material_offset);
+
+  import_lights(gltf);
 
   return gltf.nodes;
 }
@@ -281,10 +302,12 @@ void asset_loader::import_emissive(const fastgltf::Asset& gltf, const size_t& sa
 
     pbr_config.resources.emissive_image = image;
     pbr_config.resources.emissive_sampler = sampler;
+  } else {
     glm::vec3 emissiveFactor
         = glm::vec3(mat.emissiveFactor.at(0), mat.emissiveFactor.at(1), mat.emissiveFactor.at(2));
     if (length(emissiveFactor) > 0) {
-           pbr_config.constants.emissiveFactor = emissiveFactor;
+      emissiveFactor *= mat.emissiveStrength;
+      pbr_config.constants.emissiveFactor = emissiveFactor;
     }
   }
 }

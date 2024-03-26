@@ -85,7 +85,7 @@ struct pbr_material {
     glm::vec2 metal_rough_factor = {.5f, 0.f}; // roughness, metallic
     float occlusionStrength{1.f};
     float alpha_cutoff{0.f};
-    glm::vec3 emissiveFactor{1.f};
+    glm::vec3 emissiveFactor{0.f};
     uint32_t occlusion_tex_index = unused_texture;
     // float normalScale = 1.f;
   } constants;

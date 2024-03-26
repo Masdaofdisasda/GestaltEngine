@@ -14,7 +14,7 @@ void scene_manager::init(const vk_gpu& gpu,
   resource_manager_ = resource_manager;
 
   component_factory_->init(resource_manager_);
-  asset_loader_->init(gpu_, resource_manager_);
+  asset_loader_->init(gpu_, resource_manager_, component_factory_);
 
   resource_manager_->init_default_data();
 
@@ -27,7 +27,7 @@ void scene_manager::init(const vk_gpu& gpu,
                                                camera_component{camera_index});
 
   component_factory_->create_directional_light(glm::vec3(1.f, 0.957f, 0.917f), 5.f,
-                                               glm::vec3(-0.216, 0.941, -0.257), get_root_entity());
+                                              glm::vec3(-0.216, 0.941, -0.257), get_root_entity());
   component_factory_->create_point_light(glm::vec3(1.0f), 5.0f, glm ::vec3(0.0, 6.0, 0.0),
                                          get_root_entity());
 
@@ -49,7 +49,12 @@ void scene_manager::load_scene(const std::string& path) {
 
 void scene_manager::create_entities(std::vector<fastgltf::Node> nodes, const size_t& mesh_offset) {
   for (fastgltf::Node& node : nodes) {
-    const auto [entity, node_component] = component_factory_->create_entity_node(node.name.c_str());
+    if (node.lightIndex.has_value()) {
+        //TODO
+      
+    }
+
+    const auto [entity, node_component] = component_factory_->create_entity_node(std::string(node.name));
 
     if (node.meshIndex.has_value()) {
       component_factory_->add_mesh_component(entity, mesh_offset + *node.meshIndex);

@@ -2,12 +2,6 @@
 
 #include <glm/detail/_noise.hpp>
 
-#include "asset_loader.h"
-#include "asset_loader.h"
-#include "asset_loader.h"
-#include "asset_loader.h"
-#include "asset_loader.h"
-
 struct DirectionalLight {
         glm::vec3 color;
         float intensity;
@@ -87,36 +81,29 @@ void light_system::prepare() {
 
 glm::mat4 light_system::calculate_sun_view_proj(const glm::vec3 direction) const {
 
-  glm::vec3 up = glm::vec3(0, 1, 0);
-  if (glm::abs(dot(up, direction)) > 0.999f) {
-    // up = glm::vec3(1, 0, 0);  // Switch to a different up vector if the initial choice is
-    // parallel
-  }
-
-  // Create a view matrix for the light
-  glm::mat4 lightView = lookAt(glm::vec3(0, 0, 0), -direction, glm::vec3(0, 0, 1));
-
   auto& [min, max, is_dirty]
       = resource_manager_->get_database().get_node_component(root_entity).value().get().bounds;
 
-  glm::vec3 corners[] = {
-      glm::vec3(min.x, min.y, min.z), glm::vec3(min.x, max.y, min.z),
-      glm::vec3(min.x, min.y, max.z), glm::vec3(min.x, max.y, max.z),
-      glm::vec3(max.x, min.y, min.z), glm::vec3(max.x, max.y, min.z),
-      glm::vec3(max.x, min.y, max.z), glm::vec3(max.x, max.y, max.z),
-  };
-  for (auto& v : corners) v = glm::vec3(lightView * glm::vec4(v, 1.0f));
+  glm::vec3 center = (min + max) * 0.5f;
+  glm::vec3 size = max - min;
+  float radius = glm::length(size) * 0.5f;
+  glm::vec3 lightPosition = center + direction * radius;
 
-  glm::vec3 vmin(std::numeric_limits<float>::max());
-  glm::vec3 vmax(std::numeric_limits<float>::lowest());
+  // Calculate the tight orthographic frustum
+  float halfWidth = radius;          // Width of the frustum
+  float halfHeight = radius;         // Height of the frustum
+  float nearPlane = 0.1f;            // Near plane distance
+  float farPlane = radius * 2.f;    // Far plane distance
 
-  for (auto& corner : corners) {
-    vmin = glm::min(vmin, corner);
-    vmax = glm::max(vmax, corner);
-  }
-  glm::mat4 lightProjection = glm::orthoRH_ZO(vmin.x, vmax.x, vmin.y, vmax.y, vmin.z, vmax.z);
+  // Calculate the view matrix for the light
+  glm::mat4 lightView = glm::lookAt(lightPosition, center, glm::vec3(0.0f, 1.0f, 0.0f));
 
-  lightProjection[1][1] *= -1;
+  // Calculate the projection matrix for the light
+  glm::mat4 lightProjection
+      = glm::orthoRH_ZO(-halfWidth, halfWidth, -halfHeight, halfHeight, nearPlane, farPlane);
+  /*
+  const glm::vec3 ndc_test = lightProjection * lightView * glm::vec4(center, 1.0f);
+  assert(ndc_test.x  >= 0 && ndc_test.x <= 1 && ndc_test.y >= 0 && ndc_test.y <= 1 && ndc_test.z >= 0 && ndc_test.z <= 1);*/
 
   return lightProjection * lightView;
 }
@@ -262,8 +249,6 @@ void transform_system::mark_as_dirty(entity entity) {
   }
   mark_parent_dirty(node.parent);
 
-  // update the light view-projection matrix according to new scene bounds
-  resource_manager_->get_database().get_lights(light_type::directional).at(0).second.is_dirty = true;
 }
 
 void transform_system::update_aabb(const entity entity, const glm::mat4& parent_transform) {
@@ -356,6 +341,9 @@ void transform_system::update() {
    constexpr auto root_transform = glm::mat4(1.0f);
 
   update_aabb(root_entity, root_transform);
+
+  // mark the directional light as dirty to update the view-projection matrix
+  resource_manager_->get_database().get_lights(light_type::directional).at(0).second.is_dirty = true;
 }
 
  void transform_system::cleanup() {

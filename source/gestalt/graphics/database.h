@@ -106,8 +106,8 @@ public:
   component_container<mesh_component>& get_meshes() { return components_.meshes_; }
   component_container<camera_component>& get_cameras() { return components_.cameras_; }
   component_container<light_component>& get_lights() { return components_.lights_; }
-  std::vector<std::pair<entity, light_component>> get_lights(light_type type) {
-    std::vector<std::pair<entity, light_component>> lights;
+  std::vector<std::pair<entity, light_component&>> get_lights(light_type type) {
+    std::vector<std::pair<entity, light_component&>> lights;
     for (auto& [entity, light] : components_.lights_) {
       if (light.type == type) {
         lights.emplace_back(entity, light);

@@ -48,7 +48,7 @@ void main() {
 		n = perturbNormal(n, normalize(viewPos - inPosition), normal_sample, UV);
 	}
 
-	vec4 Ke = vec4(0.0, 0.0, 0.0, 1.0);
+	vec4 Ke = vec4(materialData[nonuniformEXT(inMaterialIndex)].emissiveFactor, 1.0);
 	if(emissiveIndex != uint(-1)) {
 		Ke = texture(nonuniformEXT(textures[emissiveIndex]), UV);
 		Ke.rgb *= materialData[nonuniformEXT(inMaterialIndex)].emissiveFactor;

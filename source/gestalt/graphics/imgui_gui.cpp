@@ -115,7 +115,6 @@ void imgui_gui::guizmo() {
 
   auto [viewCam, proj] = actions_.get_database().get_camera(0);
   proj[1][1] *= -1;  // Flip the Y-axis for opengl like system
-  glm::mat4 identity = glm::mat4(1.0f);
 
   // Convert glm matrices to arrays for ImGuizmo
   float* view = glm::value_ptr(viewCam);
@@ -141,7 +140,17 @@ void imgui_gui::guizmo() {
   if (transform_component.has_value()) {
     auto& transform = transform_component.value().get();
 
-    glm::vec3 t = transform.position;
+    glm::mat4 localTransform = glm::translate(glm::mat4(1.0f), transform.position)
+                               * glm::toMat4(transform.rotation)
+                               * glm::scale(glm::mat4(1.0f), glm::vec3(transform.scale));
+    glm::mat4 parentWorldTransform
+        = glm::translate(glm::mat4(1.0f), transform.parent_position)
+          * glm::toMat4(transform.parent_rotation)
+          * glm::scale(glm::mat4(1.0f), glm::vec3(transform.parent_scale));
+    glm::mat4 inverseParentWorldTransform = glm::inverse(parentWorldTransform);
+    glm::mat4 worldTransform = parentWorldTransform * localTransform;
+
+    glm::vec3 t = glm::vec3(worldTransform[3]);
     glm::quat r = transform.rotation;
     glm::vec3 s = glm::vec3(transform.scale);
 
@@ -151,14 +160,30 @@ void imgui_gui::guizmo() {
 
     ImGuizmo::RecomposeMatrixFromComponents(translation, rotation, scale, model);
 
-    if (Manipulate(view, projection, ImGuizmo::TRANSLATE, ImGuizmo::LOCAL, model)) {
+    if (guizmo_operation_ == 0) {
+      if (Manipulate(view, projection, ImGuizmo::TRANSLATE, ImGuizmo::LOCAL, model)) {
+        ImGuizmo::DecomposeMatrixToComponents(model, translation, rotation, scale);
 
-      // Convert the model matrix back to components
-      ImGuizmo::DecomposeMatrixToComponents(model, translation, rotation, scale);
+        transform.position
+            = glm::vec3(inverseParentWorldTransform
+                        * glm::vec4(translation[0], translation[1], translation[2], 1.0f));
 
-      transform.position
-          = glm::vec3(translation[0], translation[1], translation[2]);
-      transform.is_dirty = true;
+        transform.is_dirty = true;
+      }
+    } else if (guizmo_operation_ == 1) {
+      if (Manipulate(view, projection, ImGuizmo::TRANSLATE, ImGuizmo::LOCAL, model)) {
+        ImGuizmo::DecomposeMatrixToComponents(model, translation, rotation, scale);
+
+        // TODO transform.rotation = glm::quat(rotation[3], rotation[0], rotation[1], rotation[2]);
+        transform.is_dirty = true;
+      }
+    } else {
+      if (Manipulate(view, projection, ImGuizmo::SCALE, ImGuizmo::LOCAL, model)) {
+        ImGuizmo::DecomposeMatrixToComponents(model, translation, rotation, scale);
+
+        transform.scale = std::max({scale[0], scale[1], scale[2]});
+        transform.is_dirty = true;
+      }
     }
   }
 }
@@ -204,6 +229,19 @@ void imgui_gui::menu_bar() {
     }
 
     if (ImGui::BeginMenu("Edit")) {
+      if (ImGui::BeginMenu("Guizmo Mode")) {
+        if (ImGui::MenuItem("Translate")) {
+          guizmo_operation_ = 0;
+        }
+        if (ImGui::MenuItem("Rotate")) {
+          guizmo_operation_ = 1;
+        }
+        if (ImGui::MenuItem("Scale")) {
+          guizmo_operation_ = 2;
+        }
+        ImGui::EndMenu();
+      }
+
       if (ImGui::BeginMenu("Add Camera")) {
         if (ImGui::MenuItem("Free Fly Camera")) {
           actions_.add_camera();
@@ -276,7 +314,7 @@ void imgui_gui::menu_bar() {
 
       ImGui::Separator();
 
-      auto& root = actions_.get_database().get_node_component(root_entity).value().get();
+      const auto& root = actions_.get_database().get_node_component(root_entity).value().get();
 
       static glm::vec3 min_bounds = root.bounds.min;
       static glm::vec3 max_bounds = root.bounds.max;
@@ -302,12 +340,11 @@ void imgui_gui::menu_bar() {
               glm::vec3 position
                   = min_bounds
                     + glm::vec3(i * grid_spacing.x, j * grid_spacing.y, k * grid_spacing.z);
-              // Randomize position slightly within grid cell
               position += grid_spacing;
 
-              glm::vec3 color = linearRand(glm::vec3(0.0f), glm::vec3(1.0f));  // Random color
+              glm::vec3 color = linearRand(glm::vec3(0.0f), glm::vec3(1.0f));
               float intensity = glm::linearRand(
-                  intensity_range.x, intensity_range.y);  // Random intensity in range [0.5, 10.0]
+                  intensity_range.x, intensity_range.y);
 
               actions_.get_component_factory().create_point_light(color, intensity, position);
             }
@@ -368,7 +405,7 @@ void imgui_gui::lights() {
     static int currentOption = 0; // default to directional light
       ImGui::Combo("Select Type", &currentOption, lightOptions, IM_ARRAYSIZE(lightOptions));
 
-    std::vector<std::pair<entity, light_component>> lights;
+    std::vector<std::pair<entity, light_component&>> lights;
     if (currentOption == 0) {
        lights = actions_.get_database().
           get_lights(light_type::directional);
@@ -706,7 +743,7 @@ void imgui_gui::show_transform_component(node_component& node, transform_compone
 
   // Local scale control
   float local_scale = transform.scale;
-  if (ImGui::DragFloat("Local Scale", &local_scale, 0.1f)) {
+  if (ImGui::DragFloat("Local Scale", &local_scale, 0.005f)) {
     transform.scale = local_scale;
     transform.is_dirty = true;
   }
@@ -752,7 +789,7 @@ void imgui_gui::show_transform_component(node_component& node, transform_compone
 
   // World scale control (taking parent transform into account)
   float world_scale = glm::length(glm::vec3(worldTransform[0]));
-  if (ImGui::DragFloat("World Scale", &world_scale, 0.1f)) {
+  if (ImGui::DragFloat("World Scale", &world_scale, 0.005f)) {
     transform.scale = world_scale / transform.parent_scale;
     transform.is_dirty = true;
   }
@@ -825,9 +862,13 @@ void imgui_gui::show_mesh_component(mesh_component& mesh_component) {
 }
 
 void imgui_gui::show_light_component(light_component& light, transform_component& transform) {
-  ImGui::ColorPicker3("Color", &light.color.x, ImGuiColorEditFlags_Float);
-  ImGui::SliderFloat("Intensity", &light.intensity, 0.0f, 100.0f, "%.3f",
-                     ImGuiSliderFlags_Logarithmic);
+  if (ImGui::ColorPicker3("Color", &light.color.x, ImGuiColorEditFlags_Float)) {
+    light.is_dirty = true;
+  }
+  if (ImGui::SliderFloat("Intensity", &light.intensity, 0.0f, 100.0f, "%.3f",
+                     ImGuiSliderFlags_Logarithmic)) {
+    light.is_dirty = true;
+  }
   if (light.type == light_type::point) {
     if (ImGui::DragFloat3("Position", &transform.position.x, 0.1f)) {
       light.is_dirty = true;

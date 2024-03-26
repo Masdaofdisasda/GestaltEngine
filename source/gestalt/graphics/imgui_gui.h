@@ -20,6 +20,8 @@ class imgui_gui {
   gui_actions actions_;
   vk_deletion_service deletion_service_ = {};
 
+  uint32_t guizmo_operation_ = 0;
+
   action current_action_ = action::none;
   entity selected_entity_ = invalid_entity;
 
