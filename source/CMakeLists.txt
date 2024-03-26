@@ -16,6 +16,8 @@ target_link_libraries(${APPLICATION_NAME} PRIVATE
 	ImGuizmo
 	fastgltf::fastgltf 
 	vk-bootstrap 
+	meshoptimizer
+	TracyClient
 	fmt::fmt 
 	
 	${APPLICATION_MODULE} 

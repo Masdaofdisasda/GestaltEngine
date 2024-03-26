@@ -3,6 +3,8 @@
 #include <fastgltf/core.hpp>
 #include <fastgltf/glm_element_traits.hpp>
 
+#include <meshoptimizer.h>
+
 #include "scene_manager.h"
 
 
