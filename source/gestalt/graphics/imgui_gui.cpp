@@ -285,21 +285,39 @@ void imgui_gui::menu_bar() {
 
       ImGui::InputFloat3("Min Bounds", &min_bounds.x);
       ImGui::InputFloat3("Max Bounds", &max_bounds.x);
-      ImGui::InputFloat2("Intensity Range", &intensity_range.x);
+      ImGui::SliderFloat2("Intensity Range", &intensity_range.x, 0.0f, 100.0f, "%.3f",
+                         ImGuiSliderFlags_Logarithmic);
       ImGui::InputInt("Light Count", &light_count);
 
       if (ImGui::Button("Generate")) {
-        for (int i = 0; i < light_count; ++i) {
-          glm::vec3 position = linearRand(min_bounds, max_bounds);
-          glm::vec3 color = linearRand(glm::vec3(0.0f), glm::vec3(1.0f));  // Random color
-          float intensity = glm::linearRand(intensity_range.x,intensity_range.y);  // Random intensity in range [0.5, 10.0]
+        // Calculate grid spacing based on the number of lights
+        int grid_count = std::ceil(std::pow(light_count, 1.0f / 3.0f));
+        glm::vec3 grid_spacing = (max_bounds - min_bounds) / static_cast<float>(grid_count);
 
-          actions_.get_component_factory().create_point_light(color, intensity, position);
+        // Iterate over grid points and place lights
+        for (int i = 0; i < grid_count; ++i) {
+          for (int j = 0; j < grid_count; ++j) {
+            for (int k = 0; k < grid_count; ++k) {
+              // Calculate position within the grid
+              glm::vec3 position
+                  = min_bounds
+                    + glm::vec3(i * grid_spacing.x, j * grid_spacing.y, k * grid_spacing.z);
+              // Randomize position slightly within grid cell
+              position += grid_spacing;
+
+              glm::vec3 color = linearRand(glm::vec3(0.0f), glm::vec3(1.0f));  // Random color
+              float intensity = glm::linearRand(
+                  intensity_range.x, intensity_range.y);  // Random intensity in range [0.5, 10.0]
+
+              actions_.get_component_factory().create_point_light(color, intensity, position);
+            }
+          }
         }
         current_action_ = action::none;
       }
 
       ImGui::End();
+
     }
   }
 
