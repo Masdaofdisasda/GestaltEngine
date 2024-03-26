@@ -119,7 +119,13 @@ struct transform_component {
   glm::vec3 position;
   glm::quat rotation;
   float scale; // uniform scale for now
+
   size_t matrix = no_component;
+
+  glm::vec3 parent_position;
+  glm::quat parent_rotation;
+  float parent_scale;
+
   mutable bool is_dirty = true;
 };
 

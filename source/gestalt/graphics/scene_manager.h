@@ -59,7 +59,7 @@ class scene_manager {
   void link_orphans_to_root();
   const entity root_entity_ = 0;
 
-  void load_scene(std::string path);
+  void load_scene(const std::string& path);
   std::string scene_path_ = "";
 
 public:

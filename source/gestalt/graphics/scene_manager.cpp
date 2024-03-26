@@ -41,7 +41,7 @@ void scene_manager::init(const vk_gpu& gpu,
 }
 
 
-void scene_manager::load_scene(std::string path) {
+void scene_manager::load_scene(const std::string& path) {
   size_t mesh_offset = resource_manager_->get_database().get_meshes_size();
   const auto nodes = asset_loader_->load_scene_from_gltf(path);
   build_scene_graph(nodes, mesh_offset);
@@ -49,7 +49,7 @@ void scene_manager::load_scene(std::string path) {
 
 void scene_manager::create_entities(std::vector<fastgltf::Node> nodes, const size_t& mesh_offset) {
   for (fastgltf::Node& node : nodes) {
-    const auto [entity, node_component] = component_factory_->create_entity_node();
+    const auto [entity, node_component] = component_factory_->create_entity_node(node.name.c_str());
 
     if (node.meshIndex.has_value()) {
       component_factory_->add_mesh_component(entity, mesh_offset + *node.meshIndex);
@@ -60,9 +60,9 @@ void scene_manager::create_entities(std::vector<fastgltf::Node> nodes, const siz
 
       glm::vec3 translation(trs.translation[0], trs.translation[1], trs.translation[2]);
       glm::quat rotation(trs.rotation[3], trs.rotation[0], trs.rotation[1], trs.rotation[2]);
-      glm::vec3 scale(trs.scale[0], trs.scale[1], trs.scale[2]); //TODO handle non-uniform scale
+      float scale = (trs.scale[0] + trs.scale[1] + trs.scale[2]) / 3.f;//TODO handle non-uniform scale
 
-      component_factory_->update_transform_component(entity, translation, rotation, trs.scale[0]);
+      component_factory_->update_transform_component(entity, translation, rotation, scale);
     }
   }
 }
@@ -120,7 +120,7 @@ component_archetype_factory::create_entity_node(std::string node_name) {
     node_name = "entity_" + std::to_string(new_entity);
   }
   const node_component node = {
-      .name = node_name,
+      .name = node_name + "_" + std::to_string(new_entity),
   };
 
   create_transform_component(new_entity, glm::vec3(0));
@@ -182,10 +182,8 @@ entity component_archetype_factory::create_directional_light(const glm::vec3& co
                                                              const float intensity,
                                                              const glm::vec3& direction,
                                                              entity parent) {
-  auto [entity, node] = create_entity_node();
+  auto [entity, node] = create_entity_node("directional_light");
   link_entity_to_parent(entity, parent);
-
-  node.get().name = "directional_light" + std::to_string(entity);
 
   auto& transform = resource_manager_->get_database().get_transform_component(entity).value().get();
   transform.rotation = glm::quat(glm::lookAt(glm::vec3(0), direction, glm::vec3(0, 1, 0)));
@@ -210,10 +208,8 @@ entity component_archetype_factory::create_directional_light(const glm::vec3& co
 entity component_archetype_factory::create_spot_light(const glm::vec3& color, const float intensity,
                                                          const glm::vec3& direction, const glm::vec3& position,
                                                          const float innerCone, const float outerCone, entity parent) {
-   auto [entity, node] = create_entity_node();
+  auto [entity, node] = create_entity_node("spot_light");
   link_entity_to_parent(entity, parent);
-
-  node.get().name = "spot_light" + std::to_string(entity);
 
   auto& transform = resource_manager_->get_database().get_transform_component(entity).value().get();
   transform.rotation = glm::quat(glm::lookAt(glm::vec3(0), direction, glm::vec3(0, 1, 0)));
@@ -241,10 +237,8 @@ entity component_archetype_factory::create_spot_light(const glm::vec3& color, co
 entity component_archetype_factory::create_point_light(const glm::vec3& color,
                                                        const float intensity,
                                                        const glm::vec3& position, entity parent) {
-  auto [entity, node] = create_entity_node();
+  auto [entity, node] = create_entity_node("point_light");
   link_entity_to_parent(entity, parent);
-
-  node.get().name = "point_light" + std::to_string(entity);
 
   auto& transform = resource_manager_->get_database().get_transform_component(entity).value().get();
   transform.position = position;

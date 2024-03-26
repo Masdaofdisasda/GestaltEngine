@@ -3,6 +3,10 @@
 #include <glm/detail/_noise.hpp>
 
 #include "asset_loader.h"
+#include "asset_loader.h"
+#include "asset_loader.h"
+#include "asset_loader.h"
+#include "asset_loader.h"
 
 struct DirectionalLight {
         glm::vec3 color;
@@ -212,8 +216,8 @@ void light_system::cleanup() {
 }
 
 glm::mat4 transform_system::get_model_matrix(const transform_component& transform) {
-
-    return translate(transform.position) * mat4_cast(transform.rotation) * glm::scale(glm::vec3(transform.scale));
+  return translate(glm::mat4(1.0f), transform.position) * mat4_cast(transform.rotation)
+         * scale(glm::mat4(1.0f), glm::vec3(transform.scale));
 }
 
 void transform_system::prepare() {
@@ -268,6 +272,17 @@ void transform_system::update_aabb(const entity entity, const glm::mat4& parent_
     return;
   }
   auto& transform = resource_manager_->get_database().get_transform_component(entity).value().get();
+  if (node.parent != invalid_entity) {
+       const auto& parent_transform_component = resource_manager_->get_database().get_transform_component(node.parent).value().get();
+    transform.parent_position = parent_transform_component.position;
+    transform.parent_rotation = parent_transform_component.rotation;
+    transform.parent_scale = parent_transform_component.scale;
+  } else {
+    transform.parent_position = transform.position;
+    transform.parent_rotation = transform.rotation;
+    transform.parent_scale = transform.scale;
+  }
+
   const auto& mesh_optional = resource_manager_->get_database().get_mesh_component(entity);
 
   AABB aabb;
@@ -287,12 +302,13 @@ void transform_system::update_aabb(const entity entity, const glm::mat4& parent_
       min = glm::vec3(-0.0001f);
       max = glm::vec3(0.0001f);
   }
-
+  const glm::mat4 local_matrix = get_model_matrix(transform);
   const glm::mat4 model_matrix
-      = parent_transform * resource_manager_->get_database().get_matrix(transform.matrix);
+      = parent_transform * local_matrix;
   // Decompose model_matrix into translation (T) and 3x3 rotation matrix (M)
   glm::vec3 T = glm::vec3(model_matrix[3]);  // Translation vector
   glm::mat3 M = glm::mat3(model_matrix);     // Rotation matrix
+  M = transpose(M);                     // Otherwise the AABB will be rotated in the wrong direction
 
 
   AABB transformedAABB = {T, T};  // Start with a zero-volume AABB at T
@@ -337,9 +353,9 @@ void transform_system::update() {
     }
   }
 
-  const glm::mat4 identity = glm::mat4(1.0f);
+   constexpr auto root_transform = glm::mat4(1.0f);
 
-  update_aabb(root_entity, identity);
+  update_aabb(root_entity, root_transform);
 }
 
  void transform_system::cleanup() {
@@ -354,7 +370,7 @@ void render_system::traverse_scene(const entity entity, const glm::mat4& parent_
    }
 
    const auto& transform = resource_manager_->get_database().get_transform_component(entity)->get();
-   const glm::mat4 world_transform
+   const glm::mat4 world_transform //TODO check if matrix vector is needed
        = parent_transform * resource_manager_->get_database().get_matrix(transform.matrix);
 
    const auto& mesh_component = resource_manager_->get_database().get_mesh_component(entity);
@@ -414,9 +430,9 @@ void render_system::update() {
      resource_manager_->upload_mesh();
    }
 
-   constexpr glm::mat4 identity = glm::mat4(1.0f);
+   constexpr auto root_transform = glm::mat4(1.0f);
 
-   traverse_scene(0, identity);
+   traverse_scene(0, root_transform);
  }
 
 void hierarchy_system::prepare() {

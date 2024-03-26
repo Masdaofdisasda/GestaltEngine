@@ -16,7 +16,7 @@ layout( push_constant ) uniform constants
 
 vec4 umajorLineColor = vec4(1, 1, 1, 1);
 vec4 uminorLineColor = vec4(0.7, 0.7, 0.7, 1);
-vec4 ubaseColor = vec4(0.1, 0.1, 0.1, 1);
+vec4 ubaseColor = vec4(0.01, 0.01, 0.01, 1);
 vec4 ucenterColor = vec4(1.0, 1.0, 1.0, 1);
 
 vec4 uxAxisColor = vec4(1, 0, 0, 1);

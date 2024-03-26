@@ -37,14 +37,15 @@ public:
 };
 
 class transform_system final : public scene_system {
-  static glm::mat4 get_model_matrix(const transform_component& transform);
 
   void mark_children_dirty(entity entity);
   void mark_as_dirty(entity entity);
-  void update_aabb(unsigned entity, const glm::mat4& parent_transform);
+  void update_aabb(entity entity, const glm::mat4& parent_transform);
   void mark_parent_dirty(entity entity);
 
 public:
+  static glm::mat4 get_model_matrix(const transform_component& transform);
+
   void prepare() override;
   void update() override;
   void cleanup() override;

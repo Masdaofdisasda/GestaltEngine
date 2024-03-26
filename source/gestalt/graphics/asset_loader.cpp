@@ -353,25 +353,33 @@ size_t asset_loader::create_surface(std::vector<Vertex>& vertices,
                                      std::vector<uint32_t>& indices) {
   assert(!vertices.empty() && !indices.empty());
 
-  AABB aabb;
-  for (const auto& [position, uv_x, normal, uv_y, color] : vertices) {
-    // Update the min and max coordinates
-    aabb.min.x = std::min(aabb.min.x, position.x);
-    aabb.min.y = std::min(aabb.min.y, position.y);
-    aabb.min.z = std::min(aabb.min.z, position.z);
+  const size_t vertex_count = vertices.size();
+  const size_t index_count = indices.size();
 
-    aabb.max.x = std::max(aabb.max.x, position.x);
-    aabb.max.y = std::max(aabb.max.y, position.y);
-    aabb.max.z = std::max(aabb.max.z, position.z);
+  // Initialize local AABB with first vertex position
+  AABB local_aabb{vertices[0].position, vertices[0].position};
+
+  // Update local AABB for each vertex
+  for (size_t i = 1; i < vertex_count; ++i) {
+    const glm::vec3& position = vertices[i].position;
+
+    // Update min position
+    local_aabb.min.x = std::min(local_aabb.min.x, position.x);
+    local_aabb.min.y = std::min(local_aabb.min.y, position.y);
+    local_aabb.min.z = std::min(local_aabb.min.z, position.z);
+
+    // Update max position
+    local_aabb.max.x = std::max(local_aabb.max.x, position.x);
+    local_aabb.max.y = std::max(local_aabb.max.y, position.y);
+    local_aabb.max.z = std::max(local_aabb.max.z, position.z);
   }
-  aabb.is_dirty = false;
 
   const mesh_surface surface{
-      .vertex_count = static_cast<uint32_t>(vertices.size()),
-      .index_count = static_cast<uint32_t>(indices.size()),
+      .vertex_count = static_cast<uint32_t>(vertex_count),
+      .index_count = static_cast<uint32_t>(index_count),
       .first_index = static_cast<uint32_t>(resource_manager_->get_database().get_indices_size()),
       .vertex_offset = static_cast<uint32_t>(resource_manager_->get_database().get_vertices_size()),
-      .local_bounds = aabb,
+      .local_bounds = local_aabb,
   };
 
   resource_manager_->get_database().add_vertices(vertices);
@@ -390,7 +398,7 @@ size_t asset_loader::create_mesh(std::vector<size_t> surfaces, const std::string
   const std::string key = name.empty() ? "mesh_" + std::to_string(mesh_id) : name;
   AABB aabb;
   for (size_t surface_index : surfaces) {
-    assert(surface_index <= resource_manager_->get_database().get_surfaces_size());
+    assert(surface_index < resource_manager_->get_database().get_surfaces_size());
     auto& surface_bounds = resource_manager_->get_database().get_surface(surface_index).local_bounds;
     aabb.min.x = std::min(aabb.min.x, surface_bounds.min.x);
     aabb.min.y = std::min(aabb.min.y, surface_bounds.min.y);

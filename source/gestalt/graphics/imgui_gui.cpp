@@ -276,8 +276,10 @@ void imgui_gui::menu_bar() {
 
       ImGui::Separator();
 
-      static glm::vec3 min_bounds = glm::vec3(-10.0f); // todo default to scene bounds
-      static glm::vec3 max_bounds = glm::vec3(10.0f);
+      auto& root = actions_.get_database().get_node_component(root_entity).value().get();
+
+      static glm::vec3 min_bounds = root.bounds.min;
+      static glm::vec3 max_bounds = root.bounds.max;
       static glm::vec2 intensity_range = glm::vec2(1.f);
       static int light_count = 10;
 
@@ -662,19 +664,83 @@ void imgui_gui::display_scene_hierarchy(const entity entity) {
 }
 
 void imgui_gui::show_transform_component(node_component& node, transform_component& transform) {
-  ImGui::DragFloat3("Position", &transform.position.x, 0.1f);
-  glm::vec3 euler = eulerAngles(transform.rotation);
-  if (ImGui::DragFloat3("Rotation", &euler.x, 0.1f)) {
-    transform.rotation = glm::quat(euler);
+  ImGui::Text("Local Transform:");
+
+  // Local position control
+  if (ImGui::DragFloat3("Local Position", &transform.position.x, 0.1f)) {
+    transform.is_dirty = true;
   }
-  float uniform_scale = transform.scale;
-  if (ImGui::DragFloat("Uniform Scale", &uniform_scale, 0.1f)) {
-    transform.scale = uniform_scale;
+
+  // Local rotation controls
+  glm::vec3 euler = degrees(eulerAngles(transform.rotation));
+  if (ImGui::DragFloat("Local X Rotation", &euler.x, 1.0f)) {
+    transform.rotation = glm::quat(radians(euler));
+    transform.is_dirty = true;
+  }
+  if (ImGui::DragFloat("Local Y Rotation", &euler.y, 1.0f)) {
+    transform.rotation = glm::quat(radians(euler));
+    transform.is_dirty = true;
+  }
+  if (ImGui::DragFloat("Local Z Rotation", &euler.z, 1.0f)) {
+    transform.rotation = glm::quat(radians(euler));
+    transform.is_dirty = true;
+  }
+
+  // Local scale control
+  float local_scale = transform.scale;
+  if (ImGui::DragFloat("Local Scale", &local_scale, 0.1f)) {
+    transform.scale = local_scale;
+    transform.is_dirty = true;
+  }
+
+  ImGui::Separator();
+  ImGui::Text("World Transform:");
+
+  glm::mat4 localTransform = glm::translate(glm::mat4(1.0f), transform.position)
+                             * glm::toMat4(transform.rotation)
+                             * glm::scale(glm::mat4(1.0f), glm::vec3(transform.scale));
+  glm::mat4 parentWorldTransform = glm::translate(glm::mat4(1.0f), transform.parent_position)
+                             * glm::toMat4(transform.parent_rotation)
+                             * glm::scale(glm::mat4(1.0f), glm::vec3(transform.parent_scale));
+  glm::mat4 inverseParentWorldTransform = glm::inverse(parentWorldTransform);
+  glm::mat4 worldTransform = parentWorldTransform * localTransform;
+
+  // World position control (taking parent transform into account)
+  glm::vec3 world_position = glm::vec3(worldTransform[3]);
+  if (ImGui::DragFloat3("World Position", &world_position.x, 0.1f)) {
+    transform.position = glm::vec3(inverseParentWorldTransform * glm::vec4(world_position, 1.0f));
+    transform.is_dirty = true;
+  }
+
+  // World rotation controls (taking parent transform into account)
+  glm::vec3 world_euler = degrees(eulerAngles(quat_cast(worldTransform)));
+  if (ImGui::DragFloat("World X Rotation", &world_euler.x, 1.0f)) {
+    transform.rotation = normalize(quat_cast(
+        inverseParentWorldTransform
+        * toMat4(glm::quat(radians(world_euler)))));
+
+    transform.is_dirty = true;
+  }
+  if (ImGui::DragFloat("World Y Rotation", &world_euler.y, 1.0f)) {
+    transform.rotation = normalize(
+        quat_cast(inverseParentWorldTransform * toMat4(glm::quat(radians(world_euler)))));
+    transform.is_dirty = true;
+  }
+  if (ImGui::DragFloat("World Z Rotation", &world_euler.z, 1.0f)) {
+    transform.rotation = normalize(
+        quat_cast(inverseParentWorldTransform * toMat4(glm::quat(radians(world_euler)))));
+    transform.is_dirty = true;
+  }
+
+  // World scale control (taking parent transform into account)
+  float world_scale = glm::length(glm::vec3(worldTransform[0]));
+  if (ImGui::DragFloat("World Scale", &world_scale, 0.1f)) {
+    transform.scale = world_scale / transform.parent_scale;
+    transform.is_dirty = true;
   }
 
   ImGui::DragFloat3("AABB max", &node.bounds.max.x);
   ImGui::DragFloat3("AABB min", &node.bounds.min.x);
-  transform.is_dirty = true;
 }
 
 void imgui_gui::show_mesh_component(mesh_component& mesh_component) {
@@ -777,14 +843,14 @@ void imgui_gui::show_node_component() {
     const auto transform_optional
         = actions_.get_database().get_transform_component(selected_entity_);
     if (transform_optional.has_value()) {
-      if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_None)) {
+      if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
         show_transform_component(selected_node, transform_optional.value().get());
       }
     }
 
     const auto& mesh_optional = actions_.get_database().get_mesh_component(selected_entity_);
     if (mesh_optional.has_value()) {
-      if (ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_None)) {
+      if (ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_DefaultOpen)) {
         show_mesh_component(mesh_optional.value().get());
       }
     }
