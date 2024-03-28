@@ -131,7 +131,7 @@ void main() {
 	} else if (params.debugMode == 1) {
 		outFragColor = vec4(Kd.rgb, 1.0);
 	} else if (params.debugMode == 2) {
-		outFragColor = vec4(n, 1.0);
+		outFragColor = vec4(n * 0.5 + 0.5, 1.0);
 	} else if (params.debugMode == 3) {
 		outFragColor = vec4(Ke.rgb, 1.0);
 	} else if (params.debugMode == 4) {

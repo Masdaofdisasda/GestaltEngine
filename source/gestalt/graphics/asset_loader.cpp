@@ -374,6 +374,61 @@ void asset_loader::import_materials(fastgltf::Asset& gltf, size_t& sampler_offse
   }
 }
 
+void asset_loader::optimize_mesh(std::vector<Vertex>& vertices,
+                                    std::vector<uint32_t>& indices) {
+
+  // Step 1: Generate a remap table for vertex optimization
+  std::vector<unsigned int> remap(vertices.size());
+  size_t vertex_count
+      = meshopt_generateVertexRemap(remap.data(), indices.data(), indices.size(), vertices.data(),
+                                    vertices.size(), sizeof(Vertex));
+
+  // Step 2: Remap indices
+  std::vector<uint32_t> remappedIndices(indices.size());
+  meshopt_remapIndexBuffer(remappedIndices.data(), indices.data(), indices.size(), remap.data());
+
+  // Step 3: Remap vertices
+  std::vector<Vertex> remappedVertices(vertices.size());
+  meshopt_remapVertexBuffer(remappedVertices.data(), vertices.data(), vertex_count, sizeof(Vertex),
+                            remap.data());
+
+  // Step 4: Vertex cache optimization
+  meshopt_optimizeVertexCache(remappedIndices.data(), remappedIndices.data(),
+                              remappedIndices.size(), vertex_count);
+
+  // Step 5: Overdraw optimization (optional, depending on your needs)
+  meshopt_optimizeOverdraw(remappedIndices.data(), remappedIndices.data(), remappedIndices.size(), reinterpret_cast<const float*>(remappedVertices.data()), vertex_count, sizeof(Vertex), 1.05f);
+
+  // Step 6: Vertex fetch optimization
+  meshopt_optimizeVertexFetch(remappedVertices.data(), remappedIndices.data(),
+                              remappedIndices.size(), remappedVertices.data(), vertex_count,
+                              sizeof(Vertex));
+
+  // Replace the original vectors with the optimized ones
+  vertices.swap(remappedVertices);
+  indices.swap(remappedIndices);
+}
+
+void asset_loader::simplify_mesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices) {
+
+  const size_t index_count = indices.size();
+  const size_t vertex_count = vertices.size();
+
+  float complexityThreshold = 0.5f;  // For example, 20% of the original complexity
+  size_t target_index_count = index_count * complexityThreshold;
+  float target_error = 1e-2f;
+  unsigned int options = 0;  // Using default options for meshopt_simplify
+
+  std::vector<uint32_t> lod_indices(index_count);
+  float lod_error = 0.0f;
+
+  lod_indices.resize(meshopt_simplify(lod_indices.data(), indices.data(), index_count,
+                                      reinterpret_cast<const float*>(vertices.data()), vertex_count,
+                                      sizeof(Vertex), target_index_count, target_error, options,
+                                      &lod_error));
+  indices.swap(lod_indices);
+}
+
 size_t asset_loader::create_surface(std::vector<Vertex>& vertices,
                                      std::vector<uint32_t>& indices) {
   assert(!vertices.empty() && !indices.empty());
@@ -463,9 +518,8 @@ void asset_loader::import_meshes(fastgltf::Asset& gltf, const size_t material_of
         fastgltf::Accessor& indexaccessor = gltf.accessors[primitive.indicesAccessor.value()];
         indices.reserve(indices.size() + indexaccessor.count);
 
-        fastgltf::iterateAccessor<std::uint32_t>(gltf, indexaccessor, [&](std::uint32_t idx) {
-          indices.push_back(idx + initial_index);
-        });
+        fastgltf::iterateAccessor<std::uint32_t>(
+            gltf, indexaccessor, [&](std::uint32_t idx) { indices.push_back(idx); });
       }
 
       // load vertex positions
@@ -512,10 +566,16 @@ void asset_loader::import_meshes(fastgltf::Asset& gltf, const size_t material_of
             [&](glm::vec4 v, size_t index) { vertices[index].color = v; });
       }
 
+      optimize_mesh(vertices, indices);
+      if (indices.size() > 8192) {
+        simplify_mesh(vertices, indices);
+      }
+      for (auto& idx : indices) {
+        idx += initial_index;
+      }
       size_t surface_index = create_surface(vertices, indices);
       if (primitive.materialIndex.has_value()) {
-        add_material_component(surface_index,
-                               material_offset + primitive.materialIndex.value());
+        add_material_component(surface_index, material_offset + primitive.materialIndex.value());
 
       } else {
         add_material_component(surface_index, default_material);
