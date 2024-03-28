@@ -77,9 +77,9 @@ class asset_loader {
   void import_materials(fastgltf::Asset& gltf, size_t& sampler_offset, size_t& image_offset) const;
   static void optimize_mesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices);
   void simplify_mesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices);
-  size_t create_surface(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices);
-  size_t create_mesh(std::vector<size_t> surfaces, const std::string& name) const;
-  void add_material_component(size_t surface, size_t material) const;
+  mesh_surface create_surface(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices);
+  size_t create_mesh(std::vector<mesh_surface> surfaces, const std::string& name) const;
+  void add_material_component(mesh_surface& surface, const size_t material) const;
   void import_meshes(fastgltf::Asset& gltf, size_t material_offset);
 
 public:

@@ -801,8 +801,7 @@ void imgui_gui::show_transform_component(node_component& node, transform_compone
 void imgui_gui::show_mesh_component(mesh_component& mesh_component) {
   auto& mesh = actions_.get_database().get_mesh(mesh_component.mesh);
 
-  for (auto surface_index : mesh.surfaces) {
-    auto& surface = actions_.get_database().get_surface(surface_index);
+  for (auto& surface : mesh.surfaces) {
     auto& material = actions_.get_database().get_material(surface.material);
     if (ImGui::TreeNode(material.name.c_str())) {
       auto& config = material.config;

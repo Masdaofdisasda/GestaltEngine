@@ -414,10 +414,10 @@ void asset_loader::simplify_mesh(std::vector<Vertex>& vertices, std::vector<uint
   const size_t index_count = indices.size();
   const size_t vertex_count = vertices.size();
 
-  float complexityThreshold = 0.5f;  // For example, 20% of the original complexity
+  float complexityThreshold = 0.5f;  // 50% of the original complexity
   size_t target_index_count = index_count * complexityThreshold;
   float target_error = 1e-2f;
-  unsigned int options = 0;  // Using default options for meshopt_simplify
+  unsigned int options = 0;
 
   std::vector<uint32_t> lod_indices(index_count);
   float lod_error = 0.0f;
@@ -429,8 +429,8 @@ void asset_loader::simplify_mesh(std::vector<Vertex>& vertices, std::vector<uint
   indices.swap(lod_indices);
 }
 
-size_t asset_loader::create_surface(std::vector<Vertex>& vertices,
-                                     std::vector<uint32_t>& indices) {
+mesh_surface asset_loader::create_surface(std::vector<Vertex>& vertices,
+                                          std::vector<uint32_t>& indices) {
   assert(!vertices.empty() && !indices.empty());
 
   const size_t vertex_count = vertices.size();
@@ -463,46 +463,44 @@ size_t asset_loader::create_surface(std::vector<Vertex>& vertices,
   };
 
   resource_manager_->get_database().add_vertices(vertices);
-  uint32_t highest_index = *std::max_element(indices.begin(), indices.end());
+  uint32_t highest_index = *std::ranges::max_element(indices);
   assert(highest_index <= resource_manager_->get_database().get_vertices_size());
   resource_manager_->get_database().add_indices(indices);
 
-  size_t surface_id = resource_manager_->get_database().add_surface(surface);
-  fmt::print("created surface {}, index count {}\n", surface_id, surface.index_count);
+  //size_t surface_id = resource_manager_->get_database().add_surface(surface);
+  //fmt::print("created surface {}, index count {}\n", surface_id, surface.index_count);
 
-  return surface_id;
+  return surface;
 }
 
-size_t asset_loader::create_mesh(std::vector<size_t> surfaces, const std::string& name) const {
+size_t asset_loader::create_mesh(std::vector<mesh_surface> surfaces, const std::string& name) const {
   size_t mesh_id = resource_manager_->get_database().get_meshes_size();
   const std::string key = name.empty() ? "mesh_" + std::to_string(mesh_id) : name;
   AABB aabb;
-  for (size_t surface_index : surfaces) {
-    assert(surface_index < resource_manager_->get_database().get_surfaces_size());
-    auto& surface_bounds = resource_manager_->get_database().get_surface(surface_index).local_bounds;
-    aabb.min.x = std::min(aabb.min.x, surface_bounds.min.x);
-    aabb.min.y = std::min(aabb.min.y, surface_bounds.min.y);
-    aabb.min.z = std::min(aabb.min.z, surface_bounds.min.z);
+  for (mesh_surface& surface : surfaces) {
+    auto& [min, max, is_dirty] = surface.local_bounds;
+    aabb.min.x = std::min(aabb.min.x, min.x);
+    aabb.min.y = std::min(aabb.min.y, min.y);
+    aabb.min.z = std::min(aabb.min.z, min.z);
 
-    aabb.max.x = std::max(aabb.max.x, surface_bounds.max.x);
-    aabb.max.y = std::max(aabb.max.y, surface_bounds.max.y);
-    aabb.max.z = std::max(aabb.max.z, surface_bounds.max.z);
+    aabb.max.x = std::max(aabb.max.x, max.x);
+    aabb.max.y = std::max(aabb.max.y, max.y);
+    aabb.max.z = std::max(aabb.max.z, max.z);
   }
   mesh_id = resource_manager_->get_database().add_mesh(mesh{key, std::move(surfaces), aabb});
   fmt::print("created mesh {}, mesh_id {}\n", key, mesh_id);
   return mesh_id;
 }
 
-void asset_loader::add_material_component(const size_t surface, const size_t material) const {
+void asset_loader::add_material_component(mesh_surface& surface, const size_t material) const {
   assert(material != no_component);
   assert(material <= resource_manager_->get_database().get_materials_size());
-  assert(surface <= resource_manager_->get_database().get_surfaces_size());
-  assert(resource_manager_->get_database().get_surface(surface).material == default_material);
-  resource_manager_->get_database().get_surface(surface).material = material;
+  assert(surface.material == default_material);
+  surface.material = material;
 }
 
 void asset_loader::import_meshes(fastgltf::Asset& gltf, const size_t material_offset) {
-  std::vector<size_t> surfaces;
+  std::vector<mesh_surface> surfaces;
 
   fmt::print("importing meshes\n");
   for (fastgltf::Mesh& mesh : gltf.meshes) {
@@ -573,14 +571,14 @@ void asset_loader::import_meshes(fastgltf::Asset& gltf, const size_t material_of
       for (auto& idx : indices) {
         idx += initial_index;
       }
-      size_t surface_index = create_surface(vertices, indices);
+      mesh_surface surface = create_surface(vertices, indices);
       if (primitive.materialIndex.has_value()) {
-        add_material_component(surface_index, material_offset + primitive.materialIndex.value());
+        add_material_component(surface, material_offset + primitive.materialIndex.value());
 
       } else {
-        add_material_component(surface_index, default_material);
+        add_material_component(surface, default_material);
       }
-      surfaces.push_back(surface_index);
+      surfaces.push_back(surface);
     }
     create_mesh(surfaces, std::string(mesh.name));
   }

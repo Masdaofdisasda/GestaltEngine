@@ -365,9 +365,7 @@ void render_system::traverse_scene(const entity entity, const glm::mat4& parent_
    if (mesh_component.has_value()) {
      const auto& mesh = resource_manager_->get_database().get_mesh(mesh_component->get().mesh);
 
-     for (const auto surface_index : mesh.surfaces) {
-       const auto& surface = resource_manager_->get_database().get_surface(surface_index);
-
+     for (const auto surface : mesh.surfaces) {
        const auto& material = resource_manager_->get_database().get_material(surface.material);
 
        render_object def;

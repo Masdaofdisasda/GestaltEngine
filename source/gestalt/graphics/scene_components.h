@@ -27,7 +27,7 @@ struct mesh_component {
 
 struct mesh {
   std::string name;
-  std::vector<size_t> surfaces;
+  std::vector<mesh_surface> surfaces;
   AABB local_bounds;
 };
 

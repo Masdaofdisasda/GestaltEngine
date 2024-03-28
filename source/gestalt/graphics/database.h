@@ -19,10 +19,6 @@ public:
     gpu_data_.indices_.insert(gpu_data_.indices_.end(), indices.begin(), indices.end());
     return offset;
   }
-  size_t add_surface(const mesh_surface& surface) {
-    gpu_data_.surfaces_.push_back(surface);
-    return gpu_data_.surfaces_.size() - 1;
-  }
   size_t add_matrix(const glm::mat4& matrix) {
     gpu_data_.matrices_.push_back(matrix);
     return gpu_data_.matrices_.size() - 1;
@@ -54,7 +50,6 @@ public:
 
   std::vector<Vertex>& get_vertices() { return gpu_data_.vertices_; }
   std::vector<uint32_t>& get_indices() { return gpu_data_.indices_; }
-  std::vector<mesh_surface>& get_surfaces() { return gpu_data_.surfaces_; }
   std::vector<glm::mat4>& get_matrices() { return gpu_data_.matrices_; }
   std::vector<glm::mat4>& get_light_view_projs() { return gpu_data_.light_view_projections; }
   std::vector<AllocatedImage>& get_images() { return gpu_data_.images_; }
@@ -69,7 +64,6 @@ public:
 
   size_t get_vertices_size() const { return gpu_data_.vertices_.size(); }
   size_t get_indices_size() const { return gpu_data_.indices_.size(); }
-  size_t get_surfaces_size() const { return gpu_data_.surfaces_.size(); }
   size_t get_matrices_size() const { return gpu_data_.matrices_.size(); }
   size_t get_images_size() const { return gpu_data_.images_.size(); }
   size_t get_samplers_size() const { return gpu_data_.samplers_.size(); }
@@ -77,7 +71,6 @@ public:
   size_t get_meshes_size() const { return gpu_data_.meshes_.size(); }
   size_t get_light_view_projs_size() const { return gpu_data_.light_view_projections.size(); }
 
-  mesh_surface& get_surface(const size_t surface) { return gpu_data_.surfaces_[surface]; }
   glm::mat4& get_matrix(const size_t matrix) { return gpu_data_.matrices_[matrix]; }
   glm::mat4& get_light_view_proj(const size_t matrix) { return gpu_data_.light_view_projections[matrix]; }
   AllocatedImage& get_image(const size_t image) { return gpu_data_.images_[image]; }
@@ -199,7 +192,6 @@ private:
   struct gpu_data_container {
     std::vector<Vertex> vertices_;
     std::vector<uint32_t> indices_;
-    std::vector<mesh_surface> surfaces_;
     std::vector<glm::mat4> matrices_;
     std::vector<glm::mat4> light_view_projections;
     std::vector<AllocatedImage> images_;
