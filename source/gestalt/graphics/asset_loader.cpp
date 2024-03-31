@@ -7,6 +7,13 @@
 
 #include "scene_manager.h"
 
+struct Vertex {
+   glm::vec3 position;
+  glm::vec3 normal;
+   glm::vec4 tangent;
+  glm::vec2 uv;
+};
+
 
 void asset_loader::init(const vk_gpu& gpu,
                         const std::shared_ptr<resource_manager>& resource_manager,
@@ -375,7 +382,8 @@ void asset_loader::import_materials(fastgltf::Asset& gltf, size_t& sampler_offse
 }
 
 void asset_loader::optimize_mesh(std::vector<Vertex>& vertices,
-                                    std::vector<uint32_t>& indices) {
+                                 std::vector<uint32_t>& indices) {
+
 
   // Step 1: Generate a remap table for vertex optimization
   std::vector<unsigned int> remap(vertices.size());
@@ -409,6 +417,7 @@ void asset_loader::optimize_mesh(std::vector<Vertex>& vertices,
   indices.swap(remappedIndices);
 }
 
+
 void asset_loader::simplify_mesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices) {
 
   const size_t index_count = indices.size();
@@ -429,19 +438,76 @@ void asset_loader::simplify_mesh(std::vector<Vertex>& vertices, std::vector<uint
   indices.swap(lod_indices);
 }
 
-mesh_surface asset_loader::create_surface(std::vector<Vertex>& vertices,
-                                          std::vector<uint32_t>& indices) {
-  assert(!vertices.empty() && !indices.empty());
 
-  const size_t vertex_count = vertices.size();
+std::vector<meshlet> asset_loader::generate_meshlets(std::vector<GpuVertexPosition>& vertices,
+                                                     std::vector<uint32_t>& indices) {
+  const size_t max_vertices = 64;
+  const size_t max_triangles = 124;  // Must be divisible by 4
+  const float cone_weight = 0.0f;    // Set between 0 and 1 if using cone culling
+
+  size_t max_meshlets = meshopt_buildMeshletsBound(indices.size(), max_vertices, max_triangles);
+  std::vector<meshopt_Meshlet> meshopt_meshlets(max_meshlets);
+  std::vector<unsigned int> meshlet_vertices(max_meshlets * max_vertices);
+  std::vector<unsigned char> meshlet_triangles(max_meshlets * max_triangles * 3);
+
+  size_t meshlet_count = meshopt_buildMeshlets(
+      meshopt_meshlets.data(), meshlet_vertices.data(), meshlet_triangles.data(), indices.data(),
+      indices.size(), reinterpret_cast<const float*>(vertices.data()), vertices.size(),
+      sizeof(GpuVertexPosition), max_vertices, max_triangles, cone_weight);
+
+  // Resize the arrays based on actual meshlet count and last meshlet's offsets + counts
+  const auto& last = meshopt_meshlets[meshlet_count - 1];
+  meshlet_vertices.resize(last.vertex_offset + last.vertex_count);
+  meshlet_triangles.resize(last.triangle_offset + ((last.triangle_count * 3 + 3) & ~3));
+  meshopt_meshlets.resize(meshlet_count);
+
+  std::vector<meshlet> result_meshlets(meshlet_count);
+  for (size_t i = 0; i < meshlet_count; ++i) {
+    const auto& local_meshlet = meshopt_meshlets[i];
+    auto& meshlet = result_meshlets[i];
+
+    
+    meshopt_Bounds meshlet_bounds = meshopt_computeMeshletBounds(
+        meshlet_vertices.data() + local_meshlet.vertex_offset,
+        meshlet_triangles.data() + local_meshlet.triangle_offset, local_meshlet.triangle_count,
+        reinterpret_cast<float*>(vertices.data()), vertices.size(), sizeof(GpuVertexPosition));
+        
+
+    meshlet.data_offset = result_meshlets.size();
+    meshlet.vertex_count = local_meshlet.vertex_count;
+    meshlet.triangle_count = local_meshlet.triangle_count;
+    
+    meshlet.center
+        = glm::vec3{meshlet_bounds.center[0], meshlet_bounds.center[1], meshlet_bounds.center[2]};
+    meshlet.radius = meshlet_bounds.radius;
+
+    meshlet.cone_axis[0] = meshlet_bounds.cone_axis_s8[0];
+    meshlet.cone_axis[1] = meshlet_bounds.cone_axis_s8[1];
+    meshlet.cone_axis[2] = meshlet_bounds.cone_axis_s8[2];
+
+    meshlet.cone_cutoff = meshlet_bounds.cone_cutoff_s8;
+    meshlet.mesh_index = resource_manager_->get_database().get_meshes_size(); //TODO
+  }
+
+  return result_meshlets;
+}
+
+mesh_surface asset_loader::create_surface(std::vector<GpuVertexPosition>& vertex_positions,
+                                          std::vector<GpuVertexData>& vertex_data,
+                                          std::vector<uint32_t>& indices,
+                                          std::vector<meshlet>&& meshlets) {
+  assert(!vertex_positions.empty() && !indices.empty());
+  assert(vertex_positions.size() == vertex_data.size());
+
+  const size_t vertex_count = vertex_positions.size();
   const size_t index_count = indices.size();
 
   // Initialize local AABB with first vertex position
-  AABB local_aabb{vertices[0].position, vertices[0].position};
+  AABB local_aabb{vertex_positions[0].position, vertex_positions[0].position};
 
   // Update local AABB for each vertex
   for (size_t i = 1; i < vertex_count; ++i) {
-    const glm::vec3& position = vertices[i].position;
+    const glm::vec3& position = vertex_positions[i].position;
 
     // Update min position
     local_aabb.min.x = std::min(local_aabb.min.x, position.x);
@@ -454,21 +520,20 @@ mesh_surface asset_loader::create_surface(std::vector<Vertex>& vertices,
     local_aabb.max.z = std::max(local_aabb.max.z, position.z);
   }
 
-  const mesh_surface surface{
+  mesh_surface surface{
+      .meshlets = std::move(meshlets),
       .vertex_count = static_cast<uint32_t>(vertex_count),
       .index_count = static_cast<uint32_t>(index_count),
       .first_index = static_cast<uint32_t>(resource_manager_->get_database().get_indices_size()),
-      .vertex_offset = static_cast<uint32_t>(resource_manager_->get_database().get_vertices_size()),
+      .vertex_offset = static_cast<uint32_t>(resource_manager_->get_database().get_vertex_positions_size()),
       .local_bounds = local_aabb,
   };
 
-  resource_manager_->get_database().add_vertices(vertices);
+  resource_manager_->get_database().add_vertices(vertex_positions);
+  resource_manager_->get_database().add_vertices(vertex_data);
   uint32_t highest_index = *std::ranges::max_element(indices);
-  assert(highest_index <= resource_manager_->get_database().get_vertices_size());
+  assert(highest_index <= resource_manager_->get_database().get_vertex_positions_size());
   resource_manager_->get_database().add_indices(indices);
-
-  //size_t surface_id = resource_manager_->get_database().add_surface(surface);
-  //fmt::print("created surface {}, index count {}\n", surface_id, surface.index_count);
 
   return surface;
 }
@@ -507,7 +572,7 @@ void asset_loader::import_meshes(fastgltf::Asset& gltf, const size_t material_of
     surfaces.clear();
 
     for (auto&& primitive : mesh.primitives) {
-      size_t initial_index = resource_manager_->get_database().get_vertices_size();
+      size_t initial_index = resource_manager_->get_database().get_vertex_positions_size();
       std::vector<uint32_t> indices;
       std::vector<Vertex> vertices;
 
@@ -528,13 +593,9 @@ void asset_loader::import_meshes(fastgltf::Asset& gltf, const size_t material_of
 
         fastgltf::iterateAccessorWithIndex<glm::vec3>(gltf, posAccessor,
                                                       [&](glm::vec3 v, size_t index) {
-                                                        Vertex newvtx;
-                                                        newvtx.position = v;
-                                                        newvtx.normal = {1, 0, 0};
-                                                        newvtx.color = glm::vec4{1.f};
-                                                        newvtx.uv_x = 0;
-                                                        newvtx.uv_y = 0;
-                                                        vertices[index] = newvtx;
+                                                            Vertex vtx;        
+                                                            vtx.position = v;
+                                                        vertices[index] = vtx;
                                                       });
       }
 
@@ -551,34 +612,54 @@ void asset_loader::import_meshes(fastgltf::Asset& gltf, const size_t material_of
       if (uv != primitive.attributes.end()) {
         fastgltf::iterateAccessorWithIndex<glm::vec2>(gltf, gltf.accessors[(*uv).second],
                                                       [&](glm::vec2 v, size_t index) {
-                                                        vertices[index].uv_x = v.x;
-                                                        vertices[index].uv_y = v.y;
+                                                        vertices[index].uv = v;
+
                                                       });
       }
 
-      // load vertex colors
-      auto colors = primitive.findAttribute("COLOR_0");
-      if (colors != primitive.attributes.end()) {
-        fastgltf::iterateAccessorWithIndex<glm::vec4>(
-            gltf, gltf.accessors[(*colors).second],
-            [&](glm::vec4 v, size_t index) { vertices[index].color = v; });
-      }
-
       optimize_mesh(vertices, indices);
+
       if (indices.size() > 8192) {
         simplify_mesh(vertices, indices);
       }
+
+      std::vector<GpuVertexPosition> vertex_positions{vertices.size()};
+      std::vector<GpuVertexData> vertex_data{vertices.size()};
+      for (int i = 0; i < vertex_positions.size(); i++) {
+        vertex_positions[i].position = vertices[i].position;
+        
+        vertex_data[i].normal[0] = static_cast<uint8_t>((vertices[i].normal.x + 1.0f) * 127.5f);
+        vertex_data[i].normal[1] = static_cast<uint8_t>((vertices[i].normal.y + 1.0f) * 127.5f);
+        vertex_data[i].normal[2] = static_cast<uint8_t>((vertices[i].normal.z + 1.0f) * 127.5f);
+        vertex_data[i].normal[3] = 0;  // padding
+
+        vertex_data[i].tangent[0] = static_cast<uint8_t>((vertices[i].tangent.x + 1.0f) * 127.5f);
+        vertex_data[i].tangent[1] = static_cast<uint8_t>((vertices[i].tangent.y + 1.0f) * 127.5f);
+        vertex_data[i].tangent[2] = static_cast<uint8_t>((vertices[i].tangent.z + 1.0f) * 127.5f);
+        vertex_data[i].tangent[3] = static_cast<uint8_t>((vertices[i].tangent.w + 1.0f)
+                                                         * 127.5f);  // Assuming .w is in [-1, 1]
+
+        vertex_data[i].uv[0] = meshopt_quantizeHalf(vertices[i].uv.x);
+        vertex_data[i].uv[1] = meshopt_quantizeHalf(vertices[i].uv.y);
+      }
+
+      std::vector<meshlet> meshlets = generate_meshlets(vertex_positions, indices);
+
       for (auto& idx : indices) {
         idx += initial_index;
       }
-      mesh_surface surface = create_surface(vertices, indices);
+
+      for (auto& meshlet : meshlets) {
+          //meshlet.vertex_count += initial_index;
+      }
+      mesh_surface surface = create_surface(vertex_positions, vertex_data, indices, std::move(meshlets));
       if (primitive.materialIndex.has_value()) {
         add_material_component(surface, material_offset + primitive.materialIndex.value());
 
       } else {
         add_material_component(surface, default_material);
       }
-      surfaces.push_back(surface);
+      surfaces.push_back(std::move(surface));
     }
     create_mesh(surfaces, std::string(mesh.name));
   }

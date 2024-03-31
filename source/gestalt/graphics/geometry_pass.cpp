@@ -11,6 +11,7 @@ void deferred_pass::prepare() {
   descriptor_layouts_.push_back(resource_manager_->ibl_data.IblLayout);
   descriptor_layouts_.push_back(resource_manager_->material_data.resource_layout);
   descriptor_layouts_.push_back(resource_manager_->material_data.constants_layout);
+  descriptor_layouts_.push_back(resource_manager_->scene_geometry_.vertex_layout);
 
   VkShaderModule meshFragShader;
   vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &meshFragShader);
@@ -94,11 +95,11 @@ void deferred_pass::execute(VkCommandBuffer cmd) {
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
   VkDescriptorSet descriptorSets[]
       = {resource_manager_->ibl_data.IblSet, resource_manager_->material_data.resource_set,
-         resource_manager_->material_data.constants_set};
+         resource_manager_->material_data.constants_set, resource_manager_->scene_geometry_.vertex_set};
 
   gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                                  &descriptor_write);
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 3,
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 4,
                           descriptorSets, 0, nullptr);
 
   viewport_.width = static_cast<float>(depth_image->getExtent2D().width);
@@ -111,7 +112,6 @@ void deferred_pass::execute(VkCommandBuffer cmd) {
     GPUDrawPushConstants push_constants;
     push_constants.worldMatrix = r.transform;
     push_constants.material_id = r.material;
-    push_constants.vertexBuffer = r.vertex_buffer_address;
     vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0,
                        sizeof(GPUDrawPushConstants), &push_constants);
     vkCmdDrawIndexed(cmd, r.index_count, 1, r.first_index, 0, 0);
@@ -121,10 +121,9 @@ void deferred_pass::execute(VkCommandBuffer cmd) {
            GPUDrawPushConstants push_constants;
            push_constants.worldMatrix = r.transform;
            push_constants.material_id = r.material;
-           push_constants.vertexBuffer = r.vertex_buffer_address;
            vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0,
                               sizeof(GPUDrawPushConstants), &push_constants);
-           vkCmdDrawIndexed(cmd, r.index_count, 1, r.first_index, 0, 0);
+      vkCmdDrawIndexed(cmd, r.index_count, 1, r.first_index, 0, 0);
     }
   }
 
@@ -240,7 +239,6 @@ void transparent_pass::execute(VkCommandBuffer cmd) {
     GPUDrawPushConstants push_constants;
     push_constants.worldMatrix = r.transform;
     push_constants.material_id = r.material;
-    push_constants.vertexBuffer = r.vertex_buffer_address;
     vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0,
                        sizeof(GPUDrawPushConstants), &push_constants);
     vkCmdDrawIndexed(cmd, r.index_count, 1, r.first_index, 0, 0);

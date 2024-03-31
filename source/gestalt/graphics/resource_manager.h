@@ -88,7 +88,6 @@ public:
   void init(const vk_gpu& gpu);
 
   void cleanup();
-  void update_mesh(const std::vector<uint32_t>& indices, const std::vector<Vertex>& vertices);
 
   AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage,
                                 VmaMemoryUsage memoryUsage);

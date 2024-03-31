@@ -13,6 +13,7 @@ void directional_depth_pass::prepare() {
                        resource_manager_->get_database().max_lights(light_type::directional)
                            + resource_manager_->get_database().max_lights(light_type::point))
           .build(gpu_.device));
+  descriptor_layouts_.push_back(resource_manager_->scene_geometry_.vertex_layout);
 
   VkShaderModule meshFragShader;
   vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &meshFragShader);
@@ -112,9 +113,13 @@ void directional_depth_pass::execute(VkCommandBuffer cmd) {
   }
   writer.write_buffer_array(17, lightViewProjBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
 
+  VkDescriptorSet descriptorSets[]
+      = {descriptor_set_,
+         resource_manager_->scene_geometry_.vertex_set};
+
   writer.update_set(gpu_.device, descriptor_set_);
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 1,
-                          &descriptor_set_, 0, nullptr);
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 2,
+                          descriptorSets, 0, nullptr);
 
   gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                                  &descriptor_write);
@@ -135,7 +140,6 @@ void directional_depth_pass::execute(VkCommandBuffer cmd) {
     GPUDrawPushConstants push_constants;
     push_constants.worldMatrix = r.transform;
     push_constants.material_id = r.material;
-    push_constants.vertexBuffer = r.vertex_buffer_address;
     vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0,
                        sizeof(GPUDrawPushConstants), &push_constants);
     vkCmdDrawIndexed(cmd, r.index_count, 1, r.first_index, 0, 0);
@@ -144,7 +148,6 @@ void directional_depth_pass::execute(VkCommandBuffer cmd) {
     GPUDrawPushConstants push_constants;
     push_constants.worldMatrix = r.transform;
     push_constants.material_id = r.material;
-    push_constants.vertexBuffer = r.vertex_buffer_address;
     vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0,
                        sizeof(GPUDrawPushConstants), &push_constants);
     vkCmdDrawIndexed(cmd, r.index_count, 1, r.first_index, 0, 0);

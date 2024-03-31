@@ -17,7 +17,7 @@ void vk_gpu::init(
                       .require_api_version(1, 3, 0)
                       .build();
 
-  if ( !inst_ret.has_value() ) {
+  if (!inst_ret.has_value()) {
     throw std::runtime_error("Could not create a Vulkan instance: " + inst_ret.error().message());
   }
 
@@ -33,6 +33,10 @@ void vk_gpu::init(
   VkPhysicalDeviceFeatures device_features{};
   device_features.fillModeNonSolid = true;
 
+  VkPhysicalDeviceVulkan11Features features11{};
+  features11.uniformAndStorageBuffer16BitAccess = true;
+  features11.storageBuffer16BitAccess = true;
+
   // vulkan 1.3 features
   VkPhysicalDeviceVulkan13Features features13{};
   features13.dynamicRendering = true;
@@ -42,6 +46,9 @@ void vk_gpu::init(
   VkPhysicalDeviceVulkan12Features features12{};
   features12.bufferDeviceAddress = true;
   features12.descriptorIndexing = true;
+  features12.uniformAndStorageBuffer8BitAccess = true;
+  features12.shaderFloat16 = true;
+  features12.shaderInt8 = true;
 
   features12.shaderSampledImageArrayNonUniformIndexing = true;
   features12.shaderStorageBufferArrayNonUniformIndexing = true;
@@ -55,13 +62,14 @@ void vk_gpu::init(
   auto device_ret = selector.set_minimum_version(1, 3)
                         .set_required_features_13(features13)
                         .set_required_features_12(features12)
+                        .set_required_features_11(features11)
                         .set_required_features(device_features)
                         .add_required_extension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME)
                         .set_surface(surface)
                         .select();
 
   if (!device_ret.has_value()) {
-       throw std::runtime_error("Could not select a Vulkan device: " + device_ret.error().message());
+    throw std::runtime_error("Could not select a Vulkan device: " + device_ret.error().message());
   }
 
   vkb::PhysicalDevice physicalDevice = device_ret.value();
@@ -72,7 +80,7 @@ void vk_gpu::init(
   auto dev_ret = deviceBuilder.build();
 
   if (!dev_ret.has_value()) {
-       throw std::runtime_error("Could not create a Vulkan device: " + dev_ret.error().message());
+    throw std::runtime_error("Could not create a Vulkan device: " + dev_ret.error().message());
   }
 
   vkb::Device vkbDevice = dev_ret.value();
@@ -84,9 +92,10 @@ void vk_gpu::init(
 
   // use vkbootstrap to get a Graphics queue
   auto graphics_queue_ret = vkbDevice.get_queue(vkb::QueueType::graphics);
-  
+
   if (!graphics_queue_ret.has_value()) {
-       throw std::runtime_error("Could not get a graphics queue: " + graphics_queue_ret.error().message());
+    throw std::runtime_error("Could not get a graphics queue: "
+                             + graphics_queue_ret.error().message());
   }
   graphics_queue = graphics_queue_ret.value();
   graphics_queue_family = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();

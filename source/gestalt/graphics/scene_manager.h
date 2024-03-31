@@ -1,12 +1,17 @@
 ﻿#pragma once
 
 #include <filesystem>
+#include <iosfwd>
+#include <iosfwd>
+#include <vector>
+#include <vector>
 
 #include "scene_components.h"
 
 #include "resource_manager.h"
 #include "scene_systems.h"
 
+struct Vertex;
 class asset_loader;
 
 class component_archetype_factory {
@@ -77,7 +82,10 @@ class asset_loader {
   void import_materials(fastgltf::Asset& gltf, size_t& sampler_offset, size_t& image_offset) const;
   static void optimize_mesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices);
   void simplify_mesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices);
-  mesh_surface create_surface(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices);
+  std::vector<meshlet> generate_meshlets(std::vector<GpuVertexPosition>& vertices,
+                                         std::vector<uint32_t>& indices);
+  mesh_surface create_surface(std::vector<GpuVertexPosition>& vertex_positions, std::vector<GpuVertexData>& vertex_data,
+                              std::vector<uint32_t>& indices, std::vector<meshlet>&& meshlets);
   size_t create_mesh(std::vector<mesh_surface> surfaces, const std::string& name) const;
   void add_material_component(mesh_surface& surface, const size_t material) const;
   void import_meshes(fastgltf::Asset& gltf, size_t material_offset);

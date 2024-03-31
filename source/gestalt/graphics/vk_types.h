@@ -112,34 +112,36 @@ struct per_frame_data {
   glm::mat4 inv_viewproj{1.f};
 };
 
-//> mat_types
 struct MaterialPipeline {
   VkPipeline pipeline;
   VkPipelineLayout layout;
 };
 
-//< mat_types
-//> vbuf_types
-struct Vertex {
-  glm::vec3 position;
-  float uv_x;
-  glm::vec3 normal;
-  float uv_y;
-  glm::vec4 color;
+struct GpuVertexPosition {
+  glm::vec3 position{0.f};
+  float padding{0.f};
+};
+
+struct GpuVertexData {
+  uint8_t normal[4];
+  uint8_t tangent[4];
+  uint16_t uv[2];
+  float padding{0.f};
 };
 
 // holds the resources needed for a mesh
 struct gpu_mesh_buffers {
   AllocatedBuffer indexBuffer;
-  AllocatedBuffer vertexBuffer;
-  VkDeviceAddress vertexBufferAddress;
+  AllocatedBuffer vertexPositionBuffer;
+  VkDescriptorSet vertex_set;
+  VkDescriptorSetLayout vertex_layout;
+  AllocatedBuffer vertexDataBuffer;
 };
 
 // push constants for our mesh object draws
 struct GPUDrawPushConstants {
   glm::mat4 worldMatrix;
   int material_id;
-  VkDeviceAddress vertexBuffer;
 };
 //< vbuf_types
 
@@ -167,10 +169,10 @@ struct AABB {
 struct render_object {
   uint32_t index_count;
   uint32_t first_index;
+  uint32_t vertex_offset;
 
   uint32_t material;
   glm::mat4 transform;
-  VkDeviceAddress vertex_buffer_address;
 };
 
 struct draw_context {
@@ -208,7 +210,7 @@ struct render_config {
   struct hdr_params {
     float exposure{1.f};
     float maxWhite{1.35f};
-    float bloomStrength{0.1f};
+    float bloomStrength{0.04f};
     float padding{1.f};
     glm::vec4 lift{0.f};
     glm::vec4 gamma{1.f};
@@ -226,7 +228,7 @@ struct render_config {
   } light_adaptation{};
 
   struct streaks_params {
-    float intensity{.18f};
+    float intensity{.04f};
     float attenuation{1.f};
     int streak_samples{6};
     int num_streaks{4};

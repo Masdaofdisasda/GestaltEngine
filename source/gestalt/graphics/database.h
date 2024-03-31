@@ -9,9 +9,16 @@ template <typename component_type> using component_container
 
 class database {
 public:
-  size_t add_vertices(std::vector<Vertex>& vertices) {
-    const size_t offset = gpu_data_.vertices_.size();
-    gpu_data_.vertices_.insert(gpu_data_.vertices_.end(), vertices.begin(), vertices.end());
+  size_t add_vertices(std::vector<GpuVertexPosition>& vertices) {
+    const size_t offset = gpu_data_.vertex_positions.size();
+    gpu_data_.vertex_positions.insert(gpu_data_.vertex_positions.end(), vertices.begin(),
+                                      vertices.end());
+    return offset;
+  }
+  size_t add_vertices(std::vector<GpuVertexData>& vertices) {
+    const size_t offset = gpu_data_.vertex_data.size();
+    gpu_data_.vertex_data.insert(gpu_data_.vertex_data.end(), vertices.begin(),
+                                      vertices.end());
     return offset;
   }
   size_t add_indices(std::vector<uint32_t>& indices) {
@@ -48,7 +55,8 @@ public:
     return gpu_data_.cameras_.size() - 1;
   }
 
-  std::vector<Vertex>& get_vertices() { return gpu_data_.vertices_; }
+  std::vector<GpuVertexPosition>& get_vertex_positions() { return gpu_data_.vertex_positions; }
+  std::vector<GpuVertexData>& get_vertex_data() { return gpu_data_.vertex_data; }
   std::vector<uint32_t>& get_indices() { return gpu_data_.indices_; }
   std::vector<glm::mat4>& get_matrices() { return gpu_data_.matrices_; }
   std::vector<glm::mat4>& get_light_view_projs() { return gpu_data_.light_view_projections; }
@@ -62,7 +70,8 @@ public:
        gpu_data_.light_view_projections[matrix] = value;
   }
 
-  size_t get_vertices_size() const { return gpu_data_.vertices_.size(); }
+  size_t get_vertex_positions_size() const { return gpu_data_.vertex_positions.size(); }
+  size_t get_vertex_data_size() const { return gpu_data_.vertex_data.size(); }
   size_t get_indices_size() const { return gpu_data_.indices_.size(); }
   size_t get_matrices_size() const { return gpu_data_.matrices_.size(); }
   size_t get_images_size() const { return gpu_data_.images_.size(); }
@@ -190,7 +199,8 @@ public:
 
 private:
   struct gpu_data_container {
-    std::vector<Vertex> vertices_;
+    std::vector<GpuVertexPosition> vertex_positions;
+    std::vector<GpuVertexData> vertex_data;
     std::vector<uint32_t> indices_;
     std::vector<glm::mat4> matrices_;
     std::vector<glm::mat4> light_view_projections;

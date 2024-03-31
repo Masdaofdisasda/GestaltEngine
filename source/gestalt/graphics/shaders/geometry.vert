@@ -1,54 +1,59 @@
 #version 450
 
 #extension GL_GOOGLE_include_directive : require
-#extension GL_EXT_buffer_reference : require
+#extension GL_EXT_shader_16bit_storage : require
+#extension GL_EXT_shader_8bit_storage: require
+#extension GL_EXT_shader_explicit_arithmetic_types: require
+#extension GL_EXT_shader_explicit_arithmetic_types_float16: require
 
 #include "per_frame_structs.glsl"
 
 layout (location = 0) out vec3 outNormal;
-layout (location = 1) out vec3 outPosition; //was color
+layout (location = 1) out vec3 outPosition;
 layout (location = 2) out vec2 outUV;
 layout (location = 3) flat out int outMaterialIndex;
 
-struct Vertex {
-
+struct VertexPosition {
 	vec3 position;
-	float uv_x;
-	vec3 normal;
-	float uv_y;
-	vec4 color;
+	float pad;
 }; 
 
-layout(buffer_reference, std430) readonly buffer VertexBuffer{ 
-	Vertex vertices[];
+struct VertexData {
+    uint8_t nx, ny, nz, nw; // normal
+    uint8_t tx, ty, tz, tw; // tangent
+    float16_t tu, tv;       // tex coords
+	float pad;
 };
 
-//push constants block
+layout(set=4, binding = 0) readonly buffer VertexPositionBuffer{ 
+	VertexPosition positions[];
+} vertexPositionBuffer;
+
+layout(set=4, binding = 1) readonly buffer VertexDataBuffer{ 
+	VertexData vertex_data[];
+} vertexDataBuffer;
+
 layout( push_constant ) uniform constants
 {
 	mat4 model_matrix;
 	int materialIndex;
-	VertexBuffer vertexBuffer;
 } PushConstants;
 
-const mat4 biasMat = mat4( 
-	0.5, 0.0, 0.0, 0.0,
-	0.0, 0.5, 0.0, 0.0,
-	0.0, 0.0, 1.0, 0.0,
-	0.5, 0.5, 0.0, 1.0 );
+const float i8_inverse = 1.0 / 127.0;
 
 void main() 
 {
-	Vertex v = PushConstants.vertexBuffer.vertices[gl_VertexIndex];
+	VertexPosition v = vertexPositionBuffer.positions[gl_VertexIndex];
+	VertexData data = vertexDataBuffer.vertex_data[gl_VertexIndex];
 	
 	vec4 position = vec4(v.position, 1.0f);
 
 	gl_Position =  sceneData.viewproj * PushConstants.model_matrix * position;
 
-	outNormal = mat3(transpose(inverse(PushConstants.model_matrix))) * v.normal;
-	//outColor = v.color.xyz * materialData.colorFactors.xyz;	
+	vec3 normal = vec3(int(data.nx), int(data.ny), int(data.nz)) * i8_inverse - 1.0;
+	outNormal = normalize(mat3(transpose(inverse(PushConstants.model_matrix))) * normal);
+
 	outPosition = vec3(PushConstants.model_matrix * position);
-	outUV.x = v.uv_x;
-	outUV.y = v.uv_y;
+	outUV = vec2(data.tu, data.tv);
 	outMaterialIndex = PushConstants.materialIndex;
 }

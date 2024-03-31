@@ -1,7 +1,6 @@
 #version 450
 
 #extension GL_GOOGLE_include_directive : require
-#extension GL_EXT_buffer_reference : require
 
 #include "per_frame_structs.glsl"
 
@@ -9,30 +8,27 @@ layout(set = 1, binding = 17) buffer LightViewProj{
 	mat4 viewProj;
 } lightViewProj[256 + 2];
 
-struct Vertex {
+
+struct VertexPosition {
 
 	vec3 position;
-	float uv_x;
-	vec3 normal;
-	float uv_y;
-	vec4 color;
+	float pad;
 }; 
 
-layout(buffer_reference, std430) readonly buffer VertexBuffer{ 
-	Vertex vertices[];
-};
+layout(set=2, binding = 0) readonly buffer VertexPositionBuffer{ 
+	VertexPosition positions[];
+} vertexPositionBuffer;
 
 //push constants block
 layout( push_constant ) uniform constants
 {
 	mat4 model_matrix;
 	int materialIndex;
-	VertexBuffer vertexBuffer;
 } PushConstants;
 
 void main() 
 {
-	Vertex v = PushConstants.vertexBuffer.vertices[gl_VertexIndex];
+	VertexPosition v = vertexPositionBuffer.positions[gl_VertexIndex];
 	
 	vec4 position = vec4(v.position, 1.0f);
 	

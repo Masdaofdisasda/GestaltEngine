@@ -104,7 +104,7 @@ vec3 linearToSrgb(vec3 linearColor) {
 
 void main() {
     vec3 sceneColor = texture(texScene, uv).rgb;
-    vec3 bloomColor = texture(texBloom, uv).rgb * params.bloomStrength;
+    vec3 bloomColor = texture(texBloom, uv).rgb;
 	float avgLuminance = texture(texLuminance, vec2(0.5, 0.5)).x;
 
     float exposureAdjustment = 1.0 / max(avgLuminance, 0.0001);
@@ -113,10 +113,8 @@ void main() {
     if (params.showBloom) {
         sceneColor = bloomColor;
     } else {
-        float minLuminanceThreshold = 0.0001;
-        float maxLuminanceThreshold = 10.0; //TODO
         bloomColor *= avgLuminance;
-		sceneColor += bloomColor;
+		sceneColor = mix(sceneColor, bloomColor, params.bloomStrength); //todo upsample bloom
 	}
 
     // Tone mapping

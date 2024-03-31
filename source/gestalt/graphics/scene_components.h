@@ -11,7 +11,22 @@ constexpr uint32_t invalid_entity = std::numeric_limits<uint32_t>::max();
 constexpr size_t no_component = std::numeric_limits<size_t>::max();
 constexpr size_t default_material = 0;
 
+struct alignas(16) meshlet {
+  glm::vec3 center;
+  float radius;
+
+  int8_t cone_axis[3];
+  int8_t cone_cutoff;
+
+  uint32_t data_offset;
+  uint32_t mesh_index;
+  uint8_t vertex_count;
+  uint8_t triangle_count;
+};
+
 struct mesh_surface {
+  std::vector<meshlet> meshlets;
+
   uint32_t vertex_count;
   uint32_t index_count;
   uint32_t first_index;

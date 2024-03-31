@@ -45,7 +45,7 @@ void main() {
 	vec3 viewPos = -normalize(vec3(sceneData.view[0][2], sceneData.view[1][2], sceneData.view[2][2]));
 	if(normalIndex != uint(-1)) {
 		vec3 normal_sample = texture(nonuniformEXT(textures[normalIndex]), UV).rgb;
-		n = perturbNormal(n, normalize(viewPos - inPosition), normal_sample, UV);
+		//n = perturbNormal(n, normalize(viewPos - inPosition), normal_sample, UV);
 	}
 
 	vec4 Ke = vec4(materialData[nonuniformEXT(inMaterialIndex)].emissiveFactor, 1.0);

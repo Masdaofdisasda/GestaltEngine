@@ -371,9 +371,9 @@ void render_system::traverse_scene(const entity entity, const glm::mat4& parent_
        render_object def;
        def.index_count = surface.index_count;
        def.first_index = surface.first_index;
+       def.vertex_offset = surface.vertex_offset;
        def.material = surface.material;
        def.transform = world_transform;
-       def.vertex_buffer_address = resource_manager_->scene_geometry_.vertexBufferAddress;
 
        if (material.config.transparent) {
          resource_manager_->main_draw_context_.transparent_surfaces.push_back(def);
@@ -389,14 +389,20 @@ void render_system::traverse_scene(const entity entity, const glm::mat4& parent_
  }
 
 void render_system::prepare() {
-   const size_t initial_vertex_buffer_size = 184521 * sizeof(Vertex);
+   const size_t initial_vertex_position_buffer_size = 184521 * sizeof(GpuVertexPosition);
+   const size_t initial_vertex_data_buffer_size = 184521 * sizeof(GpuVertexData);
    const size_t initial_index_buffer_size = 786801 * sizeof(uint32_t);
 
    // Create initially empty vertex buffer
-   resource_manager_->scene_geometry_.vertexBuffer = resource_manager_->create_buffer(
-       initial_vertex_buffer_size,
-       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
-           | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+   resource_manager_->scene_geometry_.vertexPositionBuffer = resource_manager_->create_buffer(
+       initial_vertex_position_buffer_size,
+       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
+            | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+       VMA_MEMORY_USAGE_GPU_ONLY);
+   resource_manager_->scene_geometry_.vertexDataBuffer = resource_manager_->create_buffer(
+       initial_vertex_data_buffer_size,
+       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
+           | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
        VMA_MEMORY_USAGE_GPU_ONLY);
 
    // Create initially empty index buffer
