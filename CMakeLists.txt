@@ -10,7 +10,9 @@ set(FOUNDATION_MODULE "Foundation")
 set(APPLICATION_MODULE "Application")
 
 if(NOT EXISTS ${CMAKE_BINARY_DIR}/cmake/CPM.cmake)
-  file(DOWNLOAD https://github.com/cpm-cmake/CPM.cmake/releases/latest/download/CPM.cmake ${CMAKE_BINARY_DIR}/cmake/CPM.cmake)
+  file(DOWNLOAD https://github.com/cpm-cmake/CPM.cmake/releases/latest/download/CPM.cmake
+       ${CMAKE_BINARY_DIR}/cmake/CPM.cmake
+  )
 endif()
 include(${CMAKE_BINARY_DIR}/cmake/CPM.cmake)
 
@@ -31,7 +33,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 if(MSVC)
-    add_compile_options(/experimental:module /std:c++latest)
+  add_compile_options(/experimental:module /std:c++latest)
 endif()
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_SOURCE_DIR}/bin/debug")
@@ -47,6 +49,9 @@ set_property(TARGET ${FOUNDATION_MODULE} PROPERTY FOLDER "GestaltEngine")
 set_property(TARGET ${APPLICATION_MODULE} PROPERTY FOLDER "GestaltEngine")
 set_property(TARGET Shaders PROPERTY FOLDER "GestaltEngine")
 
-set_target_properties(${APPLICATION_NAME} PROPERTIES
-    VS_DEBUGGER_WORKING_DIRECTORY "$<$<CONFIG:Debug>:${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG}>$<$<CONFIG:Release>:${CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE}>"
+set_target_properties(
+  ${APPLICATION_NAME}
+  PROPERTIES
+    VS_DEBUGGER_WORKING_DIRECTORY
+    "$<$<CONFIG:Debug>:${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG}>$<$<CONFIG:Release>:${CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE}>"
 )

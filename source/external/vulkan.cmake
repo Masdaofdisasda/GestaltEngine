@@ -9,17 +9,17 @@ set(Vulkan_LIBRARIES "${VULKAN_SDK}/Lib")
 message(STATUS "Vulkan LIBRARIES: ${Vulkan_LIBRARIES}")
 
 if(WIN32)
-    set(VULKAN_LIBRARY "${Vulkan_LIBRARIES}/vulkan-1.lib")
+  set(VULKAN_LIBRARY "${Vulkan_LIBRARIES}/vulkan-1.lib")
 elseif(UNIX AND NOT APPLE)
-    set(VULKAN_LIBRARY "${Vulkan_LIBRARIES}/libvulkan.so")
+  set(VULKAN_LIBRARY "${Vulkan_LIBRARIES}/libvulkan.so")
 elseif(APPLE)
-    set(VULKAN_LIBRARY "${Vulkan_LIBRARIES}/libvulkan.dylib")
+  set(VULKAN_LIBRARY "${Vulkan_LIBRARIES}/libvulkan.dylib")
 endif()
 
 message(STATUS "Vulkan LIBRARY: ${VULKAN_LIBRARY}")
 
-# When linking your target, link against the Vulkan library
-#target_link_libraries(your_target PRIVATE ${VULKAN_LIBRARY})
+# When linking your target, link against the Vulkan library target_link_libraries(your_target
+# PRIVATE ${VULKAN_LIBRARY})
 
-#find_package(Vulkan REQUIRED)
-#message(STATUS "Vulkan INCLUDE_DIRS: ${Vulkan_INCLUDE_DIRS}, LIBRARIES: ${Vulkan_LIBRARIES}")
+# find_package(Vulkan REQUIRED) message(STATUS "Vulkan INCLUDE_DIRS: ${Vulkan_INCLUDE_DIRS},
+# LIBRARIES: ${Vulkan_LIBRARIES}")

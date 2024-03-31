@@ -1,7 +1,7 @@
 CPMAddPackage(
-    NAME tracy
-    GITHUB_REPOSITORY wolfpld/tracy
-    VERSION 0.10
+  NAME tracy
+  GITHUB_REPOSITORY wolfpld/tracy
+  VERSION 0.10
 )
 add_compile_definitions(TRACY_ENABLE)
 
