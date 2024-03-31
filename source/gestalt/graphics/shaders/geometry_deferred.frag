@@ -6,10 +6,11 @@
 #include "input_structures.glsl"
 #include "normal_mapping.glsl"
 
-layout (location = 0) in vec3 inNormal;
-layout (location = 1) in vec3 inPosition;
-layout (location = 2) in vec2 inUV;
-layout (location = 3) flat in int inMaterialIndex;
+layout (location = 0) in vec2 inUV;
+layout (location = 1) in vec4 inNormal_BiTanX;
+layout (location = 2) in vec4 inTangent_BiTanY;
+layout (location = 3) in vec4 inPosition_BiTanZ;
+layout (location = 4) flat in int inMaterialIndex;
 
 layout(location = 0) out vec4 gBuffer1; // Albedo (RGB) + Metalness (A)
 layout(location = 1) out vec4 gBuffer2; // Normal (RG) + Roughness (A)
@@ -29,6 +30,10 @@ void main() {
 	uint occlusionIndex =		materialData[nonuniformEXT(inMaterialIndex)].occlusion_tex_index;
 
     vec2 UV = inUV;
+	vec3 inNormal = normalize(inNormal_BiTanX.xyz);
+	vec3 inTangent = normalize(inTangent_BiTanY.xyz);
+	vec3 inBiTangent = normalize(inPosition_BiTanZ.xyz);
+	vec3 inPosition = inPosition_BiTanZ.xyz;
 
 	vec4 Kd = materialData[nonuniformEXT(inMaterialIndex)].albedo_factor;
 	if(albedoIndex != uint(-1)) {
@@ -45,7 +50,7 @@ void main() {
 	vec3 viewPos = -normalize(vec3(sceneData.view[0][2], sceneData.view[1][2], sceneData.view[2][2]));
 	if(normalIndex != uint(-1)) {
 		vec3 normal_sample = texture(nonuniformEXT(textures[normalIndex]), UV).rgb;
-		//n = perturbNormal(n, normalize(viewPos - inPosition), normal_sample, UV);
+		n = perturbNormal(n, normalize(viewPos - inPosition), normal_sample, UV);
 	}
 
 	vec4 Ke = vec4(materialData[nonuniformEXT(inMaterialIndex)].emissiveFactor, 1.0);

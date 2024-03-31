@@ -576,7 +576,6 @@ void asset_loader::import_meshes(fastgltf::Asset& gltf, const size_t material_of
       std::vector<uint32_t> indices;
       std::vector<Vertex> vertices;
 
-      // load indexes
       {
         fastgltf::Accessor& indexaccessor = gltf.accessors[primitive.indicesAccessor.value()];
         indices.reserve(indices.size() + indexaccessor.count);
@@ -585,7 +584,6 @@ void asset_loader::import_meshes(fastgltf::Asset& gltf, const size_t material_of
             gltf, indexaccessor, [&](std::uint32_t idx) { indices.push_back(idx); });
       }
 
-      // load vertex positions
       {
         fastgltf::Accessor& posAccessor
             = gltf.accessors[primitive.findAttribute("POSITION")->second];
@@ -599,7 +597,6 @@ void asset_loader::import_meshes(fastgltf::Asset& gltf, const size_t material_of
                                                       });
       }
 
-      // load vertex normals
       auto normals = primitive.findAttribute("NORMAL");
       if (normals != primitive.attributes.end()) {
         fastgltf::iterateAccessorWithIndex<glm::vec3>(
@@ -607,7 +604,13 @@ void asset_loader::import_meshes(fastgltf::Asset& gltf, const size_t material_of
             [&](glm::vec3 v, size_t index) { vertices[index].normal = v; });
       }
 
-      // load UVs
+      auto tangents = primitive.findAttribute("TANGENT");
+      if (tangents != primitive.attributes.end()) {
+        fastgltf::iterateAccessorWithIndex<glm::vec4>(
+            gltf, gltf.accessors[(*tangents).second],
+            [&](glm::vec4 v, size_t index) { vertices[index].tangent = v; });
+      }
+
       auto uv = primitive.findAttribute("TEXCOORD_0");
       if (uv != primitive.attributes.end()) {
         fastgltf::iterateAccessorWithIndex<glm::vec2>(gltf, gltf.accessors[(*uv).second],

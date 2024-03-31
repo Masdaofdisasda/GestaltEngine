@@ -8,10 +8,11 @@
 
 #include "per_frame_structs.glsl"
 
-layout (location = 0) out vec3 outNormal;
-layout (location = 1) out vec3 outPosition;
-layout (location = 2) out vec2 outUV;
-layout (location = 3) flat out int outMaterialIndex;
+layout (location = 0) out vec2 outUV;
+layout (location = 1) out vec4 outNormal_BiTanX;
+layout (location = 2) out vec4 outTangent_BiTanY;
+layout (location = 3) out vec4 outPosition_BiTanZ;
+layout (location = 4) flat out int outMaterialIndex;
 
 struct VertexPosition {
 	vec3 position;
@@ -46,14 +47,22 @@ void main()
 	VertexPosition v = vertexPositionBuffer.positions[gl_VertexIndex];
 	VertexData data = vertexDataBuffer.vertex_data[gl_VertexIndex];
 	
-	vec4 position = vec4(v.position, 1.0f);
+	outUV = vec2(data.tu, data.tv);
 
+	vec4 position = vec4(v.position, 1.0f);
+	outPosition_BiTanZ.xyz = vec3(PushConstants.model_matrix * position);
 	gl_Position =  sceneData.viewproj * PushConstants.model_matrix * position;
 
 	vec3 normal = vec3(int(data.nx), int(data.ny), int(data.nz)) * i8_inverse - 1.0;
-	outNormal = normalize(mat3(transpose(inverse(PushConstants.model_matrix))) * normal);
+	outNormal_BiTanX.xyz = normalize(mat3(PushConstants.model_matrix) * normal);
 
-	outPosition = vec3(PushConstants.model_matrix * position);
-	outUV = vec2(data.tu, data.tv);
+	vec3 tangent = vec3(int(data.tx), int(data.ty), int(data.tz)) * i8_inverse - 1.0;
+	outTangent_BiTanY.xyz = normalize(mat3(PushConstants.model_matrix) * tangent);
+
+	vec3 bitangent = cross( outNormal_BiTanX.xyz, tangent ) * (int(data.tw) * i8_inverse  - 1.0 );
+    outNormal_BiTanX.w = bitangent.x;
+    outTangent_BiTanY.w = bitangent.y;
+    outPosition_BiTanZ.w = bitangent.z;
+
 	outMaterialIndex = PushConstants.materialIndex;
 }
