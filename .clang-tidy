@@ -1,0 +1,116 @@
+Checks: >
+  *,
+  -fuchsia-*,
+  -google-*,
+  -llvm-header-guard,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -llvm-include-order,
+  -google-runtime-references,
+  -hicpp-no-array-decay,
+  -cert-err58-cpp,
+  -modernize-use-trailing-return-type,
+  -readability-magic-numbers,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-avoid-c-arrays,
+  -cppcoreguidelines-pro-type-union-access,
+  -hicpp-no-assembler,
+  -hicpp-vararg,
+  -hicpp-exception-baseclass,
+  -hicpp-avoid-c-arrays,
+  -hicpp-use-equals-default,
+  -hicpp-use-override,
+  -hicpp-noexcept-move,
+  -hicpp-signed-bitwise,
+  -hicpp-uppercase-literal-suffix,
+  -hicpp-use-auto,
+  -hicpp-use-emplace,
+  -hicpp-use-equals-delete,
+  -hicpp-use-noexcept,
+  -hicpp-use-nullptr,
+  -hicpp-member-init,
+  -misc-non-private-member-variables-in-classes,
+  -misc-no-recursion,
+  -misc-throw-by-value-catch-by-reference,
+  -modernize-avoid-c-arrays,
+  -modernize-deprecated-headers,
+  -modernize-make-shared,
+  -modernize-make-unique,
+  -modernize-pass-by-value,
+  -modernize-raw-string-literal,
+  -modernize-redundant-void-arg,
+  -modernize-replace-auto-ptr,
+  -modernize-use-auto,
+  -modernize-use-bool-literals,
+  -modernize-use-default-member-init,
+  -modernize-use-emplace,
+  -modernize-use-equals-default,
+  -modernize-use-equals-delete,
+  -modernize-use-noexcept,
+  -modernize-use-nullptr,
+  -modernize-use-override,
+  -modernize-use-transparent-functors,
+  -modernize-use-uncaught-exceptions,
+  -modernize-use-using,
+  -performance-unnecessary-value-param,
+  -readability-avoid-const-params-in-decls,
+  -readability-braces-around-statements,
+  -readability-convert-member-functions-to-static,
+  -readability-delete-null-pointer,
+  -readability-deleted-default,
+  -readability-else-after-return,
+  -readability-function-size,
+  -readability-identifier-length,
+  -readability-identifier-naming,
+  -readability-inconsistent-declaration-parameter-name,
+  -readability-misleading-indentation,
+  -readability-misplaced-array-index,
+  -readability-named-parameter,
+  -readability-non-const-parameter,
+  -readability-redundant-control-flow,
+  -readability-redundant-declaration,
+  -readability-redundant-function-ptr-dereference,
+  -readability-redundant-member-init,
+  -readability-redundant-preprocessor,
+  -readability-redundant-smartptr-get,
+  -readability-redundant-string-cstr,
+  -readability-redundant-string-init,
+  -readability-simplify-boolean-expr,
+  -readability-simplify-subscript-expr,
+  -readability-static-accessed-through-instance,
+  -readability-static-definition-in-anonymous-namespace,
+  -readability-string-compare,
+  -readability-uniqueptr-delete-release,
+  -readability-uppercase-literal-suffix
+
+CheckOptions:
+  # Enforce namespace comments
+  - key:             readability-namespace-comments.ShortNamespaceLines
+    value:           '1'
+  - key:             readability-namespace-comments.SpacesBeforeComments
+    value:           '2'
+
+  # Enforce casing styles
+  - key:             readability-identifier-naming.NamespaceCase
+    value:           'aN'
+  - key:             readability-identifier-naming.ClassCase
+    value:           'CamelCase'
+  - key:             readability-identifier-naming.StructCase
+    value:           'CamelCase'
+  - key:             readability-identifier-naming.FunctionCase
+    value:           'camelBack'
+  - key:             readability-identifier-naming.VariableCase
+    value:           'camelBack'
+  - key:             readability-identifier-naming.PublicMemberCase
+    value:           'camelBack'
+  - key:             readability-identifier-naming.PrivateMemberCase
+    value:           'camelBack_'
+  - key:             readability-identifier-naming.GlobalConstantCase
+    value:           'UPPER_CASE'
+  - key:             readability-identifier-naming.EnumConstantCase
+    value:           'UPPER_CASE'
+  - key:             readability-identifier-naming.ConstantCase
+    value:           'UPPER_CASE'
+
+  # Force left pointer alignment
+  - key:             PointerAlignment
+    value:           'Left'
