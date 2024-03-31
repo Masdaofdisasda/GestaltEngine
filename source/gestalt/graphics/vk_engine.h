@@ -32,6 +32,7 @@ private:
 
   std::shared_ptr<frame_graph> frame_graph_ = std::make_shared<frame_graph>();
   std::shared_ptr<scene_manager> scene_manager_ = std::make_shared<scene_manager>();
+  std::shared_ptr<Repository> repository_ = std::make_shared<Repository>();
 
   gui_actions gui_actions_;
   std::shared_ptr<imgui_gui> imgui_ = std::make_shared<imgui_gui>();

@@ -27,10 +27,10 @@ void deferred_pass::prepare() {
 
   VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
 
-  const auto gbuffer_1 = resource_manager_->get_resource<AllocatedImage>("gbuffer_1");
-  const auto gbuffer_2 = resource_manager_->get_resource<AllocatedImage>("gbuffer_2");
-  const auto gbuffer_3 = resource_manager_->get_resource<AllocatedImage>("gbuffer_3");
-  const auto depth_image = resource_manager_->get_resource<AllocatedImage>("gbuffer_d");
+  const auto gbuffer_1 = registry_->get_resource<AllocatedImage>("gbuffer_1");
+  const auto gbuffer_2 = registry_->get_resource<AllocatedImage>("gbuffer_2");
+  const auto gbuffer_3 = registry_->get_resource<AllocatedImage>("gbuffer_3");
+  const auto depth_image = registry_->get_resource<AllocatedImage>("gbuffer_d");
 
   pipeline_ = PipelineBuilder()
                   .set_shaders(meshVertexShader, meshFragShader)
@@ -56,10 +56,10 @@ void deferred_pass::cleanup() {
 
 void deferred_pass::execute(VkCommandBuffer cmd) {
 
-  const auto gbuffer_1 = resource_manager_->get_resource<AllocatedImage>("gbuffer_1");
-  const auto gbuffer_2 = resource_manager_->get_resource<AllocatedImage>("gbuffer_2");
-  const auto gbuffer_3 = resource_manager_->get_resource<AllocatedImage>("gbuffer_3");
-  const auto depth_image = resource_manager_->get_resource<AllocatedImage>("gbuffer_d");
+  const auto gbuffer_1 = registry_->get_resource<AllocatedImage>("gbuffer_1");
+  const auto gbuffer_2 = registry_->get_resource<AllocatedImage>("gbuffer_2");
+  const auto gbuffer_3 = registry_->get_resource<AllocatedImage>("gbuffer_3");
+  const auto depth_image = registry_->get_resource<AllocatedImage>("gbuffer_d");
 
   VkClearValue depth_clear = {.depthStencil = {1.f, 0}};
   VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
@@ -130,6 +130,120 @@ void deferred_pass::execute(VkCommandBuffer cmd) {
   vkCmdEndRendering(cmd);
 }
 
+void meshlet_pass::prepare() {
+  fmt::print("preparing deferred pass\n");
+
+  descriptor_layouts_.push_back(resource_manager_->per_frame_data_layout);
+  descriptor_layouts_.push_back(resource_manager_->ibl_data.IblLayout);
+  descriptor_layouts_.push_back(resource_manager_->material_data.resource_layout);
+  descriptor_layouts_.push_back(resource_manager_->material_data.constants_layout);
+  descriptor_layouts_.push_back(resource_manager_->scene_geometry_.vertex_layout);
+
+  VkShaderModule fragShader;
+  vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &fragShader);
+
+  VkShaderModule meshShader;
+  vkutil::load_shader_module(mesh_shader_source_.c_str(), gpu_.device, &meshShader);
+  VkShaderModule taskShader;
+  vkutil::load_shader_module(task_shader_source_.c_str(), gpu_.device, &taskShader);
+
+  VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
+  mesh_layout_info.setLayoutCount = descriptor_layouts_.size();
+  mesh_layout_info.pSetLayouts = descriptor_layouts_.data();
+
+  VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
+
+  const auto gbuffer_1 = registry_->get_resource<AllocatedImage>("gbuffer_1");
+  const auto gbuffer_2 = registry_->get_resource<AllocatedImage>("gbuffer_2");
+  const auto gbuffer_3 = registry_->get_resource<AllocatedImage>("gbuffer_3");
+  const auto depth_image = registry_->get_resource<AllocatedImage>("gbuffer_d");
+
+  pipeline_ = PipelineBuilder()
+                  .set_shaders(taskShader, meshShader, fragShader)
+                  .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+                  .set_polygon_mode(VK_POLYGON_MODE_FILL)
+                  .set_cull_mode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE)
+                  .set_multisampling_none()
+                  .disable_blending(3)
+                  .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
+                  .set_color_attachment_formats(
+                      {gbuffer_1->imageFormat, gbuffer_2->imageFormat, gbuffer_3->imageFormat})
+                  .set_depth_format(depth_image->imageFormat)
+                  .set_pipeline_layout(pipeline_layout_)
+                  .build_pipeline(gpu_.device);
+
+  vkDestroyShaderModule(gpu_.device, taskShader, nullptr);
+  vkDestroyShaderModule(gpu_.device, meshShader, nullptr);
+  vkDestroyShaderModule(gpu_.device, fragShader, nullptr);
+}
+
+void meshlet_pass::cleanup() {
+  vkDestroyPipeline(gpu_.device, pipeline_, nullptr);
+}
+
+void meshlet_pass::execute(VkCommandBuffer cmd) {
+
+  const auto gbuffer_1 = registry_->get_resource<AllocatedImage>("gbuffer_1");
+  const auto gbuffer_2 = registry_->get_resource<AllocatedImage>("gbuffer_2");
+  const auto gbuffer_3 = registry_->get_resource<AllocatedImage>("gbuffer_3");
+  const auto depth_image = registry_->get_resource<AllocatedImage>("gbuffer_d");
+
+  VkClearValue depth_clear = {.depthStencil = {1.f, 0}};
+  VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
+      depth_image->imageView, &depth_clear, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+
+  std::array attachment_begin_infos{
+      vkinit::attachment_info(gbuffer_1->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL),
+      vkinit::attachment_info(gbuffer_2->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL),
+      vkinit::attachment_info(gbuffer_3->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL)};
+
+  VkRenderingInfo renderInfo = vkinit::rendering_info_for_gbuffer(gbuffer_1->getExtent2D(), attachment_begin_infos.data(),
+                                           attachment_begin_infos.size(),
+      &depthAttachment);
+
+  vkCmdBeginRendering(cmd, &renderInfo);
+
+  VkDescriptorBufferInfo buffer_info;
+  buffer_info.buffer = resource_manager_->per_frame_data_buffer.buffer;
+  buffer_info.offset = 0;
+  buffer_info.range = sizeof(per_frame_data);
+
+  VkWriteDescriptorSet descriptor_write = {};
+  descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  descriptor_write.dstBinding = 0;
+  descriptor_write.dstArrayElement = 0;
+  descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  descriptor_write.descriptorCount = 1;
+  descriptor_write.pBufferInfo = &buffer_info;
+
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
+  VkDescriptorSet descriptorSets[]
+      = {resource_manager_->ibl_data.IblSet, resource_manager_->material_data.resource_set,
+         resource_manager_->material_data.constants_set, resource_manager_->scene_geometry_.vertex_set};
+
+  gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
+                                 &descriptor_write);
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 4,
+                          descriptorSets, 0, nullptr);
+
+  viewport_.width = static_cast<float>(depth_image->getExtent2D().width);
+  viewport_.height = static_cast<float>(depth_image->getExtent2D().height);
+  scissor_.extent = depth_image->getExtent2D();
+  vkCmdSetViewport(cmd, 0, 1, &viewport_);
+  vkCmdSetScissor(cmd, 0, 1, &scissor_);
+
+  //wip
+  size_t maxCount = resource_manager_->main_draw_context_.opaque_surfaces.size();
+
+    AllocatedBuffer countBuffer;
+    AllocatedBuffer argumentBuffer;
+
+    gpu_.vkCmdDrawMeshTasksIndirectCountEXT(cmd, argumentBuffer.buffer, argumentBuffer.info.offset,
+                                       countBuffer.buffer, countBuffer.info.offset, maxCount, 0);
+
+  vkCmdEndRendering(cmd);
+}
+
 void transparent_pass::prepare() {
   fmt::print("preparing transparent pass\n");
 
@@ -156,8 +270,8 @@ void transparent_pass::prepare() {
 
   VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_opaque_color");
-  const auto depth_image = resource_manager_->get_resource<AllocatedImage>("scene_opaque_depth");
+  const auto color_image = registry_->get_resource<AllocatedImage>("scene_opaque_color");
+  const auto depth_image = registry_->get_resource<AllocatedImage>("scene_opaque_depth");
 
   pipeline_ = PipelineBuilder()
                   .set_shaders(meshVertexShader, meshFragShader)
@@ -180,10 +294,10 @@ void transparent_pass::execute(VkCommandBuffer cmd) {
   descriptor_set_
       = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(4));
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_opaque_color");
-  const auto depth_image = resource_manager_->get_resource<AllocatedImage>("scene_opaque_depth");
+  const auto color_image = registry_->get_resource<AllocatedImage>("scene_opaque_color");
+  const auto depth_image = registry_->get_resource<AllocatedImage>("scene_opaque_depth");
 
-  const auto shadow_map = resource_manager_->get_resource<AllocatedImage>("directional_shadow_map");
+  const auto shadow_map = registry_->get_resource<AllocatedImage>("directional_shadow_map");
 
   VkRenderingAttachmentInfo colorAttachment
       = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -226,7 +340,7 @@ void transparent_pass::execute(VkCommandBuffer cmd) {
   writer.clear();
   writer.write_image(
       10, shadow_map->imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+                     repository_->default_material_.nearestSampler,
       VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.update_set(gpu_.device, descriptor_set_);
 
@@ -268,8 +382,8 @@ void debug_aabb_pass::prepare() {
 
   VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_final");
-  const auto depth_image = resource_manager_->get_resource<AllocatedImage>("grid_depth");
+  const auto color_image = registry_->get_resource<AllocatedImage>("scene_final");
+  const auto depth_image = registry_->get_resource<AllocatedImage>("grid_depth");
 
   pipeline_ = PipelineBuilder()
                   .set_shaders(meshVertexShader, meshFragShader)
@@ -292,8 +406,8 @@ void debug_aabb_pass::cleanup() {
 }
 
 void debug_aabb_pass::execute(VkCommandBuffer cmd) {
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_final");
-  const auto depth_image = resource_manager_->get_resource<AllocatedImage>("grid_depth");
+  const auto color_image = registry_->get_resource<AllocatedImage>("scene_final");
+  const auto depth_image = registry_->get_resource<AllocatedImage>("grid_depth");
 
   VkRenderingAttachmentInfo colorAttachment
       = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -329,7 +443,7 @@ void debug_aabb_pass::execute(VkCommandBuffer cmd) {
   gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                                  &descriptor_write);
 
-  for (auto& node : resource_manager_->get_database().get_scene_graph() | std::views::values) {
+  for (auto& node : repository_->scene_graph.components() | std::views::values) {
     if (!node.visible) continue;
 
     aabb_debug_push_constants push_constant{

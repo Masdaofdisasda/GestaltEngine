@@ -14,6 +14,7 @@
 #include <VkBootstrap.h>
 
 #include <glm/gtx/transform.hpp>
+#include <tracy/Tracy.hpp>
 
 #include <vk_initializers.h>
 #include <vk_types.h>
@@ -36,14 +37,14 @@ void render_engine::init() {
   gpu_.init(use_validation_layers, window_,
             [this](auto func) { this->immediate_submit(std::move(func)); });
 
-  resource_manager_->init(gpu_);
+  resource_manager_->init(gpu_, repository_);
 
-  frame_graph_->init(gpu_, window_, resource_manager_, imgui_);
+  frame_graph_->init(gpu_, window_, resource_manager_, repository_, imgui_);
 
-  scene_manager_->init(gpu_, resource_manager_);
+  scene_manager_->init(gpu_, resource_manager_, repository_);
 
   register_gui_actions();
-  imgui_->init(gpu_, window_, frame_graph_->get_swapchain(), gui_actions_);
+  imgui_->init(gpu_, window_, frame_graph_->get_swapchain(), repository_, gui_actions_);
 
   for (auto& cam : camera_positioners_) {
     auto free_fly_camera_ptr = std::make_unique<free_fly_camera>();
@@ -66,8 +67,6 @@ void render_engine::register_gui_actions() {
   gui_actions_.load_gltf = [this](std::string path) { scene_manager_->request_scene(std::move(path)); };
   gui_actions_.get_stats = [this]() -> engine_stats& { return stats_; };
   gui_actions_.get_scene_data = [this]() -> per_frame_data& { return resource_manager_->per_frame_data_; };
-  
-  gui_actions_.get_database = [this]() -> database& { return resource_manager_->get_database(); };
   gui_actions_.get_component_factory = [this]() -> component_archetype_factory& { return scene_manager_->get_component_factory(); };
   gui_actions_.get_render_config = [this]() -> render_config& { return resource_manager_->config_; };
 }
@@ -129,7 +128,7 @@ void render_engine::update_scene() {
     // to opengl and gltf axis
     projection[1][1] *= -1;
 
-    auto& camera = resource_manager_->get_database().get_camera(0);
+    auto& camera = repository_->cameras.get(0); // assume this as the main camera
     camera.view_matrix = view;
     camera.projection_matrix = projection;
 
@@ -177,7 +176,9 @@ void render_engine::run()
 
       update_scene();
 
-      frame_graph_->execute_passes(); 
+      frame_graph_->execute_passes();
+
+      FrameMark;
     }
 
     // get clock again, compare with start clock

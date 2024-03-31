@@ -35,12 +35,16 @@ file(MAKE_DIRECTORY ${SHADER_BINARY_DIR})
 file(GLOB_RECURSE GLSL_COMPILE_FILES
     "${SHADER_SOURCE_DIR}/*.frag"
     "${SHADER_SOURCE_DIR}/*.vert"
+    "${SHADER_SOURCE_DIR}/*.task"
+    "${SHADER_SOURCE_DIR}/*.mesh"
     "${SHADER_SOURCE_DIR}/*.comp"
 )
 
 file(GLOB_RECURSE GLSL_SOURCE_FILES
     "${SHADER_SOURCE_DIR}/*.frag"
     "${SHADER_SOURCE_DIR}/*.vert"
+    "${SHADER_SOURCE_DIR}/*.task"
+    "${SHADER_SOURCE_DIR}/*.mesh"
     "${SHADER_SOURCE_DIR}/*.comp"
     "${SHADER_SOURCE_DIR}/*.glsl"
 )

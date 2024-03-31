@@ -20,6 +20,7 @@ public:
   
   std::function<void(std::function<void(VkCommandBuffer)>)> immediate_submit;
   PFN_vkCmdPushDescriptorSetKHR vkCmdPushDescriptorSetKHR;
+  PFN_vkCmdDrawMeshTasksIndirectCountEXT vkCmdDrawMeshTasksIndirectCountEXT;
 
   void init(bool use_validation_layers, sdl_window& window,
             std::function<void(std::function<void(VkCommandBuffer)>)> immediate_submit_function);

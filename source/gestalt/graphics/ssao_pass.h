@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include "vk_types.h"
-#include "render_pass.h"
+#include "frame_graph.h"
 #include "vk_descriptors.h"
 
 class ssao_filter_pass final : public render_pass {

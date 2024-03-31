@@ -1,11 +1,8 @@
 ﻿#pragma once
 
 #include "vk_types.h"
-#include "render_pass.h"
+#include "frame_graph.h"
 #include "vk_descriptors.h"
-#include "vk_types.h"
-#include "vk_types.h"
-#include "vk_types.h"
 
 /*
   struct adaptation {

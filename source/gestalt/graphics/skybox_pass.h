@@ -3,7 +3,7 @@
 #include "vk_types.h"
 #include <string>
 
-#include "render_pass.h"
+#include "frame_graph.h"
 #include "resource_manager.h"
 
 class skybox_pass final : public render_pass {

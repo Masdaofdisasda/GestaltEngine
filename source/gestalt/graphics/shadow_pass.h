@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "render_pass.h"
+#include "frame_graph.h"
 #include "vk_types.h"
 #include "resource_manager.h"
 

@@ -3,7 +3,7 @@
 #include "vk_types.h"
 #include <string>
 
-#include "render_pass.h"
+#include "frame_graph.h"
 
 class deferred_pass final : public render_pass {
   std::string vertex_shader_source_ = "../shaders/geometry.vert.spv";
@@ -33,6 +33,44 @@ class deferred_pass final : public render_pass {
   VkRect2D scissor_{
       .offset = {0, 0},
   };
+
+  descriptor_writer writer;
+
+  VkPipeline pipeline_ = nullptr;
+  VkPipelineLayout pipeline_layout_ = nullptr;
+  std::vector<VkDescriptorSetLayout> descriptor_layouts_;
+  VkDescriptorSet descriptor_set_ = nullptr;
+
+public:
+  void prepare() override;
+  void cleanup() override;
+  void execute(VkCommandBuffer cmd) override;
+  shader_pass_dependency_info& get_dependencies() override { return deps_; }
+};
+
+class meshlet_pass final : public render_pass {
+   std::string mesh_shader_source_ = "../shaders/geometry.mesh.spv";
+   std::string task_shader_source_ = "../shaders/geometry.task.spv";
+  std::string fragment_shader_source_ = "../shaders/meshlet_deferred.frag.spv";
+
+  shader_pass_dependency_info deps_ = {
+      .read_resources = {},
+      .write_resources
+      = {{"gbuffer_1_final", std::make_shared<color_image_resource>("gbuffer_1", 1.f)},
+         {"gbuffer_2_final", std::make_shared<color_image_resource>("gbuffer_2", 1.f)},
+         {"gbuffer_3_final", std::make_shared<color_image_resource>("gbuffer_3", 1.f)},
+         {"gbuffer_depth", std::make_shared<depth_image_resource>("gbuffer_d", 1.f)}},
+  };
+
+  VkViewport viewport_{
+       .x = 0,
+       .y = 0,
+       .minDepth = 0.f,
+       .maxDepth = 1.f,
+   };
+  VkRect2D scissor_{
+       .offset = {0, 0},
+   };
 
   descriptor_writer writer;
 

@@ -10,8 +10,8 @@ void directional_depth_pass::prepare() {
   descriptor_layouts_.emplace_back(
       descriptor_layout_builder()
           .add_binding(17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, false,
-                       resource_manager_->get_database().max_lights(light_type::directional)
-                           + resource_manager_->get_database().max_lights(light_type::point))
+                       repository_->max_lights(light_type::directional)
+                           + repository_->max_lights(light_type::point))
           .build(gpu_.device));
   descriptor_layouts_.push_back(resource_manager_->scene_geometry_.vertex_layout);
 
@@ -29,7 +29,7 @@ void directional_depth_pass::prepare() {
 
   VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
 
-  const auto depth_image = resource_manager_->get_resource<AllocatedImage>("directional_depth");
+  const auto depth_image = registry_->get_resource<AllocatedImage>("directional_depth");
 
   pipeline_ = PipelineBuilder()
                   .set_shaders(meshVertexShader, meshFragShader)
@@ -54,7 +54,7 @@ void directional_depth_pass::execute(VkCommandBuffer cmd) {
   descriptor_set_
       = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(1));
 
-  const auto depth_image = resource_manager_->get_resource<AllocatedImage>("directional_depth");
+  const auto depth_image = registry_->get_resource<AllocatedImage>("directional_depth");
 
   VkClearValue depth_clear = {.depthStencil = {1.f, 0}};
   VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
@@ -67,12 +67,12 @@ void directional_depth_pass::execute(VkCommandBuffer cmd) {
 
   {
     // TODO this should be done elsewhere
-    auto& cam = resource_manager_->get_database().get_camera(0);
+    auto& cam = repository_->cameras.get(0);
     resource_manager_->per_frame_data_.proj = cam.projection_matrix;
     resource_manager_->per_frame_data_.view = cam.view_matrix;
     resource_manager_->per_frame_data_.viewproj = cam.projection_matrix * cam.view_matrix;
     resource_manager_->per_frame_data_.inv_viewproj
-        = inverse(cam.projection_matrix * cam.view_matrix);
+        = glm::inverse(cam.projection_matrix * cam.view_matrix);
 
     void* mapped_data;
     VmaAllocation allocation = resource_manager_->per_frame_data_buffer.allocation;
@@ -102,8 +102,8 @@ void directional_depth_pass::execute(VkCommandBuffer cmd) {
   writer.clear();
 
   std::vector<VkDescriptorBufferInfo> lightViewProjBufferInfos;
-  for (int i = 0; i < resource_manager_->get_database().max_lights(light_type::directional)
-                          + resource_manager_->get_database().max_lights(light_type::point);
+  for (int i = 0; i < repository_->max_lights(light_type::directional)
+                          + repository_->max_lights(light_type::point);
        ++i) {
     VkDescriptorBufferInfo bufferInfo = {};
     bufferInfo.buffer = resource_manager_->light_data.view_proj_matrices.buffer;

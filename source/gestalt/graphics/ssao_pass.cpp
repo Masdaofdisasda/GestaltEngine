@@ -29,7 +29,7 @@ void ssao_filter_pass::prepare() {
   VkShaderModule ssao_filter_shader;
   vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &ssao_filter_shader);
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("color_ssao_filter");
+  const auto color_image = registry_->get_resource<AllocatedImage>("color_ssao_filter");
 
   pipeline_
       = PipelineBuilder()
@@ -51,8 +51,8 @@ void ssao_filter_pass::execute(VkCommandBuffer cmd) {
   descriptor_set_ = resource_manager_->descriptor_pool->allocate(
       gpu_.device, descriptor_layouts_.at(0));
 
-  const auto scene_depth = resource_manager_->get_resource<AllocatedImage>("grid_depth");
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("color_ssao_filter");
+  const auto scene_depth = registry_->get_resource<AllocatedImage>("grid_depth");
+  const auto color_image = registry_->get_resource<AllocatedImage>("color_ssao_filter");
 
   VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
   VkRenderingInfo newRenderInfo = vkinit::rendering_info({effect_size_, effect_size_},
@@ -60,13 +60,9 @@ void ssao_filter_pass::execute(VkCommandBuffer cmd) {
   vkCmdBeginRendering(cmd, &newRenderInfo);
 
   writer.clear();
-  writer.write_image(
-      10, scene_depth->imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+  writer.write_image(10, scene_depth->imageView, repository_->default_material_.nearestSampler,
       VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.write_image(
-      11, rotation_pattern.imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+  writer.write_image(11, rotation_pattern.imageView, repository_->default_material_.nearestSampler,
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.update_set(gpu_.device, descriptor_set_);
 
@@ -113,7 +109,7 @@ void ssao_blur_pass::prepare() {
   VkShaderModule ssao_blur_y_shader;
   vkutil::load_shader_module(fragment_blur_y.c_str(), gpu_.device, &ssao_blur_y_shader);
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("color_ssao_filtered");
+  const auto color_image = registry_->get_resource<AllocatedImage>("color_ssao_filtered");
 
   PipelineBuilder builder
       = PipelineBuilder()
@@ -131,8 +127,8 @@ void ssao_blur_pass::prepare() {
 }
 
 void ssao_blur_pass::execute(VkCommandBuffer cmd) {
-  const auto image_x = resource_manager_->get_resource<AllocatedImage>("color_ssao_filtered");
-  const auto image_y = resource_manager_->get_resource<AllocatedImage>("ssao_blur_y");
+  const auto image_x = registry_->get_resource<AllocatedImage>("color_ssao_filtered");
+  const auto image_y = registry_->get_resource<AllocatedImage>("ssao_blur_y");
 
   for (int i = 0; i < resource_manager_->config_.ssao_quality; ++i) {
     {
@@ -148,9 +144,7 @@ void ssao_blur_pass::execute(VkCommandBuffer cmd) {
       vkCmdBeginRendering(cmd, &newRenderInfo);
 
       writer.clear();
-      writer.write_image(
-          10, image_x->imageView,
-          resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+      writer.write_image(10, image_x->imageView, repository_->default_material_.nearestSampler,
           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
       writer.update_set(gpu_.device, blur_x_descriptor_set_);
 
@@ -176,9 +170,7 @@ void ssao_blur_pass::execute(VkCommandBuffer cmd) {
       vkCmdBeginRendering(cmd, &newRenderInfo);
 
       writer.clear();
-      writer.write_image(
-          10, image_y->imageView,
-          resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+      writer.write_image(10, image_y->imageView, repository_->default_material_.nearestSampler,
           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
       writer.update_set(gpu_.device, blur_y_descriptor_set_);
 
@@ -224,7 +216,7 @@ void ssao_final_pass::prepare() {
   VkShaderModule ssao_final_shader;
   vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &ssao_final_shader);
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_ssao_final");
+  const auto color_image = registry_->get_resource<AllocatedImage>("scene_ssao_final");
 
   pipeline_
       = PipelineBuilder()
@@ -245,9 +237,9 @@ void ssao_final_pass::execute(VkCommandBuffer cmd) {
       gpu_.device, descriptor_layouts_.at(0));
 
   
-  const auto scene_color = resource_manager_->get_resource<AllocatedImage>("grid_color");
-  const auto scene_ssao = resource_manager_->get_resource<AllocatedImage>("scene_ssao_final");
-  const auto ssao_blurred = resource_manager_->get_resource<AllocatedImage>("ssao_blurred_final");
+  const auto scene_color = registry_->get_resource<AllocatedImage>("grid_color");
+  const auto scene_ssao = registry_->get_resource<AllocatedImage>("scene_ssao_final");
+  const auto ssao_blurred = registry_->get_resource<AllocatedImage>("ssao_blurred_final");
 
   VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(scene_ssao->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
   VkRenderingInfo newRenderInfo = vkinit::rendering_info(scene_ssao->getExtent2D(),
@@ -255,13 +247,9 @@ void ssao_final_pass::execute(VkCommandBuffer cmd) {
   vkCmdBeginRendering(cmd, &newRenderInfo);
 
   writer.clear();
-  writer.write_image(
-      10, scene_color->imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+  writer.write_image(10, scene_color->imageView, repository_->default_material_.nearestSampler,
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.write_image(
-      11, ssao_blurred->imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+  writer.write_image(11, ssao_blurred->imageView, repository_->default_material_.nearestSampler,
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.update_set(gpu_.device, descriptor_set_);
 

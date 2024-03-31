@@ -4,6 +4,8 @@
 #include <set>
 #include <unordered_set>
 
+#include <tracy/Tracy.hpp>
+
 #include "geometry_pass.h"
 #include "hdr_pass.h"
 #include "lighting_pass.h"
@@ -15,10 +17,12 @@
 
 void frame_graph::init(const vk_gpu& gpu, const sdl_window& window,
                        const std::shared_ptr<resource_manager>& resource_manager,
+                       const std::shared_ptr<Repository>& repository,
                        const std::shared_ptr<imgui_gui>& imgui_gui) {
   gpu_ = gpu;
   window_ = window;
   resource_manager_ = resource_manager;
+  repository_ = repository;
   imgui_ = imgui_gui;
 
   swapchain_->init(gpu_, {window_.extent.width, window_.extent.height, 1});
@@ -27,6 +31,7 @@ void frame_graph::init(const vk_gpu& gpu, const sdl_window& window,
 
   render_passes_.push_back(std::make_unique<directional_depth_pass>()); //TODO investigate sorting
   render_passes_.push_back(std::make_unique<deferred_pass>());
+  //render_passes_.push_back(std::make_unique<meshlet_pass>());
   render_passes_.push_back(std::make_unique<lighting_pass>());
   render_passes_.push_back(std::make_unique<skybox_pass>());
   render_passes_.push_back(std::make_unique<infinite_grid_pass>());
@@ -58,13 +63,13 @@ void frame_graph::init(const vk_gpu& gpu, const sdl_window& window,
 
   create_resources();
   // the shader pipelines need acccess to their resources to be created
-  resource_manager_->direct_original_mapping = direct_original_mapping_;
+  resource_registry_->direct_original_mapping = direct_original_mapping_;
 
   for (auto& pass : render_passes_) {
-    pass->init(gpu_, resource_manager_);
+    pass->init(gpu_, resource_manager_, resource_registry_, repository_);
   }
 
-  resource_manager_->direct_original_mapping.clear();
+  resource_registry_->direct_original_mapping.clear();
 }
 
 std::string frame_graph::get_final_transformation(const std::string& original) {
@@ -123,7 +128,7 @@ void frame_graph::calculate_resource_transform() {
 void frame_graph::create_resources() {
 
   for (auto [original, final] : resource_pairs_) {
-    resource_manager_->update_resource_id(final, original);
+    resource_registry_->update_resource_id(final, original);
   }
 
   std::unordered_map<std::string, std::shared_ptr<shader_resource>> resource_map;
@@ -150,7 +155,7 @@ void frame_graph::create_resources() {
 
   for (auto& r : resource_map | std::views::values) {
     if (auto image_resource = std::dynamic_pointer_cast<color_image_resource>(r)) {
-      if (resource_manager_->get_resource<AllocatedImage>(image_resource->getId())) {
+      if (resource_registry_->get_resource<AllocatedImage>(image_resource->getId())) {
         continue;
       }
 
@@ -165,9 +170,9 @@ void frame_graph::create_resources() {
       }
       resource_manager_->create_color_frame_buffer(
           {image->getExtent2D().width, image->getExtent2D().height, 1}, *image.get());
-      resource_manager_->add_resource(image_resource->getId(), image);
+      resource_registry_->add_resource(image_resource->getId(), image);
     } else if (auto image_resource = std::dynamic_pointer_cast<depth_image_resource>(r)) {
-      if (resource_manager_->get_resource<AllocatedImage>(image_resource->getId())) {
+      if (resource_registry_->get_resource<AllocatedImage>(image_resource->getId())) {
         continue;
       }
 
@@ -182,7 +187,7 @@ void frame_graph::create_resources() {
       }
       resource_manager_->create_depth_frame_buffer(
           {image->getExtent2D().width, image->getExtent2D().height, 1}, *image.get());
-      resource_manager_->add_resource(image_resource->getId(), image);
+      resource_registry_->add_resource(image_resource->getId(), image);
     } else if (auto buffer = std::dynamic_pointer_cast<buffer_resource>(r)) {
       // TODO: create buffer
     }
@@ -269,7 +274,7 @@ void frame_graph::execute(size_t id, VkCommandBuffer cmd) {
     if (std::dynamic_pointer_cast<color_image_resource>(read)
         || std::dynamic_pointer_cast<depth_image_resource>(read)) {
       std::shared_ptr<AllocatedImage> resource
-          = resource_manager_->get_resource<AllocatedImage>(read->getId());
+          = resource_registry_->get_resource<AllocatedImage>(read->getId());
       vkutil::transition_read(cmd, *resource);
     }
   }
@@ -279,7 +284,7 @@ void frame_graph::execute(size_t id, VkCommandBuffer cmd) {
     if (std::dynamic_pointer_cast<color_image_resource>(write.second)
         || std::dynamic_pointer_cast<depth_image_resource>(write.second)) {
       std::shared_ptr<AllocatedImage> resource
-          = resource_manager_->get_resource<AllocatedImage>(write.second->getId());
+          = resource_registry_->get_resource<AllocatedImage>(write.second->getId());
       vkutil::transition_write(cmd, *resource);
     }
   }
@@ -290,7 +295,7 @@ void frame_graph::execute(size_t id, VkCommandBuffer cmd) {
        const auto& write : writes) {
     if (std::dynamic_pointer_cast<color_image_resource>(write.second)
         || std::dynamic_pointer_cast<depth_image_resource>(write.second)) {
-      resource_manager_->update_resource_id(write.second->getId(), write.first);
+      resource_registry_->update_resource_id(write.second->getId(), write.first);
     }
   }
 }
@@ -343,13 +348,14 @@ void frame_graph::execute_passes() {
   VkCommandBuffer cmd = start_draw();
 
   for (const size_t index : sorted_passes_) {
+    ZoneScopedN("Execute Pass");
     execute(index, cmd);
   }
 
   resource_manager_->main_draw_context_.opaque_surfaces.clear();
   resource_manager_->main_draw_context_.transparent_surfaces.clear();
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_debug_aabb");
+  const auto color_image = resource_registry_->get_resource<AllocatedImage>("scene_debug_aabb");
 
   vkutil::transition_image(cmd, color_image->image, color_image->currentLayout,
                            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);

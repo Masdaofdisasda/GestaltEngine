@@ -5,9 +5,10 @@
 
 class scene_system {
 public:
-  void init(const vk_gpu& gpu, const std::shared_ptr<resource_manager>& resource_manager) {
+  void init(const vk_gpu& gpu, const std::shared_ptr<resource_manager>& resource_manager, const std::shared_ptr<Repository>& repository) {
     gpu_ = gpu;
     resource_manager_ = resource_manager;
+    repository_ = repository;
 
     prepare();
   }
@@ -21,14 +22,15 @@ protected:
 
   vk_gpu gpu_ = {};
   std::shared_ptr<resource_manager> resource_manager_;
+  std::shared_ptr<Repository> repository_;
 };
 
 class light_system final : public scene_system {
   descriptor_writer writer;
 
   glm::mat4 calculate_sun_view_proj(const glm::vec3 direction) const;
-  void update_directional_lights(component_container<light_component>& lights);
-  void update_point_lights(component_container<light_component>& lights);
+  void update_directional_lights(std::unordered_map<entity, light_component>& lights);
+  void update_point_lights(std::unordered_map<entity, light_component>& lights);
 
 public:
   void prepare() override;

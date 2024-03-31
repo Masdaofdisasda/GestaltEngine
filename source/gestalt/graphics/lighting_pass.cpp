@@ -33,7 +33,7 @@ void lighting_pass::prepare() {
 
   VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("gbuffer_shaded");
+  const auto color_image = registry_->get_resource<AllocatedImage>("gbuffer_shaded");
 
   pipeline_ = PipelineBuilder()
                   .set_shaders(meshVertexShader, meshFragShader)
@@ -59,13 +59,13 @@ void lighting_pass::execute(VkCommandBuffer cmd) {
   descriptor_set_
       = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(2));
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("gbuffer_shaded");
+  const auto color_image = registry_->get_resource<AllocatedImage>("gbuffer_shaded");
 
-  const auto gbuffer_1 = resource_manager_->get_resource<AllocatedImage>("gbuffer_1_final");
-  const auto gbuffer_2 = resource_manager_->get_resource<AllocatedImage>("gbuffer_2_final");
-  const auto gbuffer_3 = resource_manager_->get_resource<AllocatedImage>("gbuffer_3_final");
-  const auto gbuffer_depth = resource_manager_->get_resource<AllocatedImage>("gbuffer_depth");
-  const auto shadow_map = resource_manager_->get_resource<AllocatedImage>("directional_shadow_map");
+  const auto gbuffer_1 = registry_->get_resource<AllocatedImage>("gbuffer_1_final");
+  const auto gbuffer_2 = registry_->get_resource<AllocatedImage>("gbuffer_2_final");
+  const auto gbuffer_3 = registry_->get_resource<AllocatedImage>("gbuffer_3_final");
+  const auto gbuffer_depth = registry_->get_resource<AllocatedImage>("gbuffer_depth");
+  const auto shadow_map = registry_->get_resource<AllocatedImage>("directional_shadow_map");
 
   VkRenderingAttachmentInfo colorAttachment
       = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -92,25 +92,15 @@ void lighting_pass::execute(VkCommandBuffer cmd) {
                        VK_INDEX_TYPE_UINT32);
 
   writer.clear();
-  writer.write_image(
-      10, gbuffer_1->imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+  writer.write_image(10, gbuffer_1->imageView, repository_->default_material_.nearestSampler,
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.write_image(
-      11, gbuffer_2->imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+  writer.write_image(11, gbuffer_2->imageView, repository_->default_material_.nearestSampler,
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.write_image(
-      12, gbuffer_3->imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+  writer.write_image(12, gbuffer_3->imageView, repository_->default_material_.nearestSampler,
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.write_image(
-      13, gbuffer_depth->imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+  writer.write_image(13, gbuffer_depth->imageView, repository_->default_material_.nearestSampler,
       VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.write_image(
-      14, shadow_map->imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+  writer.write_image(14, shadow_map->imageView, repository_->default_material_.nearestSampler,
       VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.update_set(gpu_.device, descriptor_set_);
   VkDescriptorSet descriptorSets[] = {resource_manager_->ibl_data.IblSet, descriptor_set_, resource_manager_->light_data.light_set};

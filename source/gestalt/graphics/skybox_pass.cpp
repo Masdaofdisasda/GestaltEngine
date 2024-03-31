@@ -26,8 +26,8 @@ void skybox_pass::prepare() {
   VkShaderModule fragment_shader;
   vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &fragment_shader);
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_shaded");
-  const auto depth_image = resource_manager_->get_resource<AllocatedImage>("gbuffer_depth");
+  const auto color_image = registry_->get_resource<AllocatedImage>("scene_shaded");
+  const auto depth_image = registry_->get_resource<AllocatedImage>("gbuffer_depth");
 
   pipeline_ = PipelineBuilder()
                   .set_shaders(vertex_shader, fragment_shader)
@@ -48,8 +48,8 @@ void skybox_pass::prepare() {
 }
 
 void skybox_pass::execute(const VkCommandBuffer cmd) {
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_shaded");
-  const auto depth_image = resource_manager_->get_resource<AllocatedImage>("gbuffer_depth");
+  const auto color_image = registry_->get_resource<AllocatedImage>("scene_shaded");
+  const auto depth_image = registry_->get_resource<AllocatedImage>("gbuffer_depth");
 
   VkRenderingAttachmentInfo colorAttachment
       = vkinit::attachment_info(color_image->imageView, nullptr, color_image->currentLayout);
@@ -127,8 +127,8 @@ void infinite_grid_pass::prepare() {
   VkShaderModule fragment_shader;
   vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &fragment_shader);
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("skybox_color");
-  const auto depth_image = resource_manager_->get_resource<AllocatedImage>("skybox_depth");
+  const auto color_image = registry_->get_resource<AllocatedImage>("skybox_color");
+  const auto depth_image = registry_->get_resource<AllocatedImage>("skybox_depth");
 
   pipeline_ = PipelineBuilder()
                   .set_shaders(vertex_shader, fragment_shader)
@@ -149,8 +149,8 @@ void infinite_grid_pass::prepare() {
 }
 
 void infinite_grid_pass::execute(const VkCommandBuffer cmd) {
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("skybox_color");
-  const auto depth_image = resource_manager_->get_resource<AllocatedImage>("skybox_depth");
+  const auto color_image = registry_->get_resource<AllocatedImage>("skybox_color");
+  const auto depth_image = registry_->get_resource<AllocatedImage>("skybox_depth");
 
   VkRenderingAttachmentInfo colorAttachment
       = vkinit::attachment_info(color_image->imageView, nullptr, color_image->currentLayout);

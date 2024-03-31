@@ -17,6 +17,7 @@ class imgui_gui {
   vk_gpu gpu_ = {};
   sdl_window window_;
   std::shared_ptr<vk_swapchain> swapchain_;
+  std::shared_ptr<Repository> repository_;
   gui_actions actions_;
   vk_deletion_service deletion_service_ = {};
 
@@ -55,7 +56,9 @@ class imgui_gui {
 
 public:
 
-  void init(vk_gpu& gpu, sdl_window& window, const std::shared_ptr<vk_swapchain>& swapchain, gui_actions& actions);
+  void init(vk_gpu& gpu, sdl_window& window, const std::shared_ptr<vk_swapchain>& swapchain,
+            const std::shared_ptr<Repository>& repository,
+            gui_actions & actions);
 
   void cleanup();
 

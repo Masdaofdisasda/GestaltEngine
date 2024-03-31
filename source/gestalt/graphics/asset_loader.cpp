@@ -17,9 +17,11 @@ struct Vertex {
 
 void asset_loader::init(const vk_gpu& gpu,
                         const std::shared_ptr<resource_manager>& resource_manager,
-                        const std::shared_ptr<component_archetype_factory>& component_factory) {
+                        const std::shared_ptr<component_archetype_factory>& component_factory,
+                        const std::shared_ptr<Repository>& repository) {
   gpu_ = gpu;
   resource_manager_ = resource_manager;
+  repository_ = repository;
   component_factory_ = component_factory;
 }
 
@@ -47,9 +49,9 @@ std::vector<fastgltf::Node> asset_loader::load_scene_from_gltf(const std::string
 
   fastgltf::Asset gltf = parse_gltf(file_path).value();
 
-  size_t image_offset = resource_manager_->get_database().get_images_size();
-  size_t sampler_offset = resource_manager_->get_database().get_samplers_size();
-  size_t material_offset = resource_manager_->get_database().get_materials_size();
+  size_t image_offset = repository_->textures.size();
+  size_t sampler_offset = repository_->samplers.size();
+  size_t material_offset = repository_->materials.size();
 
   import_samplers(gltf);
   import_textures(gltf);
@@ -139,8 +141,8 @@ void asset_loader::import_samplers(fastgltf::Asset& gltf) {
     VkSampler new_sampler;
     vkCreateSampler(gpu_.device, &sampl, nullptr, &new_sampler);
 
-    fmt::print("created sampler {}, sampler_id {}\n", sampler.name, resource_manager_->get_database().get_samplers_size());
-    resource_manager_->get_database().add_sampler(new_sampler);
+    fmt::print("created sampler {}, sampler_id {}\n", sampler.name, repository_->samplers.size());
+    repository_->samplers.add(new_sampler);
   }
 }
 
@@ -215,25 +217,25 @@ void asset_loader::import_textures(fastgltf::Asset& gltf) const {
     std::optional<AllocatedImage> img = load_image(gltf, image);
 
     if (img.has_value()) {
-      size_t image_id = resource_manager_->get_database().add_image(img.value());
+      size_t image_id = repository_->textures.add(img.value());
       fmt::print("loaded texture {}, image_id {}\n", image.name, image_id);
     } else {
       fmt::print("gltf failed to load texture {}\n", image.name);
-      resource_manager_->get_database().add_image(
-          resource_manager_->get_database().default_material_.error_checkerboard_image);
+      repository_->textures.add(
+          repository_->default_material_.error_checkerboard_image);
     }
   }
 }
 
 size_t asset_loader::create_material(pbr_material& config,
                                       const std::string& name) const {
-  const size_t material_id = resource_manager_->get_database().get_materials_size();
+  const size_t material_id = repository_->materials.size();
   fmt::print("creating material {}, mat_id {}\n", name, material_id);
 
   const std::string key = name.empty() ? "material_" + std::to_string(material_id) : name;
   resource_manager_->write_material(config, material_id);
 
-  resource_manager_->get_database().add_material(material{.name = key, .config = config});
+  repository_->materials.add(material{.name = key, .config = config});
 
   return material_id;
 }
@@ -244,8 +246,8 @@ std::tuple<AllocatedImage, VkSampler> asset_loader::get_textures(
   const size_t image_index = gltf.textures[texture_index].imageIndex.value();
   const size_t sampler_index = gltf.textures[texture_index].samplerIndex.value();
 
-  AllocatedImage image = resource_manager_->get_database().get_image(image_index + image_offset);
-  VkSampler sampler = resource_manager_->get_database().get_sampler(sampler_index + sampler_offset);
+  AllocatedImage image = repository_->textures.get(image_index + image_offset);
+  VkSampler sampler = repository_->samplers.get(sampler_index + sampler_offset);
   return std::make_tuple(image, sampler);
 }
 
@@ -278,7 +280,7 @@ void asset_loader::import_metallic_roughness(
 
     pbr_config.resources.metal_rough_image = image;
     assert(image.image
-           != resource_manager_->get_database().default_material_.error_checkerboard_image.image);
+           != repository_->default_material_.error_checkerboard_image.image);
   } else {
     pbr_config.constants.metal_rough_factor
         = glm::vec2(mat.pbrData.roughnessFactor, mat.pbrData.metallicFactor); // r - occlusion, g - roughness, b - metallic
@@ -345,19 +347,19 @@ void asset_loader::import_material(fastgltf::Asset& gltf, size_t& sampler_offset
     pbr_config.constants.alpha_cutoff = mat.alphaCutoff;
   }
 
-  auto& default_material = resource_manager_->get_database().default_material_;
+  auto& default_material = repository_->default_material_;
 
   pbr_config.resources
       = {.albedo_image = default_material.color_image,
-         .albedo_sampler = default_material.default_sampler_linear,
+         .albedo_sampler = default_material.linearSampler,
          .metal_rough_image = default_material.metallic_roughness_image,
-         .metal_rough_sampler = default_material.default_sampler_linear,
+         .metal_rough_sampler = default_material.linearSampler,
          .normal_image = default_material.normal_image,
-         .normal_sampler = default_material.default_sampler_linear,
+         .normal_sampler = default_material.linearSampler,
          .emissive_image = default_material.emissive_image,
-         .emissive_sampler = default_material.default_sampler_linear,
+         .emissive_sampler = default_material.linearSampler,
          .occlusion_image = default_material.occlusion_image,
-         .occlusion_sampler = default_material.default_sampler_nearest};
+         .occlusion_sampler = default_material.nearestSampler};
 
   // grab textures from gltf file
   import_albedo(gltf, sampler_offset, image_offset, mat, pbr_config);
@@ -375,7 +377,7 @@ void asset_loader::import_materials(fastgltf::Asset& gltf, size_t& sampler_offse
   fmt::print("importing materials\n");
   for (fastgltf::Material& mat : gltf.materials) {
     if (mat.name == "arch.002") {
-           mat.name = "material_" + std::to_string(resource_manager_->get_database().get_materials_size());
+           mat.name = "material_" + std::to_string(repository_->materials.size());
     }
     import_material(gltf, sampler_offset, image_offset, mat);
   }
@@ -486,7 +488,7 @@ std::vector<meshlet> asset_loader::generate_meshlets(std::vector<GpuVertexPositi
     meshlet.cone_axis[2] = meshlet_bounds.cone_axis_s8[2];
 
     meshlet.cone_cutoff = meshlet_bounds.cone_cutoff_s8;
-    meshlet.mesh_index = resource_manager_->get_database().get_meshes_size(); //TODO
+    meshlet.mesh_index = repository_->meshes.size(); //TODO
   }
 
   return result_meshlets;
@@ -524,22 +526,22 @@ mesh_surface asset_loader::create_surface(std::vector<GpuVertexPosition>& vertex
       .meshlets = std::move(meshlets),
       .vertex_count = static_cast<uint32_t>(vertex_count),
       .index_count = static_cast<uint32_t>(index_count),
-      .first_index = static_cast<uint32_t>(resource_manager_->get_database().get_indices_size()),
-      .vertex_offset = static_cast<uint32_t>(resource_manager_->get_database().get_vertex_positions_size()),
+      .first_index = static_cast<uint32_t>(repository_->indices.size()),
+      .vertex_offset = static_cast<uint32_t>(repository_->vertex_positions.size()),
       .local_bounds = local_aabb,
   };
 
-  resource_manager_->get_database().add_vertices(vertex_positions);
-  resource_manager_->get_database().add_vertices(vertex_data);
-  uint32_t highest_index = *std::ranges::max_element(indices);
-  assert(highest_index <= resource_manager_->get_database().get_vertex_positions_size());
-  resource_manager_->get_database().add_indices(indices);
+  repository_->vertex_positions.add(vertex_positions);
+  repository_->vertex_data.add(vertex_data);
+  const uint32_t highest_index = *std::ranges::max_element(indices);
+  assert(highest_index <= repository_->vertex_positions.size());
+  repository_->indices.add(indices);
 
   return surface;
 }
 
 size_t asset_loader::create_mesh(std::vector<mesh_surface> surfaces, const std::string& name) const {
-  size_t mesh_id = resource_manager_->get_database().get_meshes_size();
+  size_t mesh_id = repository_->meshes.size();
   const std::string key = name.empty() ? "mesh_" + std::to_string(mesh_id) : name;
   AABB aabb;
   for (mesh_surface& surface : surfaces) {
@@ -552,14 +554,14 @@ size_t asset_loader::create_mesh(std::vector<mesh_surface> surfaces, const std::
     aabb.max.y = std::max(aabb.max.y, max.y);
     aabb.max.z = std::max(aabb.max.z, max.z);
   }
-  mesh_id = resource_manager_->get_database().add_mesh(mesh{key, std::move(surfaces), aabb});
+  mesh_id = repository_->meshes.add(mesh{key, std::move(surfaces), aabb});
   fmt::print("created mesh {}, mesh_id {}\n", key, mesh_id);
   return mesh_id;
 }
 
 void asset_loader::add_material_component(mesh_surface& surface, const size_t material) const {
   assert(material != no_component);
-  assert(material <= resource_manager_->get_database().get_materials_size());
+  assert(material <= repository_->materials.size());
   assert(surface.material == default_material);
   surface.material = material;
 }
@@ -572,7 +574,7 @@ void asset_loader::import_meshes(fastgltf::Asset& gltf, const size_t material_of
     surfaces.clear();
 
     for (auto&& primitive : mesh.primitives) {
-      size_t initial_index = resource_manager_->get_database().get_vertex_positions_size();
+      size_t initial_index = repository_->vertex_positions.size();
       std::vector<uint32_t> indices;
       std::vector<Vertex> vertices;
 

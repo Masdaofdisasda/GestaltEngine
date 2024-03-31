@@ -1,16 +1,14 @@
 #pragma once
 #include <fastgltf/types.hpp>
 
-#include "database.h"
+#include "Repository.h"
 #include "vk_gpu.h"
 #include "vk_types.h"
 #include "vk_descriptors.h"
 
 class resource_manager {
   vk_gpu gpu_ = {};
-  std::unique_ptr<database> database_ = std::make_unique<database>();
-  std::unordered_map<std::string, std::shared_ptr<AllocatedImage>> resources_;
-
+  std::shared_ptr<Repository> repository_;
 
   void load_and_create_cubemap(const std::string& file_path, AllocatedImage& cubemap);
 public:
@@ -48,44 +46,16 @@ public:
     VkDescriptorSetLayout light_layout;
   } light_data;
 
-  template <typename T> void add_resource(const std::string& id, std::shared_ptr<T> resource) {
-  resources_[id] = resource;
-  }
-
-  std::unordered_map<std::string, std::string> direct_original_mapping;
-  template <typename T> std::shared_ptr<T> get_resource(const std::string& id) {
-  if (const auto it = resources_.find(id); it != resources_.end()) {
-    return std::dynamic_pointer_cast<T>(it->second);
-  }
-  const std::string original_id = direct_original_mapping[id];
-  if (const auto it = resources_.find(original_id); it != resources_.end()) {
-    return std::dynamic_pointer_cast<T>(it->second);
-  }
-  return nullptr;
-  }
-
-  bool update_resource_id(const std::string& oldId, const std::string& newId) {
-  auto it = resources_.find(oldId);
-  if (it == resources_.end()) {
-    return false;
-  }
-  resources_[newId] = it->second;
-  resources_.erase(it);
-  return true;
-  }
-
   DescriptorAllocatorGrowable* descriptor_pool;
 
   DescriptorAllocatorGrowable descriptorPool; //TODO hide this
   descriptor_writer writer;
 
-  database& get_database() const { return *database_; }
-
   draw_context main_draw_context_; //TODO cleanup
   per_frame_data per_frame_data_;
   render_config config_;
 
-  void init(const vk_gpu& gpu);
+  void init(const vk_gpu& gpu, const std::shared_ptr<Repository> repository);
 
   void cleanup();
 

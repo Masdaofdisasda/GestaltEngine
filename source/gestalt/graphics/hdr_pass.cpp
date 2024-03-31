@@ -27,7 +27,7 @@ void bright_pass::prepare() {
   VkShaderModule bright_pass_shader;
   vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &bright_pass_shader);
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_bright");
+  const auto color_image = registry_->get_resource<AllocatedImage>("scene_bright");
 
   pipeline_
       = PipelineBuilder()
@@ -47,9 +47,8 @@ void bright_pass::execute(VkCommandBuffer cmd) {
   descriptor_set_ = resource_manager_->descriptor_pool->allocate(
       gpu_.device, descriptor_layouts_.at(0));
 
-  const auto scene_ssao
-      = resource_manager_->get_resource<AllocatedImage>("scene_ssao");
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_bright");
+  const auto scene_ssao = registry_->get_resource<AllocatedImage>("scene_ssao");
+  const auto color_image = registry_->get_resource<AllocatedImage>("scene_bright");
 
   VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
   VkRenderingInfo newRenderInfo = vkinit::rendering_info({effect_size_, effect_size_},
@@ -59,7 +58,7 @@ void bright_pass::execute(VkCommandBuffer cmd) {
   writer.clear();
   writer.write_image(
       10, scene_ssao->imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+                     repository_->default_material_.nearestSampler,
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.update_set(gpu_.device, descriptor_set_);
 
@@ -101,7 +100,7 @@ void bloom_blur_pass::prepare() {
   VkShaderModule blur_y_shader;
   vkutil::load_shader_module(fragment_blur_y.c_str(), gpu_.device, &blur_y_shader);
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_brightness_filtered");
+  const auto color_image = registry_->get_resource<AllocatedImage>("scene_brightness_filtered");
 
   auto builder
       = PipelineBuilder()
@@ -119,8 +118,8 @@ void bloom_blur_pass::prepare() {
 }
 
 void bloom_blur_pass::execute(VkCommandBuffer cmd) {
-  const auto image_x = resource_manager_->get_resource<AllocatedImage>("scene_brightness_filtered");
-  const auto image_y = resource_manager_->get_resource<AllocatedImage>("bloom_blur_y");
+  const auto image_x = registry_->get_resource<AllocatedImage>("scene_brightness_filtered");
+  const auto image_y = registry_->get_resource<AllocatedImage>("bloom_blur_y");
 
   for (int i = 0; i < resource_manager_->config_.bloom_quality; i++) {
     {
@@ -137,9 +136,7 @@ void bloom_blur_pass::execute(VkCommandBuffer cmd) {
       vkCmdBeginRendering(cmd, &newRenderInfo);
 
       writer.clear();
-      writer.write_image(
-          10, image_x->imageView,
-          resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+      writer.write_image(10, image_x->imageView, repository_->default_material_.nearestSampler,
           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
       writer.update_set(gpu_.device, blur_x_descriptor_set_);
 
@@ -166,9 +163,7 @@ void bloom_blur_pass::execute(VkCommandBuffer cmd) {
       vkCmdBeginRendering(cmd, &newRenderInfo);
 
       writer.clear();
-      writer.write_image(
-          10, image_y->imageView,
-          resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+      writer.write_image(10, image_y->imageView, repository_->default_material_.nearestSampler,
           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
       writer.update_set(gpu_.device, blur_y_descriptor_set_);
 
@@ -216,7 +211,7 @@ void streaks_pass::prepare() {
   VkShaderModule streak_shader;
   vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &streak_shader);
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("scene_bloom");
+  const auto color_image = registry_->get_resource<AllocatedImage>("scene_bloom");
 
   pipeline_ = PipelineBuilder()
                   .set_shaders(vertex_shader, streak_shader)
@@ -235,8 +230,8 @@ void streaks_pass::execute(VkCommandBuffer cmd) {
   descriptor_set_
       = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(0));
 
-  const auto scene_bloom = resource_manager_->get_resource<AllocatedImage>("scene_bloom");
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("bloom_blurred_intermediate");
+  const auto scene_bloom = registry_->get_resource<AllocatedImage>("scene_bloom");
+  const auto color_image = registry_->get_resource<AllocatedImage>("bloom_blurred_intermediate");
 
   VkRenderingAttachmentInfo newColorAttachment
       = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -245,13 +240,9 @@ void streaks_pass::execute(VkCommandBuffer cmd) {
   vkCmdBeginRendering(cmd, &newRenderInfo);
 
   writer.clear();
-  writer.write_image(
-      10, scene_bloom->imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+  writer.write_image(10, scene_bloom->imageView, repository_->default_material_.nearestSampler,
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.write_image(
-      11, streak_pattern.imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+  writer.write_image(11, streak_pattern.imageView, repository_->default_material_.nearestSampler,
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.update_set(gpu_.device, descriptor_set_);
 
@@ -294,7 +285,7 @@ void luminance_pass::prepare() {
   VkShaderModule luminance_shader;
   vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &luminance_shader);
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("lum_64");
+  const auto color_image = registry_->get_resource<AllocatedImage>("lum_64");
 
   pipeline_ = PipelineBuilder()
                      .set_shaders(vertex_shader, luminance_shader)
@@ -318,8 +309,8 @@ void luminance_pass::execute(VkCommandBuffer cmd) {
   descriptor_set_
       = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(0));
 
-  const auto scene_color = resource_manager_->get_resource<AllocatedImage>("scene_ssao");
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("lum_64");
+  const auto scene_color = registry_->get_resource<AllocatedImage>("scene_ssao");
+  const auto color_image = registry_->get_resource<AllocatedImage>("lum_64");
 
   vkutil::transition_read(cmd, *scene_color);
   vkutil::transition_write(cmd, *color_image);
@@ -331,9 +322,7 @@ void luminance_pass::execute(VkCommandBuffer cmd) {
   vkCmdBeginRendering(cmd, &newRenderInfo);
 
   writer.clear();
-  writer.write_image(
-      10, scene_color->imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+  writer.write_image(10, scene_color->imageView, repository_->default_material_.nearestSampler,
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.update_set(gpu_.device, descriptor_set_);
 
@@ -372,7 +361,7 @@ void luminance_downscale_pass::prepare() {
   vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device,
                              &downscale_shader);
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("lum_64");
+  const auto color_image = registry_->get_resource<AllocatedImage>("lum_64");
 
  pipeline_ = PipelineBuilder()
                             .set_shaders(vertex_shader, downscale_shader)
@@ -400,13 +389,13 @@ void luminance_downscale_pass::execute(VkCommandBuffer cmd) {
     std::shared_ptr<AllocatedImage> scene_color;
     if (i == 0) {
       scene_color
-          = resource_manager_->get_resource<AllocatedImage>(deps_.read_resources.at(i)->getId());
+          = registry_->get_resource<AllocatedImage>(deps_.read_resources.at(i)->getId());
     } else {
-      scene_color = resource_manager_->get_resource<AllocatedImage>(
+      scene_color = registry_->get_resource<AllocatedImage>(
           deps_.write_resources.at(i - 1).second->getId());
     }
 
-    const auto color_image = resource_manager_->get_resource<AllocatedImage>(
+    const auto color_image = registry_->get_resource<AllocatedImage>(
         deps_.write_resources.at(i).second->getId());
 
     vkutil::transition_read(cmd, *scene_color);
@@ -419,9 +408,7 @@ void luminance_downscale_pass::execute(VkCommandBuffer cmd) {
     vkCmdBeginRendering(cmd, &newRenderInfo);
 
     writer.clear();
-    writer.write_image(
-        10, scene_color->imageView,
-        resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+    writer.write_image(10, scene_color->imageView, repository_->default_material_.nearestSampler,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
     writer.update_set(gpu_.device, descriptor_set_);
 
@@ -464,7 +451,7 @@ void light_adaptation_pass::prepare() {
   vkutil::load_shader_module(adaptation_fragment_shader_source_.c_str(), gpu_.device,
                              &adaptation_shader);
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("lum_64");
+  const auto color_image = registry_->get_resource<AllocatedImage>("lum_64");
 
   pipeline_ = PipelineBuilder()
                   .set_shaders(vertex_shader, adaptation_shader)
@@ -488,11 +475,11 @@ void light_adaptation_pass::execute(VkCommandBuffer cmd) {
   descriptor_set_
       = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(0));
 
-  const auto current_lum = resource_manager_->get_resource<AllocatedImage>("lum_1_final");
+  const auto current_lum = registry_->get_resource<AllocatedImage>("lum_1_final");
   std::shared_ptr<AllocatedImage> avg_lum
-      = resource_manager_->get_resource<AllocatedImage>("lum_1_avg");
+      = registry_->get_resource<AllocatedImage>("lum_1_avg");
   std::shared_ptr<AllocatedImage> new_lum
-      = resource_manager_->get_resource<AllocatedImage>("lum_1_new");
+      = registry_->get_resource<AllocatedImage>("lum_1_new");
 
   vkutil::transition_read(cmd, *current_lum);
   vkutil::transition_read(cmd, *avg_lum);
@@ -505,13 +492,9 @@ void light_adaptation_pass::execute(VkCommandBuffer cmd) {
   vkCmdBeginRendering(cmd, &newRenderInfo);
 
   writer.clear();
-  writer.write_image(
-      10, current_lum->imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+  writer.write_image(10, current_lum->imageView, repository_->default_material_.nearestSampler,
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.write_image(
-      11, avg_lum->imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+  writer.write_image(11, avg_lum->imageView, repository_->default_material_.nearestSampler,
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.update_set(gpu_.device, descriptor_set_);
 
@@ -531,9 +514,9 @@ void light_adaptation_pass::execute(VkCommandBuffer cmd) {
   vkCmdEndRendering(cmd);
 
   // TODO should not be done this way,simulate ping pong buffer
-  resource_manager_->update_resource_id("lum_1_avg", "lum_1_temp");
-  resource_manager_->update_resource_id("lum_1_new", "lum_1_avg");
-  resource_manager_->update_resource_id("lum_1_temp", "lum_1_new");
+  registry_->update_resource_id("lum_1_avg", "lum_1_temp");
+  registry_->update_resource_id("lum_1_new", "lum_1_avg");
+  registry_->update_resource_id("lum_1_temp", "lum_1_new");
 }
 
 
@@ -563,7 +546,7 @@ void tonemap_pass::prepare() {
   VkShaderModule final_shader;
   vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &final_shader);
 
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("hdr_final");
+  const auto color_image = registry_->get_resource<AllocatedImage>("hdr_final");
 
   pipeline_
       = PipelineBuilder()
@@ -585,11 +568,11 @@ void tonemap_pass::execute(VkCommandBuffer cmd) {
       gpu_.device, descriptor_layouts_.at(0));
 
   const auto scene_color
-      = resource_manager_->get_resource<AllocatedImage>("scene_ssao");
-  const auto scene_bloom = resource_manager_->get_resource<AllocatedImage>("scene_streak");
-  const auto color_image = resource_manager_->get_resource<AllocatedImage>("hdr_final");
-  const auto lum_image = resource_manager_->get_resource<AllocatedImage>("lum_1_adapted");
-  const auto depth_image = resource_manager_->get_resource<AllocatedImage>("directional_shadow_map");
+      = registry_->get_resource<AllocatedImage>("scene_ssao");
+  const auto scene_bloom = registry_->get_resource<AllocatedImage>("scene_streak");
+  const auto color_image = registry_->get_resource<AllocatedImage>("hdr_final");
+  const auto lum_image = registry_->get_resource<AllocatedImage>("lum_1_adapted");
+  const auto depth_image = registry_->get_resource<AllocatedImage>("directional_shadow_map");
 
   VkRenderingAttachmentInfo newColorAttachment
       = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -598,22 +581,14 @@ void tonemap_pass::execute(VkCommandBuffer cmd) {
   vkCmdBeginRendering(cmd, &newRenderInfo);
 
   writer.clear();
-  writer.write_image(
-      10, scene_color->imageView,
-      resource_manager_->get_database().get_sampler(0),  // todo default_sampler_nearest
+  writer.write_image(10, scene_color->imageView, repository_->default_material_.nearestSampler,
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.write_image(
-      11, scene_bloom->imageView,
-      resource_manager_->get_database().get_sampler(1),  // todo default_sampler_linear
+  writer.write_image(11, scene_bloom->imageView, repository_->default_material_.linearSampler,
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.write_image(
-      12, lum_image->imageView,
-      resource_manager_->get_database().get_sampler(1),  // todo default_sampler_linear
+  writer.write_image(12, lum_image->imageView, repository_->default_material_.linearSampler,
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.update_set(gpu_.device, descriptor_set_);
-  writer.write_image(
-      13, depth_image->imageView,
-      resource_manager_->get_database().get_sampler(1),  // todo default_sampler_linear
+  writer.write_image(13, depth_image->imageView, repository_->default_material_.linearSampler,
       VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.update_set(gpu_.device, descriptor_set_);
 

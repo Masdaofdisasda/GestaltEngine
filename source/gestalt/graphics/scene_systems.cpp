@@ -26,9 +26,8 @@ void light_system::prepare() {
       = resource_manager_->descriptorPool.allocate(gpu_.device, light_data.light_layout);
 
         const size_t max_directional_lights
-            = resource_manager_->get_database().max_lights(light_type::directional);
-        const size_t max_point_lights
-            = resource_manager_->get_database().max_lights(light_type::point);
+            = repository_->max_lights(light_type::directional);
+        const size_t max_point_lights = repository_->max_lights(light_type::point);
         const size_t max_lights = max_directional_lights + max_point_lights;
 
         light_data.dir_light_buffer = resource_manager_->create_buffer(
@@ -43,7 +42,7 @@ void light_system::prepare() {
 
   writer.clear();
         std::vector<VkDescriptorBufferInfo> dirBufferInfos;
-        for (int i = 0; i < resource_manager_->get_database().max_lights(light_type::directional);
+  for (int i = 0; i < repository_->max_lights(light_type::directional);
              ++i) {
           VkDescriptorBufferInfo bufferInfo = {};
           bufferInfo.buffer = resource_manager_->light_data.dir_light_buffer.buffer;
@@ -54,7 +53,7 @@ void light_system::prepare() {
         writer.write_buffer_array(15, dirBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
 
         std::vector<VkDescriptorBufferInfo> pointBufferInfos;
-        for (int i = 0; i < resource_manager_->get_database().max_lights(light_type::point); ++i) {
+        for (int i = 0; i < repository_->max_lights(light_type::point); ++i) {
           VkDescriptorBufferInfo bufferInfo = {};
           bufferInfo.buffer = resource_manager_->light_data.point_light_buffer.buffer;
           bufferInfo.offset = 32 * i;
@@ -64,8 +63,8 @@ void light_system::prepare() {
         writer.write_buffer_array(16, pointBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
 
         std::vector<VkDescriptorBufferInfo> lightViewProjBufferInfos;
-        for (int i = 0; i < resource_manager_->get_database().max_lights(light_type::directional)
-                                + resource_manager_->get_database().max_lights(light_type::point);
+        for (int i = 0; i < repository_->max_lights(light_type::directional)
+                                + repository_->max_lights(light_type::point);
              ++i) {
           VkDescriptorBufferInfo bufferInfo = {};
           bufferInfo.buffer = resource_manager_->light_data.view_proj_matrices.buffer;
@@ -82,7 +81,7 @@ void light_system::prepare() {
 glm::mat4 light_system::calculate_sun_view_proj(const glm::vec3 direction) const {
 
   auto& [min, max, is_dirty]
-      = resource_manager_->get_database().get_node_component(root_entity).value().get().bounds;
+      = repository_->scene_graph.get(root_entity).value().get().bounds;
 
   glm::vec3 center = (min + max) * 0.5f;
   glm::vec3 size = max - min;
@@ -108,12 +107,12 @@ glm::mat4 light_system::calculate_sun_view_proj(const glm::vec3 direction) const
   return lightProjection * lightView;
 }
 
-bool has_dirty_light(const component_container<light_component>& lights) {
+bool has_dirty_light(const std::unordered_map<entity, light_component>& lights) {
    return std::any_of(lights.begin(), lights.end(),
                            [](const std::pair<entity, light_component>& light) { return light.second.is_dirty; });
 } 
 
-void light_system::update_directional_lights(component_container<light_component>& lights) {
+void light_system::update_directional_lights(std::unordered_map<entity, light_component>& lights) {
 
   auto& light_data = resource_manager_->light_data;
 
@@ -124,10 +123,10 @@ void light_system::update_directional_lights(component_container<light_component
       continue;
     }
 
-    auto& rotation = resource_manager_->get_database().get_transform_component(entity).value().get().rotation;
-    glm::vec3 direction = normalize(glm::vec3(0,0,-1.f) * rotation);
+    auto& rotation = repository_->transform_components.get(entity).value().get().rotation;
+    glm::vec3 direction = glm::normalize(glm::vec3(0,0,-1.f) * rotation);
 
-    auto& view_proj = resource_manager_->get_database().get_light_view_proj(light.light_view_projections.at(0));
+    auto& view_proj = repository_->light_view_projections.get(light.light_view_projections.at(0));
     view_proj = calculate_sun_view_proj(direction);
 
     DirectionalLight dir_light = {};
@@ -147,8 +146,7 @@ void light_system::update_directional_lights(component_container<light_component
   resource_manager_->config_.lighting.num_dir_lights = dir_lights.size();
 }
 
-void light_system::update_point_lights(
-     component_container<light_component>& lights) {
+void light_system::update_point_lights(std::unordered_map<entity, light_component>& lights) {
 
   auto& light_data = resource_manager_->light_data;
 
@@ -158,8 +156,7 @@ void light_system::update_point_lights(
     if (light.type != light_type::point) {
       continue;
     }
-    auto& position
-        = resource_manager_->get_database().get_transform_component(entity).value().get().position;
+    auto& position = repository_->transform_components.get(entity).value().get().position;
 
     PointLight point_light = {};
     point_light.color = light.color;
@@ -180,7 +177,7 @@ void light_system::update_point_lights(
 
 void light_system::update() {
 
-  auto& light_components = resource_manager_->get_database().get_lights();
+  auto& light_components = repository_->light_components.components();
   if (has_dirty_light(light_components)) {
     update_directional_lights(light_components);
     update_point_lights(light_components);
@@ -189,7 +186,7 @@ void light_system::update() {
 
   // changes in the scene graph can affect the light view-projection matrices
   const auto& light_data = resource_manager_->light_data;
-  const auto& matrices = resource_manager_->get_database().get_light_view_projs();
+  const auto& matrices = repository_->light_view_projections.data();
   void* mapped_data;
   VK_CHECK(vmaMapMemory(gpu_.allocator, light_data.view_proj_matrices.allocation, &mapped_data));
   memcpy(mapped_data, matrices.data(), sizeof(glm::mat4) * matrices.size());
@@ -216,7 +213,7 @@ void transform_system::mark_parent_dirty(entity entity) {
     return;
   }
 
-  auto& node = resource_manager_->get_database().get_node_component(entity).value().get();
+  auto& node = repository_->scene_graph.get(entity).value().get();
   if (node.bounds.is_dirty) {
     return;
   }
@@ -230,7 +227,7 @@ void transform_system::mark_children_dirty(entity entity) {
     return;
   }
 
-  auto& node = resource_manager_->get_database().get_node_component(entity).value().get();
+  auto& node = repository_->scene_graph.get(entity).value().get();
   if (node.bounds.is_dirty) {
     return;
   }
@@ -242,7 +239,7 @@ void transform_system::mark_children_dirty(entity entity) {
 }
 
 void transform_system::mark_as_dirty(entity entity) {
-  const auto& node = resource_manager_->get_database().get_node_component(entity).value().get();
+  const auto& node = repository_->scene_graph.get(entity).value().get();
   node.bounds.is_dirty = true;
   for (const auto& child : node.children) {
        mark_children_dirty(child);
@@ -252,13 +249,14 @@ void transform_system::mark_as_dirty(entity entity) {
 }
 
 void transform_system::update_aabb(const entity entity, const glm::mat4& parent_transform) {
-  auto& node = resource_manager_->get_database().get_node_component(entity).value().get();
+  auto& node = repository_->scene_graph.get(entity).value().get();
   if (!node.bounds.is_dirty) {
     return;
   }
-  auto& transform = resource_manager_->get_database().get_transform_component(entity).value().get();
+  auto& transform = repository_->transform_components.get(entity).value().get();
   if (node.parent != invalid_entity) {
-       const auto& parent_transform_component = resource_manager_->get_database().get_transform_component(node.parent).value().get();
+    const auto& parent_transform_component
+        = repository_->transform_components.get(node.parent).value().get();
     transform.parent_position = parent_transform_component.position;
     transform.parent_rotation = parent_transform_component.rotation;
     transform.parent_scale = parent_transform_component.scale;
@@ -268,13 +266,13 @@ void transform_system::update_aabb(const entity entity, const glm::mat4& parent_
     transform.parent_scale = transform.scale;
   }
 
-  const auto& mesh_optional = resource_manager_->get_database().get_mesh_component(entity);
+  const auto& mesh_optional = repository_->mesh_components.get(entity);
 
   AABB aabb;
   auto& [min, max, is_dirty] = aabb;
 
   if (mesh_optional.has_value()) {
-    const auto& mesh = resource_manager_->get_database().get_mesh(mesh_optional->get().mesh);
+    const auto& mesh = repository_->meshes.get(mesh_optional->get().mesh);
     min.x = std::min(min.x, mesh.local_bounds.min.x);
     min.y = std::min(min.y, mesh.local_bounds.min.y);
     min.z = std::min(min.z, mesh.local_bounds.min.z);
@@ -313,8 +311,7 @@ void transform_system::update_aabb(const entity entity, const glm::mat4& parent_
 
   for (const auto& child : node.children) {
     update_aabb(child, model_matrix);
-    const auto& child_aabb
-        = resource_manager_->get_database().get_node_component(child).value().get().bounds;
+    const auto& child_aabb = repository_->scene_graph.get(child).value().get().bounds;
     min.x = std::min(min.x, child_aabb.min.x);
     min.y = std::min(min.y, child_aabb.min.y);
     min.z = std::min(min.z, child_aabb.min.z);
@@ -330,10 +327,10 @@ void transform_system::update_aabb(const entity entity, const glm::mat4& parent_
 
 void transform_system::update() {
 
-  for (auto& [entity, transform] : resource_manager_->get_database().get_transforms()) {
+  for (auto& [entity, transform] : repository_->transform_components.components()) {
     if (transform.is_dirty) {
       mark_as_dirty(entity);
-      resource_manager_->get_database().set_matrix(transform.matrix, get_model_matrix(transform));
+      repository_->model_matrices.set(transform.matrix, get_model_matrix(transform));
       transform.is_dirty = false;
     }
   }
@@ -343,7 +340,7 @@ void transform_system::update() {
   update_aabb(root_entity, root_transform);
 
   // mark the directional light as dirty to update the view-projection matrix
-  resource_manager_->get_database().get_lights(light_type::directional).at(0).second.is_dirty = true;
+  repository_->light_components.asVector().at(0).second.get().is_dirty = true;
 }
 
  void transform_system::cleanup() {
@@ -352,21 +349,21 @@ void transform_system::update() {
 
 void render_system::traverse_scene(const entity entity, const glm::mat4& parent_transform) {
    assert(entity != invalid_entity);
-   const auto& node = resource_manager_->get_database().get_node_component(entity).value().get();
+   const auto& node = repository_->scene_graph.get(entity).value().get();
    if (!node.visible) {
      return;
    }
 
-   const auto& transform = resource_manager_->get_database().get_transform_component(entity)->get();
+   const auto& transform = repository_->transform_components.get(entity)->get();
    const glm::mat4 world_transform //TODO check if matrix vector is needed
-       = parent_transform * resource_manager_->get_database().get_matrix(transform.matrix);
+       = parent_transform * repository_->model_matrices.get(transform.matrix);
 
-   const auto& mesh_component = resource_manager_->get_database().get_mesh_component(entity);
+   const auto& mesh_component = repository_->mesh_components.get(entity);
    if (mesh_component.has_value()) {
-     const auto& mesh = resource_manager_->get_database().get_mesh(mesh_component->get().mesh);
+     const auto& mesh = repository_->meshes.get(mesh_component->get().mesh);
 
      for (const auto surface : mesh.surfaces) {
-       const auto& material = resource_manager_->get_database().get_material(surface.material);
+       const auto& material = repository_->materials.get(surface.material);
 
        render_object def;
        def.index_count = surface.index_count;
@@ -413,8 +410,8 @@ void render_system::prepare() {
  }
 
 void render_system::update() {
-   if (resource_manager_->get_database().get_meshes_size() != meshes_) {
-     meshes_ = resource_manager_->get_database().get_meshes_size();
+   if (repository_->meshes.size() != meshes_) {
+    meshes_ = repository_->meshes.size();
 
      /* TODO use this
      resource_manager_->update_mesh(resource_manager_->get_database().get_indices(),

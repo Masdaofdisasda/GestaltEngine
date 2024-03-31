@@ -16,11 +16,13 @@ class asset_loader;
 
 class component_archetype_factory {
   std::shared_ptr<resource_manager> resource_manager_;
+  std::shared_ptr<Repository> repository_;
 
   entity next_entity_id_ = 0;
 
 public:
-  void init(const std::shared_ptr<resource_manager>& resource_manager);
+  void init(const std::shared_ptr<resource_manager>& resource_manager,
+            const std::shared_ptr<Repository>& repository);
 
   entity create_entity();
   std::pair<entity, std::reference_wrapper<node_component>> create_entity_node(std::string node_name
@@ -49,6 +51,7 @@ public:
 class asset_loader {
   vk_gpu gpu_ = {};
   std::shared_ptr<resource_manager> resource_manager_;
+  std::shared_ptr<Repository> repository_;
   std::shared_ptr<component_archetype_factory> component_factory_;
 
   static VkFilter extract_filter(fastgltf::Filter filter);
@@ -92,7 +95,8 @@ class asset_loader {
 
 public:
   void init(const vk_gpu& gpu, const std::shared_ptr<resource_manager>& resource_manager,
-            const std::shared_ptr<component_archetype_factory>& component_factory);
+            const std::shared_ptr<component_archetype_factory>& component_factory,
+            const std::shared_ptr<Repository>& repository);
   void import_lights(const fastgltf::Asset& gltf);
   std::vector<fastgltf::Node> load_scene_from_gltf(const std::string& file_path);
 };
@@ -103,6 +107,8 @@ public:
 class scene_manager {
   vk_gpu gpu_ = {};
   std::shared_ptr<resource_manager> resource_manager_;
+  std::shared_ptr<Repository> repository_;
+
   std::unique_ptr<asset_loader> asset_loader_ = std::make_unique<asset_loader>();
   std::shared_ptr<component_archetype_factory> component_factory_
       = std::make_shared<component_archetype_factory>();
@@ -122,7 +128,8 @@ class scene_manager {
   std::string scene_path_ = "";
 
 public:
-  void init(const vk_gpu& gpu, const std::shared_ptr<resource_manager>& resource_manager);
+  void init(const vk_gpu& gpu, const std::shared_ptr<resource_manager>& resource_manager,
+            const std::shared_ptr<Repository>& repository);
   void cleanup();
 
   void update_scene();

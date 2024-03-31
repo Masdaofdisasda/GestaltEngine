@@ -14,10 +14,12 @@
 #include "vk_initializers.h"
 
 void imgui_gui::init(vk_gpu& gpu, sdl_window& window,
-                     const std::shared_ptr<vk_swapchain>& swapchain, gui_actions& actions) {
+                     const std::shared_ptr<vk_swapchain>& swapchain,
+                     const std::shared_ptr<Repository>& repository, gui_actions& actions) {
   gpu_ = gpu;
   window_ = window;
   swapchain_ = swapchain;
+  repository_ = repository;
   actions_ = actions;
   deletion_service_.init(gpu_.device, gpu_.allocator);
 
@@ -113,7 +115,7 @@ void imgui_gui::update(const SDL_Event& e) {
 void imgui_gui::guizmo() {
   ImGuizmo::BeginFrame();
 
-  auto [viewCam, proj] = actions_.get_database().get_camera(0);
+  auto [viewCam, proj] = repository_->cameras.get(0);
   proj[1][1] *= -1;  // Flip the Y-axis for opengl like system
 
   // Convert glm matrices to arrays for ImGuizmo
@@ -136,7 +138,7 @@ void imgui_gui::guizmo() {
                            0xB4101010);
 
   const auto transform_component
-      = actions_.get_database().get_transform_component(selected_entity_);
+      = repository_->transform_components.get(selected_entity_);
   if (transform_component.has_value()) {
     auto& transform = transform_component.value().get();
 
@@ -314,7 +316,7 @@ void imgui_gui::menu_bar() {
 
       ImGui::Separator();
 
-      const auto& root = actions_.get_database().get_node_component(root_entity).value().get();
+      const auto& root = repository_->scene_graph.get(root_entity).value().get();
 
       static glm::vec3 min_bounds = root.bounds.min;
       static glm::vec3 max_bounds = root.bounds.max;
@@ -405,17 +407,20 @@ void imgui_gui::lights() {
     static int currentOption = 0; // default to directional light
       ImGui::Combo("Select Type", &currentOption, lightOptions, IM_ARRAYSIZE(lightOptions));
 
-    std::vector<std::pair<entity, light_component&>> lights;
-    if (currentOption == 0) {
-       lights = actions_.get_database().
-          get_lights(light_type::directional);
-    } else if (currentOption == 1) {
-           lights = actions_.get_database().
-          get_lights(light_type::point);
-    } else if (currentOption == 2) {
-           lights = actions_.get_database().
-          get_lights(light_type::spot);
-    }
+    //std::vector<std::pair<entity, light_component&>> lights;
+
+      std::vector<std::pair<entity, std::reference_wrapper<light_component>>> lights;
+      std::vector<std::pair<entity, std::reference_wrapper<light_component>>> temp
+          = repository_->light_components.asVector();
+      for (auto& [ent, comp]: temp) {
+                if (comp.get().type == light_type::directional && currentOption == 0) {
+                                 lights.push_back({ent, comp});
+                } else if (comp.get().type == light_type::point && currentOption == 1) {
+                                 lights.push_back({ent, comp});
+                } else if (comp.get().type == light_type::spot && currentOption == 2) {
+                                 lights.push_back({ent, comp});
+                }
+      }
 
     int selectedLightIndex = 0;  // Default to the first light
     if (!lights.empty()) {
@@ -424,7 +429,7 @@ void imgui_gui::lights() {
 
       auto& [entity, light_component] = lights[selectedLightIndex];
       const auto transform_component
-          = actions_.get_database().get_transform_component(entity).value();
+          = repository_->transform_components.get(entity).value();
 
       show_light_component(light_component, transform_component.get());
     }
@@ -659,7 +664,7 @@ void imgui_gui::tone_map_settings() {
 
 
 void imgui_gui::display_scene_hierarchy(const entity entity) {
-  const auto& node_optional = actions_.get_database().get_node_component(entity);
+  const auto& node_optional = repository_->scene_graph.get(entity);
   if (node_optional.has_value()) {
     node_component& node = node_optional.value().get();
 
@@ -799,10 +804,10 @@ void imgui_gui::show_transform_component(node_component& node, transform_compone
 }
 
 void imgui_gui::show_mesh_component(mesh_component& mesh_component) {
-  auto& mesh = actions_.get_database().get_mesh(mesh_component.mesh);
+  auto& mesh = repository_->meshes.get(mesh_component.mesh);
 
   for (auto& surface : mesh.surfaces) {
-    auto& material = actions_.get_database().get_material(surface.material);
+    auto& material = repository_->materials.get(surface.material);
     if (ImGui::TreeNode(material.name.c_str())) {
       auto& config = material.config;
 
@@ -895,25 +900,25 @@ void imgui_gui::show_light_component(light_component& light, transform_component
 
 void imgui_gui::show_node_component() {
   if (selected_entity_ != invalid_entity) {
-    auto& selected_node = actions_.get_database().get_node_component(selected_entity_)->get();
+    auto& selected_node = repository_->scene_graph.get(selected_entity_)->get();
     ImGui::Text(selected_node.name.c_str());
 
     const auto transform_optional
-        = actions_.get_database().get_transform_component(selected_entity_);
+        = repository_->transform_components.get(selected_entity_);
     if (transform_optional.has_value()) {
       if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
         show_transform_component(selected_node, transform_optional.value().get());
       }
     }
 
-    const auto& mesh_optional = actions_.get_database().get_mesh_component(selected_entity_);
+    const auto& mesh_optional = repository_->mesh_components.get(selected_entity_);
     if (mesh_optional.has_value()) {
       if (ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_DefaultOpen)) {
         show_mesh_component(mesh_optional.value().get());
       }
     }
 
-    const auto& light_optional = actions_.get_database().get_light_component(selected_entity_);
+    const auto& light_optional = repository_->light_components.get(selected_entity_);
     if (light_optional.has_value() && transform_optional.has_value()) {
       if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen)) {
         show_light_component(light_optional.value().get(), transform_optional.value().get());

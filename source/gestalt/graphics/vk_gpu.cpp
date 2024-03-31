@@ -30,43 +30,48 @@ void vk_gpu::init(
   // create the device
   window.create_surface(instance, &surface);
 
-  VkPhysicalDeviceFeatures device_features{};
-  device_features.fillModeNonSolid = true;
+  VkPhysicalDeviceFeatures features10{};
+  features10.fillModeNonSolid = true;
 
   VkPhysicalDeviceVulkan11Features features11{};
   features11.uniformAndStorageBuffer16BitAccess = true;
   features11.storageBuffer16BitAccess = true;
+  features11.shaderDrawParameters = true;
 
-  // vulkan 1.3 features
-  VkPhysicalDeviceVulkan13Features features13{};
-  features13.dynamicRendering = true;
-  features13.synchronization2 = true;
-
-  // vulkan 1.2 features
   VkPhysicalDeviceVulkan12Features features12{};
   features12.bufferDeviceAddress = true;
   features12.descriptorIndexing = true;
   features12.uniformAndStorageBuffer8BitAccess = true;
   features12.shaderFloat16 = true;
   features12.shaderInt8 = true;
-
   features12.shaderSampledImageArrayNonUniformIndexing = true;
   features12.shaderStorageBufferArrayNonUniformIndexing = true;
   features12.descriptorBindingVariableDescriptorCount = true;
   features12.runtimeDescriptorArray = true;
 
-  // use vkbootstrap to select a gpu.
-  // We want a gpu that can write to the SDL surface and supports vulkan 1.3 with the correct
-  // features
+  VkPhysicalDeviceVulkan13Features features13{};
+  features13.dynamicRendering = true;
+  features13.synchronization2 = true;
+
+  VkPhysicalDeviceMeshShaderFeaturesNV mesh_shader_features{
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_NV};
+  mesh_shader_features.taskShader = true;
+  mesh_shader_features.meshShader = true;
+
+  std::vector extensions
+      = {VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME, VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
+         VK_NV_MESH_SHADER_EXTENSION_NAME, VK_EXT_MESH_SHADER_EXTENSION_NAME};
+
   vkb::PhysicalDeviceSelector selector{vkb_inst};
   auto device_ret = selector.set_minimum_version(1, 3)
-                        .set_required_features_13(features13)
-                        .set_required_features_12(features12)
-                        .set_required_features_11(features11)
-                        .set_required_features(device_features)
-                        .add_required_extension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME)
-                        .set_surface(surface)
-                        .select();
+                            .set_required_features(features10)
+                            .set_required_features_11(features11)
+                            .set_required_features_12(features12)
+                            .set_required_features_13(features13)
+                            .add_required_extension_features(mesh_shader_features)
+                            .add_required_extensions(extensions)
+                            .set_surface(surface)
+                            .select();
 
   if (!device_ret.has_value()) {
     throw std::runtime_error("Could not select a Vulkan device: " + device_ret.error().message());
@@ -113,6 +118,12 @@ void vk_gpu::init(
 
   if (!vkCmdPushDescriptorSetKHR) {
     throw std::runtime_error("Failed to load vkCmdPushDescriptorSetKHR");
+  }
+
+  vkCmdDrawMeshTasksIndirectCountEXT = reinterpret_cast<PFN_vkCmdDrawMeshTasksIndirectCountEXT>(
+      vkGetDeviceProcAddr(device, "vkCmdDrawMeshTasksIndirectCountEXT"));
+  if (!vkCmdDrawMeshTasksIndirectCountEXT) {
+       throw std::runtime_error("Failed to load vkCmdDrawMeshTasksIndirectCountEXT");
   }
 }
 

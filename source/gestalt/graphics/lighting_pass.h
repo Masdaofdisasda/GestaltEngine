@@ -3,8 +3,7 @@
 #include "vk_types.h"
 #include <string>
 
-#include "render_pass.h"
-#include "vk_types.h"
+#include "frame_graph.h"
 
 class lighting_pass final : public render_pass {
   std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";

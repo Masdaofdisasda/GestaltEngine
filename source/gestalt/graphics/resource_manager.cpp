@@ -36,8 +36,9 @@ AllocatedBuffer resource_manager::create_buffer(size_t allocSize, VkBufferUsageF
   return newBuffer;
 }
 
-void resource_manager::init(const vk_gpu& gpu) {
+void resource_manager::init(const vk_gpu& gpu, const std::shared_ptr<Repository> repository) {
   gpu_ = gpu;
+  repository_ = repository;
 
   per_frame_data_buffer = create_buffer(sizeof(per_frame_data), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                                         VMA_MEMORY_USAGE_CPU_TO_GPU);
@@ -82,12 +83,12 @@ void resource_manager::init(const vk_gpu& gpu) {
   light_data.light_layout
       = descriptor_layout_builder()
             .add_binding(15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
-                         get_database().max_lights(light_type::directional))
+                         repository_->max_lights(light_type::directional))
             .add_binding(16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
-                         get_database().max_lights(light_type::point))
+                         repository_->max_lights(light_type::point))
             .add_binding(17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
-                         get_database().max_lights(light_type::directional)
-                             + get_database().max_lights(light_type::point))
+                         repository_->max_lights(light_type::directional)
+                             + repository_->max_lights(light_type::point))
             .build(gpu_.device);
 
   scene_geometry_.vertex_layout
@@ -122,7 +123,7 @@ void resource_manager::init(const vk_gpu& gpu) {
 }
 
 void resource_manager::init_default_data() {
-  auto& default_material = get_database().default_material_;
+  auto& default_material = repository_->default_material_;
 
   uint32_t white = 0xFFFFFFFF;                       // White color for color and occlusion
   uint32_t default_metallic_roughness = 0xFF00FF00;  // Green color representing metallic-roughness
@@ -131,25 +132,25 @@ void resource_manager::init_default_data() {
 
   default_material.color_image = create_image((void*)&white, VkExtent3D{1, 1, 1},
                                               VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-  get_database().add_image(default_material.color_image);
+  repository_->textures.add(default_material.color_image);
 
   default_material.metallic_roughness_image
       = create_image((void*)&default_metallic_roughness, VkExtent3D{1, 1, 1},
                      VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-  get_database().add_image(default_material.metallic_roughness_image);
+  repository_->textures.add(default_material.metallic_roughness_image);
 
   default_material.normal_image
       = create_image((void*)&flat_normal, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
                      VK_IMAGE_USAGE_SAMPLED_BIT);
-  get_database().add_image(default_material.normal_image);
+  repository_->textures.add(default_material.normal_image);
 
   default_material.emissive_image = create_image(
       (void*)&black, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-  get_database().add_image(default_material.emissive_image);
+  repository_->textures.add(default_material.emissive_image);
 
   default_material.occlusion_image = create_image(
       (void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-  get_database().add_image(default_material.occlusion_image);
+  repository_->textures.add(default_material.occlusion_image);
 
   // checkerboard image for error textures and testing
   uint32_t magenta = 0xFFFF00FF;
@@ -162,20 +163,20 @@ void resource_manager::init_default_data() {
   }
   default_material.error_checkerboard_image = create_image(
       pixels.data(), VkExtent3D{16, 16, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-  get_database().add_image(default_material.error_checkerboard_image);
+  repository_->textures.add(default_material.error_checkerboard_image);
 
   VkSamplerCreateInfo sampler = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
 
   sampler.magFilter = VK_FILTER_NEAREST;
   sampler.minFilter = VK_FILTER_NEAREST;
 
-  vkCreateSampler(gpu_.device, &sampler, nullptr, &default_material.default_sampler_nearest);
-  get_database().add_sampler(default_material.default_sampler_nearest);
+  vkCreateSampler(gpu_.device, &sampler, nullptr, &default_material.nearestSampler);
+  repository_->samplers.add(default_material.nearestSampler);
 
   sampler.magFilter = VK_FILTER_LINEAR;
   sampler.minFilter = VK_FILTER_LINEAR;
-  vkCreateSampler(gpu_.device, &sampler, nullptr, &default_material.default_sampler_linear);
-  get_database().add_sampler(default_material.default_sampler_linear);
+  vkCreateSampler(gpu_.device, &sampler, nullptr, &default_material.linearSampler);
+  repository_->samplers.add(default_material.linearSampler);
 
   pbr_material pbr_material{};
   pbr_material.constants.albedo_factor.x = 1.f;
@@ -189,22 +190,22 @@ void resource_manager::init_default_data() {
 
   // default the material textures
   pbr_material.resources.albedo_image = default_material.color_image;
-  pbr_material.resources.albedo_sampler = default_material.default_sampler_linear;
+  pbr_material.resources.albedo_sampler = default_material.linearSampler;
   pbr_material.resources.metal_rough_image = default_material.metallic_roughness_image;
-  pbr_material.resources.metal_rough_sampler = default_material.default_sampler_linear;
+  pbr_material.resources.metal_rough_sampler = default_material.linearSampler;
   pbr_material.resources.normal_image = default_material.normal_image;
-  pbr_material.resources.normal_sampler = default_material.default_sampler_linear;
+  pbr_material.resources.normal_sampler = default_material.linearSampler;
   pbr_material.resources.emissive_image = default_material.emissive_image;
-  pbr_material.resources.emissive_sampler = default_material.default_sampler_linear;
+  pbr_material.resources.emissive_sampler = default_material.linearSampler;
   pbr_material.resources.occlusion_image = default_material.occlusion_image;
-  pbr_material.resources.occlusion_sampler = default_material.default_sampler_nearest;
+  pbr_material.resources.occlusion_sampler = default_material.nearestSampler;
 
   {
     // build material
-    const size_t material_id = get_database().get_materials_size();
+    const size_t material_id = repository_->materials.size();
     const std::string key = "default_material";
     write_material(pbr_material, material_id);
-    get_database().add_material(material{.name = key, .config = pbr_material});
+    repository_->materials.add(material{.name = key, .config = pbr_material});
     fmt::print("creating material {}, mat_id {}\n", key, material_id);
   }
 
@@ -236,8 +237,8 @@ void resource_manager::init_default_data() {
   for (int i = 0; i < max_textures; ++i) {
     VkDescriptorImageInfo image_info;
     image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    image_info.imageView = database_->default_material_.error_checkerboard_image.imageView;
-    image_info.sampler = database_->default_material_.default_sampler_linear;
+    image_info.imageView = repository_->default_material_.error_checkerboard_image.imageView;
+    image_info.sampler = repository_->default_material_.linearSampler;
     imageInfos[i] = image_info;
   }
   writer.write_image_array(4, imageInfos, 0);
@@ -245,10 +246,10 @@ void resource_manager::init_default_data() {
 }
 
 void resource_manager::cleanup() {
-  for (auto& image : database_->get_images()) {
+  for (auto& image : repository_->textures.data()) {
        destroy_image(image);
   }
-  for (const auto& sampler : database_->get_samplers()) {
+  for (const auto& sampler : repository_->samplers.data()) {
        vkDestroySampler(gpu_.device, sampler, nullptr);
   }
 
@@ -260,9 +261,9 @@ void resource_manager::cleanup() {
 }
 
 void resource_manager::upload_mesh() {
-  const std::span indices = database_->get_indices();
-  const std::span vertex_positions = database_->get_vertex_positions();
-  const std::span vertex_data = database_->get_vertex_data();
+  const std::span indices = repository_->indices.data();
+  const std::span vertex_positions = repository_->vertex_positions.data();
+  const std::span vertex_data = repository_->vertex_data.data();
 
   const size_t vertex_position_buffer_size = vertex_positions.size() * sizeof(GpuVertexPosition);
   const size_t vertex_data_buffer_size = vertex_data.size() * sizeof(GpuVertexData);
@@ -682,7 +683,7 @@ void resource_manager::load_and_process_cubemap(const std::string& file_path) {
                      VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.write_image(2, ibl_data.environment_irradiance_map.imageView, ibl_data.cube_map_sampler,
                      VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.write_image(3, ibl_data.bdrfLUT.imageView, get_database().default_material_.default_sampler_linear ,
+  writer.write_image(3, ibl_data.bdrfLUT.imageView, repository_->default_material_.linearSampler ,
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   writer.update_set(gpu_.device, ibl_data.IblSet);
 }

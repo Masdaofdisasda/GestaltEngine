@@ -9,12 +9,14 @@
 #include <glm/gtx/matrix_decompose.hpp>
 
 void scene_manager::init(const vk_gpu& gpu,
-                         const std::shared_ptr<resource_manager>& resource_manager) {
+                         const std::shared_ptr<resource_manager>& resource_manager,
+                         const std::shared_ptr<Repository>& repository) {
   gpu_ = gpu;
   resource_manager_ = resource_manager;
+  repository_ = repository;
 
-  component_factory_->init(resource_manager_);
-  asset_loader_->init(gpu_, resource_manager_, component_factory_);
+  component_factory_->init(resource_manager_, repository);
+  asset_loader_->init(gpu_, resource_manager_, component_factory_, repository_);
 
   resource_manager_->init_default_data();
 
@@ -22,8 +24,8 @@ void scene_manager::init(const vk_gpu& gpu,
 
   // TODO add lights from gltf to resource manager
 
-  const size_t camera_index = resource_manager_->get_database().add_camera(camera_data{});
-  resource_manager_->get_database().add_camera(component_factory_->create_entity_node().first,
+  const size_t camera_index = repository_->cameras.add(camera_data{});
+  repository_->camera_components.add(component_factory_->create_entity_node().first,
                                                camera_component{camera_index});
 
   component_factory_->create_directional_light(glm::vec3(1.f, 0.957f, 0.917f), 5.f,
@@ -32,17 +34,17 @@ void scene_manager::init(const vk_gpu& gpu,
                                          get_root_entity());
 
   light_system_ = std::make_unique<light_system>();
-  light_system_->init(gpu, resource_manager);
+  light_system_->init(gpu, resource_manager, repository);
   transform_system_ = std::make_unique<transform_system>();
-  transform_system_->init(gpu, resource_manager);
+  transform_system_->init(gpu, resource_manager, repository);
   render_system_ = std::make_unique<render_system>();
-  render_system_->init(gpu, resource_manager);
+  render_system_->init(gpu, resource_manager, repository);
 
 }
 
 
 void scene_manager::load_scene(const std::string& path) {
-  size_t mesh_offset = resource_manager_->get_database().get_meshes_size();
+  size_t mesh_offset = repository_->meshes.size();
   const auto nodes = asset_loader_->load_scene_from_gltf(path);
   build_scene_graph(nodes, mesh_offset);
 }
@@ -76,12 +78,11 @@ void scene_manager::build_hierarchy(std::vector<fastgltf::Node> nodes, const siz
   for (int i = 0; i < nodes.size(); i++) {
     fastgltf::Node& node = nodes[i];
     entity parent_entity = node_offset + i;
-    auto& scene_object = resource_manager_->get_database().get_node_component(parent_entity).value().get();
+    auto& scene_object = repository_->scene_graph.get(parent_entity).value().get();
 
     for (auto& c : node.children) {
       entity child_entity = node_offset + c;
-      auto& child
-          = resource_manager_->get_database().get_node_component(child_entity).value().get();
+      auto& child = repository_->scene_graph.get(child_entity).value().get();
       scene_object.children.push_back(child_entity);
       child.parent = parent_entity;
     }
@@ -90,7 +91,7 @@ void scene_manager::build_hierarchy(std::vector<fastgltf::Node> nodes, const siz
 
 
 void scene_manager::link_orphans_to_root() {
-  for (auto& [entity, node] : resource_manager_->get_database().get_scene_graph()) {
+  for (auto& [entity, node] : repository_->scene_graph.components()) {
     if (entity == get_root_entity()) {
       continue;
     }
@@ -103,7 +104,7 @@ void scene_manager::link_orphans_to_root() {
 }
 
 void scene_manager::build_scene_graph(const std::vector<fastgltf::Node>& nodes, const size_t& mesh_offset) {
-  const size_t node_offset = resource_manager_->get_database().get_scene_graph().size();
+  const size_t node_offset = repository_->scene_graph.size();
 
   create_entities(nodes, mesh_offset);
   build_hierarchy(nodes, node_offset);
@@ -129,24 +130,22 @@ component_archetype_factory::create_entity_node(std::string node_name) {
   };
 
   create_transform_component(new_entity, glm::vec3(0));
-  resource_manager_->get_database().add_node(new_entity, node);
+  repository_->scene_graph.add(new_entity, node);
 
 
   fmt::print("created entity {}\n", new_entity);
 
   return std::make_pair(
-      new_entity,
-      std::ref(resource_manager_->get_database().get_node_component(new_entity)->get()));
+      new_entity, std::ref(repository_->scene_graph.get(new_entity)->get()));
 }
 
 void component_archetype_factory::create_transform_component(const entity entity,
                                                           const glm::vec3& position,
                                                           const glm::quat& rotation,
                                                           const float& scale) const {
-  resource_manager_->get_database().add_transform(entity,
-                                                  transform_component(position, rotation, scale));
-  auto& transform = resource_manager_->get_database().get_transform_component(entity)->get();
-  transform.matrix = resource_manager_->get_database().add_matrix(glm::mat4(1.0));
+  repository_->transform_components.add(entity,transform_component(position, rotation, scale));
+  auto& transform = repository_->transform_components.get(entity)->get();
+  transform.matrix = repository_->model_matrices.add(glm::mat4(1.0));
 }
 
 void component_archetype_factory::update_transform_component(const entity entity,
@@ -154,7 +153,7 @@ void component_archetype_factory::update_transform_component(const entity entity
                                                           const glm::quat& rotation,
                                                           const float& scale) {
   const std::optional<std::reference_wrapper<transform_component>> transform_optional
-      = resource_manager_->get_database().get_transform_component(entity);
+      = repository_->transform_components.get(entity);
 
   if (transform_optional.has_value()) {
     auto& transform = transform_optional->get();
@@ -167,20 +166,20 @@ void component_archetype_factory::update_transform_component(const entity entity
 }
 
 node_component& scene_manager::get_root_node() {
-  return resource_manager_->get_database().get_node_component(get_root_entity()).value();
+  return repository_->scene_graph.get(get_root_entity()).value();
 }
 
 void component_archetype_factory::add_mesh_component(const entity entity, const size_t mesh_index) {
   assert(entity != invalid_entity);
 
-  resource_manager_->get_database().add_mesh(entity, mesh_component{mesh_index});
+  repository_->mesh_components.add(entity, mesh_component{mesh_index});
 }
 
 void component_archetype_factory::add_camera_component(const entity entity,
                                                        const camera_component& camera) {
   assert(entity != invalid_entity);
 
-  resource_manager_->get_database().add_camera(entity, camera);
+  repository_->camera_components.add(entity, camera);
 }
 
 entity component_archetype_factory::create_directional_light(const glm::vec3& color,
@@ -190,7 +189,7 @@ entity component_archetype_factory::create_directional_light(const glm::vec3& co
   auto [entity, node] = create_entity_node("directional_light");
   link_entity_to_parent(entity, parent);
 
-  auto& transform = resource_manager_->get_database().get_transform_component(entity).value().get();
+  auto& transform = repository_->transform_components.get(entity).value().get();
   transform.rotation = glm::quat(glm::lookAt(glm::vec3(0), direction, glm::vec3(0, 1, 0)));
 
   const light_component light{
@@ -199,13 +198,9 @@ entity component_archetype_factory::create_directional_light(const glm::vec3& co
       .intensity = intensity,
   };
 
-  resource_manager_->get_database().add_light(entity, light);
-  const size_t matrix_id = resource_manager_->get_database().add_light_view_proj(glm::mat4(1.0));
-  resource_manager_->get_database()
-      .get_light_component(entity)
-      .value()
-      .get()
-      .light_view_projections.push_back(matrix_id);
+  repository_->light_components.add(entity, light);
+  const size_t matrix_id = repository_->light_view_projections.add(glm::mat4(1.0));
+  repository_->light_components.get(entity).value().get().light_view_projections.push_back(matrix_id);
 
   return entity;
 }
@@ -216,7 +211,7 @@ entity component_archetype_factory::create_spot_light(const glm::vec3& color, co
   auto [entity, node] = create_entity_node("spot_light");
   link_entity_to_parent(entity, parent);
 
-  auto& transform = resource_manager_->get_database().get_transform_component(entity).value().get();
+  auto& transform = repository_->transform_components.get(entity).value().get();
   transform.rotation = glm::quat(glm::lookAt(glm::vec3(0), direction, glm::vec3(0, 1, 0)));
   transform.position = position;
 
@@ -228,13 +223,9 @@ entity component_archetype_factory::create_spot_light(const glm::vec3& color, co
        .outer_cone = outerCone,
    };
 
-  resource_manager_->get_database().add_light(entity, light);
-  const size_t matrix_id = resource_manager_->get_database().add_light_view_proj(glm::mat4(1.0));
-  resource_manager_->get_database()
-      .get_light_component(entity)
-      .value()
-      .get()
-      .light_view_projections.push_back(matrix_id);
+  repository_->light_components.add(entity, light);
+   const size_t matrix_id = repository_->light_view_projections.add(glm::mat4(1.0));
+  repository_->light_components.get(entity).value().get().light_view_projections.push_back(matrix_id);
 
   return entity;
 }
@@ -245,7 +236,7 @@ entity component_archetype_factory::create_point_light(const glm::vec3& color,
   auto [entity, node] = create_entity_node("point_light");
   link_entity_to_parent(entity, parent);
 
-  auto& transform = resource_manager_->get_database().get_transform_component(entity).value().get();
+  auto& transform = repository_->transform_components.get(entity).value().get();
   transform.position = position;
 
   const light_component light{
@@ -254,14 +245,11 @@ entity component_archetype_factory::create_point_light(const glm::vec3& color,
       .intensity = intensity,
   };
 
-  resource_manager_->get_database().add_light(entity, light);
+  repository_->light_components.add(entity, light);
   for (int i = 0; i < 6; i++) {
-    const size_t matrix_id = resource_manager_->get_database().add_light_view_proj(glm::mat4(1.0));
-    resource_manager_->get_database()
-        .get_light_component(entity)
-        .value()
-        .get()
-        .light_view_projections.push_back(matrix_id);
+    const size_t matrix_id = repository_->light_view_projections.add(glm::mat4(1.0));
+    repository_->light_components.get(entity).value().get().light_view_projections.push_back(
+        matrix_id);
   }
   return entity;
 }
@@ -271,8 +259,8 @@ void component_archetype_factory::link_entity_to_parent(const entity child, cons
        return;
   }
 
-  const auto& parent_node = resource_manager_->get_database().get_node_component(parent);
-  const auto& child_node = resource_manager_->get_database().get_node_component(child);
+  const auto& parent_node = repository_->scene_graph.get(parent);
+  const auto& child_node = repository_->scene_graph.get(child);
 
   if (parent_node.has_value() && child_node.has_value()) {
     parent_node->get().children.push_back(child);
@@ -302,8 +290,10 @@ void scene_manager::request_scene(const std::string& path) {
   scene_path_ = path;
 }
 
-void component_archetype_factory::init(const std::shared_ptr<resource_manager>& resource_manager) {
+void component_archetype_factory::init(const std::shared_ptr<resource_manager>& resource_manager,
+                                       const std::shared_ptr<Repository>& repository) {
   resource_manager_ = resource_manager;
+  repository_ = repository;
 
   auto [entity, root_node] = create_entity_node();
   root_node.get().name = "root";
