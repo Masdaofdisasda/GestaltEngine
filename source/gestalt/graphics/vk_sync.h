@@ -4,13 +4,18 @@
 #include "Gpu.h"
 #include "vk_types.h"
 
-class vk_sync {
-  Gpu gpu_;
-  DeletionService deletion_service_;
+namespace gestalt {
+  namespace graphics {
 
-public:
-  VkFence imgui_fence;
+    class vk_sync {
+      Gpu gpu_;
+      DeletionService deletion_service_;
 
-  void init(const Gpu& gpu, std::vector<FrameData>& frames);
-  void cleanup() { deletion_service_.flush(); }
-};
+    public:
+      VkFence imgui_fence;
+
+      void init(const graphics::Gpu& gpu, std::vector<FrameData>& frames);
+      void cleanup() { deletion_service_.flush(); }
+    };
+  }  // namespace graphics
+}  // namespace gestalt

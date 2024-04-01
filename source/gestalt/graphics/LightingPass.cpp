@@ -4,124 +4,141 @@
 #include "vk_initializers.h"
 #include "vk_pipelines.h"
 
-void LightingPass::prepare() {
-  fmt::print("preparing lighting pass\n");
 
-  descriptor_layouts_.push_back(resource_manager_->per_frame_data_layout);
-  descriptor_layouts_.push_back(resource_manager_->ibl_data.IblLayout);
-  descriptor_layouts_.emplace_back(
-      DescriptorLayoutBuilder()
-          .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
-          .add_binding(11, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
-          .add_binding(12, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
-          .add_binding(13, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
-          .add_binding(14, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
-          .build(gpu_.device));
-  descriptor_layouts_.push_back(resource_manager_->light_data.light_layout);
+namespace gestalt {
+  namespace graphics {
 
-  VkShaderModule meshFragShader;
-  vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &meshFragShader);
+    using namespace foundation;
+    void LightingPass::prepare() {
+      fmt::print("preparing lighting pass\n");
 
-  VkShaderModule meshVertexShader;
-  vkutil::load_shader_module(vertex_shader_source_.c_str(), gpu_.device, &meshVertexShader);
+      descriptor_layouts_.push_back(resource_manager_->per_frame_data_layout);
+      descriptor_layouts_.push_back(resource_manager_->ibl_data.IblLayout);
+      descriptor_layouts_.emplace_back(
+          DescriptorLayoutBuilder()
+              .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                           VK_SHADER_STAGE_FRAGMENT_BIT)
+              .add_binding(11, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                           VK_SHADER_STAGE_FRAGMENT_BIT)
+              .add_binding(12, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                           VK_SHADER_STAGE_FRAGMENT_BIT)
+              .add_binding(13, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                           VK_SHADER_STAGE_FRAGMENT_BIT)
+              .add_binding(14, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                           VK_SHADER_STAGE_FRAGMENT_BIT)
+              .build(gpu_.device));
+      descriptor_layouts_.push_back(resource_manager_->light_data.light_layout);
 
-  VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
-  mesh_layout_info.setLayoutCount = descriptor_layouts_.size();
-  mesh_layout_info.pSetLayouts = descriptor_layouts_.data();
-  mesh_layout_info.pPushConstantRanges = &push_constant_range_;
-  mesh_layout_info.pushConstantRangeCount = 1;
+      VkShaderModule meshFragShader;
+      vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &meshFragShader);
 
-  VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
+      VkShaderModule meshVertexShader;
+      vkutil::load_shader_module(vertex_shader_source_.c_str(), gpu_.device, &meshVertexShader);
 
-  const auto color_image = registry_->get_resource<AllocatedImage>("gbuffer_shaded");
+      VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
+      mesh_layout_info.setLayoutCount = descriptor_layouts_.size();
+      mesh_layout_info.pSetLayouts = descriptor_layouts_.data();
+      mesh_layout_info.pPushConstantRanges = &push_constant_range_;
+      mesh_layout_info.pushConstantRangeCount = 1;
 
-  pipeline_ = PipelineBuilder()
-                  .set_shaders(meshVertexShader, meshFragShader)
-                  .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
-                  .set_polygon_mode(VK_POLYGON_MODE_FILL)
-                  .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
-                  .set_multisampling_none()
-                  .disable_blending()
-                  .set_color_attachment_format(color_image->imageFormat)
-                  .disable_depthtest()
-                  .set_pipeline_layout(pipeline_layout_)
-                  .build_pipeline(gpu_.device);
+      VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
 
-  vkDestroyShaderModule(gpu_.device, meshFragShader, nullptr);
-  vkDestroyShaderModule(gpu_.device, meshVertexShader, nullptr);
-}
+      const auto color_image = registry_->get_resource<AllocatedImage>("gbuffer_shaded");
 
-void LightingPass::cleanup() {
-  vkDestroyPipeline(gpu_.device, pipeline_, nullptr);
-}
+      pipeline_ = PipelineBuilder()
+                      .set_shaders(meshVertexShader, meshFragShader)
+                      .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+                      .set_polygon_mode(VK_POLYGON_MODE_FILL)
+                      .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
+                      .set_multisampling_none()
+                      .disable_blending()
+                      .set_color_attachment_format(color_image->imageFormat)
+                      .disable_depthtest()
+                      .set_pipeline_layout(pipeline_layout_)
+                      .build_pipeline(gpu_.device);
 
-void LightingPass::execute(VkCommandBuffer cmd) {
-  descriptor_set_
-      = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(2));
+      vkDestroyShaderModule(gpu_.device, meshFragShader, nullptr);
+      vkDestroyShaderModule(gpu_.device, meshVertexShader, nullptr);
+    }
 
-  const auto color_image = registry_->get_resource<AllocatedImage>("gbuffer_shaded");
+    void LightingPass::cleanup() { vkDestroyPipeline(gpu_.device, pipeline_, nullptr); }
 
-  const auto gbuffer_1 = registry_->get_resource<AllocatedImage>("gbuffer_1_final");
-  const auto gbuffer_2 = registry_->get_resource<AllocatedImage>("gbuffer_2_final");
-  const auto gbuffer_3 = registry_->get_resource<AllocatedImage>("gbuffer_3_final");
-  const auto gbuffer_depth = registry_->get_resource<AllocatedImage>("gbuffer_depth");
-  const auto shadow_map = registry_->get_resource<AllocatedImage>("directional_shadow_map");
+    void LightingPass::execute(VkCommandBuffer cmd) {
+      descriptor_set_
+          = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(2));
 
-  VkRenderingAttachmentInfo colorAttachment
-      = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+      const auto color_image = registry_->get_resource<AllocatedImage>("gbuffer_shaded");
 
-  VkRenderingInfo renderInfo
-      = vkinit::rendering_info(color_image->getExtent2D(), &colorAttachment, nullptr);
+      const auto gbuffer_1 = registry_->get_resource<AllocatedImage>("gbuffer_1_final");
+      const auto gbuffer_2 = registry_->get_resource<AllocatedImage>("gbuffer_2_final");
+      const auto gbuffer_3 = registry_->get_resource<AllocatedImage>("gbuffer_3_final");
+      const auto gbuffer_depth = registry_->get_resource<AllocatedImage>("gbuffer_depth");
+      const auto shadow_map = registry_->get_resource<AllocatedImage>("directional_shadow_map");
 
-  vkCmdBeginRendering(cmd, &renderInfo);
+      VkRenderingAttachmentInfo colorAttachment
+          = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
 
-  VkDescriptorBufferInfo buffer_info;
-  buffer_info.buffer = resource_manager_->per_frame_data_buffer.buffer;
-  buffer_info.offset = 0;
-  buffer_info.range = sizeof(PerFrameData);
+      VkRenderingInfo renderInfo
+          = vkinit::rendering_info(color_image->getExtent2D(), &colorAttachment, nullptr);
 
-  VkWriteDescriptorSet descriptor_write = {};
-  descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  descriptor_write.dstBinding = 0;
-  descriptor_write.dstArrayElement = 0;
-  descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  descriptor_write.descriptorCount = 1;
-  descriptor_write.pBufferInfo = &buffer_info;
+      vkCmdBeginRendering(cmd, &renderInfo);
 
-  vkCmdBindIndexBuffer(cmd, resource_manager_->scene_geometry_.indexBuffer.buffer, 0,
-                       VK_INDEX_TYPE_UINT32);
+      VkDescriptorBufferInfo buffer_info;
+      buffer_info.buffer = resource_manager_->per_frame_data_buffer.buffer;
+      buffer_info.offset = 0;
+      buffer_info.range = sizeof(PerFrameData);
 
-  writer.clear();
-  writer.write_image(10, gbuffer_1->imageView, repository_->default_material_.nearestSampler,
-      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.write_image(11, gbuffer_2->imageView, repository_->default_material_.nearestSampler,
-      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.write_image(12, gbuffer_3->imageView, repository_->default_material_.nearestSampler,
-      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.write_image(13, gbuffer_depth->imageView, repository_->default_material_.nearestSampler,
-      VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.write_image(14, shadow_map->imageView, repository_->default_material_.nearestSampler,
-      VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-  writer.update_set(gpu_.device, descriptor_set_);
-  VkDescriptorSet descriptorSets[] = {resource_manager_->ibl_data.IblSet, descriptor_set_, resource_manager_->light_data.light_set};
+      VkWriteDescriptorSet descriptor_write = {};
+      descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      descriptor_write.dstBinding = 0;
+      descriptor_write.dstArrayElement = 0;
+      descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+      descriptor_write.descriptorCount = 1;
+      descriptor_write.pBufferInfo = &buffer_info;
 
-  gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
-                                 &descriptor_write);
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 3,
-                          descriptorSets, 0, nullptr);
+      vkCmdBindIndexBuffer(cmd, resource_manager_->scene_geometry_.indexBuffer.buffer, 0,
+                           VK_INDEX_TYPE_UINT32);
 
-  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
-  viewport_.width = static_cast<float>(color_image->getExtent2D().width);
-  viewport_.height = static_cast<float>(color_image->getExtent2D().height);
-  scissor_.extent.width = color_image->getExtent2D().width;
-  scissor_.extent.height = color_image->getExtent2D().height;
-  vkCmdSetViewport(cmd, 0, 1, &viewport_);
-  vkCmdSetScissor(cmd, 0, 1, &scissor_);
-  resource_manager_->config_.lighting.invViewProj
-      = inverse(resource_manager_->per_frame_data_.viewproj);
+      writer.clear();
+      writer.write_image(10, gbuffer_1->imageView, repository_->default_material_.nearestSampler,
+                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+      writer.write_image(11, gbuffer_2->imageView, repository_->default_material_.nearestSampler,
+                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+      writer.write_image(12, gbuffer_3->imageView, repository_->default_material_.nearestSampler,
+                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+      writer.write_image(
+          13, gbuffer_depth->imageView, repository_->default_material_.nearestSampler,
+          VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+      writer.write_image(14, shadow_map->imageView, repository_->default_material_.nearestSampler,
+                         VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL,
+                         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+      writer.update_set(gpu_.device, descriptor_set_);
+      VkDescriptorSet descriptorSets[] = {resource_manager_->ibl_data.IblSet, descriptor_set_,
+                                          resource_manager_->light_data.light_set};
 
-  vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                     sizeof(RenderConfig::LightingParams), &resource_manager_->config_.lighting);
-  vkCmdDraw(cmd, 3, 1, 0, 0);
-  vkCmdEndRendering(cmd);
-}
+      gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
+                                     &descriptor_write);
+      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 3,
+                              descriptorSets, 0, nullptr);
+
+      vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
+      viewport_.width = static_cast<float>(color_image->getExtent2D().width);
+      viewport_.height = static_cast<float>(color_image->getExtent2D().height);
+      scissor_.extent.width = color_image->getExtent2D().width;
+      scissor_.extent.height = color_image->getExtent2D().height;
+      vkCmdSetViewport(cmd, 0, 1, &viewport_);
+      vkCmdSetScissor(cmd, 0, 1, &scissor_);
+      resource_manager_->config_.lighting.invViewProj
+          = glm::inverse(resource_manager_->per_frame_data_.viewproj);
+
+      vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                         sizeof(RenderConfig::LightingParams),
+                         &resource_manager_->config_.lighting);
+      vkCmdDraw(cmd, 3, 1, 0, 0);
+      vkCmdEndRendering(cmd);
+    }
+  }  // namespace graphics
+}  // namespace gestalt

@@ -3,14 +3,22 @@
 
 #include <vulkan/vulkan.h>
 
-class AllocatedImage;
 
-namespace vkutil {
-  void transition_read(VkCommandBuffer cmd, AllocatedImage& image);
-  void transition_write(VkCommandBuffer cmd, AllocatedImage& image);
-  void transition_image(VkCommandBuffer cmd, VkImage image, VkImageLayout currentLayout,
-                        VkImageLayout newLayout);
-  void copy_image_to_image(VkCommandBuffer cmd, VkImage source, VkImage destination,
-                           VkExtent2D srcSize, VkExtent2D dstSize);
-  void generate_mipmaps(VkCommandBuffer cmd, VkImage image, VkExtent2D imageSize);
-};
+namespace gestalt {
+  namespace foundation {
+    class AllocatedImage;
+  }
+
+  namespace graphics {
+
+    namespace vkutil {
+      void transition_read(VkCommandBuffer cmd, foundation::AllocatedImage& image);
+      void transition_write(VkCommandBuffer cmd, foundation::AllocatedImage& image);
+      void transition_image(VkCommandBuffer cmd, VkImage image, VkImageLayout currentLayout,
+                            VkImageLayout newLayout);
+      void copy_image_to_image(VkCommandBuffer cmd, VkImage source, VkImage destination,
+                               VkExtent2D srcSize, VkExtent2D dstSize);
+      void generate_mipmaps(VkCommandBuffer cmd, VkImage image, VkExtent2D imageSize);
+    };  // namespace vkutil
+  }     // namespace graphics
+}  // namespace gestalt

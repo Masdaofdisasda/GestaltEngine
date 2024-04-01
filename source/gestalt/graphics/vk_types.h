@@ -20,247 +20,254 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
 
-enum class ImageType { kColor, kDepth };
+namespace gestalt {
+  namespace foundation {
 
-class AllocatedImage {
-public:
-  VkImage image = VK_NULL_HANDLE;
-  VkImageView imageView = VK_NULL_HANDLE;
-  VmaAllocation allocation = VK_NULL_HANDLE;
-  VkExtent3D imageExtent = {};
-  VkFormat imageFormat = VK_FORMAT_UNDEFINED;
-  ImageType type;
-  VkImageLayout currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    enum class ImageType { kColor, kDepth };
 
-  AllocatedImage(const ImageType type = ImageType::kColor) : type(type) {}
+    class AllocatedImage {
+    public:
+      VkImage image = VK_NULL_HANDLE;
+      VkImageView imageView = VK_NULL_HANDLE;
+      VmaAllocation allocation = VK_NULL_HANDLE;
+      VkExtent3D imageExtent = {};
+      VkFormat imageFormat = VK_FORMAT_UNDEFINED;
+      ImageType type;
+      VkImageLayout currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-  VkExtent2D getExtent2D() const { return {imageExtent.width, imageExtent.height}; }
-};
+      AllocatedImage(const ImageType type = ImageType::kColor) : type(type) {}
 
-struct AllocatedBuffer {
-  VkBuffer buffer;
-  VmaAllocation allocation;
-  VmaAllocationInfo info;
-};
+      VkExtent2D getExtent2D() const { return {imageExtent.width, imageExtent.height}; }
+    };
 
-struct FrameBuffer {
+    struct AllocatedBuffer {
+      VkBuffer buffer;
+      VmaAllocation allocation;
+      VmaAllocationInfo info;
+    };
 
-  FrameBuffer() = default;
+    struct FrameBuffer {
+      FrameBuffer() = default;
 
-  void add_color_image(const AllocatedImage& image) {
-    assert(image.type == ImageType::kColor);
-    if (color_image_.has_value()) {
-      assert(color_image_.value().getExtent2D().height == image.getExtent2D().height);
-      assert(color_image_.value().getExtent2D().width == image.getExtent2D().width);
-    }
+      void add_color_image(const AllocatedImage& image) {
+        assert(image.type == ImageType::kColor);
+        if (color_image_.has_value()) {
+          assert(color_image_.value().getExtent2D().height == image.getExtent2D().height);
+          assert(color_image_.value().getExtent2D().width == image.getExtent2D().width);
+        }
 
-    color_image_ = image;
-  }
+        color_image_ = image;
+      }
 
-  void add_depth_image(const AllocatedImage& image) {
-    assert(image.type == ImageType::kDepth);
-    if (depth_image_.has_value()) {
-      assert(depth_image_.value().getExtent2D().height == image.getExtent2D().height);
-      assert(depth_image_.value().getExtent2D().width == image.getExtent2D().width);
-    }
+      void add_depth_image(const AllocatedImage& image) {
+        assert(image.type == ImageType::kDepth);
+        if (depth_image_.has_value()) {
+          assert(depth_image_.value().getExtent2D().height == image.getExtent2D().height);
+          assert(depth_image_.value().getExtent2D().width == image.getExtent2D().width);
+        }
 
-    depth_image_ = image;
-  }
+        depth_image_ = image;
+      }
 
-  AllocatedImage& get_color_image() {
-    assert(color_image_.has_value());
-    return color_image_.value();
-  }
+      AllocatedImage& get_color_image() {
+        assert(color_image_.has_value());
+        return color_image_.value();
+      }
 
-  AllocatedImage& get_depth_image() {
-      assert(depth_image_.has_value());
-      return depth_image_.value();
-  }
+      AllocatedImage& get_depth_image() {
+        assert(depth_image_.has_value());
+        return depth_image_.value();
+      }
 
-private:
-  std::optional<AllocatedImage> color_image_;
-  std::optional<AllocatedImage> depth_image_;
-};
+    private:
+      std::optional<AllocatedImage> color_image_;
+      std::optional<AllocatedImage> depth_image_;
+    };
 
+    struct DoubleBufferedFrameBuffer {
+      void switch_buffers() { write_buffer_index_ = (write_buffer_index_ + 1) % buffers_.size(); }
 
-struct DoubleBufferedFrameBuffer {
+      FrameBuffer& get_write_buffer() { return buffers_[write_buffer_index_]; }
+      AllocatedImage& get_write_color_image() {
+        return buffers_[write_buffer_index_].get_color_image();
+      }
+      AllocatedImage& get_write_depth_image() {
+        return buffers_[write_buffer_index_].get_depth_image();
+      }
 
-  void switch_buffers() { write_buffer_index_ = (write_buffer_index_ + 1) % buffers_.size(); }
+      FrameBuffer& get_read_buffer() {
+        return buffers_[(write_buffer_index_ + 1) % buffers_.size()];
+      }
+      AllocatedImage& get_read_color_image() {
+        return buffers_[(write_buffer_index_ + 1) % buffers_.size()].get_color_image();
+      }
+      AllocatedImage& get_read_depth_image() {
+        return buffers_[(write_buffer_index_ + 1) % buffers_.size()].get_depth_image();
+      }
 
-  FrameBuffer& get_write_buffer() { return buffers_[write_buffer_index_]; }
-  AllocatedImage& get_write_color_image() { return buffers_[write_buffer_index_].get_color_image(); }
-  AllocatedImage& get_write_depth_image() { return buffers_[write_buffer_index_].get_depth_image(); }
+    private:
+      std::array<FrameBuffer, 2> buffers_;
+      size_t write_buffer_index_ = 0;
+    };
 
-  FrameBuffer& get_read_buffer() { return buffers_[(write_buffer_index_ + 1) % buffers_.size()]; }
-  AllocatedImage& get_read_color_image() {
-    return buffers_[(write_buffer_index_ + 1) % buffers_.size()].get_color_image();
-  }
-  AllocatedImage& get_read_depth_image() {
-    return buffers_[(write_buffer_index_ + 1) % buffers_.size()].get_depth_image();
-  }
+    struct PerFrameData {
+      glm::mat4 view{1.f};
+      glm::mat4 proj{1.f};
+      glm::mat4 viewproj{1.f};
+      glm::mat4 inv_viewproj{1.f};
+    };
 
-private:
-  std::array<FrameBuffer, 2> buffers_;
-  size_t write_buffer_index_ = 0;
-};
+    struct MaterialPipeline {
+      VkPipeline pipeline;
+      VkPipelineLayout layout;
+    };
 
+    struct GpuVertexPosition {
+      glm::vec3 position{0.f};
+      float padding{0.f};
+    };
 
-struct PerFrameData {
-  glm::mat4 view{1.f};
-  glm::mat4 proj{1.f};
-  glm::mat4 viewproj{1.f};
-  glm::mat4 inv_viewproj{1.f};
-};
+    struct GpuVertexData {
+      uint8_t normal[4];
+      uint8_t tangent[4];
+      uint16_t uv[2];
+      float padding{0.f};
+    };
 
-struct MaterialPipeline {
-  VkPipeline pipeline;
-  VkPipelineLayout layout;
-};
+    // holds the resources needed for a mesh
+    struct GpuMeshBuffers {
+      AllocatedBuffer indexBuffer;
+      AllocatedBuffer vertexPositionBuffer;
+      VkDescriptorSet vertex_set;
+      VkDescriptorSetLayout vertex_layout;
+      AllocatedBuffer vertexDataBuffer;
+    };
 
-struct GpuVertexPosition {
-  glm::vec3 position{0.f};
-  float padding{0.f};
-};
+    // push constants for our mesh object draws
+    struct GpuDrawPushConstants {
+      glm::mat4 worldMatrix;
+      int material_id;
+    };
+    //< vbuf_types
 
-struct GpuVertexData {
-  uint8_t normal[4];
-  uint8_t tangent[4];
-  uint16_t uv[2];
-  float padding{0.f};
-};
+    struct EngineStats {
+      float frametime;
+      int triangle_count;
+      int drawcall_count;
+      float scene_update_time;
+      float mesh_draw_time;
+    };
 
-// holds the resources needed for a mesh
-struct GpuMeshBuffers {
-  AllocatedBuffer indexBuffer;
-  AllocatedBuffer vertexPositionBuffer;
-  VkDescriptorSet vertex_set;
-  VkDescriptorSetLayout vertex_layout;
-  AllocatedBuffer vertexDataBuffer;
-};
+    struct Bounds {
+      glm::vec3 origin;
+      glm::vec3 extents;
+      float sphereRadius;
+    };
 
-// push constants for our mesh object draws
-struct GpuDrawPushConstants {
-  glm::mat4 worldMatrix;
-  int material_id;
-};
-//< vbuf_types
+    struct AABB {
+      glm::vec3 min{glm::vec3(std::numeric_limits<float>::max())};
+      glm::vec3 max{glm::vec3(std::numeric_limits<float>::lowest())};
 
-struct EngineStats {
-  float frametime;
-  int triangle_count;
-  int drawcall_count;
-  float scene_update_time;
-  float mesh_draw_time;
-};
+      mutable bool is_dirty = true;
+    };
 
-struct Bounds {
-  glm::vec3 origin;
-  glm::vec3 extents;
-  float sphereRadius;
-};
+    struct RenderObject {
+      uint32_t index_count;
+      uint32_t first_index;
+      uint32_t vertex_offset;
 
-struct AABB {
-  glm::vec3 min{glm::vec3(std::numeric_limits<float>::max())};
-  glm::vec3 max{glm::vec3(std::numeric_limits<float>::lowest())};
+      uint32_t material;
+      glm::mat4 transform;
+    };
 
-  mutable bool is_dirty = true;
-};
+    struct DrawContext {
+      std::vector<RenderObject> opaque_surfaces;
+      std::vector<RenderObject> transparent_surfaces;
+    };
 
-struct RenderObject {
-  uint32_t index_count;
-  uint32_t first_index;
-  uint32_t vertex_offset;
+    struct RenderConfig { //TODO move to graphics
+      bool always_opaque{true};
 
-  uint32_t material;
-  glm::mat4 transform;
-};
+      struct SkyboxParams {
+        glm::vec3 betaR = glm::vec3(5.22e-6, 9.19e-6, 33.1e-6);
+        float pad1;
+        glm::vec3 betaA = glm::vec3(0.000425, 0.001881, 0.000085);
+        float pad2;
+        glm::vec3 betaM = glm::vec3(5.61e-6, 2.1e-5, 2.1e-5);
+        float pad3;
+      } skybox{};
 
-struct DrawContext {
-  std::vector<RenderObject> opaque_surfaces;
-  std::vector<RenderObject> transparent_surfaces;
-};
+      bool enable_ssao{true};
+      int ssao_quality{1};
+      struct SsaoParams {
+        bool show_ssao_only = false;
+        float scale = 0.75f;
+        float bias = 0.008f;
+        float zNear = 0.1f;
+        float zFar = 1000.0f;
+        float radius = 0.4f;
+        float attScale = .95f;
+        float distScale = 5.f;
+      } ssao{};
 
-struct RenderConfig {
-  bool always_opaque{true};
+      bool enable_hdr{true};
+      int bloom_quality{3};
+      struct HdrParams {
+        float exposure{1.f};
+        float maxWhite{1.35f};
+        float bloomStrength{0.04f};
+        float padding{1.f};
+        glm::vec4 lift{0.f};
+        glm::vec4 gamma{1.f};
+        glm::vec4 gain{1.f};
+        bool show_bright_pass = false;
+        int toneMappingOption{2};
+      } hdr{};
 
-  struct SkyboxParams {
-    glm::vec3 betaR = glm::vec3(5.22e-6, 9.19e-6, 33.1e-6);
-    float pad1;
-    glm::vec3 betaA = glm::vec3(0.000425, 0.001881, 0.000085);
-    float pad2;
-    glm::vec3 betaM = glm::vec3(5.61e-6, 2.1e-5, 2.1e-5);
-    float pad3;
-  } skybox{};
+      struct LightAdaptationParams {
+        float adaptation_speed_dark2light{.01f};
+        float adaptation_speed_light2dark{.02f};
+        float delta_time{0.16f};
+        float min_luminance{0.002f};
+        float max_luminance{10.0f};
+      } light_adaptation{};
 
-  bool enable_ssao{true};
-  int ssao_quality{1};
-  struct SsaoParams {
-    bool show_ssao_only = false;
-    float scale = 0.75f;
-    float bias = 0.008f;
-    float zNear = 0.1f;
-    float zFar = 1000.0f;
-    float radius = 0.4f;
-    float attScale = .95f;
-    float distScale = 5.f;
-  } ssao{};
+      struct StreaksParams {
+        float intensity{.04f};
+        float attenuation{1.f};
+        int streak_samples{6};
+        int num_streaks{4};
+      } streaks{};
 
-  bool enable_hdr{true};
-  int bloom_quality{3};
-  struct HdrParams {
-    float exposure{1.f};
-    float maxWhite{1.35f};
-    float bloomStrength{0.04f};
-    float padding{1.f};
-    glm::vec4 lift{0.f};
-    glm::vec4 gamma{1.f};
-    glm::vec4 gain{1.f};
-    bool show_bright_pass = false;
-    int toneMappingOption{2};
-  } hdr{};
+      struct ShadowParams {
+        float shadow_bias{1.f};
+        float shadow_slope_bias{1.f};
+      } shadow{};
 
-  struct LightAdaptationParams {
-    float adaptation_speed_dark2light{.01f};
-    float adaptation_speed_light2dark{.02f};
-    float delta_time{0.16f};
-    float min_luminance{0.002f};
-    float max_luminance{10.0f};
-  } light_adaptation{};
+      struct LightingParams {
+        glm::mat4 invViewProj;
+        int debug_mode{0};
+        int num_dir_lights{0};
+        int num_point_lights{0};
+        int shading_mode{0};
+        int shadow_mode{0};
+        int ibl_mode{0};
+      } lighting{};
 
-  struct StreaksParams {
-    float intensity{.04f};
-    float attenuation{1.f};
-    int streak_samples{6};
-    int num_streaks{4};
-  } streaks{};
+      struct GridParams {
+        float majorLineWidth = 0.065f;
+        float minorLineWidth = 0.015f;
+        float axisLineWidth = 0.080f;
+        float axisDashScale = 1.33f;
+        float majorGridDivision = 5.f;
+      } grid{};
 
-  struct ShadowParams {
-    float shadow_bias{1.f};
-    float shadow_slope_bias{1.f};
-  } shadow{};
+      static_assert(sizeof(LightingParams) <= 88);
 
-  struct LightingParams {
-    glm::mat4 invViewProj;
-    int debug_mode{0};
-    int num_dir_lights{0};
-    int num_point_lights{0};
-    int shading_mode{0};
-    int shadow_mode{0};
-    int ibl_mode{0};
-  } lighting{};
-
-  struct GridParams {
-    float majorLineWidth = 0.065f;
-    float minorLineWidth = 0.015f;
-    float axisLineWidth = 0.080f;
-    float axisDashScale = 1.33f;
-    float majorGridDivision = 5.f;
-  } grid{};
-
-  static_assert(sizeof(LightingParams) <= 88);
-
-  // todo : more settings
-};
+      // todo : more settings
+    };
+  }  // namespace foundation
+}  // namespace gestalt
 
 #define VK_CHECK(x)                                                     \
     do {                                                                \
@@ -270,3 +277,4 @@ struct RenderConfig {
             abort();                                                    \
         }                                                               \
     } while (0)
+

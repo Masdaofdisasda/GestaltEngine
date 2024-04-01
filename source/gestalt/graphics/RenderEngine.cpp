@@ -23,57 +23,63 @@
 #include <thread>
 #include <utility>
 
-RenderEngine* loaded_engine = nullptr;
+namespace gestalt {
 
-constexpr bool use_validation_layers = true;
+  RenderEngine* loaded_engine = nullptr;
 
-void RenderEngine::init() {
+  constexpr bool use_validation_layers = true;
 
-  assert(loaded_engine == nullptr);
-  loaded_engine = this;
+  void RenderEngine::init() {
+    assert(loaded_engine == nullptr);
+    loaded_engine = this;
 
-  window_.init({1300, 900}); // todo : get window size from config
+    window_.init({1300, 900});  // todo : get window size from config
 
-  gpu_.init(use_validation_layers, window_,
-            [this](auto func) { this->immediate_submit(std::move(func)); });
+    gpu_.init(use_validation_layers, window_,
+              [this](auto func) { this->immediate_submit(std::move(func)); });
 
-  resource_manager_->init(gpu_, repository_);
+    resource_manager_->init(gpu_, repository_);
 
-  frame_graph_->init(gpu_, window_, resource_manager_, repository_, imgui_);
+    frame_graph_->init(gpu_, window_, resource_manager_, repository_, imgui_);
 
-  scene_manager_->init(gpu_, resource_manager_, repository_);
+    scene_manager_->init(gpu_, resource_manager_, repository_);
 
-  register_gui_actions();
-  imgui_->init(gpu_, window_, frame_graph_->get_swapchain(), repository_, gui_actions_);
+    register_gui_actions();
+    imgui_->init(gpu_, window_, frame_graph_->get_swapchain(), repository_, gui_actions_);
 
-  for (auto& cam : camera_positioners_) {
-    auto free_fly_camera_ptr = std::make_unique<FreeFlyCamera>();
-    free_fly_camera_ptr->init(glm::vec3(7, 1.8,-7), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-    cam = std::move(free_fly_camera_ptr);
+    for (auto& cam : camera_positioners_) {
+      auto free_fly_camera_ptr = std::make_unique<FreeFlyCamera>();
+      free_fly_camera_ptr->init(glm::vec3(7, 1.8, -7), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+      cam = std::move(free_fly_camera_ptr);
+    }
+    active_camera_.init(*camera_positioners_.at(current_camera_positioner_index_));
+
+    // everything went fine
+    is_initialized_ = true;
   }
-  active_camera_.init(*camera_positioners_.at(current_camera_positioner_index_));
 
-  // everything went fine
-  is_initialized_ = true;
-}
+  void RenderEngine::register_gui_actions() {
+    gui_actions_.exit = [this]() { quit_ = true; };
+    gui_actions_.add_camera = [this]() {
+      auto free_fly_camera_ptr = std::make_unique<FreeFlyCamera>();
+      free_fly_camera_ptr->init(glm::vec3(0, 0, 0), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
+      camera_positioners_.push_back(std::move(free_fly_camera_ptr));
+    };
+    gui_actions_.load_gltf
+        = [this](std::string path) { scene_manager_->request_scene(std::move(path)); };
+    gui_actions_.get_stats = [this]() -> foundation::EngineStats& { return stats_; };
+    gui_actions_.get_scene_data
+        = [this]() -> foundation::PerFrameData& { return resource_manager_->per_frame_data_; };
+    gui_actions_.get_component_factory = [this]() -> application::ComponentArchetypeFactory& {
+      return scene_manager_->get_component_factory();
+    };
+    gui_actions_.get_render_config
+        = [this]() -> foundation::RenderConfig& { return resource_manager_->config_; };
+  }
 
-void RenderEngine::register_gui_actions() {
-  gui_actions_.exit = [this]() { quit_ = true; };
-  gui_actions_.add_camera = [this]() {
-    auto free_fly_camera_ptr = std::make_unique<FreeFlyCamera>();
-    free_fly_camera_ptr->init(glm::vec3(0, 0, 0), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
-    camera_positioners_.push_back(std::move(free_fly_camera_ptr));
-  };
-  gui_actions_.load_gltf = [this](std::string path) { scene_manager_->request_scene(std::move(path)); };
-  gui_actions_.get_stats = [this]() -> EngineStats& { return stats_; };
-  gui_actions_.get_scene_data = [this]() -> PerFrameData& { return resource_manager_->per_frame_data_; };
-  gui_actions_.get_component_factory = [this]() -> ComponentArchetypeFactory& { return scene_manager_->get_component_factory(); };
-  gui_actions_.get_render_config = [this]() -> RenderConfig& { return resource_manager_->config_; };
-}
-
-void RenderEngine::immediate_submit(std::function<void(VkCommandBuffer cmd)> function) {
+  void RenderEngine::immediate_submit(std::function<void(VkCommandBuffer cmd)> function) {
     VK_CHECK(vkResetFences(gpu_.device, 1, &frame_graph_->get_sync().imgui_fence));
-  VK_CHECK(vkResetCommandBuffer(frame_graph_->get_commands().imgui_command_buffer, 0));
+    VK_CHECK(vkResetCommandBuffer(frame_graph_->get_commands().imgui_command_buffer, 0));
 
     VkCommandBuffer cmd = frame_graph_->get_commands().imgui_command_buffer;
 
@@ -96,12 +102,10 @@ void RenderEngine::immediate_submit(std::function<void(VkCommandBuffer cmd)> fun
 
     VK_CHECK(
         vkWaitForFences(gpu_.device, 1, &frame_graph_->get_sync().imgui_fence, true, 9999999999));
-}
+  }
 
-void RenderEngine::cleanup() {
-
+  void RenderEngine::cleanup() {
     if (is_initialized_) {
-
       vkDeviceWaitIdle(gpu_.device);
 
       imgui_->cleanup();
@@ -111,36 +115,35 @@ void RenderEngine::cleanup() {
       gpu_.cleanup();
       window_.cleanup();
     }
-}
+  }
 
-void RenderEngine::update_scene() const {
-
-  //TODO move to camera system
+  void RenderEngine::update_scene() const {
+    // TODO move to camera system
 
     glm::mat4 view = active_camera_.get_view_matrix();
 
     // camera projection
-    glm::mat4 projection
-        = glm::perspective(glm::radians(70.f),
-                           (float)window_.extent.width / (float)window_.extent.height, 0.1f, 1000.f);
-    
+    glm::mat4 projection = glm::perspective(
+        glm::radians(70.f), (float)window_.extent.width / (float)window_.extent.height, 0.1f,
+        1000.f);
+
     // invert the Y direction on projection matrix so that we are more similar
     // to opengl and gltf axis
     projection[1][1] *= -1;
 
-    auto& camera = repository_->cameras.get(0); // assume this as the main camera
+    auto& camera = repository_->cameras.get(0);  // assume this as the main camera
     camera.view_matrix = view;
     camera.projection_matrix = projection;
 
-    resource_manager_ ->config_.light_adaptation.delta_time = time_tracking_service_.get_delta_time();
+    resource_manager_->config_.light_adaptation.delta_time
+        = time_tracking_service_.get_delta_time();
 
     scene_manager_->update_scene();
-}
+  }
 
-void RenderEngine::run()
-{
-    //begin clock
-    auto start = std::chrono::system_clock::now(); // todo replace with timetracker
+  void RenderEngine::run() {
+    // begin clock
+    auto start = std::chrono::system_clock::now();  // todo replace with timetracker
 
     time_tracking_service_.update_timer();
 
@@ -187,4 +190,5 @@ void RenderEngine::run()
     // convert to microseconds (integer), and then come back to miliseconds
     auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     stats_.frametime = elapsed.count() / 1000.f;
-}
+  }
+}  // namespace gestalt

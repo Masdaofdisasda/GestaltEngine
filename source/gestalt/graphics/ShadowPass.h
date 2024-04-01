@@ -3,44 +3,49 @@
 #include "FrameGraph.h"
 #include "vk_types.h"
 
-class DirectionalDepthPass final : public RenderPass {
-  std::string vertex_shader_source_ = "../shaders/shadow_geometry.vert.spv";
-  std::string fragment_shader_source_ = "../shaders/shadow_depth.frag.spv";
+namespace gestalt {
+  namespace graphics {
 
-  VkExtent2D effect_size_{2048, 2048};
+    class DirectionalDepthPass final : public RenderPass {
+      std::string vertex_shader_source_ = "../shaders/shadow_geometry.vert.spv";
+      std::string fragment_shader_source_ = "../shaders/shadow_depth.frag.spv";
 
-  ShaderPassDependencyInfo deps_ = {
-      .read_resources = {},
-      .write_resources = {{"directional_shadow_map", std::make_shared<DepthImageResource>(
-                                                         "directional_depth", effect_size_)}},
-  };
+      VkExtent2D effect_size_{2048, 2048};
 
-  VkPushConstantRange push_constant_range_{
-      .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-      .offset = 0,
-      .size = sizeof(GpuDrawPushConstants),
-  };
+      ShaderPassDependencyInfo deps_ = {
+          .read_resources = {},
+          .write_resources = {{"directional_shadow_map", std::make_shared<DepthImageResource>(
+                                                             "directional_depth", effect_size_)}},
+      };
 
-  VkViewport viewport_{
-      .x = 0,
-      .y = 0,
-      .minDepth = 0.f,
-      .maxDepth = 1.f,
-  };
-  VkRect2D scissor_{
-      .offset = {0, 0},
-  };
+      VkPushConstantRange push_constant_range_{
+          .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+          .offset = 0,
+          .size = sizeof(foundation::GpuDrawPushConstants),
+      };
 
-  descriptor_writer writer;
+      VkViewport viewport_{
+          .x = 0,
+          .y = 0,
+          .minDepth = 0.f,
+          .maxDepth = 1.f,
+      };
+      VkRect2D scissor_{
+          .offset = {0, 0},
+      };
 
-  VkPipeline pipeline_ = nullptr;
-  VkPipelineLayout pipeline_layout_ = nullptr;
-  std::vector<VkDescriptorSetLayout> descriptor_layouts_;
-  VkDescriptorSet descriptor_set_ = nullptr;
+      descriptor_writer writer;
 
-public:
-  void prepare() override;
-  void cleanup() override;
-  void execute(VkCommandBuffer cmd) override;
-  ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
-};
+      VkPipeline pipeline_ = nullptr;
+      VkPipelineLayout pipeline_layout_ = nullptr;
+      std::vector<VkDescriptorSetLayout> descriptor_layouts_;
+      VkDescriptorSet descriptor_set_ = nullptr;
+
+    public:
+      void prepare() override;
+      void cleanup() override;
+      void execute(VkCommandBuffer cmd) override;
+      ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
+    };
+  }  // namespace graphics
+}  // namespace gestalt

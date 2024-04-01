@@ -6,79 +6,88 @@
 #include "vk_types.h"
 #include "vk_descriptors.h"
 
-class ResourceManager {
-  Gpu gpu_ = {};
-  std::shared_ptr<Repository> repository_;
+namespace gestalt {
+  namespace graphics {
 
-  void load_and_create_cubemap(const std::string& file_path, AllocatedImage& cubemap);
-public:
-  GpuMeshBuffers scene_geometry_;
+    class ResourceManager {
+      Gpu gpu_ = {};
+      std::shared_ptr<foundation::Repository> repository_;
 
-  AllocatedBuffer per_frame_data_buffer;
-  VkDescriptorSetLayout per_frame_data_layout;
+      void load_and_create_cubemap(const std::string& file_path, foundation::AllocatedImage& cubemap);
 
-  struct material_data {
-  VkDescriptorSet resource_set;
-  VkDescriptorSetLayout resource_layout;
+    public:
+      foundation::GpuMeshBuffers scene_geometry_;
 
-  AllocatedBuffer constants_buffer;
-  VkDescriptorSet constants_set;
-  VkDescriptorSetLayout constants_layout;
-  } material_data;
+      foundation::AllocatedBuffer per_frame_data_buffer;
+      VkDescriptorSetLayout per_frame_data_layout;
 
-  struct ibl_data {
-  AllocatedImage environment_map;
-  AllocatedImage environment_irradiance_map;
-  AllocatedImage bdrfLUT;
+      struct material_data {
+        VkDescriptorSet resource_set;
+        VkDescriptorSetLayout resource_layout;
 
-  VkSampler cube_map_sampler;
+        foundation::AllocatedBuffer constants_buffer;
+        VkDescriptorSet constants_set;
+        VkDescriptorSetLayout constants_layout;
+      } material_data;
 
-  VkDescriptorSet IblSet;
-  VkDescriptorSetLayout IblLayout;
-  } ibl_data;
+      struct ibl_data {
+        foundation::AllocatedImage environment_map;
+        foundation::AllocatedImage environment_irradiance_map;
+        foundation::AllocatedImage bdrfLUT;
 
-  struct light_data {
-    AllocatedBuffer dir_light_buffer;
-    AllocatedBuffer point_light_buffer;
-    AllocatedBuffer view_proj_matrices;
+        VkSampler cube_map_sampler;
 
-    VkDescriptorSet light_set = nullptr;
-    VkDescriptorSetLayout light_layout;
-  } light_data;
+        VkDescriptorSet IblSet;
+        VkDescriptorSetLayout IblLayout;
+      } ibl_data;
 
-  DescriptorAllocatorGrowable* descriptor_pool;
+      struct light_data {
+        foundation::AllocatedBuffer dir_light_buffer;
+        foundation::AllocatedBuffer point_light_buffer;
+        foundation::AllocatedBuffer view_proj_matrices;
 
-  DescriptorAllocatorGrowable descriptorPool; //TODO hide this
-  descriptor_writer writer;
+        VkDescriptorSet light_set = nullptr;
+        VkDescriptorSetLayout light_layout;
+      } light_data;
 
-  DrawContext main_draw_context_; //TODO cleanup
-  PerFrameData per_frame_data_;
-  RenderConfig config_;
+      DescriptorAllocatorGrowable* descriptor_pool;
 
-  void init(const Gpu& gpu, const std::shared_ptr<Repository> repository);
+      DescriptorAllocatorGrowable descriptorPool;  // TODO hide this
+      descriptor_writer writer;
 
-  void cleanup();
+      foundation::DrawContext main_draw_context_;  // TODO cleanup
+      foundation::PerFrameData per_frame_data_;
+      foundation::RenderConfig config_;
 
-  AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage,
-                                VmaMemoryUsage memoryUsage);
+      void init(const Gpu& gpu, const std::shared_ptr<foundation::Repository> repository);
 
-  void upload_mesh();
-  void destroy_buffer(const AllocatedBuffer& buffer);
+      void cleanup();
 
-  AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
-                              bool mipmapped = false);
-  AllocatedImage create_cubemap(const void* imageData, VkExtent3D size, VkFormat format,
-                                VkImageUsageFlags usage, bool mipmapped = false);
-  std::optional<AllocatedImage> load_image(const std::string& filepath);
-  void init_default_data();
-  void load_and_process_cubemap(const std::string& file_path);
-  AllocatedImage create_cubemap_from_HDR(std::vector<float>& image_data, int h, int w);
-  void create_color_frame_buffer(const VkExtent3D& extent, AllocatedImage& color_image) const;
-  void create_depth_frame_buffer(const VkExtent3D& extent, AllocatedImage& depth_image) const;
-  void create_framebuffer(const VkExtent3D& extent, FrameBuffer& frame_buffer);
-  void create_framebuffer(const VkExtent3D& extent, DoubleBufferedFrameBuffer& frame_buffer);
-  AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
-                              bool mipmapped = false, bool cubemap = false);
-  void write_material(PbrMaterial& material, const uint32_t material_id);
-  void destroy_image(const AllocatedImage& img);
-};
+      foundation::AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage,
+                                                VmaMemoryUsage memoryUsage);
+
+      void upload_mesh();
+      void destroy_buffer(const foundation::AllocatedBuffer& buffer);
+
+      VkSampler create_sampler(const VkSamplerCreateInfo& sampler_create_info) const;
+
+      foundation::AllocatedImage create_image(void* data, VkExtent3D size, VkFormat format,
+                                              VkImageUsageFlags usage, bool mipmapped = false);
+      foundation::AllocatedImage create_cubemap(const void* imageData, VkExtent3D size, VkFormat format,
+                                                VkImageUsageFlags usage, bool mipmapped = false);
+      std::optional<foundation::AllocatedImage> load_image(const std::string& filepath);
+      void init_default_data();
+      void load_and_process_cubemap(const std::string& file_path);
+      foundation::AllocatedImage create_cubemap_from_HDR(std::vector<float>& image_data, int h, int w);
+      void create_color_frame_buffer(const VkExtent3D& extent, foundation::AllocatedImage& color_image) const;
+      void create_depth_frame_buffer(const VkExtent3D& extent, foundation::AllocatedImage& depth_image) const;
+      void create_framebuffer(const VkExtent3D& extent, foundation::FrameBuffer& frame_buffer);
+      void create_framebuffer(const VkExtent3D& extent, foundation::DoubleBufferedFrameBuffer& frame_buffer);
+      foundation::AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
+                                              bool mipmapped = false, bool cubemap = false);
+      void write_material(foundation::PbrMaterial& material, const uint32_t material_id);
+      void destroy_image(const foundation::AllocatedImage& img);
+    };
+
+  }  // namespace graphics
+}  // namespace gestalt

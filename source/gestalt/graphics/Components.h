@@ -5,149 +5,153 @@
 #include <glm/gtx/transform.hpp>
 
 
-using entity = uint32_t;
-constexpr entity root_entity = 0;
-constexpr uint32_t invalid_entity = std::numeric_limits<uint32_t>::max();
-constexpr size_t no_component = std::numeric_limits<size_t>::max();
-constexpr size_t default_material = 0;
+namespace gestalt {
+  namespace foundation {
 
-struct alignas(16) Meshlet {
-  glm::vec3 center;
-  float radius;
+    using entity = uint32_t;
+    constexpr entity root_entity = 0;
+    constexpr uint32_t invalid_entity = std::numeric_limits<uint32_t>::max();
+    constexpr size_t no_component = std::numeric_limits<size_t>::max();
+    constexpr size_t default_material = 0;
 
-  int8_t cone_axis[3];
-  int8_t cone_cutoff;
+    struct alignas(16) Meshlet {
+      glm::vec3 center;
+      float radius;
 
-  uint32_t data_offset;
-  uint32_t mesh_index;
-  uint8_t vertex_count;
-  uint8_t triangle_count;
-};
+      int8_t cone_axis[3];
+      int8_t cone_cutoff;
 
-struct MeshSurface {
-  std::vector<Meshlet> meshlets;
+      uint32_t data_offset;
+      uint32_t mesh_index;
+      uint8_t vertex_count;
+      uint8_t triangle_count;
+    };
 
-  uint32_t vertex_count;
-  uint32_t index_count;
-  uint32_t first_index;
-  uint32_t vertex_offset;
-  AABB local_bounds;
+    struct MeshSurface {
+      std::vector<Meshlet> meshlets;
 
-  size_t material = default_material;
-};
+      uint32_t vertex_count;
+      uint32_t index_count;
+      uint32_t first_index;
+      uint32_t vertex_offset;
+      AABB local_bounds;
 
-struct MeshComponent {
-  size_t mesh;
-};
+      size_t material = default_material;
+    };
 
-struct Mesh {
-  std::string name;
-  std::vector<MeshSurface> surfaces;
-  AABB local_bounds;
-};
+    struct MeshComponent {
+      size_t mesh;
+    };
 
-struct CameraComponent {
-  size_t camera_data;
-  //TODO : add more camera settings
-};
+    struct Mesh {
+      std::string name;
+      std::vector<MeshSurface> surfaces;
+      AABB local_bounds;
+    };
 
-struct CameraData {
-  glm::mat4 view_matrix{1.0f};
-  glm::mat4 projection_matrix{1.0};
-};
+    struct CameraComponent {
+      size_t camera_data;
+      // TODO : add more camera settings
+    };
 
-enum class LightType { kDirectional, kPoint, kSpot };
+    struct CameraData {
+      glm::mat4 view_matrix{1.0f};
+      glm::mat4 projection_matrix{1.0};
+    };
 
-struct LightComponent {
-  LightType type;
-  glm::vec3 color;
-  float intensity;
-  float inner_cone;     // Used for spot lights
-  float outer_cone;     // Used for spot lights
-  std::vector<size_t> light_view_projections;
-  bool is_dirty = true;
-};
+    enum class LightType { kDirectional, kPoint, kSpot };
 
+    struct LightComponent {
+      LightType type;
+      glm::vec3 color;
+      float intensity;
+      float inner_cone;  // Used for spot lights
+      float outer_cone;  // Used for spot lights
+      std::vector<size_t> light_view_projections;
+      bool is_dirty = true;
+    };
 
-constexpr auto unused_texture = std::numeric_limits<uint32_t>::max();
+    constexpr auto unused_texture = std::numeric_limits<uint32_t>::max();
 
-struct PbrMaterial {
-  bool use_albedo_tex{false};
-  std::string albedo_uri;
+    struct PbrMaterial {
+      bool use_albedo_tex{false};
+      std::string albedo_uri;
 
-  bool use_metal_rough_tex{false};
-  std::string metal_rough_uri;
+      bool use_metal_rough_tex{false};
+      std::string metal_rough_uri;
 
-  bool use_normal_tex{false};
-  std::string normal_uri;
+      bool use_normal_tex{false};
+      std::string normal_uri;
 
-  bool use_emissive_tex{false};
-  std::string emissive_uri;
+      bool use_emissive_tex{false};
+      std::string emissive_uri;
 
-  bool use_occlusion_tex{false};
-  std::string occlusion_uri;
+      bool use_occlusion_tex{false};
+      std::string occlusion_uri;
 
-  bool double_sided{false};
-  bool transparent{false};
+      bool double_sided{false};
+      bool transparent{false};
 
-  struct MaterialConstants {
-    uint32_t albedo_tex_index = unused_texture;
-    uint32_t metal_rough_tex_index = unused_texture;
-    uint32_t normal_tex_index = unused_texture;
-    uint32_t emissive_tex_index = unused_texture;
+      struct MaterialConstants {
+        uint32_t albedo_tex_index = unused_texture;
+        uint32_t metal_rough_tex_index = unused_texture;
+        uint32_t normal_tex_index = unused_texture;
+        uint32_t emissive_tex_index = unused_texture;
 
-    glm::vec4 albedo_factor{1.f};
-    glm::vec2 metal_rough_factor = {.5f, 0.f}; // roughness, metallic
-    float occlusionStrength{1.f};
-    float alpha_cutoff{0.f};
-    glm::vec3 emissiveFactor{0.f};
-    uint32_t occlusion_tex_index = unused_texture;
-    // float normalScale = 1.f;
-  } constants;
+        glm::vec4 albedo_factor{1.f};
+        glm::vec2 metal_rough_factor = {.5f, 0.f};  // roughness, metallic
+        float occlusionStrength{1.f};
+        float alpha_cutoff{0.f};
+        glm::vec3 emissiveFactor{0.f};
+        uint32_t occlusion_tex_index = unused_texture;
+        // float normalScale = 1.f;
+      } constants;
 
-  static_assert(sizeof(MaterialConstants) == 64);
+      static_assert(sizeof(MaterialConstants) == 64);
 
-  struct MaterialResources {
-    AllocatedImage albedo_image;
-    VkSampler albedo_sampler;
-    AllocatedImage metal_rough_image;
-    VkSampler metal_rough_sampler;
-    AllocatedImage normal_image;
-    VkSampler normal_sampler;
-    AllocatedImage emissive_image;
-    VkSampler emissive_sampler;
-    AllocatedImage occlusion_image;
-    VkSampler occlusion_sampler;
-  } resources;
-};
+      struct MaterialResources {
+        AllocatedImage albedo_image;
+        VkSampler albedo_sampler;
+        AllocatedImage metal_rough_image;
+        VkSampler metal_rough_sampler;
+        AllocatedImage normal_image;
+        VkSampler normal_sampler;
+        AllocatedImage emissive_image;
+        VkSampler emissive_sampler;
+        AllocatedImage occlusion_image;
+        VkSampler occlusion_sampler;
+      } resources;
+    };
 
-struct MaterialComponent {
-  size_t material;
-};
+    struct MaterialComponent {
+      size_t material;
+    };
 
-struct Material {
-  std::string name;
-  PbrMaterial config;
-};
+    struct Material {
+      std::string name;
+      PbrMaterial config;
+    };
 
-struct TransformComponent {
-  glm::vec3 position;
-  glm::quat rotation;
-  float scale; // uniform scale for now
+    struct TransformComponent {
+      glm::vec3 position;
+      glm::quat rotation;
+      float scale;  // uniform scale for now
 
-  size_t matrix = no_component;
+      size_t matrix = no_component;
 
-  glm::vec3 parent_position;
-  glm::quat parent_rotation;
-  float parent_scale;
+      glm::vec3 parent_position;
+      glm::quat parent_rotation;
+      float parent_scale;
 
-  mutable bool is_dirty = true;
-};
+      mutable bool is_dirty = true;
+    };
 
-struct NodeComponent {
-   std::string name;
-  entity parent = invalid_entity;
-  std::vector<entity> children;
-  AABB bounds;
-  bool visible = true;
-};
+    struct NodeComponent {
+      std::string name;
+      entity parent = invalid_entity;
+      std::vector<entity> children;
+      AABB bounds;
+      bool visible = true;
+    };
+  }  // namespace foundation
+}  // namespace gestalt

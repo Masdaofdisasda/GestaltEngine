@@ -7,15 +7,18 @@
 #include "DeletionService.h"
 #include "vk_descriptors.h"
 
-class VkCommand {
+namespace gestalt {
 
-  Gpu gpu_;
-  DeletionService deletion_service_;
+  class VkCommand {
+    graphics::Gpu gpu_;
+    DeletionService deletion_service_;
 
-public:
-  VkCommandBuffer imgui_command_buffer;
-  VkCommandPool imgui_command_pool;
+  public:
+    VkCommandBuffer imgui_command_buffer;
+    VkCommandPool imgui_command_pool;
 
-  void init(const Gpu& gpu, std::vector<FrameData>& frames);
-  void cleanup();
-};
+    void init(const graphics::Gpu& gpu, std::vector<graphics::FrameData>& frames);
+    void cleanup();
+  };
+
+}  // namespace gestalt
