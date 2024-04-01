@@ -2,7 +2,7 @@
 
 #include "vk_initializers.h"
 
-void vk_sync::init(const vk_gpu& gpu, std::vector<frame_data>& frames) {
+void vk_sync::init(const Gpu& gpu, std::vector<FrameData>& frames) {
     gpu_= gpu;
   deletion_service_.init(gpu_.device, gpu_.allocator);
 

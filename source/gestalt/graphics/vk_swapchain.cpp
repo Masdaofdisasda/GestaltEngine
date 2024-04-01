@@ -2,13 +2,13 @@
 
 #include <VkBootstrap.h>
 
-void vk_swapchain::init(const vk_gpu& gpu, const VkExtent3D& extent) {
+void VkSwapchain::init(const Gpu& gpu, const VkExtent3D& extent) {
   gpu_ = gpu;
 
   create_swapchain(extent.width, extent.height);
 }
 
-void vk_swapchain::create_swapchain(const uint32_t width, const uint32_t height) {
+void VkSwapchain::create_swapchain(const uint32_t width, const uint32_t height) {
   vkb::SwapchainBuilder swapchainBuilder{gpu_.chosen_gpu, gpu_.device, gpu_.surface};
 
   swapchain_image_format = VK_FORMAT_B8G8R8A8_UNORM;
@@ -33,7 +33,7 @@ void vk_swapchain::create_swapchain(const uint32_t width, const uint32_t height)
 }
 
 
-void vk_swapchain::resize_swapchain(sdl_window& window) {
+void VkSwapchain::resize_swapchain(ApplicationWindow& window) {
   vkDeviceWaitIdle(gpu_.device);
 
   destroy_swapchain();
@@ -43,7 +43,7 @@ void vk_swapchain::resize_swapchain(sdl_window& window) {
   create_swapchain(window.extent.width, window.extent.height);
 }
 
-void vk_swapchain::destroy_swapchain() const {
+void VkSwapchain::destroy_swapchain() const {
   vkDestroySwapchainKHR(gpu_.device, swapchain, nullptr);
 
   // destroy swapchain resources

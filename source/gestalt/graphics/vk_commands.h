@@ -1,21 +1,21 @@
 ﻿#pragma once
 
-#include "vk_gpu.h"
+#include "Gpu.h"
 
 #include <vk_types.h>
 
-#include "vk_deletion_service.h"
+#include "DeletionService.h"
 #include "vk_descriptors.h"
 
-class vk_command {
+class VkCommand {
 
-  vk_gpu gpu_;
-  vk_deletion_service deletion_service_;
+  Gpu gpu_;
+  DeletionService deletion_service_;
 
 public:
   VkCommandBuffer imgui_command_buffer;
   VkCommandPool imgui_command_pool;
 
-  void init(const vk_gpu& gpu, std::vector<frame_data>& frames);
+  void init(const Gpu& gpu, std::vector<FrameData>& frames);
   void cleanup();
 };

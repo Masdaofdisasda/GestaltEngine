@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include "vk_types.h"
-#include "scene_components.h"
+#include "Components.h"
 
 template <typename ComponentType> class ComponentContainer {
 public:
@@ -66,21 +66,18 @@ private:
   std::vector<DataType> data_;
 };
 
+struct EngineLimits {
+  size_t directional_lights = 2; // actually only 1 is used, but we need 2 to fulfill the 64 bytes alignment
+  size_t point_lights = 256;
+  size_t spot_lights = 0; // not implemented yet
+  size_t materials = -1; //TODO
+  size_t max_textures = -1;
+  size_t max_samplers = -1;
+  size_t max_cameras = -1;
+} constexpr kLimits = {};
+
 class Repository {
 public:
-
-
-  size_t max_lights(light_type type) {
-      if (type == light_type::directional) {
-        return 2;
-      } else if (type == light_type::point) {
-        return 256;
-      } else if (type == light_type::spot) {
-        return 0; //TDOO: Implement
-      } else {
-        return 0;
-      }
-  }
 
   struct default_material {
     AllocatedImage color_image;
@@ -102,13 +99,13 @@ public:
   GpuDataContainer<glm::mat4> light_view_projections;
   GpuDataContainer<AllocatedImage> textures;
   GpuDataContainer<VkSampler> samplers;
-  GpuDataContainer<material> materials;
-  GpuDataContainer<mesh> meshes;
-  GpuDataContainer<camera_data> cameras;
+  GpuDataContainer<Material> materials;
+  GpuDataContainer<Mesh> meshes;
+  GpuDataContainer<CameraData> cameras;
 
-  ComponentContainer<node_component> scene_graph;
-  ComponentContainer<mesh_component> mesh_components;
-  ComponentContainer<camera_component> camera_components;
-  ComponentContainer<light_component> light_components;
-  ComponentContainer<transform_component> transform_components;
+  ComponentContainer<NodeComponent> scene_graph;
+  ComponentContainer<MeshComponent> mesh_components;
+  ComponentContainer<CameraComponent> camera_components;
+  ComponentContainer<LightComponent> light_components;
+  ComponentContainer<TransformComponent> transform_components;
 };

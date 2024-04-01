@@ -1,13 +1,14 @@
 #pragma once
 
-#include "input_system.h"
+#include "InputSystem.h"
 
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/transform.hpp>
 
-class camera_positioner_interface {
+
+class CameraPositionerInterface {
 public:
-  virtual ~camera_positioner_interface() = default;
+  virtual ~CameraPositionerInterface() = default;
 
   virtual void init(const glm::vec3& pos, const glm::vec3& target, const glm::vec3& up) = 0;
 
@@ -17,32 +18,32 @@ public:
 
   [[nodiscard]] virtual glm::quat get_orientation() const = 0;
 
-  virtual void update(double delta_seconds, const movement& movement) = 0;
+  virtual void update(double delta_seconds, const Movement& movement) = 0;
 };
 
 
-class camera final {
+class Camera final {
 public:
-  camera() : positioner_(nullptr) {}
+  Camera() : positioner_(nullptr) {}
 
-  void init(camera_positioner_interface& positioner) { positioner_ = &positioner; }
+  void init(CameraPositionerInterface& positioner) { positioner_ = &positioner; }
 
-  camera(const camera&) = default;
-  camera& operator=(const camera&) = default;
+  Camera(const Camera&) = default;
+  Camera& operator=(const Camera&) = default;
 
   glm::mat4 get_view_matrix() const { return positioner_->get_view_matrix(); }
   glm::vec3 get_position() const { return positioner_->get_position(); }
   glm::quat get_orientation() const { return positioner_->get_orientation(); }
-  void set_positioner(camera_positioner_interface* new_positioner) { positioner_ = new_positioner; }
-  void update(double delta_seconds, const movement& movement) const {
+  void set_positioner(CameraPositionerInterface* new_positioner) { positioner_ = new_positioner; }
+  void update(double delta_seconds, const Movement& movement) const {
     positioner_->update(delta_seconds, movement);
   }
 
 private:
-  camera_positioner_interface* positioner_;
+  CameraPositionerInterface* positioner_;
 };
 
-class free_fly_camera final : public camera_positioner_interface {
+class FreeFlyCamera final : public CameraPositionerInterface {
 
 public:
 
@@ -52,15 +53,15 @@ public:
     set_up_vector(up);
   }
 
-  void update(double delta_seconds, const movement& movement) override;
+  void update(double delta_seconds, const Movement& movement) override;
 
-  glm::mat4 get_view_matrix() const override {
+  [[nodiscard]] glm::mat4 get_view_matrix() const override {
     const glm::mat4 t = translate(glm::mat4(1.0f), -camera_position_);
     const glm::mat4 r = mat4_cast(camera_orientation_);
     return r * t;
   }
 
-  glm::vec3 get_position() const override { return camera_position_; }
+  [[nodiscard]] glm::vec3 get_position() const override { return camera_position_; }
 
   void set_position(const glm::vec3& pos);
   void set_orientation(const glm::vec3& target, const glm::vec3& up) {
@@ -72,7 +73,7 @@ public:
 
   void set_up_vector(const glm::vec3& up);
 
-  glm::quat get_orientation() const override { return camera_orientation_; }
+  [[nodiscard]] glm::quat get_orientation() const override { return camera_orientation_; }
 
 private:
   float mouse_speed = 4.5f;

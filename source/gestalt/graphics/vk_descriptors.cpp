@@ -1,6 +1,6 @@
 ﻿#include <vk_descriptors.h>
 
-descriptor_layout_builder& descriptor_layout_builder::add_binding(
+DescriptorLayoutBuilder& DescriptorLayoutBuilder::add_binding(
     uint32_t binding, VkDescriptorType type, VkShaderStageFlags shader_stages,
                                                                   bool bindless,
                                                                   uint32_t descriptor_count) {
@@ -24,9 +24,9 @@ descriptor_layout_builder& descriptor_layout_builder::add_binding(
 }
 
 
-void descriptor_layout_builder::clear() { bindings.clear(); }
+void DescriptorLayoutBuilder::clear() { bindings.clear(); }
 
-VkDescriptorSetLayout descriptor_layout_builder::build(VkDevice device, bool is_push_descriptor) {
+VkDescriptorSetLayout DescriptorLayoutBuilder::build(VkDevice device, bool is_push_descriptor) {
   VkDescriptorSetLayoutCreateInfo info
       = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
          .pNext = nullptr,
@@ -133,7 +133,7 @@ void descriptor_writer::write_image(int binding, VkImageView image, VkSampler sa
   writes.push_back(write);
 }
 
-void descriptor_allocator::init_pool(VkDevice device, uint32_t maxSets,
+void DescriptorAllocator::init_pool(VkDevice device, uint32_t maxSets,
                                     std::span<pool_size_ratio> poolRatios) {
   std::vector<VkDescriptorPoolSize> poolSizes;
   for (pool_size_ratio ratio : poolRatios) {
@@ -150,15 +150,15 @@ void descriptor_allocator::init_pool(VkDevice device, uint32_t maxSets,
   vkCreateDescriptorPool(device, &pool_info, nullptr, &pool);
 }
 
-void descriptor_allocator::clear_descriptors(VkDevice device) {
+void DescriptorAllocator::clear_descriptors(VkDevice device) {
   vkResetDescriptorPool(device, pool, 0);
 }
 
-void descriptor_allocator::destroy_pool(VkDevice device) {
+void DescriptorAllocator::destroy_pool(VkDevice device) {
   vkDestroyDescriptorPool(device, pool, nullptr);
 }
 
-VkDescriptorSet descriptor_allocator::allocate(VkDevice device, VkDescriptorSetLayout layout) {
+VkDescriptorSet DescriptorAllocator::allocate(VkDevice device, VkDescriptorSetLayout layout) {
   VkDescriptorSetAllocateInfo allocInfo = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
   allocInfo.pNext = nullptr;
   allocInfo.descriptorPool = pool;

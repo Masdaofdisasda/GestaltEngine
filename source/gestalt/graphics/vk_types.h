@@ -20,7 +20,7 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
 
-enum class image_type { color, depth };
+enum class ImageType { kColor, kDepth };
 
 class AllocatedImage {
 public:
@@ -29,10 +29,10 @@ public:
   VmaAllocation allocation = VK_NULL_HANDLE;
   VkExtent3D imageExtent = {};
   VkFormat imageFormat = VK_FORMAT_UNDEFINED;
-  image_type type;
+  ImageType type;
   VkImageLayout currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-  AllocatedImage(const image_type type = image_type::color) : type(type) {}
+  AllocatedImage(const ImageType type = ImageType::kColor) : type(type) {}
 
   VkExtent2D getExtent2D() const { return {imageExtent.width, imageExtent.height}; }
 };
@@ -43,12 +43,12 @@ struct AllocatedBuffer {
   VmaAllocationInfo info;
 };
 
-struct frame_buffer {
+struct FrameBuffer {
 
-  frame_buffer() = default;
+  FrameBuffer() = default;
 
   void add_color_image(const AllocatedImage& image) {
-    assert(image.type == image_type::color);
+    assert(image.type == ImageType::kColor);
     if (color_image_.has_value()) {
       assert(color_image_.value().getExtent2D().height == image.getExtent2D().height);
       assert(color_image_.value().getExtent2D().width == image.getExtent2D().width);
@@ -58,7 +58,7 @@ struct frame_buffer {
   }
 
   void add_depth_image(const AllocatedImage& image) {
-    assert(image.type == image_type::depth);
+    assert(image.type == ImageType::kDepth);
     if (depth_image_.has_value()) {
       assert(depth_image_.value().getExtent2D().height == image.getExtent2D().height);
       assert(depth_image_.value().getExtent2D().width == image.getExtent2D().width);
@@ -83,15 +83,15 @@ private:
 };
 
 
-struct double_buffered_frame_buffer {
+struct DoubleBufferedFrameBuffer {
 
   void switch_buffers() { write_buffer_index_ = (write_buffer_index_ + 1) % buffers_.size(); }
 
-  frame_buffer& get_write_buffer() { return buffers_[write_buffer_index_]; }
+  FrameBuffer& get_write_buffer() { return buffers_[write_buffer_index_]; }
   AllocatedImage& get_write_color_image() { return buffers_[write_buffer_index_].get_color_image(); }
   AllocatedImage& get_write_depth_image() { return buffers_[write_buffer_index_].get_depth_image(); }
 
-  frame_buffer& get_read_buffer() { return buffers_[(write_buffer_index_ + 1) % buffers_.size()]; }
+  FrameBuffer& get_read_buffer() { return buffers_[(write_buffer_index_ + 1) % buffers_.size()]; }
   AllocatedImage& get_read_color_image() {
     return buffers_[(write_buffer_index_ + 1) % buffers_.size()].get_color_image();
   }
@@ -100,12 +100,12 @@ struct double_buffered_frame_buffer {
   }
 
 private:
-  std::array<frame_buffer, 2> buffers_;
+  std::array<FrameBuffer, 2> buffers_;
   size_t write_buffer_index_ = 0;
 };
 
 
-struct per_frame_data {
+struct PerFrameData {
   glm::mat4 view{1.f};
   glm::mat4 proj{1.f};
   glm::mat4 viewproj{1.f};
@@ -130,7 +130,7 @@ struct GpuVertexData {
 };
 
 // holds the resources needed for a mesh
-struct gpu_mesh_buffers {
+struct GpuMeshBuffers {
   AllocatedBuffer indexBuffer;
   AllocatedBuffer vertexPositionBuffer;
   VkDescriptorSet vertex_set;
@@ -139,13 +139,13 @@ struct gpu_mesh_buffers {
 };
 
 // push constants for our mesh object draws
-struct GPUDrawPushConstants {
+struct GpuDrawPushConstants {
   glm::mat4 worldMatrix;
   int material_id;
 };
 //< vbuf_types
 
-struct engine_stats {
+struct EngineStats {
   float frametime;
   int triangle_count;
   int drawcall_count;
@@ -166,7 +166,7 @@ struct AABB {
   mutable bool is_dirty = true;
 };
 
-struct render_object {
+struct RenderObject {
   uint32_t index_count;
   uint32_t first_index;
   uint32_t vertex_offset;
@@ -175,15 +175,15 @@ struct render_object {
   glm::mat4 transform;
 };
 
-struct draw_context {
-  std::vector<render_object> opaque_surfaces;
-  std::vector<render_object> transparent_surfaces;
+struct DrawContext {
+  std::vector<RenderObject> opaque_surfaces;
+  std::vector<RenderObject> transparent_surfaces;
 };
 
-struct render_config {
+struct RenderConfig {
   bool always_opaque{true};
 
-  struct skybox_params {
+  struct SkyboxParams {
     glm::vec3 betaR = glm::vec3(5.22e-6, 9.19e-6, 33.1e-6);
     float pad1;
     glm::vec3 betaA = glm::vec3(0.000425, 0.001881, 0.000085);
@@ -194,7 +194,7 @@ struct render_config {
 
   bool enable_ssao{true};
   int ssao_quality{1};
-  struct ssao_params {
+  struct SsaoParams {
     bool show_ssao_only = false;
     float scale = 0.75f;
     float bias = 0.008f;
@@ -207,7 +207,7 @@ struct render_config {
 
   bool enable_hdr{true};
   int bloom_quality{3};
-  struct hdr_params {
+  struct HdrParams {
     float exposure{1.f};
     float maxWhite{1.35f};
     float bloomStrength{0.04f};
@@ -219,7 +219,7 @@ struct render_config {
     int toneMappingOption{2};
   } hdr{};
 
-  struct light_adaptation_params {
+  struct LightAdaptationParams {
     float adaptation_speed_dark2light{.01f};
     float adaptation_speed_light2dark{.02f};
     float delta_time{0.16f};
@@ -227,19 +227,19 @@ struct render_config {
     float max_luminance{10.0f};
   } light_adaptation{};
 
-  struct streaks_params {
+  struct StreaksParams {
     float intensity{.04f};
     float attenuation{1.f};
     int streak_samples{6};
     int num_streaks{4};
   } streaks{};
 
-  struct shadow_params {
+  struct ShadowParams {
     float shadow_bias{1.f};
     float shadow_slope_bias{1.f};
   } shadow{};
 
-  struct lighting_params {
+  struct LightingParams {
     glm::mat4 invViewProj;
     int debug_mode{0};
     int num_dir_lights{0};
@@ -249,7 +249,7 @@ struct render_config {
     int ibl_mode{0};
   } lighting{};
 
-  struct grid_params {
+  struct GridParams {
     float majorLineWidth = 0.065f;
     float minorLineWidth = 0.015f;
     float axisLineWidth = 0.080f;
@@ -257,7 +257,7 @@ struct render_config {
     float majorGridDivision = 5.f;
   } grid{};
 
-  static_assert(sizeof(lighting_params) <= 88);
+  static_assert(sizeof(LightingParams) <= 88);
 
   // todo : more settings
 };

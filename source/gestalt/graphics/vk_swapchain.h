@@ -1,14 +1,13 @@
 ﻿#pragma once
 
 #include "vk_types.h"
-#include "vk_gpu.h"
-#include "sdl_window.h"
-#include "vk_deletion_service.h"
+#include "Gpu.h"
+#include "ApplicationWindow.h"
 
 
-class vk_swapchain {
+class VkSwapchain {
 
-  vk_gpu gpu_;
+  Gpu gpu_;
 
 public:
 
@@ -20,8 +19,8 @@ public:
   std::vector<VkImage> swapchain_images;
   std::vector<VkImageView> swapchain_image_views;
 
-  void init(const vk_gpu& gpu, const VkExtent3D& extent);
+  void init(const Gpu& gpu, const VkExtent3D& extent);
   void create_swapchain(uint32_t width, uint32_t height);
-  void resize_swapchain(sdl_window& window);
+  void resize_swapchain(ApplicationWindow& window);
   void destroy_swapchain() const;
 };

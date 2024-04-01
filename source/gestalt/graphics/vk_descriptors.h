@@ -2,14 +2,14 @@
 
 #include <vk_types.h>
 
-#include "vk_deletion_service.h"
-#include "vk_gpu.h"
+#include "DeletionService.h"
+#include "Gpu.h"
 
-struct descriptor_layout_builder {
+struct DescriptorLayoutBuilder {
   std::vector<VkDescriptorSetLayoutBinding> bindings;
   std::vector<VkDescriptorBindingFlags> binding_flags;
 
-  descriptor_layout_builder& add_binding(uint32_t binding, VkDescriptorType type,
+  DescriptorLayoutBuilder& add_binding(uint32_t binding, VkDescriptorType type,
                                          VkShaderStageFlags shader_stages, bool bindless = false, uint32_t descriptor_count = 1);
   void clear();
   VkDescriptorSetLayout build(VkDevice device, bool is_push_descriptor = false);
@@ -33,7 +33,7 @@ struct descriptor_writer {
   void update_set(VkDevice device, VkDescriptorSet set);
 };
 
-struct descriptor_allocator {
+struct DescriptorAllocator {
   struct pool_size_ratio {
     VkDescriptorType type;
     float ratio;
@@ -72,7 +72,7 @@ private:
   uint32_t setsPerPool;
 };
 
-struct frame_data {
+struct FrameData {
   VkSemaphore swapchain_semaphore, render_semaphore;
   VkFence render_fence;
 

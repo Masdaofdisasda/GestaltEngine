@@ -2,8 +2,8 @@
 
 #include "vk_initializers.h"
 
-void vk_command::init(const vk_gpu& gpu,
-                      std::vector<frame_data>& frames) {
+void VkCommand::init(const Gpu& gpu,
+                      std::vector<FrameData>& frames) {
   gpu_ = gpu;
   deletion_service_.init(gpu_.device, gpu_.allocator);
 
@@ -35,6 +35,6 @@ void vk_command::init(const vk_gpu& gpu,
   deletion_service_.push(imgui_command_pool);
 }
 
-void vk_command::cleanup() {
+void VkCommand::cleanup() {
    deletion_service_.flush();
 }

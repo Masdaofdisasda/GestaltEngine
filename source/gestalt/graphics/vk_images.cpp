@@ -9,10 +9,10 @@ void vkutil::transition_read(VkCommandBuffer cmd, AllocatedImage& image) {
   constexpr auto color_read_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
   constexpr auto depth_read_layout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL;
 
-  if (image.type == image_type::color && image.currentLayout != color_read_layout) {
+  if (image.type == ImageType::kColor && image.currentLayout != color_read_layout) {
     transition_image(cmd, image.image, image.currentLayout, color_read_layout);
     image.currentLayout = color_read_layout;
-  } else if (image.type == image_type::depth && image.currentLayout != depth_read_layout) {
+  } else if (image.type == ImageType::kDepth && image.currentLayout != depth_read_layout) {
     transition_image(cmd, image.image, image.currentLayout, depth_read_layout);
     image.currentLayout = depth_read_layout;
   }
@@ -22,10 +22,10 @@ void vkutil::transition_write(VkCommandBuffer cmd, AllocatedImage& image) {
   constexpr auto color_write_layout = VK_IMAGE_LAYOUT_GENERAL;
   constexpr auto depth_write_layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
 
-  if (image.type == image_type::color && image.currentLayout != color_write_layout) {
+  if (image.type == ImageType::kColor && image.currentLayout != color_write_layout) {
     transition_image(cmd, image.image, image.currentLayout, color_write_layout);
     image.currentLayout = color_write_layout;
-  } else if (image.type == image_type::depth
+  } else if (image.type == ImageType::kDepth
              && image.currentLayout != depth_write_layout) {
     transition_image(cmd, image.image, image.currentLayout, depth_write_layout);
     image.currentLayout = depth_write_layout;

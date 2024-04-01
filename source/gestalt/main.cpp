@@ -1,7 +1,7 @@
-#include "graphics/vk_engine.h"
+#include "graphics/RenderEngine.h"
 
 int main(int argc, char* argv[]) {
-  render_engine engine;
+  RenderEngine engine;
 
   engine.init();
 
