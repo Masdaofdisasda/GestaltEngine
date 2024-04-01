@@ -39,7 +39,7 @@ add_custom_target(
     fix-clang-tidy
     COMMAND clang-tidy
     -p ${CMAKE_BINARY_DIR}
-    -fix 
+    --fix-errors 
     ${ALL_SOURCE_FILES}
     --
     # After '--', you can add additional arguments to pass to the compiler if needed
