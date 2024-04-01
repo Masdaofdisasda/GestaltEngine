@@ -43,7 +43,7 @@ namespace gestalt {
 
       VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
 
-      const auto color_image = registry_->get_resource<AllocatedImage>("gbuffer_shaded");
+      const auto color_image = registry_->get_resource<TextureHandle>("gbuffer_shaded");
 
       pipeline_ = PipelineBuilder()
                       .set_shaders(meshVertexShader, meshFragShader)
@@ -67,13 +67,13 @@ namespace gestalt {
       descriptor_set_
           = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(2));
 
-      const auto color_image = registry_->get_resource<AllocatedImage>("gbuffer_shaded");
+      const auto color_image = registry_->get_resource<TextureHandle>("gbuffer_shaded");
 
-      const auto gbuffer_1 = registry_->get_resource<AllocatedImage>("gbuffer_1_final");
-      const auto gbuffer_2 = registry_->get_resource<AllocatedImage>("gbuffer_2_final");
-      const auto gbuffer_3 = registry_->get_resource<AllocatedImage>("gbuffer_3_final");
-      const auto gbuffer_depth = registry_->get_resource<AllocatedImage>("gbuffer_depth");
-      const auto shadow_map = registry_->get_resource<AllocatedImage>("directional_shadow_map");
+      const auto gbuffer_1 = registry_->get_resource<TextureHandle>("gbuffer_1_final");
+      const auto gbuffer_2 = registry_->get_resource<TextureHandle>("gbuffer_2_final");
+      const auto gbuffer_3 = registry_->get_resource<TextureHandle>("gbuffer_3_final");
+      const auto gbuffer_depth = registry_->get_resource<TextureHandle>("gbuffer_depth");
+      const auto shadow_map = registry_->get_resource<TextureHandle>("directional_shadow_map");
 
       VkRenderingAttachmentInfo colorAttachment
           = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -131,12 +131,13 @@ namespace gestalt {
       scissor_.extent.height = color_image->getExtent2D().height;
       vkCmdSetViewport(cmd, 0, 1, &viewport_);
       vkCmdSetScissor(cmd, 0, 1, &scissor_);
-      resource_manager_->config_.lighting.invViewProj
-          = glm::inverse(resource_manager_->per_frame_data_.viewproj);
+      registry_->config_.lighting.invViewProj
+          = glm::inverse(registry_->per_frame_data_.viewproj);
+      registry_->config_.lighting.num_dir_lights = repository_->directional_lights.size();
+      registry_->config_.lighting.num_point_lights = repository_->point_lights.size();
 
       vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                         sizeof(RenderConfig::LightingParams),
-                         &resource_manager_->config_.lighting);
+                         sizeof(RenderConfig::LightingParams), &registry_->config_.lighting);
       vkCmdDraw(cmd, 3, 1, 0, 0);
       vkCmdEndRendering(cmd);
     }

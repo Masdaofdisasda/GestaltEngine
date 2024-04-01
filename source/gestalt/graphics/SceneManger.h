@@ -16,7 +16,7 @@ namespace gestalt {
     struct Vertex;
     class AssetLoader;
 
-    class ComponentArchetypeFactory {
+    class ComponentFactory {
       std::shared_ptr<graphics::ResourceManager> resource_manager_;
       std::shared_ptr<foundation::Repository> repository_;
 
@@ -50,20 +50,19 @@ namespace gestalt {
     };
 
     class AssetLoader {
-      //graphics::Gpu gpu_ = {};
       std::shared_ptr<graphics::ResourceManager> resource_manager_;
       std::shared_ptr<foundation::Repository> repository_;
-      std::shared_ptr<ComponentArchetypeFactory> component_factory_;
+      std::shared_ptr<ComponentFactory> component_factory_;
 
       static VkFilter extract_filter(fastgltf::Filter filter);
       VkSamplerMipmapMode extract_mipmap_mode(fastgltf::Filter filter);
       std::optional<fastgltf::Asset> parse_gltf(const std::filesystem::path& file_path);
       void import_samplers(fastgltf::Asset& gltf);
-      std::optional<foundation::AllocatedImage> load_image(fastgltf::Asset& asset,
+      std::optional<foundation::TextureHandle> load_image(fastgltf::Asset& asset,
                                                            fastgltf::Image& image) const;
       void import_textures(fastgltf::Asset& gltf) const;
-      size_t create_material(foundation::PbrMaterial& config, const std::string& name) const;
-      std::tuple<foundation::AllocatedImage, VkSampler> get_textures(const fastgltf::Asset& gltf,
+      size_t create_material(const foundation::PbrMaterial& config, const std::string& name) const;
+      std::tuple<foundation::TextureHandle, VkSampler> get_textures(const fastgltf::Asset& gltf,
                                                                      const size_t& texture_index,
                                                                      const size_t& image_offset,
                                                                      const size_t& sampler_offset) const;
@@ -99,7 +98,7 @@ namespace gestalt {
 
     public:
       void init(const std::shared_ptr<graphics::ResourceManager>& resource_manager,
-                const std::shared_ptr<ComponentArchetypeFactory>& component_factory,
+                const std::shared_ptr<ComponentFactory>& component_factory,
                 const std::shared_ptr<foundation::Repository>& repository);
       void import_lights(const fastgltf::Asset& gltf);
       std::vector<fastgltf::Node> load_scene_from_gltf(const std::string& file_path);
@@ -114,9 +113,10 @@ namespace gestalt {
       std::shared_ptr<foundation::Repository> repository_;
 
       std::unique_ptr<AssetLoader> asset_loader_ = std::make_unique<AssetLoader>();
-      std::shared_ptr<ComponentArchetypeFactory> component_factory_
-          = std::make_shared<ComponentArchetypeFactory>();
+      std::shared_ptr<ComponentFactory> component_factory_
+          = std::make_shared<ComponentFactory>();
 
+      std::unique_ptr<MaterialSystem> material_system_;
       std::unique_ptr<SceneSystem> light_system_;
       std::unique_ptr<SceneSystem> transform_system_;
       std::unique_ptr<SceneSystem> render_system_;
@@ -138,7 +138,7 @@ namespace gestalt {
       void update_scene();
 
       void request_scene(const std::string& path);
-      ComponentArchetypeFactory& get_component_factory() const { return *component_factory_; }
+      ComponentFactory& get_component_factory() const { return *component_factory_; }
       foundation::NodeComponent& get_root_node();
       uint32_t get_root_entity() { return root_entity_; }
       void add_to_root(foundation::entity entity, foundation::NodeComponent& node);

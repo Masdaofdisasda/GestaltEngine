@@ -46,23 +46,14 @@ namespace gestalt {
       per_frame_data_buffer = create_buffer(
           sizeof(PerFrameData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-      material_data.constants_buffer
-          = create_buffer(sizeof(PbrMaterial::MaterialConstants) * kLimits.max_materials,
-                          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+      
 
       per_frame_data_layout
           = DescriptorLayoutBuilder()
                 .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                              VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
                 .build(gpu_.device, true);
-      material_data.resource_layout = DescriptorLayoutBuilder()
-                                          .add_binding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                                       VK_SHADER_STAGE_FRAGMENT_BIT, true)
-                                          .build(gpu_.device);
-      material_data.constants_layout = DescriptorLayoutBuilder()
-                                           .add_binding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                                        VK_SHADER_STAGE_FRAGMENT_BIT, true)
-                                           .build(gpu_.device);
+      
       ibl_data.IblLayout = DescriptorLayoutBuilder()
                                .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                             VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -74,15 +65,11 @@ namespace gestalt {
 
       std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes
           = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kLimits.max_textures},
-             {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 5},
+             {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10},
              {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kLimits.max_materials}};
 
       descriptorPool.init(gpu_.device, 1, sizes);
 
-      material_data.resource_set = descriptorPool.allocate(
-          gpu_.device, material_data.resource_layout, {kLimits.max_textures});
-      material_data.constants_set = descriptorPool.allocate(
-          gpu_.device, material_data.constants_layout, {kLimits.max_materials});
       ibl_data.IblSet = descriptorPool.allocate(gpu_.device, ibl_data.IblLayout);
 
       light_data.light_layout
@@ -103,153 +90,8 @@ namespace gestalt {
 
       scene_geometry_.vertex_set
           = descriptorPool.allocate(gpu_.device, scene_geometry_.vertex_layout);
-
-      {
-        std::vector<GpuVertexPosition> vertex_positions(184521);
-
-        GpuVertexPosition* mappedData;
-        VK_CHECK(vmaMapMemory(gpu_.allocator, material_data.constants_buffer.allocation,
-                              (void**)&mappedData));
-        memcpy(mappedData, vertex_positions.data(),
-               sizeof(PbrMaterial::MaterialConstants) * kLimits.max_materials);
-
-        vmaUnmapMemory(gpu_.allocator, material_data.constants_buffer.allocation);
-
-        std::vector<VkDescriptorBufferInfo> bufferInfos;
-        for (int i = 0; i < vertex_positions.size(); ++i) {
-          VkDescriptorBufferInfo bufferInfo = {};
-          bufferInfo.buffer = material_data.constants_buffer.buffer;
-          bufferInfo.offset = sizeof(PbrMaterial::MaterialConstants) * i;
-          bufferInfo.range = sizeof(PbrMaterial::MaterialConstants);
-          bufferInfos.push_back(bufferInfo);
-        }
-      }
     }
 
-    void ResourceManager::init_default_data() {
-      auto& default_material = repository_->default_material_;
-
-      uint32_t white = 0xFFFFFFFF;  // White color for color and occlusion
-      uint32_t default_metallic_roughness
-          = 0xFF00FF00;                   // Green color representing metallic-roughness
-      uint32_t flat_normal = 0xFFFF8080;  // Flat normal
-      uint32_t black = 0xFF000000;        // Black color for emissive
-
-      default_material.color_image = create_image(
-          (void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-      repository_->textures.add(default_material.color_image);
-
-      default_material.metallic_roughness_image
-          = create_image((void*)&default_metallic_roughness, VkExtent3D{1, 1, 1},
-                         VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-      repository_->textures.add(default_material.metallic_roughness_image);
-
-      default_material.normal_image
-          = create_image((void*)&flat_normal, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM,
-                         VK_IMAGE_USAGE_SAMPLED_BIT);
-      repository_->textures.add(default_material.normal_image);
-
-      default_material.emissive_image = create_image(
-          (void*)&black, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-      repository_->textures.add(default_material.emissive_image);
-
-      default_material.occlusion_image = create_image(
-          (void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-      repository_->textures.add(default_material.occlusion_image);
-
-      // checkerboard image for error textures and testing
-      uint32_t magenta = 0xFFFF00FF;
-      constexpr size_t checkerboard_size = 256;
-      std::array<uint32_t, checkerboard_size> pixels;  // for 16x16 checkerboard texture
-      for (int x = 0; x < 16; x++) {
-        for (int y = 0; y < 16; y++) {
-          pixels[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
-        }
-      }
-      default_material.error_checkerboard_image
-          = create_image(pixels.data(), VkExtent3D{16, 16, 1}, VK_FORMAT_R8G8B8A8_UNORM,
-                         VK_IMAGE_USAGE_SAMPLED_BIT);
-      repository_->textures.add(default_material.error_checkerboard_image);
-
-      VkSamplerCreateInfo sampler = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
-
-      sampler.magFilter = VK_FILTER_NEAREST;
-      sampler.minFilter = VK_FILTER_NEAREST;
-
-      vkCreateSampler(gpu_.device, &sampler, nullptr, &default_material.nearestSampler);
-      repository_->samplers.add(default_material.nearestSampler);
-
-      sampler.magFilter = VK_FILTER_LINEAR;
-      sampler.minFilter = VK_FILTER_LINEAR;
-      vkCreateSampler(gpu_.device, &sampler, nullptr, &default_material.linearSampler);
-      repository_->samplers.add(default_material.linearSampler);
-
-      PbrMaterial pbr_material{};
-      pbr_material.constants.albedo_factor.x = 1.f;
-      pbr_material.constants.albedo_factor.y = 1.f;
-      pbr_material.constants.albedo_factor.z = 1.f;
-      pbr_material.constants.albedo_factor.w = 1.f;
-
-      pbr_material.constants.metal_rough_factor.x = 0.f;
-      pbr_material.constants.metal_rough_factor.y = 0.f;
-      // write material parameters to buffer
-
-      // default the material textures
-      pbr_material.resources.albedo_image = default_material.color_image;
-      pbr_material.resources.albedo_sampler = default_material.linearSampler;
-      pbr_material.resources.metal_rough_image = default_material.metallic_roughness_image;
-      pbr_material.resources.metal_rough_sampler = default_material.linearSampler;
-      pbr_material.resources.normal_image = default_material.normal_image;
-      pbr_material.resources.normal_sampler = default_material.linearSampler;
-      pbr_material.resources.emissive_image = default_material.emissive_image;
-      pbr_material.resources.emissive_sampler = default_material.linearSampler;
-      pbr_material.resources.occlusion_image = default_material.occlusion_image;
-      pbr_material.resources.occlusion_sampler = default_material.nearestSampler;
-
-      {
-        // build material
-        const size_t material_id = repository_->materials.size();
-        const std::string key = "default_material";
-        write_material(pbr_material, material_id);
-        repository_->materials.add(Material{.name = key, .config = pbr_material});
-        fmt::print("creating material {}, mat_id {}\n", key, material_id);
-      }
-
-      std::vector<PbrMaterial::MaterialConstants> material_constants(kLimits.max_materials);
-
-      PbrMaterial::MaterialConstants* mappedData;
-      VK_CHECK(vmaMapMemory(gpu_.allocator, material_data.constants_buffer.allocation,
-                            (void**)&mappedData));
-      memcpy(mappedData, material_constants.data(),
-             sizeof(PbrMaterial::MaterialConstants) * kLimits.max_materials);
-
-      vmaUnmapMemory(gpu_.allocator, material_data.constants_buffer.allocation);
-
-      std::vector<VkDescriptorBufferInfo> bufferInfos;
-      for (int i = 0; i < material_constants.size(); ++i) {
-        VkDescriptorBufferInfo bufferInfo = {};
-        bufferInfo.buffer = material_data.constants_buffer.buffer;
-        bufferInfo.offset = sizeof(PbrMaterial::MaterialConstants) * i;
-        bufferInfo.range = sizeof(PbrMaterial::MaterialConstants);
-        bufferInfos.push_back(bufferInfo);
-      }
-
-      writer.clear();
-      writer.write_buffer_array(5, bufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
-      writer.update_set(gpu_.device, material_data.constants_set);
-
-      writer.clear();
-      std::vector<VkDescriptorImageInfo> imageInfos{kLimits.max_textures};
-      for (int i = 0; i < kLimits.max_textures; ++i) {
-        VkDescriptorImageInfo image_info;
-        image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        image_info.imageView = repository_->default_material_.error_checkerboard_image.imageView;
-        image_info.sampler = repository_->default_material_.linearSampler;
-        imageInfos[i] = image_info;
-      }
-      writer.write_image_array(4, imageInfos, 0);
-      writer.update_set(gpu_.device, material_data.resource_set);
-    }
 
     void ResourceManager::cleanup() {
       for (auto& image : repository_->textures.data()) {
@@ -259,10 +101,7 @@ namespace gestalt {
         vkDestroySampler(gpu_.device, sampler, nullptr);
       }
 
-      vkDestroyDescriptorSetLayout(gpu_.device, material_data.constants_layout, nullptr);
       vkDestroyDescriptorSetLayout(gpu_.device, ibl_data.IblLayout, nullptr);
-      vkDestroyDescriptorSetLayout(gpu_.device, material_data.resource_layout, nullptr);
-      destroy_buffer(material_data.constants_buffer);
       descriptorPool.destroy_pools(gpu_.device);
     }
 
@@ -307,31 +146,30 @@ namespace gestalt {
       memcpy((char*)data + vertex_position_buffer_size + vertex_data_buffer_size, indices.data(),
              index_buffer_size);
 
-      gpu_.immediate_submit([&](VkCommandBuffer cmd) {
-        VkBufferCopy vertex_positions_copy;
-        vertex_positions_copy.dstOffset = 0;
-        vertex_positions_copy.srcOffset = 0;
-        vertex_positions_copy.size = vertex_position_buffer_size;
+        gpu_.immediate_submit([&](VkCommandBuffer cmd) {
+          VkBufferCopy vertex_positions_copy;
+          vertex_positions_copy.dstOffset = 0;
+          vertex_positions_copy.srcOffset = 0;
+          vertex_positions_copy.size = vertex_position_buffer_size;
 
-        vkCmdCopyBuffer(cmd, staging.buffer, scene_geometry_.vertexPositionBuffer.buffer, 1,
-                        &vertex_positions_copy);
+          vkCmdCopyBuffer(cmd, staging.buffer, scene_geometry_.vertexPositionBuffer.buffer, 1,
+                          &vertex_positions_copy);
 
-        VkBufferCopy vertex_data_copy;
-        vertex_data_copy.dstOffset = 0;
-        vertex_data_copy.srcOffset = vertex_position_buffer_size;
-        vertex_data_copy.size = vertex_data_buffer_size;
+          VkBufferCopy vertex_data_copy;
+          vertex_data_copy.dstOffset = 0;
+          vertex_data_copy.srcOffset = vertex_position_buffer_size;
+          vertex_data_copy.size = vertex_data_buffer_size;
 
-        vkCmdCopyBuffer(cmd, staging.buffer, scene_geometry_.vertexDataBuffer.buffer, 1,
-                        &vertex_data_copy);
+          vkCmdCopyBuffer(cmd, staging.buffer, scene_geometry_.vertexDataBuffer.buffer, 1,
+                          &vertex_data_copy);
 
-        VkBufferCopy index_copy;
-        index_copy.dstOffset = 0;
-        index_copy.srcOffset = vertex_position_buffer_size + vertex_data_buffer_size;
-        index_copy.size = index_buffer_size;
+          VkBufferCopy index_copy;
+          index_copy.dstOffset = 0;
+          index_copy.srcOffset = vertex_position_buffer_size + vertex_data_buffer_size;
+          index_copy.size = index_buffer_size;
 
-        vkCmdCopyBuffer(cmd, staging.buffer, scene_geometry_.indexBuffer.buffer, 1, &index_copy);
-      });
-
+          vkCmdCopyBuffer(cmd, staging.buffer, scene_geometry_.indexBuffer.buffer, 1, &index_copy);
+        });
       vmaUnmapMemory(gpu_.allocator, allocation);
       destroy_buffer(staging);
 
@@ -353,10 +191,10 @@ namespace gestalt {
       return new_sampler;
     }
 
-    AllocatedImage ResourceManager::create_image(VkExtent3D size, VkFormat format,
+    TextureHandle ResourceManager::create_image(VkExtent3D size, VkFormat format,
                                                  VkImageUsageFlags usage, bool mipmapped,
                                                  bool cubemap) {
-      AllocatedImage newImage;
+      TextureHandle newImage;
       newImage.imageFormat = format;
       newImage.imageExtent = size;
 
@@ -411,53 +249,64 @@ namespace gestalt {
       return newImage;
     }
 
-    AllocatedImage ResourceManager::create_image(void* data, VkExtent3D size, VkFormat format,
+    TextureHandle ResourceManager::create_image(void* data, VkExtent3D size, VkFormat format,
                                                  VkImageUsageFlags usage, bool mipmapped) {
+
+      TextureHandle new_image = create_image(
+          size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+          mipmapped);
+
+      resource_loader_.add_task([this, new_image, size, mipmapped, data]() {
       size_t data_size = static_cast<size_t>(size.depth * size.width * size.height) * 4;
       AllocatedBuffer uploadbuffer
           = create_buffer(data_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
       memcpy(uploadbuffer.info.pMappedData, data, data_size);
+        gpu_.immediate_submit([&](VkCommandBuffer cmd) {
+          vkutil::transition_image(cmd, new_image.image, VK_IMAGE_LAYOUT_UNDEFINED,
+                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-      AllocatedImage new_image = create_image(
-          size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-          mipmapped);
+          VkBufferImageCopy copyRegion = {};
+          copyRegion.bufferOffset = 0;
+          copyRegion.bufferRowLength = 0;
+          copyRegion.bufferImageHeight = 0;
 
-      gpu_.immediate_submit([&](VkCommandBuffer cmd) {
-        vkutil::transition_image(cmd, new_image.image, VK_IMAGE_LAYOUT_UNDEFINED,
-                                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+          copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+          copyRegion.imageSubresource.mipLevel = 0;
+          copyRegion.imageSubresource.baseArrayLayer = 0;
+          copyRegion.imageSubresource.layerCount = 1;
+          copyRegion.imageExtent = size;
 
-        VkBufferImageCopy copyRegion = {};
-        copyRegion.bufferOffset = 0;
-        copyRegion.bufferRowLength = 0;
-        copyRegion.bufferImageHeight = 0;
+          // copy the buffer into the image
+          vkCmdCopyBufferToImage(cmd, uploadbuffer.buffer, new_image.image,
+                                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 
-        copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        copyRegion.imageSubresource.mipLevel = 0;
-        copyRegion.imageSubresource.baseArrayLayer = 0;
-        copyRegion.imageSubresource.layerCount = 1;
-        copyRegion.imageExtent = size;
-
-        // copy the buffer into the image
-        vkCmdCopyBufferToImage(cmd, uploadbuffer.buffer, new_image.image,
-                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
-
-        if (mipmapped) {
-          vkutil::generate_mipmaps(
-              cmd, new_image.image,
-              VkExtent2D{new_image.imageExtent.width, new_image.imageExtent.height});
-        } else {
-          vkutil::transition_image(cmd, new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        }
+          if (mipmapped) {
+            vkutil::generate_mipmaps(
+                cmd, new_image.image,
+                VkExtent2D{new_image.imageExtent.width, new_image.imageExtent.height});
+          } else {
+            vkutil::transition_image(cmd, new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+          }
+        });
+        destroy_buffer(uploadbuffer);
       });
-      destroy_buffer(uploadbuffer);
+
       return new_image;
     }
 
-    AllocatedImage ResourceManager::create_cubemap(const void* imageData, VkExtent3D size,
+    TextureHandle ResourceManager::create_cubemap(const void* imageData, VkExtent3D size,
                                                    VkFormat format, VkImageUsageFlags usage,
                                                    bool mipmapped) {
+
+      // Create the image with VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT flag for cubemaps
+      TextureHandle new_image = create_image(
+          size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+          mipmapped, true);
+
+      resource_loader_.add_task( [this, new_image, size, mipmapped, imageData]() {
+
       size_t faceWidth = size.width;
       size_t faceHeight = size.height;
       size_t numChannels = 4;  // Assuming RGBA
@@ -472,12 +321,6 @@ namespace gestalt {
 
       // Copy each face data into the buffer
       memcpy(uploadbuffer.info.pMappedData, imageData, totalCubemapSizeBytes);
-
-      // Create the image with VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT flag for cubemaps
-      AllocatedImage new_image = create_image(
-          size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-          mipmapped, true);
-
       gpu_.immediate_submit([&](VkCommandBuffer cmd) {
         vkutil::transition_image(cmd, new_image.image, VK_IMAGE_LAYOUT_UNDEFINED,
                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -508,64 +351,14 @@ namespace gestalt {
                                    VK_IMAGE_LAYOUT_GENERAL);
         }
       });
+
       destroy_buffer(uploadbuffer);
+      });
       return new_image;
     }
 
-    void ResourceManager::write_material(PbrMaterial& material, const uint32_t material_id) {
-      writer.clear();
-
-      std::vector<VkDescriptorImageInfo> imageInfos = {
-          {material.resources.albedo_sampler, material.resources.albedo_image.imageView,
-           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-          {material.resources.metal_rough_sampler, material.resources.metal_rough_image.imageView,
-           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-          {material.resources.normal_sampler, material.resources.normal_image.imageView,
-           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-          {material.resources.emissive_sampler, material.resources.emissive_image.imageView,
-           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-          {material.resources.occlusion_sampler, material.resources.occlusion_image.imageView,
-           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
-
-      const uint32_t texture_start = imageInfos.size() * material_id;
-      writer.write_image_array(4, imageInfos, texture_start);
-
-      writer.update_set(gpu_.device, material_data.resource_set);
-
-      if (material.constants.albedo_tex_index != unused_texture) {
-        material.constants.albedo_tex_index = texture_start;
-      }
-      if (material.constants.metal_rough_tex_index != unused_texture) {
-        material.constants.metal_rough_tex_index = texture_start + 1;
-      }
-      if (material.constants.normal_tex_index != unused_texture) {
-        material.constants.normal_tex_index = texture_start + 2;
-      }
-      if (material.constants.emissive_tex_index != unused_texture) {
-        material.constants.emissive_tex_index = texture_start + 3;
-      }
-      if (material.constants.occlusion_tex_index != unused_texture) {
-        material.constants.occlusion_tex_index = texture_start + 4;
-      }
-
-      PbrMaterial::MaterialConstants* mappedData;
-      vmaMapMemory(gpu_.allocator, material_data.constants_buffer.allocation, (void**)&mappedData);
-      memcpy(mappedData + material_id, &material.constants, sizeof(PbrMaterial::MaterialConstants));
-      vmaUnmapMemory(gpu_.allocator, material_data.constants_buffer.allocation);
-
-      VkDescriptorBufferInfo buffer_info;
-      buffer_info.buffer = material_data.constants_buffer.buffer;
-      buffer_info.offset = sizeof(PbrMaterial::MaterialConstants) * material_id;
-      buffer_info.range = sizeof(PbrMaterial::MaterialConstants);
-      std::vector bufferInfos = {buffer_info};
-
-      writer.clear();
-      writer.write_buffer_array(5, bufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
-      writer.update_set(gpu_.device, material_data.constants_set);
-    }
-
-    std::optional<AllocatedImage> ResourceManager::load_image(const std::string& filepath) {
-      AllocatedImage new_image;
+    std::optional<TextureHandle> ResourceManager::load_image(const std::string& filepath) {
+      TextureHandle new_image;
 
       int width, height, nrChannels;
       unsigned char* data = stbi_load(filepath.c_str(), &width, &height, &nrChannels, 4);
@@ -599,8 +392,23 @@ namespace gestalt {
       }
     }
 
+    void PoorMansResourceLoader::init(const Gpu& gpu) {
+	  gpu_ = gpu;
+    }
+
+    void PoorMansResourceLoader::add_task(std::function<void()> task) {
+	  tasks_.push_back(task);
+    }
+
+    void PoorMansResourceLoader::flush() {
+      for (auto& task : tasks_) {
+        task();
+      }
+      tasks_.clear();
+    }
+
     void ResourceManager::load_and_create_cubemap(const std::string& file_path,
-                                                  AllocatedImage& cubemap) {
+                                                  TextureHandle& cubemap) {
       int w, h, comp;
       float* img = stbi_loadf(file_path.c_str(), &w, &h, &comp, 3);
       if (!img) {
@@ -697,7 +505,7 @@ namespace gestalt {
       writer.update_set(gpu_.device, ibl_data.IblSet);
     }
 
-    AllocatedImage ResourceManager::create_cubemap_from_HDR(std::vector<float>& image_data, int h,
+    TextureHandle ResourceManager::create_cubemap_from_HDR(std::vector<float>& image_data, int h,
                                                             int w) {
       Bitmap in(w, h, 4, eBitmapFormat_Float, image_data.data());
       Bitmap out_bitmap = convertEquirectangularMapToVerticalCross(in);
@@ -710,8 +518,8 @@ namespace gestalt {
     }
 
     void ResourceManager::create_color_frame_buffer(const VkExtent3D& extent,
-                                                    AllocatedImage& color_image) const {
-      assert(color_image.type == ImageType::kColor);
+                                                    TextureHandle& color_image) const {
+      assert(color_image.type == TextureType::kColor);
       // hardcoding the draw format to 32 bit float
       color_image.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
       color_image.imageExtent = extent;
@@ -742,8 +550,8 @@ namespace gestalt {
     }
 
     void ResourceManager::create_depth_frame_buffer(const VkExtent3D& extent,
-                                                    AllocatedImage& depth_image) const {
-      assert(depth_image.type == ImageType::kDepth);
+                                                    TextureHandle& depth_image) const {
+      assert(depth_image.type == TextureType::kDepth);
 
       depth_image.imageFormat = VK_FORMAT_D32_SFLOAT;
       depth_image.imageExtent = extent;
@@ -768,26 +576,7 @@ namespace gestalt {
       VK_CHECK(vkCreateImageView(gpu_.device, &dview_info, nullptr, &depth_image.imageView));
     }
 
-    void ResourceManager::create_framebuffer(const VkExtent3D& extent, FrameBuffer& frame_buffer) {
-      AllocatedImage color_image{ImageType::kColor};
-      AllocatedImage depth_image{ImageType::kDepth};
-
-      create_color_frame_buffer(extent, color_image);
-      create_depth_frame_buffer(extent, depth_image);
-
-      frame_buffer.add_color_image(color_image);
-      frame_buffer.add_depth_image(depth_image);
-    }
-
-    void ResourceManager::create_framebuffer(const VkExtent3D& extent,
-                                             DoubleBufferedFrameBuffer& frame_buffer) {
-      for (int i = 0; i < 2; ++i) {
-        create_framebuffer(extent, frame_buffer.get_write_buffer());
-        frame_buffer.switch_buffers();
-      }
-    }
-
-    void ResourceManager::destroy_image(const AllocatedImage& img) {
+    void ResourceManager::destroy_image(const TextureHandle& img) {
       vkDestroyImageView(gpu_.device, img.imageView, nullptr);
       vmaDestroyImage(gpu_.allocator, img.image, img.allocation);
     }

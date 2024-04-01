@@ -5,32 +5,34 @@
 #include <vk_images.h>
 #include <vk_initializers.h>
 
+#include "GpuResources.h"
+
 namespace gestalt {
 
   namespace graphics {
     using namespace foundation;
 
-    void vkutil::transition_read(VkCommandBuffer cmd, AllocatedImage& image) {
+    void vkutil::transition_read(VkCommandBuffer cmd, TextureHandle& image) {
       constexpr auto color_read_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
       constexpr auto depth_read_layout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL;
 
-      if (image.type == ImageType::kColor && image.currentLayout != color_read_layout) {
+      if (image.type == TextureType::kColor && image.currentLayout != color_read_layout) {
         transition_image(cmd, image.image, image.currentLayout, color_read_layout);
         image.currentLayout = color_read_layout;
-      } else if (image.type == ImageType::kDepth && image.currentLayout != depth_read_layout) {
+      } else if (image.type == TextureType::kDepth && image.currentLayout != depth_read_layout) {
         transition_image(cmd, image.image, image.currentLayout, depth_read_layout);
         image.currentLayout = depth_read_layout;
       }
     }
 
-    void vkutil::transition_write(VkCommandBuffer cmd, AllocatedImage& image) {
+    void vkutil::transition_write(VkCommandBuffer cmd, TextureHandle& image) {
       constexpr auto color_write_layout = VK_IMAGE_LAYOUT_GENERAL;
       constexpr auto depth_write_layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
 
-      if (image.type == ImageType::kColor && image.currentLayout != color_write_layout) {
+      if (image.type == TextureType::kColor && image.currentLayout != color_write_layout) {
         transition_image(cmd, image.image, image.currentLayout, color_write_layout);
         image.currentLayout = color_write_layout;
-      } else if (image.type == ImageType::kDepth && image.currentLayout != depth_write_layout) {
+      } else if (image.type == TextureType::kDepth && image.currentLayout != depth_write_layout) {
         transition_image(cmd, image.image, image.currentLayout, depth_write_layout);
         image.currentLayout = depth_write_layout;
       }

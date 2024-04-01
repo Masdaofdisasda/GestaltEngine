@@ -20,12 +20,8 @@ namespace gestalt {
       resource_manager_ = resource_manager;
       repository_ = repository;
 
-      component_factory_->init(resource_manager_, repository);
+      component_factory_->init(resource_manager_, repository_);
       asset_loader_->init(resource_manager_, component_factory_, repository_);
-
-      resource_manager_->init_default_data();
-
-      resource_manager_->load_and_process_cubemap(R"(..\..\assets\san_giuseppe_bridge_4k.hdr)");
 
       // TODO add lights from gltf to resource manager
 
@@ -38,6 +34,8 @@ namespace gestalt {
       component_factory_->create_point_light(glm::vec3(1.0f), 5.0f, glm ::vec3(0.0, 6.0, 0.0),
                                              get_root_entity());
 
+      material_system_ = std::make_unique<MaterialSystem>();
+      material_system_->init(gpu, resource_manager, repository);
       light_system_ = std::make_unique<LightSystem>();
       light_system_->init(gpu, resource_manager, repository);
       transform_system_ = std::make_unique<TransformSystem>();
@@ -119,10 +117,10 @@ namespace gestalt {
 
     void SceneManager::cleanup() {}
 
-    entity ComponentArchetypeFactory::create_entity() { return next_entity_id_++; }
+    entity ComponentFactory::create_entity() { return next_entity_id_++; }
 
     std::pair<entity, std::reference_wrapper<NodeComponent>>
-    ComponentArchetypeFactory::create_entity_node(std::string node_name) {
+    ComponentFactory::create_entity_node(std::string node_name) {
       const entity new_entity = create_entity();
 
       if (node_name.empty()) {
@@ -140,7 +138,7 @@ namespace gestalt {
       return std::make_pair(new_entity, std::ref(repository_->scene_graph.get(new_entity)->get()));
     }
 
-    void ComponentArchetypeFactory::create_transform_component(const entity entity,
+    void ComponentFactory::create_transform_component(const entity entity,
                                                                const glm::vec3& position,
                                                                const glm::quat& rotation,
                                                                const float& scale) const {
@@ -149,7 +147,7 @@ namespace gestalt {
       transform.matrix = repository_->model_matrices.add(glm::mat4(1.0));
     }
 
-    void ComponentArchetypeFactory::update_transform_component(const entity entity,
+    void ComponentFactory::update_transform_component(const entity entity,
                                                                const glm::vec3& position,
                                                                const glm::quat& rotation,
                                                                const float& scale) {
@@ -170,21 +168,21 @@ namespace gestalt {
       return repository_->scene_graph.get(get_root_entity()).value();
     }
 
-    void ComponentArchetypeFactory::add_mesh_component(const entity entity,
+    void ComponentFactory::add_mesh_component(const entity entity,
                                                        const size_t mesh_index) {
       assert(entity != invalid_entity);
 
       repository_->mesh_components.add(entity, MeshComponent{mesh_index});
     }
 
-    void ComponentArchetypeFactory::add_camera_component(const entity entity,
+    void ComponentFactory::add_camera_component(const entity entity,
                                                          const CameraComponent& camera) {
       assert(entity != invalid_entity);
 
       repository_->camera_components.add(entity, camera);
     }
 
-    entity ComponentArchetypeFactory::create_directional_light(const glm::vec3& color,
+    entity ComponentFactory::create_directional_light(const glm::vec3& color,
                                                                const float intensity,
                                                                const glm::vec3& direction,
                                                                entity parent) {
@@ -208,7 +206,7 @@ namespace gestalt {
       return entity;
     }
 
-    entity ComponentArchetypeFactory::create_spot_light(
+    entity ComponentFactory::create_spot_light(
         const glm::vec3& color, const float intensity, const glm::vec3& direction,
         const glm::vec3& position, const float innerCone, const float outerCone, entity parent) {
       auto [entity, node] = create_entity_node("spot_light");
@@ -234,7 +232,7 @@ namespace gestalt {
       return entity;
     }
 
-    entity ComponentArchetypeFactory::create_point_light(const glm::vec3& color,
+    entity ComponentFactory::create_point_light(const glm::vec3& color,
                                                          const float intensity,
                                                          const glm::vec3& position, entity parent) {
       auto [entity, node] = create_entity_node("point_light");
@@ -258,7 +256,7 @@ namespace gestalt {
       return entity;
     }
 
-    void ComponentArchetypeFactory::link_entity_to_parent(const entity child, const entity parent) {
+    void ComponentFactory::link_entity_to_parent(const entity child, const entity parent) {
       if (child == parent) {
         return;
       }
@@ -283,7 +281,9 @@ namespace gestalt {
         load_scene(scene_path_);
         scene_path_.clear();
       }
+      resource_manager_->resource_loader_.flush();
 
+      material_system_->update();
       light_system_->update();
       transform_system_->update();
       render_system_->update();
@@ -291,7 +291,7 @@ namespace gestalt {
 
     void SceneManager::request_scene(const std::string& path) { scene_path_ = path; }
 
-    void ComponentArchetypeFactory::init(const std::shared_ptr<graphics::ResourceManager>& resource_manager,
+    void ComponentFactory::init(const std::shared_ptr<graphics::ResourceManager>& resource_manager,
                                          const std::shared_ptr<Repository>& repository) {
       resource_manager_ = resource_manager;
       repository_ = repository;

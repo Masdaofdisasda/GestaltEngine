@@ -31,8 +31,8 @@ namespace gestalt {
       VkShaderModule fragment_shader;
       vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &fragment_shader);
 
-      const auto color_image = registry_->get_resource<AllocatedImage>("scene_shaded");
-      const auto depth_image = registry_->get_resource<AllocatedImage>("gbuffer_depth");
+      const auto color_image = registry_->get_resource<TextureHandle>("scene_shaded");
+      const auto depth_image = registry_->get_resource<TextureHandle>("gbuffer_depth");
 
       pipeline_ = PipelineBuilder()
                       .set_shaders(vertex_shader, fragment_shader)
@@ -53,8 +53,8 @@ namespace gestalt {
     }
 
     void SkyboxPass::execute(const VkCommandBuffer cmd) {
-      const auto color_image = registry_->get_resource<AllocatedImage>("scene_shaded");
-      const auto depth_image = registry_->get_resource<AllocatedImage>("gbuffer_depth");
+      const auto color_image = registry_->get_resource<TextureHandle>("scene_shaded");
+      const auto depth_image = registry_->get_resource<TextureHandle>("gbuffer_depth");
 
       VkRenderingAttachmentInfo colorAttachment
           = vkinit::attachment_info(color_image->imageView, nullptr, color_image->currentLayout);
@@ -98,7 +98,7 @@ namespace gestalt {
       vkCmdSetScissor(cmd, 0, 1, &scissor_);
 
       vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                         sizeof(RenderConfig::SkyboxParams), &resource_manager_->config_.skybox);
+                         sizeof(RenderConfig::SkyboxParams), &registry_->config_.skybox);
       vkCmdDraw(cmd, 36, 1, 0, 0);  // 36 vertices for the cube
 
       vkCmdEndRendering(cmd);
@@ -130,8 +130,8 @@ namespace gestalt {
       VkShaderModule fragment_shader;
       vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &fragment_shader);
 
-      const auto color_image = registry_->get_resource<AllocatedImage>("skybox_color");
-      const auto depth_image = registry_->get_resource<AllocatedImage>("skybox_depth");
+      const auto color_image = registry_->get_resource<TextureHandle>("skybox_color");
+      const auto depth_image = registry_->get_resource<TextureHandle>("skybox_depth");
 
       pipeline_ = PipelineBuilder()
                       .set_shaders(vertex_shader, fragment_shader)
@@ -152,8 +152,8 @@ namespace gestalt {
     }
 
     void InfiniteGridPass::execute(const VkCommandBuffer cmd) {
-      const auto color_image = registry_->get_resource<AllocatedImage>("skybox_color");
-      const auto depth_image = registry_->get_resource<AllocatedImage>("skybox_depth");
+      const auto color_image = registry_->get_resource<TextureHandle>("skybox_color");
+      const auto depth_image = registry_->get_resource<TextureHandle>("skybox_depth");
 
       VkRenderingAttachmentInfo colorAttachment
           = vkinit::attachment_info(color_image->imageView, nullptr, color_image->currentLayout);
@@ -183,7 +183,7 @@ namespace gestalt {
                                      &descriptor_write);
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
       vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                         sizeof(RenderConfig::GridParams), &resource_manager_->config_.grid);
+                         sizeof(RenderConfig::GridParams), &registry_->config_.grid);
       viewport_.width = static_cast<float>(color_image->getExtent2D().width);
       viewport_.height = static_cast<float>(color_image->getExtent2D().height);
       vkCmdSetViewport(cmd, 0, 1, &viewport_);

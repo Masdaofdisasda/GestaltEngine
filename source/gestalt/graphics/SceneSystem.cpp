@@ -7,23 +7,6 @@ namespace gestalt {
 
     using namespace foundation;
 
-    struct DirectionalLight {
-      glm::vec3 color;
-      float intensity;
-      glm::vec3 direction;
-      uint32_t viewProj;
-    };
-
-    static_assert(sizeof(DirectionalLight) == 32);
-
-    struct PointLight {
-      glm::vec3 color;
-      float intensity;
-      glm::vec3 position;
-      bool enabled;
-    };
-    static_assert(sizeof(PointLight) == 32);
-
     void LightSystem::prepare() {
       auto& light_data = resource_manager_->light_data;
 
@@ -35,16 +18,16 @@ namespace gestalt {
       constexpr size_t max_lights = max_directional_lights + max_point_lights;
 
       light_data.dir_light_buffer = resource_manager_->create_buffer(
-          sizeof(DirectionalLight) * max_directional_lights, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+          sizeof(GpuDirectionalLight) * max_directional_lights, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
           VMA_MEMORY_USAGE_CPU_TO_GPU);
       light_data.point_light_buffer = resource_manager_->create_buffer(
-          sizeof(PointLight) * max_point_lights, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+          sizeof(GpuPointLight) * max_point_lights, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
           VMA_MEMORY_USAGE_CPU_TO_GPU);
       light_data.view_proj_matrices = resource_manager_->create_buffer(
           sizeof(glm::mat4) * max_lights, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
           VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-      writer.clear();
+      writer_.clear();
       std::vector<VkDescriptorBufferInfo> dirBufferInfos;
       for (int i = 0; i < max_directional_lights; ++i) {
         VkDescriptorBufferInfo bufferInfo = {};
@@ -53,7 +36,7 @@ namespace gestalt {
         bufferInfo.range = 32;
         dirBufferInfos.push_back(bufferInfo);
       }
-      writer.write_buffer_array(15, dirBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
+      writer_.write_buffer_array(15, dirBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
 
       std::vector<VkDescriptorBufferInfo> pointBufferInfos;
       for (int i = 0; i < max_point_lights; ++i) {
@@ -63,7 +46,7 @@ namespace gestalt {
         bufferInfo.range = 32;
         pointBufferInfos.push_back(bufferInfo);
       }
-      writer.write_buffer_array(16, pointBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
+      writer_.write_buffer_array(16, pointBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
 
       std::vector<VkDescriptorBufferInfo> lightViewProjBufferInfos;
       for (int i = 0; i < max_lights; ++i) {
@@ -73,8 +56,229 @@ namespace gestalt {
         bufferInfo.range = 64;
         lightViewProjBufferInfos.push_back(bufferInfo);
       }
-      writer.write_buffer_array(17, lightViewProjBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
-      writer.update_set(gpu_.device, resource_manager_->light_data.light_set);
+      writer_.write_buffer_array(17, lightViewProjBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
+      writer_.update_set(gpu_.device, resource_manager_->light_data.light_set);
+    }
+
+    void MaterialSystem::write_material(PbrMaterial& material, const uint32_t material_id) {
+      //writer_.clear();
+
+      std::vector<VkDescriptorImageInfo> imageInfos = {
+          {material.resources.albedo_sampler, material.resources.albedo_image.imageView,
+           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+          {material.resources.metal_rough_sampler, material.resources.metal_rough_image.imageView,
+           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+          {material.resources.normal_sampler, material.resources.normal_image.imageView,
+           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+          {material.resources.emissive_sampler, material.resources.emissive_image.imageView,
+           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+          {material.resources.occlusion_sampler, material.resources.occlusion_image.imageView,
+           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
+
+      const uint32_t texture_start = imageInfos.size() * material_id;
+      //writer_.write_image_array(4, imageInfos, texture_start);
+
+      //writer_.update_set(gpu_.device, repository_->material_data.resource_set);
+
+      if (material.constants.albedo_tex_index != unused_texture) {
+        material.constants.albedo_tex_index = texture_start;
+      }
+      if (material.constants.metal_rough_tex_index != unused_texture) {
+        material.constants.metal_rough_tex_index = texture_start + 1;
+      }
+      if (material.constants.normal_tex_index != unused_texture) {
+        material.constants.normal_tex_index = texture_start + 2;
+      }
+      if (material.constants.emissive_tex_index != unused_texture) {
+        material.constants.emissive_tex_index = texture_start + 3;
+      }
+      if (material.constants.occlusion_tex_index != unused_texture) {
+        material.constants.occlusion_tex_index = texture_start + 4;
+      }
+
+      PbrMaterial::MaterialConstants* mappedData;
+      vmaMapMemory(gpu_.allocator, repository_->material_data.constants_buffer.allocation,
+                   (void**)&mappedData);
+      memcpy(mappedData + material_id, &material.constants, sizeof(PbrMaterial::MaterialConstants));
+      vmaUnmapMemory(gpu_.allocator, repository_->material_data.constants_buffer.allocation);
+
+      VkDescriptorBufferInfo buffer_info;
+      buffer_info.buffer = repository_->material_data.constants_buffer.buffer;
+      buffer_info.offset = sizeof(PbrMaterial::MaterialConstants) * material_id;
+      buffer_info.range = sizeof(PbrMaterial::MaterialConstants);
+      std::vector bufferInfos = {buffer_info};
+
+      //writer_.clear();
+      //writer_.write_buffer_array(5, bufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
+      //writer_.update_set(gpu_.device, repository_->material_data.constants_set);
+    }
+
+    void MaterialSystem::create_defaults() {
+      auto& default_material = repository_->default_material_;
+
+      uint32_t white = 0xFFFFFFFF;              // White color for color and occlusion
+      uint32_t default_metallic_roughness
+          = 0xFF00FF00;                         // Green color representing metallic-roughness
+      uint32_t flat_normal = 0xFFFF8080;        // Flat normal
+      uint32_t black = 0xFF000000;              // Black color for emissive
+
+      default_material.color_image = resource_manager_->create_image(
+          (void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+      repository_->textures.add(default_material.color_image);
+
+      default_material.metallic_roughness_image
+          = resource_manager_->create_image((void*)&default_metallic_roughness, VkExtent3D{1, 1, 1},
+                         VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+      repository_->textures.add(default_material.metallic_roughness_image);
+
+      default_material.normal_image
+          = resource_manager_->create_image((void*)&flat_normal, VkExtent3D{1, 1, 1},
+                                            VK_FORMAT_R8G8B8A8_UNORM,
+                         VK_IMAGE_USAGE_SAMPLED_BIT);
+      repository_->textures.add(default_material.normal_image);
+
+      default_material.emissive_image = resource_manager_->create_image(
+          (void*)&black, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+      repository_->textures.add(default_material.emissive_image);
+
+      default_material.occlusion_image = resource_manager_->create_image(
+          (void*)&white, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+      repository_->textures.add(default_material.occlusion_image);
+
+      // checkerboard image for error textures and testing
+      uint32_t magenta = 0xFFFF00FF;
+      constexpr size_t checkerboard_size = 256;
+      std::array<uint32_t, checkerboard_size> pixels;  // for 16x16 checkerboard texture
+      for (int x = 0; x < 16; x++) {
+        for (int y = 0; y < 16; y++) {
+          pixels[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
+        }
+      }
+      default_material.error_checkerboard_image
+          = resource_manager_->create_image(pixels.data(), VkExtent3D{16, 16, 1},
+                                            VK_FORMAT_R8G8B8A8_UNORM,
+                         VK_IMAGE_USAGE_SAMPLED_BIT);
+      repository_->textures.add(default_material.error_checkerboard_image);
+
+      VkSamplerCreateInfo sampler = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+
+      sampler.magFilter = VK_FILTER_NEAREST;
+      sampler.minFilter = VK_FILTER_NEAREST;
+
+      vkCreateSampler(gpu_.device, &sampler, nullptr, &default_material.nearestSampler);
+      repository_->samplers.add(default_material.nearestSampler);
+
+      sampler.magFilter = VK_FILTER_LINEAR;
+      sampler.minFilter = VK_FILTER_LINEAR;
+      vkCreateSampler(gpu_.device, &sampler, nullptr, &default_material.linearSampler);
+      repository_->samplers.add(default_material.linearSampler);
+
+      PbrMaterial pbr_material{};
+      pbr_material.constants.albedo_factor.x = 1.f;
+      pbr_material.constants.albedo_factor.y = 1.f;
+      pbr_material.constants.albedo_factor.z = 1.f;
+      pbr_material.constants.albedo_factor.w = 1.f;
+
+      pbr_material.constants.metal_rough_factor.x = 0.f;
+      pbr_material.constants.metal_rough_factor.y = 0.f;
+      // write material parameters to buffer
+
+      // default the material textures
+      pbr_material.resources.albedo_image = default_material.color_image;
+      pbr_material.resources.albedo_sampler = default_material.linearSampler;
+      pbr_material.resources.metal_rough_image = default_material.metallic_roughness_image;
+      pbr_material.resources.metal_rough_sampler = default_material.linearSampler;
+      pbr_material.resources.normal_image = default_material.normal_image;
+      pbr_material.resources.normal_sampler = default_material.linearSampler;
+      pbr_material.resources.emissive_image = default_material.emissive_image;
+      pbr_material.resources.emissive_sampler = default_material.linearSampler;
+      pbr_material.resources.occlusion_image = default_material.occlusion_image;
+      pbr_material.resources.occlusion_sampler = default_material.nearestSampler;
+
+      {
+        // build material
+        const size_t material_id = repository_->materials.size();
+        const std::string key = "default_material";
+        write_material(pbr_material, material_id);
+        repository_->materials.add(Material{.name = key, .config = pbr_material});
+        fmt::print("creating material {}, mat_id {}\n", key, material_id);
+      }
+
+      std::vector<PbrMaterial::MaterialConstants> material_constants(kLimits.max_materials);
+
+      PbrMaterial::MaterialConstants* mappedData;
+      VK_CHECK(vmaMapMemory(gpu_.allocator, repository_->material_data.constants_buffer.allocation,
+                            (void**)&mappedData));
+      memcpy(mappedData, material_constants.data(),
+             sizeof(PbrMaterial::MaterialConstants) * kLimits.max_materials);
+
+      vmaUnmapMemory(gpu_.allocator, repository_->material_data.constants_buffer.allocation);
+
+      std::vector<VkDescriptorBufferInfo> bufferInfos;
+      for (int i = 0; i < material_constants.size(); ++i) {
+        VkDescriptorBufferInfo bufferInfo = {};
+        bufferInfo.buffer = repository_->material_data.constants_buffer.buffer;
+        bufferInfo.offset = sizeof(PbrMaterial::MaterialConstants) * i;
+        bufferInfo.range = sizeof(PbrMaterial::MaterialConstants);
+        bufferInfos.push_back(bufferInfo);
+      }
+
+      writer_.clear();
+      writer_.write_buffer_array(5, bufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
+      writer_.update_set(gpu_.device, repository_->material_data.constants_set);
+
+      writer_.clear();
+      std::vector<VkDescriptorImageInfo> imageInfos{kLimits.max_textures};
+      for (int i = 0; i < kLimits.max_textures; ++i) {
+        VkDescriptorImageInfo image_info;
+        image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        image_info.imageView = repository_->default_material_.error_checkerboard_image.imageView;
+        image_info.sampler = repository_->default_material_.linearSampler;
+        imageInfos[i] = image_info;
+      }
+      writer_.write_image_array(4, imageInfos, 0);
+      writer_.update_set(gpu_.device, repository_->material_data.resource_set);
+    }
+
+    void MaterialSystem::prepare() {
+
+      auto& material_data = repository_->material_data;
+
+      material_data.constants_buffer
+          = resource_manager_->create_buffer(sizeof(PbrMaterial::MaterialConstants) * kLimits.max_materials,
+                          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+      material_data.resource_layout
+          = graphics::DescriptorLayoutBuilder()
+            .add_binding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                         VK_SHADER_STAGE_FRAGMENT_BIT, true)
+            .build(gpu_.device);
+      material_data.constants_layout = graphics::DescriptorLayoutBuilder()
+                                           .add_binding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                                        VK_SHADER_STAGE_FRAGMENT_BIT, true)
+                                           .build(gpu_.device);
+      material_data.resource_set = resource_manager_->descriptorPool.allocate(
+          gpu_.device, material_data.resource_layout, {kLimits.max_textures});
+      material_data.constants_set = resource_manager_->descriptorPool.allocate(
+          gpu_.device, material_data.constants_layout, {kLimits.max_materials});
+
+      create_defaults();
+
+      
+      resource_manager_->load_and_process_cubemap(R"(..\..\assets\san_giuseppe_bridge_4k.hdr)");
+    }
+
+    void MaterialSystem::update() {
+      for (size_t i = 0; i < repository_->materials.size(); ++i) {
+        auto& [name, config, is_dirty] = repository_->materials.get(i);
+            if (is_dirty) {
+                write_material(config, i);
+                is_dirty = false;
+            }
+        }
+    }
+
+    void MaterialSystem::cleanup() {
+	  //destroy material buffers
     }
 
     glm::mat4 LightSystem::calculate_sun_view_proj(const glm::vec3 direction) const {
@@ -115,7 +319,7 @@ namespace gestalt {
         std::unordered_map<entity, LightComponent>& lights) {
       auto& light_data = resource_manager_->light_data;
 
-      std::vector<DirectionalLight> dir_lights;
+      repository_->directional_lights.clear();
       for (auto& light_source : lights) {
         auto& [entity, light] = light_source;
         if (light.type != LightType::kDirectional) {
@@ -129,27 +333,27 @@ namespace gestalt {
             = repository_->light_view_projections.get(light.light_view_projections.at(0));
         view_proj = calculate_sun_view_proj(direction);
 
-        DirectionalLight dir_light = {};
+        GpuDirectionalLight dir_light = {};
         dir_light.color = light.color;
         dir_light.intensity = light.intensity;
         dir_light.direction = direction;
         dir_light.viewProj = light.light_view_projections.at(0);
-        dir_lights.push_back(dir_light);
+        repository_->directional_lights.add(dir_light);
 
         light.is_dirty = false;
       }
 
       void* mapped_data;
       VK_CHECK(vmaMapMemory(gpu_.allocator, light_data.dir_light_buffer.allocation, &mapped_data));
-      memcpy(mapped_data, dir_lights.data(), sizeof(DirectionalLight) * dir_lights.size());
+      memcpy(mapped_data, repository_->directional_lights.data().data(),
+             sizeof(GpuDirectionalLight) * repository_->directional_lights.size());
       vmaUnmapMemory(gpu_.allocator, light_data.dir_light_buffer.allocation);
-      resource_manager_->config_.lighting.num_dir_lights = dir_lights.size();
     }
 
     void LightSystem::update_point_lights(std::unordered_map<entity, LightComponent>& lights) {
       auto& light_data = resource_manager_->light_data;
 
-      std::vector<PointLight> point_lights;
+      repository_->point_lights.clear();
       for (auto& light_source : lights) {
         auto& [entity, light] = light_source;
         if (light.type != LightType::kPoint) {
@@ -157,12 +361,12 @@ namespace gestalt {
         }
         auto& position = repository_->transform_components.get(entity).value().get().position;
 
-        PointLight point_light = {};
+        GpuPointLight point_light = {};
         point_light.color = light.color;
         point_light.intensity = light.intensity;
         point_light.position = position;
         point_light.enabled = true;
-        point_lights.push_back(point_light);
+        repository_->point_lights.add(point_light);
 
         light.is_dirty = false;
       }
@@ -170,9 +374,9 @@ namespace gestalt {
       void* mapped_data;
       VK_CHECK(
           vmaMapMemory(gpu_.allocator, light_data.point_light_buffer.allocation, &mapped_data));
-      memcpy(mapped_data, point_lights.data(), sizeof(PointLight) * point_lights.size());
+      memcpy(mapped_data, repository_->point_lights.data().data(),
+             sizeof(GpuPointLight) * repository_->point_lights.size());
       vmaUnmapMemory(gpu_.allocator, light_data.point_light_buffer.allocation);
-      resource_manager_->config_.lighting.num_point_lights = point_lights.size();
     }
 
     void LightSystem::update() {
@@ -364,9 +568,9 @@ namespace gestalt {
           def.transform = world_transform;
 
           if (material.config.transparent) {
-            resource_manager_->main_draw_context_.transparent_surfaces.push_back(def);
+            repository_->main_draw_context_.transparent_surfaces.push_back(def);
           } else {
-            resource_manager_->main_draw_context_.opaque_surfaces.push_back(def);
+            repository_->main_draw_context_.opaque_surfaces.push_back(def);
           }
         }
       }

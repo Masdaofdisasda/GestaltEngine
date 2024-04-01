@@ -14,8 +14,8 @@ namespace gestalt {
 
       descriptor_layouts_.push_back(resource_manager_->per_frame_data_layout);
       descriptor_layouts_.push_back(resource_manager_->ibl_data.IblLayout);
-      descriptor_layouts_.push_back(resource_manager_->material_data.resource_layout);
-      descriptor_layouts_.push_back(resource_manager_->material_data.constants_layout);
+      descriptor_layouts_.push_back(repository_->material_data.resource_layout);
+      descriptor_layouts_.push_back(repository_->material_data.constants_layout);
       descriptor_layouts_.push_back(resource_manager_->scene_geometry_.vertex_layout);
 
       VkShaderModule meshFragShader;
@@ -32,10 +32,10 @@ namespace gestalt {
 
       VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
 
-      const auto gbuffer_1 = registry_->get_resource<AllocatedImage>("gbuffer_1");
-      const auto gbuffer_2 = registry_->get_resource<AllocatedImage>("gbuffer_2");
-      const auto gbuffer_3 = registry_->get_resource<AllocatedImage>("gbuffer_3");
-      const auto depth_image = registry_->get_resource<AllocatedImage>("gbuffer_d");
+      const auto gbuffer_1 = registry_->get_resource<TextureHandle>("gbuffer_1");
+      const auto gbuffer_2 = registry_->get_resource<TextureHandle>("gbuffer_2");
+      const auto gbuffer_3 = registry_->get_resource<TextureHandle>("gbuffer_3");
+      const auto depth_image = registry_->get_resource<TextureHandle>("gbuffer_d");
 
       pipeline_ = PipelineBuilder()
                       .set_shaders(meshVertexShader, meshFragShader)
@@ -58,10 +58,10 @@ namespace gestalt {
     void DeferredPass::cleanup() { vkDestroyPipeline(gpu_.device, pipeline_, nullptr); }
 
     void DeferredPass::execute(VkCommandBuffer cmd) {
-      const auto gbuffer_1 = registry_->get_resource<AllocatedImage>("gbuffer_1");
-      const auto gbuffer_2 = registry_->get_resource<AllocatedImage>("gbuffer_2");
-      const auto gbuffer_3 = registry_->get_resource<AllocatedImage>("gbuffer_3");
-      const auto depth_image = registry_->get_resource<AllocatedImage>("gbuffer_d");
+      const auto gbuffer_1 = registry_->get_resource<TextureHandle>("gbuffer_1");
+      const auto gbuffer_2 = registry_->get_resource<TextureHandle>("gbuffer_2");
+      const auto gbuffer_3 = registry_->get_resource<TextureHandle>("gbuffer_3");
+      const auto depth_image = registry_->get_resource<TextureHandle>("gbuffer_d");
 
       VkClearValue depth_clear = {.depthStencil = {1.f, 0}};
       VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
@@ -96,8 +96,8 @@ namespace gestalt {
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
       VkDescriptorSet descriptorSets[]
-          = {resource_manager_->ibl_data.IblSet, resource_manager_->material_data.resource_set,
-             resource_manager_->material_data.constants_set,
+          = {resource_manager_->ibl_data.IblSet, repository_->material_data.resource_set,
+          repository_->material_data.constants_set,
              resource_manager_->scene_geometry_.vertex_set};
 
       gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
@@ -111,7 +111,7 @@ namespace gestalt {
       vkCmdSetViewport(cmd, 0, 1, &viewport_);
       vkCmdSetScissor(cmd, 0, 1, &scissor_);
 
-      for (auto& r : resource_manager_->main_draw_context_.opaque_surfaces) {
+      for (auto& r : repository_->main_draw_context_.opaque_surfaces) {
         GpuDrawPushConstants push_constants;
         push_constants.worldMatrix = r.transform;
         push_constants.material_id = r.material;
@@ -119,8 +119,8 @@ namespace gestalt {
                            sizeof(GpuDrawPushConstants), &push_constants);
         vkCmdDrawIndexed(cmd, r.index_count, 1, r.first_index, 0, 0);
       }
-      if (resource_manager_->config_.always_opaque) {
-        for (auto& r : resource_manager_->main_draw_context_.transparent_surfaces) {
+      if (registry_->config_.always_opaque) {
+        for (auto& r : repository_->main_draw_context_.transparent_surfaces) {
           GpuDrawPushConstants push_constants;
           push_constants.worldMatrix = r.transform;
           push_constants.material_id = r.material;
@@ -138,8 +138,8 @@ namespace gestalt {
 
       descriptor_layouts_.push_back(resource_manager_->per_frame_data_layout);
       descriptor_layouts_.push_back(resource_manager_->ibl_data.IblLayout);
-      descriptor_layouts_.push_back(resource_manager_->material_data.resource_layout);
-      descriptor_layouts_.push_back(resource_manager_->material_data.constants_layout);
+      descriptor_layouts_.push_back(repository_->material_data.resource_layout);
+      descriptor_layouts_.push_back(repository_->material_data.constants_layout);
       descriptor_layouts_.push_back(resource_manager_->scene_geometry_.vertex_layout);
 
       VkShaderModule fragShader;
@@ -156,10 +156,10 @@ namespace gestalt {
 
       VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
 
-      const auto gbuffer_1 = registry_->get_resource<AllocatedImage>("gbuffer_1");
-      const auto gbuffer_2 = registry_->get_resource<AllocatedImage>("gbuffer_2");
-      const auto gbuffer_3 = registry_->get_resource<AllocatedImage>("gbuffer_3");
-      const auto depth_image = registry_->get_resource<AllocatedImage>("gbuffer_d");
+      const auto gbuffer_1 = registry_->get_resource<TextureHandle>("gbuffer_1");
+      const auto gbuffer_2 = registry_->get_resource<TextureHandle>("gbuffer_2");
+      const auto gbuffer_3 = registry_->get_resource<TextureHandle>("gbuffer_3");
+      const auto depth_image = registry_->get_resource<TextureHandle>("gbuffer_d");
 
       pipeline_ = PipelineBuilder()
                       .set_shaders(taskShader, meshShader, fragShader)
@@ -183,10 +183,10 @@ namespace gestalt {
     void MeshletPass::cleanup() { vkDestroyPipeline(gpu_.device, pipeline_, nullptr); }
 
     void MeshletPass::execute(VkCommandBuffer cmd) {
-      const auto gbuffer_1 = registry_->get_resource<AllocatedImage>("gbuffer_1");
-      const auto gbuffer_2 = registry_->get_resource<AllocatedImage>("gbuffer_2");
-      const auto gbuffer_3 = registry_->get_resource<AllocatedImage>("gbuffer_3");
-      const auto depth_image = registry_->get_resource<AllocatedImage>("gbuffer_d");
+      const auto gbuffer_1 = registry_->get_resource<TextureHandle>("gbuffer_1");
+      const auto gbuffer_2 = registry_->get_resource<TextureHandle>("gbuffer_2");
+      const auto gbuffer_3 = registry_->get_resource<TextureHandle>("gbuffer_3");
+      const auto depth_image = registry_->get_resource<TextureHandle>("gbuffer_d");
 
       VkClearValue depth_clear = {.depthStencil = {1.f, 0}};
       VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
@@ -218,8 +218,8 @@ namespace gestalt {
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
       VkDescriptorSet descriptorSets[]
-          = {resource_manager_->ibl_data.IblSet, resource_manager_->material_data.resource_set,
-             resource_manager_->material_data.constants_set,
+          = {resource_manager_->ibl_data.IblSet, repository_->material_data.resource_set,
+             repository_->material_data.constants_set,
              resource_manager_->scene_geometry_.vertex_set};
 
       gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
@@ -234,7 +234,7 @@ namespace gestalt {
       vkCmdSetScissor(cmd, 0, 1, &scissor_);
 
       // wip
-      size_t maxCount = resource_manager_->main_draw_context_.opaque_surfaces.size();
+      size_t maxCount = repository_->main_draw_context_.opaque_surfaces.size();
 
       AllocatedBuffer countBuffer;
       AllocatedBuffer argumentBuffer;
@@ -251,8 +251,8 @@ namespace gestalt {
 
       descriptor_layouts_.push_back(resource_manager_->per_frame_data_layout);
       descriptor_layouts_.push_back(resource_manager_->ibl_data.IblLayout);
-      descriptor_layouts_.push_back(resource_manager_->material_data.resource_layout);
-      descriptor_layouts_.push_back(resource_manager_->material_data.constants_layout);
+      descriptor_layouts_.push_back(repository_->material_data.resource_layout);
+      descriptor_layouts_.push_back(repository_->material_data.constants_layout);
       descriptor_layouts_.emplace_back(DescriptorLayoutBuilder()
                                            .add_binding(10,
                                                         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -273,8 +273,8 @@ namespace gestalt {
 
       VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
 
-      const auto color_image = registry_->get_resource<AllocatedImage>("scene_opaque_color");
-      const auto depth_image = registry_->get_resource<AllocatedImage>("scene_opaque_depth");
+      const auto color_image = registry_->get_resource<TextureHandle>("scene_opaque_color");
+      const auto depth_image = registry_->get_resource<TextureHandle>("scene_opaque_depth");
 
       pipeline_ = PipelineBuilder()
                       .set_shaders(meshVertexShader, meshFragShader)
@@ -297,10 +297,10 @@ namespace gestalt {
       descriptor_set_
           = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(4));
 
-      const auto color_image = registry_->get_resource<AllocatedImage>("scene_opaque_color");
-      const auto depth_image = registry_->get_resource<AllocatedImage>("scene_opaque_depth");
+      const auto color_image = registry_->get_resource<TextureHandle>("scene_opaque_color");
+      const auto depth_image = registry_->get_resource<TextureHandle>("scene_opaque_depth");
 
-      const auto shadow_map = registry_->get_resource<AllocatedImage>("directional_shadow_map");
+      const auto shadow_map = registry_->get_resource<TextureHandle>("directional_shadow_map");
 
       VkRenderingAttachmentInfo colorAttachment
           = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -329,8 +329,8 @@ namespace gestalt {
                            VK_INDEX_TYPE_UINT32);
 
       VkDescriptorSet descriptorSets[]
-          = {resource_manager_->ibl_data.IblSet, resource_manager_->material_data.resource_set,
-             resource_manager_->material_data.constants_set, descriptor_set_};
+          = {resource_manager_->ibl_data.IblSet, repository_->material_data.resource_set,
+             repository_->material_data.constants_set, descriptor_set_};
 
       viewport_.width = static_cast<float>(depth_image->getExtent2D().width);
       viewport_.height = static_cast<float>(depth_image->getExtent2D().height);
@@ -350,7 +350,7 @@ namespace gestalt {
       vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 4,
                               descriptorSets, 0, nullptr);
 
-      for (auto& r : resource_manager_->main_draw_context_.transparent_surfaces) {
+      for (auto& r : repository_->main_draw_context_.transparent_surfaces) {
         GpuDrawPushConstants push_constants;
         push_constants.worldMatrix = r.transform;
         push_constants.material_id = r.material;
@@ -383,8 +383,8 @@ namespace gestalt {
 
       VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
 
-      const auto color_image = registry_->get_resource<AllocatedImage>("scene_final");
-      const auto depth_image = registry_->get_resource<AllocatedImage>("grid_depth");
+      const auto color_image = registry_->get_resource<TextureHandle>("scene_final");
+      const auto depth_image = registry_->get_resource<TextureHandle>("grid_depth");
 
       pipeline_ = PipelineBuilder()
                       .set_shaders(meshVertexShader, meshFragShader)
@@ -406,8 +406,8 @@ namespace gestalt {
     void DebugAabbPass::cleanup() {}
 
     void DebugAabbPass::execute(VkCommandBuffer cmd) {
-      const auto color_image = registry_->get_resource<AllocatedImage>("scene_final");
-      const auto depth_image = registry_->get_resource<AllocatedImage>("grid_depth");
+      const auto color_image = registry_->get_resource<TextureHandle>("scene_final");
+      const auto depth_image = registry_->get_resource<TextureHandle>("grid_depth");
 
       VkRenderingAttachmentInfo colorAttachment
           = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);

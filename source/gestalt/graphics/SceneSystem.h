@@ -30,8 +30,18 @@ namespace gestalt {
       std::shared_ptr<foundation::Repository> repository_;
     };
 
+    class MaterialSystem final : public SceneSystem {
+      graphics::descriptor_writer writer_;
+    public:
+      void create_defaults();
+      void prepare() override;
+      void update() override;
+      void cleanup() override;
+      void write_material(foundation::PbrMaterial& material, uint32_t material_id);
+    };
+
     class LightSystem final : public SceneSystem {
-      graphics::descriptor_writer writer;
+      graphics::descriptor_writer writer_;
 
       glm::mat4 calculate_sun_view_proj(const glm::vec3 direction) const;
       void update_directional_lights(std::unordered_map<foundation::entity, foundation::LightComponent>& lights);

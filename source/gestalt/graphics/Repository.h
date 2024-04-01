@@ -2,6 +2,7 @@
 
 #include "vk_types.h"
 #include "Components.h"
+#include "GpuResources.h"
 
 namespace gestalt {
   namespace foundation {
@@ -61,6 +62,8 @@ namespace gestalt {
 
       void remove(const size_t index) { data_.erase(data_.begin() + index); }
 
+      void clear() { data_.clear(); }
+
     private:
       std::vector<DataType> data_;
     };
@@ -78,24 +81,30 @@ namespace gestalt {
     class Repository {
     public:
       struct default_material {
-        AllocatedImage color_image;
-        AllocatedImage metallic_roughness_image;
-        AllocatedImage normal_image;
-        AllocatedImage emissive_image;
-        AllocatedImage occlusion_image;
+        TextureHandle color_image;
+        TextureHandle metallic_roughness_image;
+        TextureHandle normal_image;
+        TextureHandle emissive_image;
+        TextureHandle occlusion_image;
 
-        AllocatedImage error_checkerboard_image;
+        TextureHandle error_checkerboard_image;
 
         VkSampler linearSampler;
         VkSampler nearestSampler;
       } default_material_ = {};
+
+      MaterialData material_data;
+
+      DrawContext main_draw_context_;  // TODO replace with draw command buffer
 
       GpuDataContainer<GpuVertexPosition> vertex_positions;
       GpuDataContainer<GpuVertexData> vertex_data;
       GpuDataContainer<uint32_t> indices;
       GpuDataContainer<glm::mat4> model_matrices;
       GpuDataContainer<glm::mat4> light_view_projections;
-      GpuDataContainer<AllocatedImage> textures;
+      GpuDataContainer<GpuDirectionalLight> directional_lights;
+      GpuDataContainer<GpuPointLight> point_lights;
+      GpuDataContainer<TextureHandle> textures;
       GpuDataContainer<VkSampler> samplers;
       GpuDataContainer<Material> materials;
       GpuDataContainer<Mesh> meshes;

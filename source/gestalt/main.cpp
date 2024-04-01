@@ -2,9 +2,7 @@
 
 int main(int argc, char* argv[]) {
 
-  using namespace gestalt;
-
-  RenderEngine engine;
+  gestalt::RenderEngine engine;
 
   engine.init();
 

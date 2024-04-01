@@ -4,6 +4,8 @@
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/transform.hpp>
 
+#include "GpuResources.h"
+
 
 namespace gestalt {
   namespace foundation {
@@ -110,26 +112,23 @@ namespace gestalt {
       static_assert(sizeof(MaterialConstants) == 64);
 
       struct MaterialResources {
-        AllocatedImage albedo_image;
+        TextureHandle albedo_image;
         VkSampler albedo_sampler;
-        AllocatedImage metal_rough_image;
+        TextureHandle metal_rough_image;
         VkSampler metal_rough_sampler;
-        AllocatedImage normal_image;
+        TextureHandle normal_image;
         VkSampler normal_sampler;
-        AllocatedImage emissive_image;
+        TextureHandle emissive_image;
         VkSampler emissive_sampler;
-        AllocatedImage occlusion_image;
+        TextureHandle occlusion_image;
         VkSampler occlusion_sampler;
       } resources;
-    };
-
-    struct MaterialComponent {
-      size_t material;
     };
 
     struct Material {
       std::string name;
       PbrMaterial config;
+      bool is_dirty = true;
     };
 
     struct TransformComponent {

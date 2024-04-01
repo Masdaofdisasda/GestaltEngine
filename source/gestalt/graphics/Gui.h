@@ -1,10 +1,13 @@
 ﻿#pragma once
 
 #include "vk_types.h"
-#include "DeletionService.h"
 #include "Gpu.h"
 #include "vk_swapchain.h"
 #include "SceneManger.h"
+
+namespace gestalt::graphics {
+  struct RenderConfig;
+}
 
 namespace gestalt {
   namespace application {
@@ -16,12 +19,10 @@ namespace gestalt {
 
     struct GuiCapabilities {
       std::function<void()> exit;
-      std::function<void()> add_camera;
       std::function<void(std::string)> load_gltf;
       std::function<foundation::EngineStats&()> get_stats;
-      std::function<foundation::PerFrameData&()> get_scene_data;
-      std::function<ComponentArchetypeFactory&()> get_component_factory;
-      std::function<foundation::RenderConfig&()> get_render_config;
+      std::function<ComponentFactory&()> get_component_factory;
+      std::function<graphics::RenderConfig&()> get_render_config;
     };
 
     class Gui {

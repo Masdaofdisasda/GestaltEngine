@@ -32,7 +32,7 @@ namespace gestalt {
       VkShaderModule bright_pass_shader;
       vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &bright_pass_shader);
 
-      const auto color_image = registry_->get_resource<AllocatedImage>("scene_bright");
+      const auto color_image = registry_->get_resource<TextureHandle>("scene_bright");
 
       pipeline_ = PipelineBuilder()
                       .set_shaders(vertex_shader, bright_pass_shader)
@@ -51,8 +51,8 @@ namespace gestalt {
       descriptor_set_
           = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(0));
 
-      const auto scene_ssao = registry_->get_resource<AllocatedImage>("scene_ssao");
-      const auto color_image = registry_->get_resource<AllocatedImage>("scene_bright");
+      const auto scene_ssao = registry_->get_resource<TextureHandle>("scene_ssao");
+      const auto color_image = registry_->get_resource<TextureHandle>("scene_bright");
 
       VkRenderingAttachmentInfo newColorAttachment
           = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -104,7 +104,7 @@ namespace gestalt {
       VkShaderModule blur_y_shader;
       vkutil::load_shader_module(fragment_blur_y.c_str(), gpu_.device, &blur_y_shader);
 
-      const auto color_image = registry_->get_resource<AllocatedImage>("scene_brightness_filtered");
+      const auto color_image = registry_->get_resource<TextureHandle>("scene_brightness_filtered");
 
       auto builder = PipelineBuilder()
                          .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
@@ -123,10 +123,10 @@ namespace gestalt {
     }
 
     void BloomBlurPass::execute(VkCommandBuffer cmd) {
-      const auto image_x = registry_->get_resource<AllocatedImage>("scene_brightness_filtered");
-      const auto image_y = registry_->get_resource<AllocatedImage>("bloom_blur_y");
+      const auto image_x = registry_->get_resource<TextureHandle>("scene_brightness_filtered");
+      const auto image_y = registry_->get_resource<TextureHandle>("bloom_blur_y");
 
-      for (int i = 0; i < resource_manager_->config_.bloom_quality; i++) {
+      for (int i = 0; i < registry_->config_.bloom_quality; i++) {
         {
           blur_x_descriptor_set_ = resource_manager_->descriptor_pool->allocate(
               gpu_.device, descriptor_layouts_.at(0));
@@ -221,7 +221,7 @@ namespace gestalt {
       VkShaderModule streak_shader;
       vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &streak_shader);
 
-      const auto color_image = registry_->get_resource<AllocatedImage>("scene_bloom");
+      const auto color_image = registry_->get_resource<TextureHandle>("scene_bloom");
 
       pipeline_ = PipelineBuilder()
                       .set_shaders(vertex_shader, streak_shader)
@@ -240,9 +240,9 @@ namespace gestalt {
       descriptor_set_
           = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(0));
 
-      const auto scene_bloom = registry_->get_resource<AllocatedImage>("scene_bloom");
+      const auto scene_bloom = registry_->get_resource<TextureHandle>("scene_bloom");
       const auto color_image
-          = registry_->get_resource<AllocatedImage>("bloom_blurred_intermediate");
+          = registry_->get_resource<TextureHandle>("bloom_blurred_intermediate");
 
       VkRenderingAttachmentInfo newColorAttachment
           = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -267,7 +267,7 @@ namespace gestalt {
       vkCmdSetScissor(cmd, 0, 1, &scissor_);
 
       vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                         sizeof(RenderConfig::StreaksParams), &resource_manager_->config_.streaks);
+                         sizeof(RenderConfig::StreaksParams), &registry_->config_.streaks);
       vkCmdDraw(cmd, 3, 1, 0, 0);
       vkCmdEndRendering(cmd);
     }
@@ -299,7 +299,7 @@ namespace gestalt {
       VkShaderModule luminance_shader;
       vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &luminance_shader);
 
-      const auto color_image = registry_->get_resource<AllocatedImage>("lum_64");
+      const auto color_image = registry_->get_resource<TextureHandle>("lum_64");
 
       pipeline_ = PipelineBuilder()
                       .set_shaders(vertex_shader, luminance_shader)
@@ -323,8 +323,8 @@ namespace gestalt {
       descriptor_set_
           = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(0));
 
-      const auto scene_color = registry_->get_resource<AllocatedImage>("scene_ssao");
-      const auto color_image = registry_->get_resource<AllocatedImage>("lum_64");
+      const auto scene_color = registry_->get_resource<TextureHandle>("scene_ssao");
+      const auto color_image = registry_->get_resource<TextureHandle>("lum_64");
 
       vkutil::transition_read(cmd, *scene_color);
      vkutil::transition_write(cmd, *color_image);
@@ -376,7 +376,7 @@ namespace gestalt {
       VkShaderModule downscale_shader;
       vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &downscale_shader);
 
-      const auto color_image = registry_->get_resource<AllocatedImage>("lum_64");
+      const auto color_image = registry_->get_resource<TextureHandle>("lum_64");
 
       pipeline_ = PipelineBuilder()
                       .set_shaders(vertex_shader, downscale_shader)
@@ -401,17 +401,17 @@ namespace gestalt {
         descriptor_set_
             = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(0));
 
-        std::shared_ptr<AllocatedImage> scene_color;
+        std::shared_ptr<TextureHandle> scene_color;
         if (i == 0) {
           scene_color
-              = registry_->get_resource<AllocatedImage>(deps_.read_resources.at(i)->getId());
+              = registry_->get_resource<TextureHandle>(deps_.read_resources.at(i)->getId());
         } else {
-          scene_color = registry_->get_resource<AllocatedImage>(
+          scene_color = registry_->get_resource<TextureHandle>(
               deps_.write_resources.at(i - 1).second->getId());
         }
 
         const auto color_image
-            = registry_->get_resource<AllocatedImage>(deps_.write_resources.at(i).second->getId());
+            = registry_->get_resource<TextureHandle>(deps_.write_resources.at(i).second->getId());
 
         vkutil::transition_read(cmd, *scene_color);
         vkutil::transition_write(cmd, *color_image);
@@ -469,7 +469,7 @@ namespace gestalt {
       vkutil::load_shader_module(adaptation_fragment_shader_source_.c_str(), gpu_.device,
                                  &adaptation_shader);
 
-      const auto color_image = registry_->get_resource<AllocatedImage>("lum_64");
+      const auto color_image = registry_->get_resource<TextureHandle>("lum_64");
 
       pipeline_ = PipelineBuilder()
                       .set_shaders(vertex_shader, adaptation_shader)
@@ -493,11 +493,11 @@ namespace gestalt {
       descriptor_set_
           = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(0));
 
-      const auto current_lum = registry_->get_resource<AllocatedImage>("lum_1_final");
-      std::shared_ptr<AllocatedImage> avg_lum
-          = registry_->get_resource<AllocatedImage>("lum_1_avg");
-      std::shared_ptr<AllocatedImage> new_lum
-          = registry_->get_resource<AllocatedImage>("lum_1_new");
+      const auto current_lum = registry_->get_resource<TextureHandle>("lum_1_final");
+      std::shared_ptr<TextureHandle> avg_lum
+          = registry_->get_resource<TextureHandle>("lum_1_avg");
+      std::shared_ptr<TextureHandle> new_lum
+          = registry_->get_resource<TextureHandle>("lum_1_new");
 
       vkutil::transition_read(cmd, *current_lum);
       vkutil::transition_read(cmd, *avg_lum);
@@ -529,7 +529,7 @@ namespace gestalt {
       vkCmdSetScissor(cmd, 0, 1, &scissor_);
       vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                          sizeof(RenderConfig::LightAdaptationParams),
-                         &resource_manager_->config_.light_adaptation);
+                         &registry_->config_.light_adaptation);
       vkCmdDraw(cmd, 3, 1, 0, 0);
       vkCmdEndRendering(cmd);
 
@@ -569,7 +569,7 @@ namespace gestalt {
       VkShaderModule final_shader;
       vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &final_shader);
 
-      const auto color_image = registry_->get_resource<AllocatedImage>("hdr_final");
+      const auto color_image = registry_->get_resource<TextureHandle>("hdr_final");
 
       pipeline_ = PipelineBuilder()
                       .set_shaders(vertex_shader, final_shader)
@@ -588,11 +588,11 @@ namespace gestalt {
       descriptor_set_
           = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(0));
 
-      const auto scene_color = registry_->get_resource<AllocatedImage>("scene_ssao");
-      const auto scene_bloom = registry_->get_resource<AllocatedImage>("scene_streak");
-      const auto color_image = registry_->get_resource<AllocatedImage>("hdr_final");
-      const auto lum_image = registry_->get_resource<AllocatedImage>("lum_1_adapted");
-      const auto depth_image = registry_->get_resource<AllocatedImage>("directional_shadow_map");
+      const auto scene_color = registry_->get_resource<TextureHandle>("scene_ssao");
+      const auto scene_bloom = registry_->get_resource<TextureHandle>("scene_streak");
+      const auto color_image = registry_->get_resource<TextureHandle>("hdr_final");
+      const auto lum_image = registry_->get_resource<TextureHandle>("lum_1_adapted");
+      const auto depth_image = registry_->get_resource<TextureHandle>("directional_shadow_map");
 
       VkRenderingAttachmentInfo newColorAttachment
           = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -626,7 +626,7 @@ namespace gestalt {
       vkCmdSetViewport(cmd, 0, 1, &viewport_);
       vkCmdSetScissor(cmd, 0, 1, &scissor_);
       vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                         sizeof(RenderConfig::HdrParams), &resource_manager_->config_.hdr);
+                         sizeof(RenderConfig::HdrParams), &registry_->config_.hdr);
       vkCmdDraw(cmd, 3, 1, 0, 0);
       vkCmdEndRendering(cmd);
     }

@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "Gui.h"
+#include "RenderConfig.h"
 #include "Repository.h"
 #include "vk_swapchain.h"
 #include "vk_sync.h"
@@ -24,7 +25,7 @@ namespace gestalt {
       float scale_ = 1.0f;
       VkExtent2D extent_ = {0, 0};
 
-      std::shared_ptr<foundation::AllocatedImage> image_;
+      std::shared_ptr<foundation::TextureHandle> image_;
 
     public:
       ColorImageResource(std::string id, VkExtent2D extent) : id(std::move(id)), extent_(extent) {}
@@ -34,7 +35,7 @@ namespace gestalt {
       std::string getId() const override { return id; }
       float get_scale() const { return scale_; }
       VkExtent2D get_extent() const { return extent_; }
-      void set_image(const std::shared_ptr<foundation::AllocatedImage>& image) { image_ = image; }
+      void set_image(const std::shared_ptr<foundation::TextureHandle>& image) { image_ = image; }
     };
 
     class DepthImageResource final : public ShaderResource {
@@ -43,7 +44,7 @@ namespace gestalt {
       float scale_ = 1.0f;
       VkExtent2D extent_ = {0, 0};
 
-      std::shared_ptr<foundation::AllocatedImage> image_;
+      std::shared_ptr<foundation::TextureHandle> image_;
 
     public:
       DepthImageResource(std::string id, VkExtent2D extent) : id(std::move(id)), extent_(extent) {}
@@ -52,7 +53,7 @@ namespace gestalt {
       std::string getId() const override { return id; }
       float get_scale() const { return scale_; }
       VkExtent2D get_extent() const { return extent_; }
-      void set_image(const std::shared_ptr<foundation::AllocatedImage>& image) { image_ = image; }
+      void set_image(const std::shared_ptr<foundation::TextureHandle>& image) { image_ = image; }
     };
 
     class BufferResource final : public ShaderResource {
@@ -71,8 +72,11 @@ namespace gestalt {
       std::vector<std::pair<std::string, std::shared_ptr<ShaderResource>>> write_resources;
     };
 
-    class RenderResourceRegistry {
+    class ResourceRegistry {
     public:
+      RenderConfig config_;
+      PerFrameData per_frame_data_;
+
       template <typename T> void add_resource(const std::string& id, std::shared_ptr<T> resource) {
         resources_[id] = resource;
       }
@@ -106,13 +110,13 @@ namespace gestalt {
       std::unordered_map<std::string, std::string> direct_original_mapping;
 
     private:
-      std::unordered_map<std::string, std::shared_ptr<foundation::AllocatedImage>> resources_;
+      std::unordered_map<std::string, std::shared_ptr<TextureHandle>> resources_;
     };
 
     class RenderPass {
     public:
       void init(const Gpu& gpu, const std::shared_ptr<ResourceManager>& resource_manager,
-                const std::shared_ptr<RenderResourceRegistry>& registry,
+                const std::shared_ptr<ResourceRegistry>& registry,
                 const std::shared_ptr<foundation::Repository>& repository) {
         gpu_ = gpu;
         resource_manager_ = resource_manager;
@@ -132,7 +136,7 @@ namespace gestalt {
 
       Gpu gpu_ = {};
       std::shared_ptr<ResourceManager> resource_manager_;
-      std::shared_ptr<RenderResourceRegistry> registry_;
+      std::shared_ptr<ResourceRegistry> registry_;
       std::shared_ptr<foundation::Repository> repository_;
     };
 
@@ -146,8 +150,8 @@ namespace gestalt {
       std::shared_ptr<foundation::Repository> repository_;
       std::shared_ptr<application::Gui> imgui_;
 
-      std::shared_ptr<RenderResourceRegistry> resource_registry_
-          = std::make_shared<RenderResourceRegistry>();
+      std::shared_ptr<ResourceRegistry> resource_registry_
+          = std::make_shared<ResourceRegistry>();
 
       std::shared_ptr<VkSwapchain> swapchain_ = std::make_unique<VkSwapchain>();
       std::unique_ptr<VkCommand> commands_ = std::make_unique<VkCommand>();
@@ -194,6 +198,7 @@ namespace gestalt {
 
       void cleanup();
 
+      RenderConfig& get_config() { return resource_registry_->config_; }
       vk_sync& get_sync() const { return *sync_; }
       VkCommand& get_commands() const { return *commands_; }
       std::shared_ptr<VkSwapchain> get_swapchain() const { return swapchain_; }

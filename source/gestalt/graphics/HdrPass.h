@@ -16,7 +16,7 @@ namespace gestalt {
       VkPushConstantRange push_constant_range{
           .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
           .offset = 0,
-          .size = sizeof(foundation::RenderConfig::HdrParams),
+          .size = sizeof(RenderConfig::HdrParams),
       };
 
       VkViewport viewport_{
@@ -106,7 +106,7 @@ namespace gestalt {
       VkPushConstantRange push_constant_range_{
           .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
           .offset = 0,
-          .size = sizeof(foundation::RenderConfig::StreaksParams),
+          .size = sizeof(RenderConfig::StreaksParams),
       };
 
       VkViewport viewport_{
@@ -127,7 +127,7 @@ namespace gestalt {
              .write_resources = {{"scene_streak", std::make_shared<ColorImageResource>(
                                                       "bloom_blurred_intermediate", 1.0f)}}};
 
-      foundation::AllocatedImage streak_pattern;
+      foundation::TextureHandle streak_pattern;
       descriptor_writer writer;
 
       VkPipeline pipeline_ = nullptr;
@@ -230,7 +230,7 @@ namespace gestalt {
       VkPushConstantRange push_constant_range_{
           .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
           .offset = 0,
-          .size = sizeof(foundation::RenderConfig::LightAdaptationParams),
+          .size = sizeof(RenderConfig::LightAdaptationParams),
       };
 
       VkViewport viewport_{
@@ -273,7 +273,7 @@ namespace gestalt {
       VkPushConstantRange push_constant_range{
           .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
           .offset = 0,
-          .size = sizeof(foundation::RenderConfig::HdrParams),
+          .size = sizeof(RenderConfig::HdrParams),
       };
 
       VkViewport viewport_{

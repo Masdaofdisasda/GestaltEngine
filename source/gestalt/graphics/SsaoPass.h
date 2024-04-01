@@ -16,7 +16,7 @@ namespace gestalt {
       VkPushConstantRange push_constant_range_{
           .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
           .offset = 0,
-          .size = sizeof(foundation::RenderConfig::SsaoParams),
+          .size = sizeof(RenderConfig::SsaoParams),
       };
 
       VkViewport viewport_{
@@ -32,7 +32,7 @@ namespace gestalt {
           .extent = extent_,
       };
 
-      foundation::AllocatedImage rotation_pattern;
+      foundation::TextureHandle rotation_pattern;
       ShaderPassDependencyInfo deps_
           = {.read_resources = {{std::make_shared<DepthImageResource>("grid_depth", 1.0f)}},
              .write_resources = {{"color_ssao_filtered", std::make_shared<ColorImageResource>(
@@ -107,7 +107,7 @@ namespace gestalt {
       VkPushConstantRange push_constant_range_{
           .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
           .offset = 0,
-          .size = sizeof(foundation::RenderConfig::SsaoParams),
+          .size = sizeof(RenderConfig::SsaoParams),
       };
 
       VkViewport viewport_{

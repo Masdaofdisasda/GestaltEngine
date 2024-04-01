@@ -21,7 +21,7 @@ namespace gestalt {
       VkPushConstantRange push_constant_range_{
           .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
           .offset = 0,
-          .size = sizeof(foundation::RenderConfig::SkyboxParams),
+          .size = sizeof(RenderConfig::SkyboxParams),
       };
 
       VkViewport viewport_{
@@ -59,7 +59,7 @@ namespace gestalt {
       VkPushConstantRange push_constant_range{
           .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
           .offset = 0,
-          .size = sizeof(foundation::RenderConfig::GridParams),
+          .size = sizeof(RenderConfig::GridParams),
       };
 
       VkViewport viewport_{

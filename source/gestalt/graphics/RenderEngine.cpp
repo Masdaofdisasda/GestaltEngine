@@ -40,9 +40,9 @@ namespace gestalt {
 
     resource_manager_->init(gpu_, repository_);
 
-    frame_graph_->init(gpu_, window_, resource_manager_, repository_, imgui_);
-
     scene_manager_->init(gpu_, resource_manager_, repository_);
+
+    frame_graph_->init(gpu_, window_, resource_manager_, repository_, imgui_);
 
     register_gui_actions();
     imgui_->init(gpu_, window_, frame_graph_->get_swapchain(), repository_, gui_actions_);
@@ -60,21 +60,14 @@ namespace gestalt {
 
   void RenderEngine::register_gui_actions() {
     gui_actions_.exit = [this]() { quit_ = true; };
-    gui_actions_.add_camera = [this]() {
-      auto free_fly_camera_ptr = std::make_unique<FreeFlyCamera>();
-      free_fly_camera_ptr->init(glm::vec3(0, 0, 0), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
-      camera_positioners_.push_back(std::move(free_fly_camera_ptr));
-    };
     gui_actions_.load_gltf
         = [this](std::string path) { scene_manager_->request_scene(std::move(path)); };
     gui_actions_.get_stats = [this]() -> foundation::EngineStats& { return stats_; };
-    gui_actions_.get_scene_data
-        = [this]() -> foundation::PerFrameData& { return resource_manager_->per_frame_data_; };
-    gui_actions_.get_component_factory = [this]() -> application::ComponentArchetypeFactory& {
+    gui_actions_.get_component_factory = [this]() -> application::ComponentFactory& {
       return scene_manager_->get_component_factory();
     };
     gui_actions_.get_render_config
-        = [this]() -> foundation::RenderConfig& { return resource_manager_->config_; };
+        = [this]() -> graphics::RenderConfig& { return frame_graph_->get_config(); };
   }
 
   void RenderEngine::immediate_submit(std::function<void(VkCommandBuffer cmd)> function) {
@@ -135,7 +128,7 @@ namespace gestalt {
     camera.view_matrix = view;
     camera.projection_matrix = projection;
 
-    resource_manager_->config_.light_adaptation.delta_time
+    frame_graph_->get_config().light_adaptation.delta_time
         = time_tracking_service_.get_delta_time();
 
     scene_manager_->update_scene();

@@ -20,7 +20,7 @@ namespace gestalt {
     using namespace gestalt::foundation;
 
     void AssetLoader::init(const std::shared_ptr<graphics::ResourceManager>& resource_manager,
-                           const std::shared_ptr<ComponentArchetypeFactory>& component_factory,
+                           const std::shared_ptr<ComponentFactory>& component_factory,
                            const std::shared_ptr<Repository>& repository) {
       resource_manager_ = resource_manager;
       repository_ = repository;
@@ -151,9 +151,9 @@ namespace gestalt {
       }
     }
 
-    std::optional<AllocatedImage> AssetLoader::load_image(fastgltf::Asset& asset,
+    std::optional<TextureHandle> AssetLoader::load_image(fastgltf::Asset& asset,
                                                           fastgltf::Image& image) const {
-      AllocatedImage newImage = {};
+      TextureHandle newImage = {};
       int width = 0, height = 0, nr_channels = 0;
 
       const std::function<void(unsigned char*)> create_image = [&](unsigned char* data) {
@@ -219,7 +219,7 @@ namespace gestalt {
     void AssetLoader::import_textures(fastgltf::Asset& gltf) const {
       fmt::print("importing textures\n");
       for (fastgltf::Image& image : gltf.images) {
-        std::optional<AllocatedImage> img = load_image(gltf, image);
+        std::optional<TextureHandle> img = load_image(gltf, image);
 
         if (img.has_value()) {
           size_t image_id = repository_->textures.add(img.value());
@@ -231,25 +231,24 @@ namespace gestalt {
       }
     }
 
-    size_t AssetLoader::create_material(PbrMaterial& config, const std::string& name) const {
+    size_t AssetLoader::create_material(const PbrMaterial& config, const std::string& name) const {
       const size_t material_id = repository_->materials.size();
       fmt::print("creating material {}, mat_id {}\n", name, material_id);
 
       const std::string key = name.empty() ? "material_" + std::to_string(material_id) : name;
-      resource_manager_->write_material(config, material_id);
 
       repository_->materials.add(Material{.name = key, .config = config});
 
       return material_id;
     }
 
-    std::tuple<AllocatedImage, VkSampler> AssetLoader::get_textures(
+    std::tuple<TextureHandle, VkSampler> AssetLoader::get_textures(
         const fastgltf::Asset& gltf, const size_t& texture_index, const size_t& image_offset,
         const size_t& sampler_offset) const {
       const size_t image_index = gltf.textures[texture_index].imageIndex.value();
       const size_t sampler_index = gltf.textures[texture_index].samplerIndex.value();
 
-      AllocatedImage image = repository_->textures.get(image_index + image_offset);
+      TextureHandle image = repository_->textures.get(image_index + image_offset);
       VkSampler sampler = repository_->samplers.get(sampler_index + sampler_offset);
       return std::make_tuple(image, sampler);
     }

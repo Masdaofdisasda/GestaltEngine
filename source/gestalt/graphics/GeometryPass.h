@@ -24,7 +24,7 @@ namespace gestalt {
       VkPushConstantRange push_constant_range_{
           .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
           .offset = 0,
-          .size = sizeof(foundation::GpuDrawPushConstants),
+          .size = sizeof(GpuDrawPushConstants),
       };
 
       VkViewport viewport_{
@@ -104,7 +104,7 @@ namespace gestalt {
       VkPushConstantRange push_constant_range_{
           .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
           .offset = 0,
-          .size = sizeof(foundation::GpuDrawPushConstants),
+          .size = sizeof(GpuDrawPushConstants),
       };
 
       VkViewport viewport_{

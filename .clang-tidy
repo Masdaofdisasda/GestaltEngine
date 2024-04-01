@@ -6,6 +6,7 @@ Checks: >
   -altera-struct-pack-align,
   -cppcoreguidelines-pro-bounds-pointer-arithmetic,  
   -llvm-include-order,
+  -llvmlibc-restrict-system-libc-headers,
   -google-runtime-references,
   -hicpp-no-array-decay,
   -cert-err58-cpp,

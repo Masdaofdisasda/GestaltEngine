@@ -12,7 +12,7 @@
 #include <glm/gtc/random.hpp>
 
 #include "vk_initializers.h"
-
+#include "RenderConfig.h"
 
 namespace gestalt {
   namespace application {
@@ -245,7 +245,7 @@ namespace gestalt {
 
           if (ImGui::BeginMenu("Add Camera")) {
             if (ImGui::MenuItem("Free Fly Camera")) {
-              actions_.add_camera();
+              //actions_.add_camera();
             }
             if (ImGui::MenuItem("Orbit Camera")) {
               // Code to add an Orbit Camera
@@ -801,6 +801,8 @@ namespace gestalt {
         auto& material = repository_->materials.get(surface.material);
         if (ImGui::TreeNode(material.name.c_str())) {
           auto& config = material.config;
+
+          material.is_dirty = true;
 
           // TODO update materials based on GUI changes
           if (ImGui::CollapsingHeader("Albedo", ImGuiTreeNodeFlags_DefaultOpen)) {

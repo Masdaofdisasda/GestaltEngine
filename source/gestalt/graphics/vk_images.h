@@ -6,14 +6,14 @@
 
 namespace gestalt {
   namespace foundation {
-    class AllocatedImage;
+    class TextureHandle;
   }
 
   namespace graphics {
 
     namespace vkutil {
-      void transition_read(VkCommandBuffer cmd, foundation::AllocatedImage& image);
-      void transition_write(VkCommandBuffer cmd, foundation::AllocatedImage& image);
+      void transition_read(VkCommandBuffer cmd, foundation::TextureHandle& image);
+      void transition_write(VkCommandBuffer cmd, foundation::TextureHandle& image);
       void transition_image(VkCommandBuffer cmd, VkImage image, VkImageLayout currentLayout,
                             VkImageLayout newLayout);
       void copy_image_to_image(VkCommandBuffer cmd, VkImage source, VkImage destination,

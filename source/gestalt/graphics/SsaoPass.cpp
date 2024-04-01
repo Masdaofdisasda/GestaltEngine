@@ -36,7 +36,7 @@ namespace gestalt {
       VkShaderModule ssao_filter_shader;
       vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &ssao_filter_shader);
 
-      const auto color_image = registry_->get_resource<AllocatedImage>("color_ssao_filter");
+      const auto color_image = registry_->get_resource<TextureHandle>("color_ssao_filter");
 
       pipeline_ = PipelineBuilder()
                       .set_shaders(vertex_shader, ssao_filter_shader)
@@ -55,8 +55,8 @@ namespace gestalt {
       descriptor_set_
           = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(0));
 
-      const auto scene_depth = registry_->get_resource<AllocatedImage>("grid_depth");
-      const auto color_image = registry_->get_resource<AllocatedImage>("color_ssao_filter");
+      const auto scene_depth = registry_->get_resource<TextureHandle>("grid_depth");
+      const auto color_image = registry_->get_resource<TextureHandle>("color_ssao_filter");
 
       VkRenderingAttachmentInfo newColorAttachment
           = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -81,7 +81,7 @@ namespace gestalt {
       vkCmdSetScissor(cmd, 0, 1, &scissor_);
 
       vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                         sizeof(RenderConfig::SsaoParams), &resource_manager_->config_.ssao);
+                         sizeof(RenderConfig::SsaoParams), &registry_->config_.ssao);
       vkCmdDraw(cmd, 3, 1, 0, 0);
 
       vkCmdEndRendering(cmd);
@@ -116,7 +116,7 @@ namespace gestalt {
       VkShaderModule ssao_blur_y_shader;
       vkutil::load_shader_module(fragment_blur_y.c_str(), gpu_.device, &ssao_blur_y_shader);
 
-      const auto color_image = registry_->get_resource<AllocatedImage>("color_ssao_filtered");
+      const auto color_image = registry_->get_resource<TextureHandle>("color_ssao_filtered");
 
       PipelineBuilder builder
           = PipelineBuilder()
@@ -136,10 +136,10 @@ namespace gestalt {
     }
 
     void SsaoBlurPass::execute(VkCommandBuffer cmd) {
-      const auto image_x = registry_->get_resource<AllocatedImage>("color_ssao_filtered");
-      const auto image_y = registry_->get_resource<AllocatedImage>("ssao_blur_y");
+      const auto image_x = registry_->get_resource<TextureHandle>("color_ssao_filtered");
+      const auto image_y = registry_->get_resource<TextureHandle>("ssao_blur_y");
 
-      for (int i = 0; i < resource_manager_->config_.ssao_quality; ++i) {
+      for (int i = 0; i < registry_->config_.ssao_quality; ++i) {
         {
           blur_x_descriptor_set_ = resource_manager_->descriptor_pool->allocate(
               gpu_.device, descriptor_layouts_.at(0));
@@ -229,7 +229,7 @@ namespace gestalt {
       VkShaderModule ssao_final_shader;
       vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &ssao_final_shader);
 
-      const auto color_image = registry_->get_resource<AllocatedImage>("scene_ssao_final");
+      const auto color_image = registry_->get_resource<TextureHandle>("scene_ssao_final");
 
       pipeline_ = PipelineBuilder()
                       .set_shaders(vertex_shader, ssao_final_shader)
@@ -248,9 +248,9 @@ namespace gestalt {
       descriptor_set_
           = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(0));
 
-      const auto scene_color = registry_->get_resource<AllocatedImage>("grid_color");
-      const auto scene_ssao = registry_->get_resource<AllocatedImage>("scene_ssao_final");
-      const auto ssao_blurred = registry_->get_resource<AllocatedImage>("ssao_blurred_final");
+      const auto scene_color = registry_->get_resource<TextureHandle>("grid_color");
+      const auto scene_ssao = registry_->get_resource<TextureHandle>("scene_ssao_final");
+      const auto ssao_blurred = registry_->get_resource<TextureHandle>("ssao_blurred_final");
 
       VkRenderingAttachmentInfo newColorAttachment
           = vkinit::attachment_info(scene_ssao->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -277,7 +277,7 @@ namespace gestalt {
       vkCmdSetViewport(cmd, 0, 1, &viewport_);
       vkCmdSetScissor(cmd, 0, 1, &scissor_);
       vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                         sizeof(RenderConfig::SsaoParams), &resource_manager_->config_.ssao);
+                         sizeof(RenderConfig::SsaoParams), &registry_->config_.ssao);
       vkCmdDraw(cmd, 3, 1, 0, 0);
       vkCmdEndRendering(cmd);
     }

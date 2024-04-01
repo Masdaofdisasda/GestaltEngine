@@ -35,7 +35,7 @@ namespace gestalt {
 
       VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
 
-      const auto depth_image = registry_->get_resource<AllocatedImage>("directional_depth");
+      const auto depth_image = registry_->get_resource<TextureHandle>("directional_depth");
 
       pipeline_ = PipelineBuilder()
                       .set_shaders(meshVertexShader, meshFragShader)
@@ -60,7 +60,7 @@ namespace gestalt {
       descriptor_set_
           = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(1));
 
-      const auto depth_image = registry_->get_resource<AllocatedImage>("directional_depth");
+      const auto depth_image = registry_->get_resource<TextureHandle>("directional_depth");
 
       VkClearValue depth_clear = {.depthStencil = {1.f, 0}};
       VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
@@ -74,17 +74,17 @@ namespace gestalt {
       {
         // TODO this should be done elsewhere
         auto& cam = repository_->cameras.get(0);
-        resource_manager_->per_frame_data_.proj = cam.projection_matrix;
-        resource_manager_->per_frame_data_.view = cam.view_matrix;
-        resource_manager_->per_frame_data_.viewproj = cam.projection_matrix * cam.view_matrix;
-        resource_manager_->per_frame_data_.inv_viewproj
+        registry_->per_frame_data_.proj = cam.projection_matrix;
+        registry_->per_frame_data_.view = cam.view_matrix;
+        registry_->per_frame_data_.viewproj = cam.projection_matrix * cam.view_matrix;
+        registry_->per_frame_data_.inv_viewproj
             = glm::inverse(cam.projection_matrix * cam.view_matrix);
 
         void* mapped_data;
         VmaAllocation allocation = resource_manager_->per_frame_data_buffer.allocation;
         VK_CHECK(vmaMapMemory(gpu_.allocator, allocation, &mapped_data));
         const auto scene_uniform_data = static_cast<PerFrameData*>(mapped_data);
-        *scene_uniform_data = resource_manager_->per_frame_data_;
+        *scene_uniform_data = registry_->per_frame_data_;
         vmaUnmapMemory(gpu_.allocator, resource_manager_->per_frame_data_buffer.allocation);
       }
 
@@ -129,7 +129,7 @@ namespace gestalt {
 
       // Depth bias (and slope) are used to avoid shadowing artifacts
       // Constant depth bias factor (always applied)
-      float depthBiasConstant = resource_manager_->config_.shadow.shadow_bias;
+      float depthBiasConstant = registry_->config_.shadow.shadow_bias;
       // Slope depth bias factor, applied depending on polygon's slope
       float depthBiasSlope = 1.75f;
       vkCmdSetDepthBias(cmd, depthBiasConstant, 0.0f, depthBiasSlope);
@@ -139,7 +139,7 @@ namespace gestalt {
       vkCmdSetViewport(cmd, 0, 1, &viewport_);
       vkCmdSetScissor(cmd, 0, 1, &scissor_);
 
-      for (auto& r : resource_manager_->main_draw_context_.opaque_surfaces) {
+      for (auto& r : repository_->main_draw_context_.opaque_surfaces) {
         GpuDrawPushConstants push_constants;
         push_constants.worldMatrix = r.transform;
         push_constants.material_id = r.material;
@@ -147,7 +147,7 @@ namespace gestalt {
                            sizeof(GpuDrawPushConstants), &push_constants);
         vkCmdDrawIndexed(cmd, r.index_count, 1, r.first_index, 0, 0);
       }
-      for (auto& r : resource_manager_->main_draw_context_.transparent_surfaces) {
+      for (auto& r : repository_->main_draw_context_.transparent_surfaces) {
         GpuDrawPushConstants push_constants;
         push_constants.worldMatrix = r.transform;
         push_constants.material_id = r.material;

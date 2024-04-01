@@ -159,12 +159,12 @@ namespace gestalt {
 
       for (auto& r : resource_map | std::views::values) {
         if (auto image_resource = std::dynamic_pointer_cast<ColorImageResource>(r)) {
-          if (resource_registry_->get_resource<foundation::AllocatedImage>(
+          if (resource_registry_->get_resource<foundation::TextureHandle>(
                   image_resource->getId())) {
             continue;
           }
 
-          auto image = std::make_shared<foundation::AllocatedImage>(foundation::ImageType::kColor);
+          auto image = std::make_shared<foundation::TextureHandle>(foundation::TextureType::kColor);
           image->imageExtent
               = {image_resource->get_extent().width, image_resource->get_extent().height, 1};
           if (image->imageExtent.height == 0 && image->imageExtent.width == 0) {
@@ -177,11 +177,11 @@ namespace gestalt {
               {image->getExtent2D().width, image->getExtent2D().height, 1}, *image.get());
           resource_registry_->add_resource(image_resource->getId(), image);
         } else if (auto image_resource = std::dynamic_pointer_cast<DepthImageResource>(r)) {
-          if (resource_registry_->get_resource<foundation::AllocatedImage>(image_resource->getId())) {
+          if (resource_registry_->get_resource<foundation::TextureHandle>(image_resource->getId())) {
             continue;
           }
 
-          auto image = std::make_shared<foundation::AllocatedImage>(foundation::ImageType::kDepth);
+          auto image = std::make_shared<foundation::TextureHandle>(foundation::TextureType::kDepth);
           image->imageExtent
               = {image_resource->get_extent().width, image_resource->get_extent().height, 1};
           if (image->imageExtent.height == 0 && image->imageExtent.width == 0) {
@@ -274,8 +274,8 @@ namespace gestalt {
            const auto& read : reads) {
         if (std::dynamic_pointer_cast<ColorImageResource>(read)
             || std::dynamic_pointer_cast<DepthImageResource>(read)) {
-          std::shared_ptr<foundation::AllocatedImage> resource
-              = resource_registry_->get_resource<foundation::AllocatedImage>(read->getId());
+          std::shared_ptr<foundation::TextureHandle> resource
+              = resource_registry_->get_resource<foundation::TextureHandle>(read->getId());
           vkutil::transition_read(cmd, *resource);
         }
       }
@@ -284,8 +284,8 @@ namespace gestalt {
            const auto& write : writes) {
         if (std::dynamic_pointer_cast<ColorImageResource>(write.second)
             || std::dynamic_pointer_cast<DepthImageResource>(write.second)) {
-          std::shared_ptr<foundation::AllocatedImage> resource
-              = resource_registry_->get_resource<foundation::AllocatedImage>(write.second->getId());
+          std::shared_ptr<foundation::TextureHandle> resource
+              = resource_registry_->get_resource<foundation::TextureHandle>(write.second->getId());
           vkutil::transition_write(cmd, *resource);
         }
       }
@@ -353,10 +353,10 @@ namespace gestalt {
         execute(index, cmd);
       }
 
-      resource_manager_->main_draw_context_.opaque_surfaces.clear();
-      resource_manager_->main_draw_context_.transparent_surfaces.clear();
+      repository_->main_draw_context_.opaque_surfaces.clear();
+      repository_->main_draw_context_.transparent_surfaces.clear();
 
-      const auto color_image = resource_registry_->get_resource<foundation::AllocatedImage>("scene_debug_aabb");
+      const auto color_image = resource_registry_->get_resource<foundation::TextureHandle>("scene_debug_aabb");
 
       vkutil::transition_image(cmd, color_image->image, color_image->currentLayout,
                                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
