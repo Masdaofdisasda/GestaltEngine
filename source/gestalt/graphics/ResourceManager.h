@@ -1,4 +1,5 @@
 #pragma once
+#include <queue>
 #include <fastgltf/types.hpp>
 
 #include "Repository.h"
@@ -35,8 +36,9 @@ namespace gestalt {
         VkCommandPool transferCommandPool = {};
         VkCommandBuffer cmd = {};
         VkFence flushFence = {};
-        std::vector<ImageTask> tasks_;
-        std::vector<CubemapTask> cubemap_tasks_;
+        std::queue<ImageTask> tasks_;
+        std::queue<CubemapTask> cubemap_tasks_;
+        const size_t max_tasks_per_batch_ = 5;
 
       public:
         void init(const Gpu& gpu);

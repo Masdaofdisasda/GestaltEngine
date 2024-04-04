@@ -442,17 +442,18 @@ namespace gestalt {
 
       gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                                      &descriptor_write);
+      if (registry_->config_.debug_aabb) {
+        for (auto& node : repository_->scene_graph.components() | std::views::values) {
+          if (!node.visible) continue;
 
-      for (auto& node : repository_->scene_graph.components() | std::views::values) {
-        if (!node.visible) continue;
-
-        aabb_debug_push_constants push_constant{
-            .min = glm::vec4(node.bounds.min, 1.0),
-            .max = glm::vec4(node.bounds.max, 1.0),
-        };
-        vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0,
-                           sizeof(aabb_debug_push_constants), &push_constant);
-        vkCmdDraw(cmd, 36, 1, 0, 0);
+          aabb_debug_push_constants push_constant{
+              .min = glm::vec4(node.bounds.min, 1.0),
+              .max = glm::vec4(node.bounds.max, 1.0),
+          };
+          vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0,
+                             sizeof(aabb_debug_push_constants), &push_constant);
+          vkCmdDraw(cmd, 36, 1, 0, 0);
+        }
       }
 
       vkCmdEndRendering(cmd);

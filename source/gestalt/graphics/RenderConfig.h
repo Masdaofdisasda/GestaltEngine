@@ -11,6 +11,7 @@ namespace gestalt {
 
     struct RenderConfig {
       bool always_opaque{true};
+      bool debug_aabb{true};
 
       struct SkyboxParams {
         glm::vec3 betaR = glm::vec3(5.22e-6, 9.19e-6, 33.1e-6);

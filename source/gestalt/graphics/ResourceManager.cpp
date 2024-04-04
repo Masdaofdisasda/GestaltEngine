@@ -344,7 +344,7 @@ namespace gestalt {
       task.mipmap = mipmap;
       task.stagingBuffer = {};
 
-      tasks_.emplace_back(task);
+      tasks_.push(task);
     }
 
     void PoorMansResourceLoader::execute_task(ImageTask& task) {
@@ -354,6 +354,7 @@ namespace gestalt {
       void* data;
       VK_CHECK(vmaMapMemory(gpu_.allocator, task.stagingBuffer.allocation, &data));
       memcpy(data, task.dataCopy, task.imageSize);
+      vmaUnmapMemory(gpu_.allocator, task.stagingBuffer.allocation);
 
       vkutil::Transition(task.image.image)
           .from(VK_IMAGE_LAYOUT_UNDEFINED)
@@ -398,6 +399,7 @@ namespace gestalt {
       void* data;
       VK_CHECK(vmaMapMemory(gpu_.allocator, task.stagingBuffer.allocation, &data));
       memcpy(data, task.dataCopy, task.totalCubemapSizeBytes);
+      vmaUnmapMemory(gpu_.allocator, task.stagingBuffer.allocation);
 
       vkutil::Transition(task.image.image)
           .from(VK_IMAGE_LAYOUT_UNDEFINED)
@@ -456,7 +458,7 @@ namespace gestalt {
       task.imageExtent = imageExtent;
       task.stagingBuffer = {};
 
-      cubemap_tasks_.emplace_back(task);
+      cubemap_tasks_.push(task);
     }
 
     void PoorMansResourceLoader::add_stagging_buffer(size_t size, AllocatedBuffer& staging_buffer) {
@@ -478,8 +480,7 @@ namespace gestalt {
     }
 
     void PoorMansResourceLoader::flush() {
-
-      if (tasks_.empty()) {
+      if (tasks_.empty() && cubemap_tasks_.empty()) {
         return;
       }
 
@@ -488,12 +489,23 @@ namespace gestalt {
       beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
       VK_CHECK(vkBeginCommandBuffer(cmd, &beginInfo));
 
-      for (auto& task : tasks_) {
-        execute_task(task);
+      size_t tasksProcessed = 0;
+      std::queue<ImageTask> tasksDone;
+      std::queue<CubemapTask> cubemapTasksDone;
+      while (!tasks_.empty() && tasksProcessed < max_tasks_per_batch_) {
+        ImageTask& task = tasks_.front();
+        execute_task(task);  // Execute the task
+        tasksDone.push(task);
+        tasks_.pop();
+        tasksProcessed++;
       }
 
-      for (auto& task : cubemap_tasks_) {
-               execute_cubemap_task(task);
+      while (!cubemap_tasks_.empty() && tasksProcessed < max_tasks_per_batch_) {
+        CubemapTask& task = cubemap_tasks_.front();
+        execute_cubemap_task(task);  // Execute the cubemap task
+        cubemapTasksDone.push(task);
+        cubemap_tasks_.pop();
+        tasksProcessed++;
       }
 
       VK_CHECK(vkEndCommandBuffer(cmd));
@@ -508,24 +520,22 @@ namespace gestalt {
       VK_CHECK(vkResetFences(gpu_.device, 1, &flushFence));
       VK_CHECK(vkResetCommandBuffer(cmd, 0));
 
-      for (auto& task : tasks_) {
+      while (!tasksDone.empty()) {
+        ImageTask& task = tasksDone.front();
         auto& stagingBuffer = task.stagingBuffer;
-        vmaUnmapMemory(gpu_.allocator, stagingBuffer.allocation);
         vmaDestroyBuffer(gpu_.allocator, stagingBuffer.buffer, stagingBuffer.allocation);
 
         delete[] task.dataCopy;
-
+        tasksDone.pop();
       }
-
-      for (auto& task : cubemap_tasks_) {
-               auto& stagingBuffer = task.stagingBuffer;
-        vmaUnmapMemory(gpu_.allocator, stagingBuffer.allocation);
+      while (!cubemapTasksDone.empty()) {
+        CubemapTask& task = cubemapTasksDone.front();
+        auto& stagingBuffer = task.stagingBuffer;
         vmaDestroyBuffer(gpu_.allocator, stagingBuffer.buffer, stagingBuffer.allocation);
 
         delete[] task.dataCopy;
+        cubemapTasksDone.pop();
       }
-      cubemap_tasks_.clear();
-      tasks_.clear();
     }
 
     void PoorMansResourceLoader::cleanup() {

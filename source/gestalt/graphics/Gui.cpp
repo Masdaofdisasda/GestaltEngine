@@ -573,6 +573,8 @@ namespace gestalt {
 
         ImGui::Checkbox("Always Opaque", &config.always_opaque);
 
+        ImGui::Checkbox("View AABBs", &config.debug_aabb);
+
         const char* shadow_mode_options[] = {"On", "Off"};
         int current_shadow_mode = config.lighting.shadow_mode;
         if (ImGui::Combo("Shadow Mode", &current_shadow_mode, shadow_mode_options,
