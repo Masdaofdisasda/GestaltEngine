@@ -38,6 +38,7 @@ namespace gestalt {
 
       VkPhysicalDeviceFeatures features10{};
       features10.fillModeNonSolid = true;
+      features10.shaderInt16 = true;
 
       VkPhysicalDeviceVulkan11Features features11{};
       features11.uniformAndStorageBuffer16BitAccess = true;
@@ -102,7 +103,7 @@ namespace gestalt {
       chosen_gpu = physicalDevice.physical_device;
       vkGetPhysicalDeviceProperties(chosen_gpu, &device_properties);
 
-      // get a Graphics queue and a Transfer queue
+      // get a Graphics queue
       auto graphics_queue_ret = vkbDevice.get_queue(vkb::QueueType::graphics);
 
       if (!graphics_queue_ret.has_value()) {

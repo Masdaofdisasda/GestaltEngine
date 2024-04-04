@@ -38,13 +38,10 @@ void getIBLContribution(PBRInfo pbrInputs, vec3 n, vec3 reflection, samplerCube 
 
 void calculatePBRInputsMetallicRoughness( vec4 albedo, vec3 normal, vec3 cameraPos, vec3 worldPos, vec4 mrSample, out PBRInfo pbrInputs, samplerCube texEnvMap, samplerCube texEnvMapIrradiance, sampler2D texBdrfLut)
 {
-	float perceptualRoughness = 1.0;
-	float metallic = 1.0;
-
 	// Roughness is stored in the 'g' channel, metallic is stored in the 'b' channel.
 	// This layout intentionally reserves the 'r' channel for (optional) occlusion map data
-	perceptualRoughness = mrSample.g * perceptualRoughness;
-	metallic = mrSample.b * metallic;
+	float perceptualRoughness = mrSample.g;
+	float metallic = mrSample.b;
 
 	const float c_MinRoughness = 0.04;
 

@@ -73,45 +73,34 @@ namespace gestalt {
       bool is_dirty = true;
     };
 
-    constexpr auto unused_texture = std::numeric_limits<uint32_t>::max();
+    constexpr auto kUnusedTexture = std::numeric_limits<uint16_t>::max();
+    constexpr uint32_t kAlbedoTextureFlag = 0x01;
+    constexpr uint32_t kMetalRoughTextureFlag = 0x02;
+    constexpr uint32_t kNormalTextureFlag = 0x04;
+    constexpr uint32_t kEmissiveTextureFlag = 0x08;
+    constexpr uint32_t kOcclusionTextureFlag = 0x10;
 
     struct PbrMaterial {
-      bool use_albedo_tex{false};
-      std::string albedo_uri;
-
-      bool use_metal_rough_tex{false};
-      std::string metal_rough_uri;
-
-      bool use_normal_tex{false};
-      std::string normal_uri;
-
-      bool use_emissive_tex{false};
-      std::string emissive_uri;
-
-      bool use_occlusion_tex{false};
-      std::string occlusion_uri;
-
       bool double_sided{false};
       bool transparent{false};
 
-      struct MaterialConstants {
-        uint32_t albedo_tex_index = unused_texture;
-        uint32_t metal_rough_tex_index = unused_texture;
-        uint32_t normal_tex_index = unused_texture;
-        uint32_t emissive_tex_index = unused_texture;
+      struct alignas(64) PbrConstants {
+        uint16_t albedo_tex_index = kUnusedTexture;
+        uint16_t metal_rough_tex_index = kUnusedTexture;
+        uint16_t normal_tex_index = kUnusedTexture;
+        uint16_t emissive_tex_index = kUnusedTexture;
+        uint16_t occlusion_tex_index = kUnusedTexture;
+        uint32_t flags{0};
 
-        glm::vec4 albedo_factor{1.f};
-        glm::vec2 metal_rough_factor = {.5f, 0.f};  // roughness, metallic
+        glm::vec4 albedo_color{1.f};
+        glm::vec2 metal_rough_factor = {.0f, 0.f};  // roughness, metallic
         float occlusionStrength{1.f};
         float alpha_cutoff{0.f};
-        glm::vec3 emissiveFactor{0.f};
-        uint32_t occlusion_tex_index = unused_texture;
-        // float normalScale = 1.f;
+        glm::vec3 emissiveColor{0.f};
+        float emissiveStrength{1.0};
       } constants;
 
-      static_assert(sizeof(MaterialConstants) == 64);
-
-      struct MaterialResources {
+      struct PbrTextures {
         TextureHandle albedo_image;
         VkSampler albedo_sampler;
         TextureHandle metal_rough_image;
@@ -122,7 +111,7 @@ namespace gestalt {
         VkSampler emissive_sampler;
         TextureHandle occlusion_image;
         VkSampler occlusion_sampler;
-      } resources;
+      } textures;
     };
 
     struct Material {

@@ -802,57 +802,108 @@ namespace gestalt {
         if (ImGui::TreeNode(material.name.c_str())) {
           auto& config = material.config;
 
-          material.is_dirty = true;
-
-          // TODO update materials based on GUI changes
           if (ImGui::CollapsingHeader("Albedo", ImGuiTreeNodeFlags_DefaultOpen)) {
-            ImGui::DragFloat4("Albedo Color", &config.constants.albedo_factor.x, 0.01f, 0.0f, 1.0f,
-                              "%.2f");
-            ImGui::Checkbox("Use Texture", &config.use_albedo_tex);
-            if (config.use_albedo_tex) {
-              ImGui::Text("URI: %s", config.albedo_uri.c_str());
+            if (ImGui::ColorPicker4("Albedo Color", &config.constants.albedo_color.x)) {
+              material.is_dirty = true;
+            }
+            bool use_texture = (config.constants.flags & kAlbedoTextureFlag) != 0;
+
+            if (ImGui::Checkbox("Use Albedo Texture", &use_texture)) {
+              if (use_texture) {
+                config.constants.flags |= kAlbedoTextureFlag;
+                material.is_dirty = true;
+              } else {
+                config.constants.flags &= ~kAlbedoTextureFlag;
+                material.is_dirty = true;
+              }
             }
           }
 
           if (ImGui::CollapsingHeader("Metallic-Roughness", ImGuiTreeNodeFlags_DefaultOpen)) {
-            ImGui::DragFloat2("Metal-Rough Factor", &config.constants.metal_rough_factor.x, 0.01f,
-                              0.0f, 1.0f, "%.2f");
-            ImGui::Checkbox("Use Texture", &config.use_metal_rough_tex);
-            if (config.use_metal_rough_tex) {
-              ImGui::Text("URI: %s", config.metal_rough_uri.c_str());
+            if (ImGui::SliderFloat("Metalness", &config.constants.metal_rough_factor.y, 0.0f, 1.0f,
+                                   "%.2f")) {
+              material.is_dirty = true;
+            }
+            if (ImGui::SliderFloat("Roughness", &config.constants.metal_rough_factor.x, 0.0f, 1.0f,
+                                   "%.2f")) {
+              material.is_dirty = true;
+            }
+            bool use_texture = (config.constants.flags & kMetalRoughTextureFlag) != 0;
+
+            if (ImGui::Checkbox("Use Metal-Roughness Texture", &use_texture)) {
+              if (use_texture) {
+                config.constants.flags |= kMetalRoughTextureFlag;
+                material.is_dirty = true;
+              } else {
+                config.constants.flags &= ~kMetalRoughTextureFlag;
+                material.is_dirty = true;
+              }
             }
           }
-          /*
-          if (ImGui::CollapsingHeader("Normal Map", ImGuiTreeNodeFlags_DefaultOpen)) {
-            ImGui::DragFloat("Scale", &config.constants.normal_scale, 0.01f, 0.0f, 10.0f, "%.2f");
-            ImGui::Checkbox("Use Texture", &config.use_normal_tex);
-            if (config.use_normal_tex) {
-              ImGui::Text("URI: %s", config.normal_uri.c_str());
+          
+          if (ImGui::CollapsingHeader("Normal", ImGuiTreeNodeFlags_DefaultOpen)) {
+              // normal factor? 
+            bool use_texture = (config.constants.flags & kNormalTextureFlag) != 0;
+
+            if (ImGui::Checkbox("Use Normal Texture", &use_texture)) {
+              if (use_texture) {
+                config.constants.flags |= kNormalTextureFlag;
+                material.is_dirty = true;
+              } else {
+                config.constants.flags &= ~kNormalTextureFlag;
+                material.is_dirty = true;
+              }
             }
-          }*/
+          }
 
           if (ImGui::CollapsingHeader("Emissive", ImGuiTreeNodeFlags_DefaultOpen)) {
-            ImGui::DragFloat3("Emmissive Factor", &config.constants.emissiveFactor.x, 0.01f, 0.0f,
-                              10.0f, "%.2f");
-            ImGui::Checkbox("Use Texture", &config.use_emissive_tex);
-            if (config.use_emissive_tex) {
-              ImGui::Text("URI: %s", config.emissive_uri.c_str());
+            if (ImGui::ColorPicker3("Emissive Color", &config.constants.emissiveColor.x)) {
+              material.is_dirty = true;
+            }
+            if (ImGui::SliderFloat("Emissive Strength", &config.constants.emissiveStrength, 0.0f, 10.0f, "%.2f")) {
+              material.is_dirty = true;
+            }
+            bool use_texture = (config.constants.flags & kEmissiveTextureFlag) != 0;
+
+            if (ImGui::Checkbox("Use Emissive Texture", &use_texture)) {
+              if (use_texture) {
+                config.constants.flags |= kEmissiveTextureFlag;
+                material.is_dirty = true;
+              } else {
+                config.constants.flags &= ~kEmissiveTextureFlag;
+                material.is_dirty = true;
+              }
             }
           }
 
           if (ImGui::CollapsingHeader("Occlusion", ImGuiTreeNodeFlags_DefaultOpen)) {
-            ImGui::DragFloat("Occlusion Strength", &config.constants.occlusionStrength, 0.01f, 0.0f,
-                             10.0f, "%.2f");
-            ImGui::Checkbox("Use Texture", &config.use_occlusion_tex);
-            if (config.use_occlusion_tex) {
-              ImGui::Text("URI: %s", config.occlusion_uri.c_str());
+            if (ImGui::DragFloat("Occlusion Strength", &config.constants.occlusionStrength, 0.01f, 0.0f,
+                             10.0f, "%.2f")) {
+              material.is_dirty = true;
+            }
+            bool use_texture = (config.constants.flags & kOcclusionTextureFlag) != 0;
+
+            if (ImGui::Checkbox("Use Occlusion Texture", &use_texture)) {
+              if (use_texture) {
+                config.constants.flags |= kOcclusionTextureFlag;
+                material.is_dirty = true;
+              } else {
+                config.constants.flags &= ~kOcclusionTextureFlag;
+                material.is_dirty = true;
+              }
             }
           }
 
-          ImGui::Checkbox("Double Sided", &config.double_sided);
-          ImGui::Checkbox("Transparent", &config.transparent);
-          ImGui::DragFloat("Alpha Cutoff", &config.constants.alpha_cutoff, 0.01f, 0.0f, 1.0f,
-                           "%.2f");
+          if (ImGui::Checkbox("Double Sided", &config.double_sided)) {
+            material.is_dirty = true;
+          }
+          if (ImGui::Checkbox("Transparent", &config.transparent)) {
+            material.is_dirty = true;
+          }
+          if (ImGui::DragFloat("Alpha Cutoff", &config.constants.alpha_cutoff, 0.01f, 0.0f, 1.0f,
+                           "%.2f")) {
+            material.is_dirty = true;
+          }
 
           ImGui::TreePop();
         }

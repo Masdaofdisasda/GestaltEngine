@@ -1,6 +1,9 @@
 #version 450
 
 #extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_shader_16bit_storage : require
+#extension GL_EXT_shader_explicit_arithmetic_types: require
+#extension GL_EXT_shader_explicit_arithmetic_types_float16: require
 #extension GL_GOOGLE_include_directive : require
 #include "per_frame_structs.glsl"
 #include "input_structures.glsl"
@@ -23,11 +26,20 @@ vec3 sRGBToLinear(vec3 color) {
 
 void main() {
 
-	uint albedoIndex =			materialData[nonuniformEXT(inMaterialIndex)].albedo_tex_index;
-	uint metalicRoughIndex =	materialData[nonuniformEXT(inMaterialIndex)].metal_rough_tex_index;
-	uint normalIndex =			materialData[nonuniformEXT(inMaterialIndex)].normal_tex_index;
-	uint emissiveIndex =		materialData[nonuniformEXT(inMaterialIndex)].emissive_tex_index;
-	uint occlusionIndex =		materialData[nonuniformEXT(inMaterialIndex)].occlusion_tex_index;
+	uint16_t albedoIndex =			materialData[nonuniformEXT(inMaterialIndex)].albedo_tex_index;
+	uint16_t metalicRoughIndex =	materialData[nonuniformEXT(inMaterialIndex)].metal_rough_tex_index;
+	uint16_t normalIndex =			materialData[nonuniformEXT(inMaterialIndex)].normal_tex_index;
+	uint16_t emissiveIndex =		materialData[nonuniformEXT(inMaterialIndex)].emissive_tex_index;
+	uint16_t occlusionIndex =		materialData[nonuniformEXT(inMaterialIndex)].occlusion_tex_index;
+
+	uint textureFlags = materialData[nonuniformEXT(inMaterialIndex)].textureFlags;
+
+	bool hasAlbedoTexture = (textureFlags & 0x01) != 0;
+	bool hasMetalRoughTexture = (textureFlags & 0x02) != 0;
+	bool hasNormalTexture = (textureFlags & 0x04) != 0;
+	bool hasEmissiveTexture = (textureFlags & 0x08) != 0;
+	bool hasOcclusionTexture = (textureFlags & 0x10) != 0;
+
 
     vec2 UV = inUV;
 	vec3 inNormal = normalize(inNormal_BiTanX.xyz);
@@ -36,7 +48,7 @@ void main() {
 	vec3 inPosition = inPosition_BiTanZ.xyz;
 
 	vec4 Kd = materialData[nonuniformEXT(inMaterialIndex)].albedo_factor;
-	if(albedoIndex != uint(-1)) {
+	if(hasAlbedoTexture) {
 		Kd = texture(nonuniformEXT(textures[albedoIndex]), UV);
     }
 	Kd.rgb = sRGBToLinear(Kd.rgb);
@@ -48,25 +60,25 @@ void main() {
 
 	vec3 n = normalize(inNormal);
 	vec3 viewPos = -normalize(vec3(sceneData.view[0][2], sceneData.view[1][2], sceneData.view[2][2]));
-	if(normalIndex != uint(-1)) {
+	if(hasNormalTexture) {
 		vec3 normal_sample = texture(nonuniformEXT(textures[normalIndex]), UV).rgb;
 		n = perturbNormal(n, normalize(viewPos - inPosition), normal_sample, UV);
 	}
 
-	vec4 Ke = vec4(materialData[nonuniformEXT(inMaterialIndex)].emissiveFactor, 1.0);
-	if(emissiveIndex != uint(-1)) {
+	vec4 Ke = vec4(materialData[nonuniformEXT(inMaterialIndex)].emissiveColor, 1.0);
+	if(hasEmissiveTexture) {
 		Ke = texture(nonuniformEXT(textures[emissiveIndex]), UV);
-		Ke.rgb *= materialData[nonuniformEXT(inMaterialIndex)].emissiveFactor;
-		Ke.rgb = sRGBToLinear(Ke.rgb);
 	}
+	Ke.rgb *= materialData[nonuniformEXT(inMaterialIndex)].emissiveStrength;
+	Ke.rgb = sRGBToLinear(Ke.rgb);
 
 	float Kao = 1.0;
-	if (occlusionIndex != uint(-1)) {
+	if (hasOcclusionTexture) {
 		Kao = texture(nonuniformEXT(textures[occlusionIndex]), UV).r;
 	}
 	
 	vec4 MeR = vec4(Kao, materialData[nonuniformEXT(inMaterialIndex)].metal_rough_factor, 1.0);
-	if (metalicRoughIndex != uint(-1)) {
+	if (hasMetalRoughTexture) {
 		MeR = texture(nonuniformEXT(textures[metalicRoughIndex]), UV);
 	}
 	

@@ -64,15 +64,15 @@ namespace gestalt {
       writer_.clear();
 
       std::vector<VkDescriptorImageInfo> imageInfos = {
-          {material.resources.albedo_sampler, material.resources.albedo_image.imageView,
+          {material.textures.albedo_sampler, material.textures.albedo_image.imageView,
            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-          {material.resources.metal_rough_sampler, material.resources.metal_rough_image.imageView,
+          {material.textures.metal_rough_sampler, material.textures.metal_rough_image.imageView,
            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-          {material.resources.normal_sampler, material.resources.normal_image.imageView,
+          {material.textures.normal_sampler, material.textures.normal_image.imageView,
            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-          {material.resources.emissive_sampler, material.resources.emissive_image.imageView,
+          {material.textures.emissive_sampler, material.textures.emissive_image.imageView,
            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-          {material.resources.occlusion_sampler, material.resources.occlusion_image.imageView,
+          {material.textures.occlusion_sampler, material.textures.occlusion_image.imageView,
            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
 
       const uint32_t texture_start = imageInfos.size() * material_id;
@@ -80,26 +80,26 @@ namespace gestalt {
 
       writer_.update_set(gpu_.device, repository_->material_data.resource_set);
 
-      if (material.constants.albedo_tex_index != unused_texture) {
+      if (material.constants.albedo_tex_index != kUnusedTexture) {
         material.constants.albedo_tex_index = texture_start;
       }
-      if (material.constants.metal_rough_tex_index != unused_texture) {
+      if (material.constants.metal_rough_tex_index != kUnusedTexture) {
         material.constants.metal_rough_tex_index = texture_start + 1;
       }
-      if (material.constants.normal_tex_index != unused_texture) {
+      if (material.constants.normal_tex_index != kUnusedTexture) {
         material.constants.normal_tex_index = texture_start + 2;
       }
-      if (material.constants.emissive_tex_index != unused_texture) {
+      if (material.constants.emissive_tex_index != kUnusedTexture) {
         material.constants.emissive_tex_index = texture_start + 3;
       }
-      if (material.constants.occlusion_tex_index != unused_texture) {
+      if (material.constants.occlusion_tex_index != kUnusedTexture) {
         material.constants.occlusion_tex_index = texture_start + 4;
       }
 
-      PbrMaterial::MaterialConstants* mappedData;
+      PbrMaterial::PbrConstants* mappedData;
       vmaMapMemory(gpu_.allocator, repository_->material_data.constants_buffer.allocation,
                    (void**)&mappedData);
-      memcpy(mappedData + material_id, &material.constants, sizeof(PbrMaterial::MaterialConstants));
+      memcpy(mappedData + material_id, &material.constants, sizeof(PbrMaterial::PbrConstants));
       vmaUnmapMemory(gpu_.allocator, repository_->material_data.constants_buffer.allocation);
     }
 
@@ -108,7 +108,7 @@ namespace gestalt {
 
       uint32_t white = 0xFFFFFFFF;              // White color for color and occlusion
       uint32_t default_metallic_roughness
-          = 0xFF00FF00;                         // Green color representing metallic-roughness
+          = 0xFF00FFFF;                         // Green color representing metallic-roughness
       uint32_t flat_normal = 0xFFFF8080;        // Flat normal
       uint32_t black = 0xFF000000;              // Black color for emissive
 
@@ -164,26 +164,18 @@ namespace gestalt {
       repository_->samplers.add(default_material.linearSampler);
 
       PbrMaterial pbr_material{};
-      pbr_material.constants.albedo_factor.x = 1.f;
-      pbr_material.constants.albedo_factor.y = 1.f;
-      pbr_material.constants.albedo_factor.z = 1.f;
-      pbr_material.constants.albedo_factor.w = 1.f;
-
-      pbr_material.constants.metal_rough_factor.x = 0.f;
-      pbr_material.constants.metal_rough_factor.y = 0.f;
-      // write material parameters to buffer
 
       // default the material textures
-      pbr_material.resources.albedo_image = default_material.color_image;
-      pbr_material.resources.albedo_sampler = default_material.linearSampler;
-      pbr_material.resources.metal_rough_image = default_material.metallic_roughness_image;
-      pbr_material.resources.metal_rough_sampler = default_material.linearSampler;
-      pbr_material.resources.normal_image = default_material.normal_image;
-      pbr_material.resources.normal_sampler = default_material.linearSampler;
-      pbr_material.resources.emissive_image = default_material.emissive_image;
-      pbr_material.resources.emissive_sampler = default_material.linearSampler;
-      pbr_material.resources.occlusion_image = default_material.occlusion_image;
-      pbr_material.resources.occlusion_sampler = default_material.nearestSampler;
+      pbr_material.textures.albedo_image = default_material.color_image;
+      pbr_material.textures.albedo_sampler = default_material.linearSampler;
+      pbr_material.textures.metal_rough_image = default_material.metallic_roughness_image;
+      pbr_material.textures.metal_rough_sampler = default_material.linearSampler;
+      pbr_material.textures.normal_image = default_material.normal_image;
+      pbr_material.textures.normal_sampler = default_material.linearSampler;
+      pbr_material.textures.emissive_image = default_material.emissive_image;
+      pbr_material.textures.emissive_sampler = default_material.linearSampler;
+      pbr_material.textures.occlusion_image = default_material.occlusion_image;
+      pbr_material.textures.occlusion_sampler = default_material.nearestSampler;
 
       {
         // build material
@@ -194,13 +186,13 @@ namespace gestalt {
         fmt::print("creating material {}, mat_id {}\n", key, material_id);
       }
 
-      std::vector<PbrMaterial::MaterialConstants> material_constants(kLimits.max_materials);
+      std::vector<PbrMaterial::PbrConstants> material_constants(kLimits.max_materials);
 
-      PbrMaterial::MaterialConstants* mappedData;
+      PbrMaterial::PbrConstants* mappedData;
       VK_CHECK(vmaMapMemory(gpu_.allocator, repository_->material_data.constants_buffer.allocation,
                             (void**)&mappedData));
       memcpy(mappedData, material_constants.data(),
-             sizeof(PbrMaterial::MaterialConstants) * kLimits.max_materials);
+             sizeof(PbrMaterial::PbrConstants) * kLimits.max_materials);
 
       vmaUnmapMemory(gpu_.allocator, repository_->material_data.constants_buffer.allocation);
 
@@ -208,8 +200,8 @@ namespace gestalt {
       for (int i = 0; i < material_constants.size(); ++i) {
         VkDescriptorBufferInfo bufferInfo = {};
         bufferInfo.buffer = repository_->material_data.constants_buffer.buffer;
-        bufferInfo.offset = sizeof(PbrMaterial::MaterialConstants) * i;
-        bufferInfo.range = sizeof(PbrMaterial::MaterialConstants);
+        bufferInfo.offset = sizeof(PbrMaterial::PbrConstants) * i;
+        bufferInfo.range = sizeof(PbrMaterial::PbrConstants);
         bufferInfos.push_back(bufferInfo);
       }
 
@@ -235,7 +227,7 @@ namespace gestalt {
       auto& material_data = repository_->material_data;
 
       material_data.constants_buffer
-          = resource_manager_->create_buffer(sizeof(PbrMaterial::MaterialConstants) * kLimits.max_materials,
+          = resource_manager_->create_buffer(sizeof(PbrMaterial::PbrConstants) * kLimits.max_materials,
                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
       material_data.resource_layout
           = graphics::DescriptorLayoutBuilder()

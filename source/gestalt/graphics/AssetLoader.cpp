@@ -257,15 +257,15 @@ namespace gestalt {
                                     const size_t& image_offset, const fastgltf::Material& mat,
                                     PbrMaterial& pbr_config) const {
       if (mat.pbrData.baseColorTexture.has_value()) {
-        pbr_config.use_albedo_tex = true;
+        pbr_config.constants.flags |= kAlbedoTextureFlag;
         pbr_config.constants.albedo_tex_index = 0;
         auto [image, sampler] = get_textures(
             gltf, mat.pbrData.baseColorTexture.value().textureIndex, image_offset, sampler_offset);
 
-        pbr_config.resources.albedo_image = image;
-        pbr_config.resources.albedo_sampler = sampler;
+        pbr_config.textures.albedo_image = image;
+        pbr_config.textures.albedo_sampler = sampler;
       } else {
-        pbr_config.constants.albedo_factor
+        pbr_config.constants.albedo_color
             = glm::vec4(mat.pbrData.baseColorFactor.at(0), mat.pbrData.baseColorFactor.at(1),
                         mat.pbrData.baseColorFactor.at(2), mat.pbrData.baseColorFactor.at(3));
       }
@@ -277,13 +277,13 @@ namespace gestalt {
                                                 const fastgltf::Material& mat,
                                                 PbrMaterial& pbr_config) const {
       if (mat.pbrData.metallicRoughnessTexture.has_value()) {
-        pbr_config.use_metal_rough_tex = true;
+        pbr_config.constants.flags |= kMetalRoughTextureFlag;
         pbr_config.constants.metal_rough_tex_index = 0;
         auto [image, sampler]
             = get_textures(gltf, mat.pbrData.metallicRoughnessTexture.value().textureIndex,
                            image_offset, sampler_offset);
 
-        pbr_config.resources.metal_rough_image = image;
+        pbr_config.textures.metal_rough_image = image;
         assert(image.image != repository_->default_material_.error_checkerboard_image.image);
       } else {
         pbr_config.constants.metal_rough_factor
@@ -296,13 +296,13 @@ namespace gestalt {
                                     const size_t& image_offset, const fastgltf::Material& mat,
                                     PbrMaterial& pbr_config) const {
       if (mat.normalTexture.has_value()) {
-        pbr_config.use_normal_tex = true;
+        pbr_config.constants.flags |= kNormalTextureFlag;
         pbr_config.constants.normal_tex_index = 0;
         auto [image, sampler] = get_textures(gltf, mat.normalTexture.value().textureIndex,
                                              image_offset, sampler_offset);
 
-        pbr_config.resources.normal_image = image;
-        pbr_config.resources.normal_sampler = sampler;
+        pbr_config.textures.normal_image = image;
+        pbr_config.textures.normal_sampler = sampler;
         // pbr_config.normal_scale = 1.f;  // TODO
       }
     }
@@ -311,19 +311,19 @@ namespace gestalt {
                                       const size_t& image_offset, const fastgltf::Material& mat,
                                       PbrMaterial& pbr_config) const {
       if (mat.emissiveTexture.has_value()) {
-        pbr_config.use_emissive_tex = true;
+        pbr_config.constants.flags |= kEmissiveTextureFlag;
         pbr_config.constants.emissive_tex_index = 0;
         auto [image, sampler] = get_textures(gltf, mat.emissiveTexture.value().textureIndex,
                                              image_offset, sampler_offset);
 
-        pbr_config.resources.emissive_image = image;
-        pbr_config.resources.emissive_sampler = sampler;
+        pbr_config.textures.emissive_image = image;
+        pbr_config.textures.emissive_sampler = sampler;
       } else {
-        glm::vec3 emissiveFactor = glm::vec3(mat.emissiveFactor.at(0), mat.emissiveFactor.at(1),
-                                             mat.emissiveFactor.at(2));
-        if (length(emissiveFactor) > 0) {
-          emissiveFactor *= mat.emissiveStrength;
-          pbr_config.constants.emissiveFactor = emissiveFactor;
+        const glm::vec3 emissiveColor = glm::vec3(mat.emissiveFactor.at(0), mat.emissiveFactor.at(1),
+                                                  mat.emissiveFactor.at(2));
+        if (length(emissiveColor) > 0) {
+          pbr_config.constants.emissiveColor = emissiveColor;
+          pbr_config.constants.emissiveStrength = mat.emissiveStrength;
         }
       }
     }
@@ -332,13 +332,13 @@ namespace gestalt {
                                        const size_t& image_offset, const fastgltf::Material& mat,
                                        PbrMaterial& pbr_config) const {
       if (mat.occlusionTexture.has_value()) {
-        pbr_config.use_occlusion_tex = true;
+        pbr_config.constants.flags |= kOcclusionTextureFlag;
         pbr_config.constants.occlusion_tex_index = 0;
         auto [image, sampler] = get_textures(gltf, mat.occlusionTexture.value().textureIndex,
                                              image_offset, sampler_offset);
 
-        pbr_config.resources.occlusion_image = image;
-        pbr_config.resources.occlusion_sampler = sampler;
+        pbr_config.textures.occlusion_image = image;
+        pbr_config.textures.occlusion_sampler = sampler;
         pbr_config.constants.occlusionStrength = 1.f;
       }
     }
@@ -355,7 +355,7 @@ namespace gestalt {
 
       auto& default_material = repository_->default_material_;
 
-      pbr_config.resources = {.albedo_image = default_material.color_image,
+      pbr_config.textures = {.albedo_image = default_material.color_image,
                               .albedo_sampler = default_material.linearSampler,
                               .metal_rough_image = default_material.metallic_roughness_image,
                               .metal_rough_sampler = default_material.linearSampler,
