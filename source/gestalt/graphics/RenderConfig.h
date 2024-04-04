@@ -1,8 +1,5 @@
 ﻿#pragma once
 
-#include <glm/gtx/quaternion.hpp>
-#include <glm/gtx/transform.hpp>
-
 
 namespace gestalt {
   namespace graphics {

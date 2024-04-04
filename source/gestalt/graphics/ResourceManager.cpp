@@ -42,6 +42,7 @@ namespace gestalt {
     void ResourceManager::init(const Gpu& gpu, const std::shared_ptr<Repository> repository) {
       gpu_ = gpu;
       repository_ = repository;
+      resource_loader_.init(gpu);
 
       per_frame_data_buffer = create_buffer(
           sizeof(PerFrameData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
@@ -255,48 +256,13 @@ namespace gestalt {
       TextureHandle new_image = create_image(
           size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
           mipmapped);
-
-      resource_loader_.add_task([this, new_image, size, mipmapped, data]() {
-      size_t data_size = static_cast<size_t>(size.depth * size.width * size.height) * 4;
-      AllocatedBuffer uploadbuffer
-          = create_buffer(data_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-      memcpy(uploadbuffer.info.pMappedData, data, data_size);
-        gpu_.immediate_submit([&](VkCommandBuffer cmd) {
-          vkutil::transition_image(cmd, new_image.image, VK_IMAGE_LAYOUT_UNDEFINED,
-                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-          VkBufferImageCopy copyRegion = {};
-          copyRegion.bufferOffset = 0;
-          copyRegion.bufferRowLength = 0;
-          copyRegion.bufferImageHeight = 0;
-
-          copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-          copyRegion.imageSubresource.mipLevel = 0;
-          copyRegion.imageSubresource.baseArrayLayer = 0;
-          copyRegion.imageSubresource.layerCount = 1;
-          copyRegion.imageExtent = size;
-
-          // copy the buffer into the image
-          vkCmdCopyBufferToImage(cmd, uploadbuffer.buffer, new_image.image,
-                                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
-
-          if (mipmapped) {
-            vkutil::generate_mipmaps(
-                cmd, new_image.image,
-                VkExtent2D{new_image.imageExtent.width, new_image.imageExtent.height});
-          } else {
-            vkutil::transition_image(cmd, new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-          }
-        });
-        destroy_buffer(uploadbuffer);
-      });
+      const size_t data_size = static_cast<size_t>(size.depth * size.width * size.height) * 4;
+      resource_loader_.addImageTask(new_image, data, data_size, size, mipmapped);
 
       return new_image;
     }
 
-    TextureHandle ResourceManager::create_cubemap(const void* imageData, VkExtent3D size,
+    TextureHandle ResourceManager::create_cubemap(void* imageData, VkExtent3D size,
                                                    VkFormat format, VkImageUsageFlags usage,
                                                    bool mipmapped) {
 
@@ -305,55 +271,7 @@ namespace gestalt {
           size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
           mipmapped, true);
 
-      resource_loader_.add_task( [this, new_image, size, mipmapped, imageData]() {
-
-      size_t faceWidth = size.width;
-      size_t faceHeight = size.height;
-      size_t numChannels = 4;  // Assuming RGBA
-      size_t bytesPerFloat = sizeof(float);
-
-      size_t faceSizeBytes = faceWidth * faceHeight * numChannels * bytesPerFloat;
-      size_t totalCubemapSizeBytes = faceSizeBytes * 6;
-
-      // Create a buffer large enough to hold all faces
-      AllocatedBuffer uploadbuffer = create_buffer(
-          totalCubemapSizeBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-      // Copy each face data into the buffer
-      memcpy(uploadbuffer.info.pMappedData, imageData, totalCubemapSizeBytes);
-      gpu_.immediate_submit([&](VkCommandBuffer cmd) {
-        vkutil::transition_image(cmd, new_image.image, VK_IMAGE_LAYOUT_UNDEFINED,
-                                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-        // Copy each face from the buffer to the image
-        for (int i = 0; i < 6; ++i) {
-          VkBufferImageCopy copyRegion = {};
-          copyRegion.bufferOffset = faceSizeBytes * i;
-          copyRegion.bufferRowLength = 0;
-          copyRegion.bufferImageHeight = 0;
-
-          copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-          copyRegion.imageSubresource.mipLevel = 0;
-          copyRegion.imageSubresource.baseArrayLayer = i;  // Specify the face index
-          copyRegion.imageSubresource.layerCount = 1;
-          copyRegion.imageExtent = size;
-
-          vkCmdCopyBufferToImage(cmd, uploadbuffer.buffer, new_image.image,
-                                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
-        }
-
-        if (mipmapped) {
-          // vkutil::generate_mipmaps( TODO
-          // cmd, new_image.image,
-          // VkExtent2D{new_image.imageExtent.width, new_image.imageExtent.height});
-        } else {
-          vkutil::transition_image(cmd, new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                   VK_IMAGE_LAYOUT_GENERAL);
-        }
-      });
-
-      destroy_buffer(uploadbuffer);
-      });
+      resource_loader_.addCubemapTask(new_image, imageData, size);
       return new_image;
     }
 
@@ -394,17 +312,226 @@ namespace gestalt {
 
     void PoorMansResourceLoader::init(const Gpu& gpu) {
 	  gpu_ = gpu;
+      VkCommandPoolCreateInfo poolInfo = {};
+      poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+      poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+      poolInfo.queueFamilyIndex = gpu_.graphics_queue_family;
+
+      VK_CHECK(vkCreateCommandPool(gpu_.device, &poolInfo, nullptr, &transferCommandPool));
+
+      VkCommandBufferAllocateInfo allocInfo = {};
+      allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+      allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+      allocInfo.commandPool = transferCommandPool;
+      allocInfo.commandBufferCount = 1;
+
+      VK_CHECK(vkAllocateCommandBuffers(gpu_.device, &allocInfo, &cmd));
+
+      VkFenceCreateInfo fenceInfo = {};
+      fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+      VK_CHECK(vkCreateFence(gpu_.device, &fenceInfo, nullptr, &flushFence));
     }
 
-    void PoorMansResourceLoader::add_task(std::function<void()> task) {
-	  tasks_.push_back(task);
+    void PoorMansResourceLoader::addImageTask(TextureHandle image, void* imageData,
+                                              VkDeviceSize imageSize, VkExtent3D imageExtent, bool mipmap) {
+
+      ImageTask task;
+      task.image = image;
+      task.dataCopy = new unsigned char[imageSize];
+      memcpy(task.dataCopy, imageData, imageSize);
+      task.imageSize = imageSize;
+      task.imageExtent = imageExtent;
+      task.mipmap = mipmap;
+      task.stagingBuffer = {};
+
+      tasks_.emplace_back(task);
+    }
+
+    void PoorMansResourceLoader::execute_task(ImageTask& task) {
+
+      add_stagging_buffer(task.imageSize, task.stagingBuffer);
+
+      void* data;
+      VK_CHECK(vmaMapMemory(gpu_.allocator, task.stagingBuffer.allocation, &data));
+      memcpy(data, task.dataCopy, task.imageSize);
+
+      vkutil::Transition(task.image.image)
+          .from(VK_IMAGE_LAYOUT_UNDEFINED)
+          .to(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+          .withSource(VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0)
+          .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
+          .andSubmitTo(cmd);
+
+      VkBufferImageCopy copyRegion = {};
+      copyRegion.bufferOffset = 0;
+      copyRegion.bufferRowLength = 0;
+      copyRegion.bufferImageHeight = 0;
+
+      copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+      copyRegion.imageSubresource.mipLevel = 0;
+      copyRegion.imageSubresource.baseArrayLayer = 0;
+      copyRegion.imageSubresource.layerCount = 1;
+      copyRegion.imageExtent = task.imageExtent;
+
+      // copy the buffer into the image
+      vkCmdCopyBufferToImage(cmd, task.stagingBuffer.buffer, task.image.image,
+                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+
+      if (task.mipmap) {
+        vkutil::generate_mipmaps(cmd, task.image.image,
+            VkExtent2D{task.image.imageExtent.width, task.image.imageExtent.height});
+      } else {
+        vkutil::Transition(task.image.image)
+            .from(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+            .to(VK_IMAGE_LAYOUT_GENERAL)
+            .withSource(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
+            .withDestination(VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT)
+            .andSubmitTo(cmd);
+      }
+    }
+
+    void PoorMansResourceLoader::execute_cubemap_task(CubemapTask & task) {
+
+      add_stagging_buffer(task.totalCubemapSizeBytes, task.stagingBuffer);
+
+      // Copy each face data into the buffer
+      void* data;
+      VK_CHECK(vmaMapMemory(gpu_.allocator, task.stagingBuffer.allocation, &data));
+      memcpy(data, task.dataCopy, task.totalCubemapSizeBytes);
+
+      vkutil::Transition(task.image.image)
+          .from(VK_IMAGE_LAYOUT_UNDEFINED)
+          .to(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+          .withSource(VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0)
+          .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
+          .andSubmitTo(cmd);
+
+      // Copy each face from the buffer to the image
+      for (int i = 0; i < 6; ++i) {
+        VkBufferImageCopy copyRegion = {};
+        copyRegion.bufferOffset = task.faceSizeBytes * i;
+        copyRegion.bufferRowLength = 0;
+        copyRegion.bufferImageHeight = 0;
+
+        copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        copyRegion.imageSubresource.mipLevel = 0;
+        copyRegion.imageSubresource.baseArrayLayer = i;  // Specify the face index
+        copyRegion.imageSubresource.layerCount = 1;
+        copyRegion.imageExtent = task.imageExtent;
+
+        vkCmdCopyBufferToImage(cmd, task.stagingBuffer.buffer, task.image.image,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+      }
+
+      if (false) {
+        // vkutil::generate_mipmaps( TODO
+        // cmd, new_image.image,
+        // VkExtent2D{new_image.imageExtent.width, new_image.imageExtent.height});
+      } else {
+        vkutil::Transition(task.image.image)
+            .from(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+            .to(VK_IMAGE_LAYOUT_GENERAL)
+            .withSource(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
+            .withDestination(VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT)
+            .andSubmitTo(cmd);
+      }
+    }
+
+    void PoorMansResourceLoader::addCubemapTask(TextureHandle image, void* imageData,
+                                                VkExtent3D imageExtent) {
+      size_t faceWidth = imageExtent.width;
+      size_t faceHeight = imageExtent.height;
+      size_t numChannels = 4;  // Assuming RGBA
+      size_t bytesPerFloat = sizeof(float);
+
+      size_t faceSizeBytes = faceWidth * faceHeight * numChannels * bytesPerFloat;
+      size_t totalCubemapSizeBytes = faceSizeBytes * 6;
+
+      CubemapTask task;
+      task.image = image;
+      task.dataCopy = new unsigned char[totalCubemapSizeBytes];
+      memcpy(task.dataCopy, imageData, totalCubemapSizeBytes);
+      task.totalCubemapSizeBytes = totalCubemapSizeBytes;
+      task.faceSizeBytes = faceSizeBytes;
+      task.imageExtent = imageExtent;
+      task.stagingBuffer = {};
+
+      cubemap_tasks_.emplace_back(task);
+    }
+
+    void PoorMansResourceLoader::add_stagging_buffer(size_t size, AllocatedBuffer& staging_buffer) {
+
+        // allocate buffer
+      VkBufferCreateInfo bufferInfo = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+      bufferInfo.pNext = nullptr;
+      bufferInfo.size = size;
+
+      bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+      VmaAllocationCreateInfo vmaallocInfo = {};
+      vmaallocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+      vmaallocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+      // allocate the buffer
+      VK_CHECK(vmaCreateBuffer(gpu_.allocator, &bufferInfo, &vmaallocInfo, &staging_buffer.buffer,
+                               &staging_buffer.allocation, &staging_buffer.info));
     }
 
     void PoorMansResourceLoader::flush() {
-      for (auto& task : tasks_) {
-        task();
+
+      if (tasks_.empty()) {
+        return;
       }
+
+      VkCommandBufferBeginInfo beginInfo = {};
+      beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+      beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+      VK_CHECK(vkBeginCommandBuffer(cmd, &beginInfo));
+
+      for (auto& task : tasks_) {
+        execute_task(task);
+      }
+
+      for (auto& task : cubemap_tasks_) {
+               execute_cubemap_task(task);
+      }
+
+      VK_CHECK(vkEndCommandBuffer(cmd));
+
+      VkSubmitInfo submitInfo = {};
+      submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+      submitInfo.commandBufferCount = 1;
+      submitInfo.pCommandBuffers = &cmd;
+
+      VK_CHECK(vkQueueSubmit(gpu_.graphics_queue, 1, &submitInfo, flushFence));
+      VK_CHECK(vkWaitForFences(gpu_.device, 1, &flushFence, VK_TRUE, UINT64_MAX));
+      VK_CHECK(vkResetFences(gpu_.device, 1, &flushFence));
+      VK_CHECK(vkResetCommandBuffer(cmd, 0));
+
+      for (auto& task : tasks_) {
+        auto& stagingBuffer = task.stagingBuffer;
+        vmaUnmapMemory(gpu_.allocator, stagingBuffer.allocation);
+        vmaDestroyBuffer(gpu_.allocator, stagingBuffer.buffer, stagingBuffer.allocation);
+
+        delete[] task.dataCopy;
+
+      }
+
+      for (auto& task : cubemap_tasks_) {
+               auto& stagingBuffer = task.stagingBuffer;
+        vmaUnmapMemory(gpu_.allocator, stagingBuffer.allocation);
+        vmaDestroyBuffer(gpu_.allocator, stagingBuffer.buffer, stagingBuffer.allocation);
+
+        delete[] task.dataCopy;
+      }
+      cubemap_tasks_.clear();
       tasks_.clear();
+    }
+
+    void PoorMansResourceLoader::cleanup() {
+      vkFreeCommandBuffers(gpu_.device, transferCommandPool, 1, &cmd);
+	  vkDestroyCommandPool(gpu_.device, transferCommandPool, nullptr);
+	  vkDestroyFence(gpu_.device, flushFence, nullptr);
     }
 
     void ResourceManager::load_and_create_cubemap(const std::string& file_path,

@@ -303,12 +303,12 @@ namespace gestalt {
 
     bool FrameGraph::acquire_next_image() {
       VK_CHECK(
-          vkWaitForFences(gpu_.device, 1, &get_current_frame().render_fence, true, 1000000000));
+          vkWaitForFences(gpu_.device, 1, &get_current_frame().render_fence, true, UINT64_MAX));
 
       get_current_frame().descriptor_pool.clear_pools(gpu_.device);
       resource_manager_->descriptor_pool = &get_current_frame().descriptor_pool;
 
-      VkResult e = vkAcquireNextImageKHR(gpu_.device, swapchain_->swapchain, 1000000000,
+      VkResult e = vkAcquireNextImageKHR(gpu_.device, swapchain_->swapchain, UINT64_MAX,
                                          get_current_frame().swapchain_semaphore, nullptr,
                                          &swapchain_image_index_);
       if (e == VK_ERROR_OUT_OF_DATE_KHR) {

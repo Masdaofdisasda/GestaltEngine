@@ -102,7 +102,7 @@ namespace gestalt {
       chosen_gpu = physicalDevice.physical_device;
       vkGetPhysicalDeviceProperties(chosen_gpu, &device_properties);
 
-      // use vkbootstrap to get a Graphics queue
+      // get a Graphics queue and a Transfer queue
       auto graphics_queue_ret = vkbDevice.get_queue(vkb::QueueType::graphics);
 
       if (!graphics_queue_ret.has_value()) {

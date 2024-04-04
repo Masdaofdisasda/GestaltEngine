@@ -12,6 +12,54 @@ namespace gestalt {
   namespace graphics {
     using namespace foundation;
 
+    vkutil::Transition& vkutil::Transition::from(VkImageLayout old_layout) {
+      imageBarrier.oldLayout = old_layout;
+      return *this;
+    }
+
+    vkutil::Transition& vkutil::Transition::to(const VkImageLayout new_layout) {
+      imageBarrier.newLayout = new_layout;
+
+      aspectMask_ = (new_layout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL
+                     || new_layout == VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL)
+                      ? VK_IMAGE_ASPECT_DEPTH_BIT
+                      : VK_IMAGE_ASPECT_COLOR_BIT;
+
+      return *this;
+    }
+
+    vkutil::Transition& vkutil::Transition::withAspect(const VkImageAspectFlags aspect_mask) {
+      aspectMask_ = aspect_mask;
+      return *this;
+    }
+
+    vkutil::Transition& vkutil::Transition::withSource(VkPipelineStageFlags2 src_stage_mask,
+        VkAccessFlags2 src_access_mask) {
+      imageBarrier.srcStageMask = src_stage_mask;
+      imageBarrier.srcAccessMask = src_access_mask;
+      return *this;
+    }
+
+    vkutil::Transition& vkutil::Transition::withDestination(VkPipelineStageFlags2 dst_stage_mask,
+        VkAccessFlags2 dst_access_mask) {
+      imageBarrier.dstStageMask = dst_stage_mask;
+      imageBarrier.dstAccessMask = dst_access_mask;
+      return *this;
+    }
+
+    void vkutil::Transition::andSubmitTo(const VkCommandBuffer cmd) {
+      imageBarrier.subresourceRange = vkinit::image_subresource_range(aspectMask_);
+
+      VkDependencyInfo depInfo{};
+      depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+      depInfo.pNext = nullptr;
+
+      depInfo.imageMemoryBarrierCount = 1;
+      depInfo.pImageMemoryBarriers = &imageBarrier;
+
+      vkCmdPipelineBarrier2(cmd, &depInfo);
+    }
+
     void vkutil::transition_read(VkCommandBuffer cmd, TextureHandle& image) {
       constexpr auto color_read_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
       constexpr auto depth_read_layout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL;

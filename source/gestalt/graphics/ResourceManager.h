@@ -13,12 +13,42 @@ namespace gestalt {
       using namespace foundation;
 
     class PoorMansResourceLoader {
+        struct ImageTask {
+          AllocatedBuffer stagingBuffer;
+          TextureHandle image;
+          unsigned char* dataCopy;
+          VkDeviceSize imageSize;
+          VkExtent3D imageExtent;
+          bool mipmap;
+        };
+
+        struct CubemapTask {
+          AllocatedBuffer stagingBuffer;
+          TextureHandle image;
+          unsigned char* dataCopy;
+          VkDeviceSize totalCubemapSizeBytes;
+          VkDeviceSize faceSizeBytes;
+          VkExtent3D imageExtent;
+        };
+
         Gpu gpu_ = {};
-      std::vector<std::function<void()>> tasks_;
-    public:
-      void init(const Gpu& gpu);
-      void add_task(std::function<void()> task);
-      void flush();
+        VkCommandPool transferCommandPool = {};
+        VkCommandBuffer cmd = {};
+        VkFence flushFence = {};
+        std::vector<ImageTask> tasks_;
+        std::vector<CubemapTask> cubemap_tasks_;
+
+      public:
+        void init(const Gpu& gpu);
+        void cleanup();
+
+        void addImageTask(TextureHandle image, void* imageData, VkDeviceSize imageSize,
+                          VkExtent3D imageExtent, bool mipmap);
+        void execute_task(ImageTask& task);
+        void execute_cubemap_task(CubemapTask& task);
+        void addCubemapTask(TextureHandle image, void* imageData, VkExtent3D imageExtent);
+        void add_stagging_buffer(size_t size, AllocatedBuffer& staging_buffer);
+        void flush();
       };
 
     class ResourceManager {
@@ -79,8 +109,8 @@ namespace gestalt {
 
       TextureHandle create_image(void* data, VkExtent3D size, VkFormat format,
                                               VkImageUsageFlags usage, bool mipmapped = false);
-      TextureHandle create_cubemap(const void* imageData, VkExtent3D size, VkFormat format,
-                                                VkImageUsageFlags usage, bool mipmapped = false);
+      TextureHandle create_cubemap(void* imageData, VkExtent3D size, VkFormat format,
+                                   VkImageUsageFlags usage, bool mipmapped = false);
       std::optional<TextureHandle> load_image(const std::string& filepath);
       void load_and_process_cubemap(const std::string& file_path);
       TextureHandle create_cubemap_from_HDR(std::vector<float>& image_data, int h, int w);

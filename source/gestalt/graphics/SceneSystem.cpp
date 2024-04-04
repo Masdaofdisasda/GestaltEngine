@@ -61,7 +61,7 @@ namespace gestalt {
     }
 
     void MaterialSystem::write_material(PbrMaterial& material, const uint32_t material_id) {
-      //writer_.clear();
+      writer_.clear();
 
       std::vector<VkDescriptorImageInfo> imageInfos = {
           {material.resources.albedo_sampler, material.resources.albedo_image.imageView,
@@ -76,9 +76,9 @@ namespace gestalt {
            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
 
       const uint32_t texture_start = imageInfos.size() * material_id;
-      //writer_.write_image_array(4, imageInfos, texture_start);
+      writer_.write_image_array(4, imageInfos, texture_start);
 
-      //writer_.update_set(gpu_.device, repository_->material_data.resource_set);
+      writer_.update_set(gpu_.device, repository_->material_data.resource_set);
 
       if (material.constants.albedo_tex_index != unused_texture) {
         material.constants.albedo_tex_index = texture_start;
@@ -101,16 +101,6 @@ namespace gestalt {
                    (void**)&mappedData);
       memcpy(mappedData + material_id, &material.constants, sizeof(PbrMaterial::MaterialConstants));
       vmaUnmapMemory(gpu_.allocator, repository_->material_data.constants_buffer.allocation);
-
-      VkDescriptorBufferInfo buffer_info;
-      buffer_info.buffer = repository_->material_data.constants_buffer.buffer;
-      buffer_info.offset = sizeof(PbrMaterial::MaterialConstants) * material_id;
-      buffer_info.range = sizeof(PbrMaterial::MaterialConstants);
-      std::vector bufferInfos = {buffer_info};
-
-      //writer_.clear();
-      //writer_.write_buffer_array(5, bufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
-      //writer_.update_set(gpu_.device, repository_->material_data.constants_set);
     }
 
     void MaterialSystem::create_defaults() {
