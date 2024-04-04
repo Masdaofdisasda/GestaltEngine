@@ -9,6 +9,7 @@ namespace gestalt {
     class BrightPass final : public RenderPass {
       std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
       std::string fragment_shader_source_ = "../shaders/hdr_bright_pass.frag.spv";
+      std::string name_ = "Bright Pass";
 
       uint32_t effect_size_ = 512;
       VkExtent2D extent_{effect_size_, effect_size_};
@@ -49,12 +50,14 @@ namespace gestalt {
       void cleanup() override;
       void execute(VkCommandBuffer cmd) override;
       ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
+      std::string get_name() const override { return name_; }
     };
 
     class BloomBlurPass final : public RenderPass {
       std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
       std::string fragment_blur_x = "../shaders/hdr_bloom_x.frag.spv";
       std::string fragment_blur_y = "../shaders/hdr_bloom_y.frag.spv";
+      std::string name_ = "Bloom Blur Pass";
 
       uint32_t effect_size_ = 512;
       VkExtent2D extent_{effect_size_, effect_size_};
@@ -94,11 +97,13 @@ namespace gestalt {
       void cleanup() override;
       void execute(VkCommandBuffer cmd) override;
       ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
+      std::string get_name() const override { return name_; }
     };
 
     class StreaksPass final : public RenderPass {
       std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
       std::string fragment_shader_source_ = "../shaders/hdr_streaks.frag.spv";
+      std::string name_ = "Streaks Pass";
 
       uint32_t effect_size_ = 512;
       VkExtent2D extent_{effect_size_, effect_size_};
@@ -140,11 +145,13 @@ namespace gestalt {
       void cleanup() override;
       void execute(VkCommandBuffer cmd) override;
       ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
+      std::string get_name() const override { return name_; }
     };
 
     class LuminancePass final : public RenderPass {
       std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
       std::string fragment_shader_source_ = "../shaders/to_luminance.frag.spv";
+      std::string name_ = "Luminance Pass";
 
       VkExtent2D extent64_{64, 64};
 
@@ -175,10 +182,12 @@ namespace gestalt {
       void cleanup() override;
       void execute(VkCommandBuffer cmd) override;
       ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
+      std::string get_name() const override { return name_; }
     };
     class LuminanceDownscalePass final : public RenderPass {
       std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
       std::string fragment_shader_source_ = "../shaders/downscale2x2.frag.spv";
+      std::string name_ = "Luminance Downscale Pass";
 
       VkExtent2D extent64_{64, 64};
       VkExtent2D extent32_{32, 32};
@@ -220,10 +229,12 @@ namespace gestalt {
       void cleanup() override;
       void execute(VkCommandBuffer cmd) override;
       ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
+      std::string get_name() const override { return name_; }
     };
     class LightAdaptationPass final : public RenderPass {
       std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
       std::string adaptation_fragment_shader_source_ = "../shaders/hdr_light_adaptation.frag.spv";
+      std::string name_ = "Light Adaption Pass";
 
       VkExtent2D extent1_{1, 1};
 
@@ -261,11 +272,13 @@ namespace gestalt {
       void cleanup() override;
       void execute(VkCommandBuffer cmd) override;
       ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
+      std::string get_name() const override { return name_; }
     };
 
     class TonemapPass final : public RenderPass {
       std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
       std::string fragment_shader_source_ = "../shaders/hdr_final.frag.spv";
+      std::string name_ = "Tonemap Pass";
 
       uint32_t effect_size_ = 512;
       VkExtent2D extent_{effect_size_, effect_size_};
@@ -307,6 +320,7 @@ namespace gestalt {
       void cleanup() override;
       void execute(VkCommandBuffer cmd) override;
       ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
+      std::string get_name() const override { return name_; }
     };
   }  // namespace graphics
 }  // namespace gestalt

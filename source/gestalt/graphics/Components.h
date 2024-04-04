@@ -41,7 +41,11 @@ namespace gestalt {
       size_t material = default_material;
     };
 
-    struct MeshComponent {
+    struct Component {
+      mutable bool is_dirty = true;
+    };
+
+    struct MeshComponent : Component {
       size_t mesh;
     };
 
@@ -51,7 +55,7 @@ namespace gestalt {
       AABB local_bounds;
     };
 
-    struct CameraComponent {
+    struct CameraComponent : Component {
       size_t camera_data;
       // TODO : add more camera settings
     };
@@ -63,14 +67,13 @@ namespace gestalt {
 
     enum class LightType { kDirectional, kPoint, kSpot };
 
-    struct LightComponent {
+    struct LightComponent : Component {
       LightType type;
       glm::vec3 color;
       float intensity;
       float inner_cone;  // Used for spot lights
       float outer_cone;  // Used for spot lights
       std::vector<size_t> light_view_projections;
-      bool is_dirty = true;
     };
 
     constexpr auto kUnusedTexture = std::numeric_limits<uint16_t>::max();
@@ -120,7 +123,7 @@ namespace gestalt {
       bool is_dirty = true;
     };
 
-    struct TransformComponent {
+    struct TransformComponent : Component {
       glm::vec3 position;
       glm::quat rotation;
       float scale;  // uniform scale for now
@@ -130,11 +133,9 @@ namespace gestalt {
       glm::vec3 parent_position;
       glm::quat parent_rotation;
       float parent_scale;
-
-      mutable bool is_dirty = true;
     };
 
-    struct NodeComponent {
+    struct NodeComponent :Component {
       std::string name;
       entity parent = invalid_entity;
       std::vector<entity> children;

@@ -27,7 +27,7 @@ namespace gestalt {
 
       const size_t camera_index = repository_->cameras.add(CameraData{});
       repository_->camera_components.add(component_factory_->create_entity_node().first,
-                                         CameraComponent{camera_index});
+                                         CameraComponent{true, camera_index});
 
       component_factory_->create_directional_light(
           glm::vec3(1.f, 0.957f, 0.917f), 5.f, glm::vec3(-0.216, 0.941, -0.257), get_root_entity());
@@ -142,7 +142,7 @@ namespace gestalt {
                                                                const glm::vec3& position,
                                                                const glm::quat& rotation,
                                                                const float& scale) const {
-      repository_->transform_components.add(entity, TransformComponent(position, rotation, scale));
+      repository_->transform_components.add(entity, TransformComponent{true, position, rotation, scale});
       auto& transform = repository_->transform_components.get(entity)->get();
       transform.matrix = repository_->model_matrices.add(glm::mat4(1.0));
     }
@@ -172,7 +172,7 @@ namespace gestalt {
                                                        const size_t mesh_index) {
       assert(entity != invalid_entity);
 
-      repository_->mesh_components.add(entity, MeshComponent{mesh_index});
+      repository_->mesh_components.add(entity, MeshComponent{{true}, mesh_index});
     }
 
     void ComponentFactory::add_camera_component(const entity entity,

@@ -11,6 +11,7 @@ namespace gestalt {
     class DeferredPass final : public RenderPass {
       std::string vertex_shader_source_ = "../shaders/geometry.vert.spv";
       std::string fragment_shader_source_ = "../shaders/geometry_deferred.frag.spv";
+      std::string name_ = "Deferred Pass";
 
       ShaderPassDependencyInfo deps_ = {
           .read_resources = {},
@@ -49,12 +50,14 @@ namespace gestalt {
       void cleanup() override;
       void execute(VkCommandBuffer cmd) override;
       ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
+      std::string get_name() const override { return name_; }
     };
 
     class MeshletPass final : public RenderPass {
       std::string mesh_shader_source_ = "../shaders/geometry.mesh.spv";
       std::string task_shader_source_ = "../shaders/geometry.task.spv";
       std::string fragment_shader_source_ = "../shaders/meshlet_deferred.frag.spv";
+      std::string name_ = "Meshlet Pass";
 
       ShaderPassDependencyInfo deps_ = {
           .read_resources = {},
@@ -87,11 +90,13 @@ namespace gestalt {
       void cleanup() override;
       void execute(VkCommandBuffer cmd) override;
       ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
+      std::string get_name() const override { return name_; }
     };
 
     class TransparentPass final : public RenderPass {
       std::string vertex_shader_source_ = "../shaders/geometry.vert.spv";
       std::string fragment_shader_source_ = "../shaders/transparent.frag.spv";
+      std::string name_ = "Transparent Pass";
 
       ShaderPassDependencyInfo deps_ = {
           .read_resources = {std::make_shared<DepthImageResource>("directional_shadow_map", 1.f)},
@@ -129,11 +134,13 @@ namespace gestalt {
       void cleanup() override;
       void execute(VkCommandBuffer cmd) override;
       ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
+      std::string get_name() const override { return name_; }
     };
 
     class DebugAabbPass final : public RenderPass {
       std::string vertex_shader_source_ = "../shaders/debug_aabb.vert.spv";
       std::string fragment_shader_source_ = "../shaders/debug_aabb.frag.spv";
+      std::string name_ = "Debug AABB Pass";
 
       ShaderPassDependencyInfo deps_ = {
           .read_resources = {},
@@ -175,6 +182,7 @@ namespace gestalt {
       void cleanup() override;
       void execute(VkCommandBuffer cmd) override;
       ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
+      std::string get_name() const override { return name_; }
     };
   }  // namespace graphics
 }  // namespace gestalt

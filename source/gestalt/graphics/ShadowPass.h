@@ -9,6 +9,7 @@ namespace gestalt {
     class DirectionalDepthPass final : public RenderPass {
       std::string vertex_shader_source_ = "../shaders/shadow_geometry.vert.spv";
       std::string fragment_shader_source_ = "../shaders/shadow_depth.frag.spv";
+      std::string name_ = "Direction Depth Pass";
 
       VkExtent2D effect_size_{2048, 2048};
 
@@ -46,6 +47,7 @@ namespace gestalt {
       void cleanup() override;
       void execute(VkCommandBuffer cmd) override;
       ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
+      std::string get_name() const override { return name_; }
     };
   }  // namespace graphics
 }  // namespace gestalt

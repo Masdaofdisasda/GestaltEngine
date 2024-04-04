@@ -9,6 +9,7 @@ namespace gestalt {
     class SsaoFilterPass final : public RenderPass {
       std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
       std::string fragment_shader_source_ = "../shaders/ssao_filter.frag.spv";
+      std::string name_ = "SSAO Filter Pass";
 
       uint32_t effect_size_ = 1024;
       VkExtent2D extent_{effect_size_, effect_size_};
@@ -50,12 +51,14 @@ namespace gestalt {
       void cleanup() override;
       void execute(VkCommandBuffer cmd) override;
       ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
+      std::string get_name() const override { return name_; }
     };
 
     class SsaoBlurPass final : public RenderPass {
       std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
       std::string fragment_blur_x = "../shaders/ssao_blur_x.frag.spv";
       std::string fragment_blur_y = "../shaders/ssao_blur_y.frag.spv";
+      std::string name_ = "SSAO Blur Pass";
 
       uint32_t effect_size_ = 1024;
       VkExtent2D extent_{effect_size_, effect_size_};
@@ -95,11 +98,13 @@ namespace gestalt {
       void cleanup() override;
       void execute(VkCommandBuffer cmd) override;
       ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
+      std::string get_name() const override { return name_; }
     };
 
     class SsaoFinalPass final : public RenderPass {
       std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
       std::string fragment_shader_source_ = "../shaders/ssao_final.frag.spv";
+      std::string name_ = "SSAO Final Pass";
 
       uint32_t effect_size_ = 1024;
       VkExtent2D extent_{effect_size_, effect_size_};
@@ -138,6 +143,7 @@ namespace gestalt {
       void cleanup() override;
       void execute(VkCommandBuffer cmd) override;
       ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
+      std::string get_name() const override { return name_; }
     };
   }  // namespace graphics
 }  // namespace gestalt

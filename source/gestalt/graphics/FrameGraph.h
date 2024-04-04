@@ -129,6 +129,7 @@ namespace gestalt {
 
       virtual void execute(VkCommandBuffer cmd) = 0;
       virtual ShaderPassDependencyInfo& get_dependencies() = 0;
+      virtual std::string get_name() const = 0;
       virtual void cleanup() = 0;
 
     protected:
