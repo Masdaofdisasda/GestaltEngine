@@ -68,7 +68,7 @@ namespace gestalt {
         AllocatedBuffer vertexDataBuffer;
       } scene_geometry_;
 
-      AllocatedBuffer per_frame_data_buffer;
+      std::array<AllocatedBuffer, 2> per_frame_data_buffer;
       VkDescriptorSetLayout per_frame_data_layout;
 
       struct ibl_data {

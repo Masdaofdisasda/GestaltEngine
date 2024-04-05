@@ -102,13 +102,16 @@ void main() {
 	// Calculate lighting contribution from image based lighting source (IBL)
 	vec3 diffuseIbl, specularIbl;
 	getIBLContribution(pbrInputs, n, pbrInputs.reflection, texEnvMap, texEnvMapIrradiance, texBdrfLut, diffuseIbl, specularIbl);
+	float ibl_strength = max(shadow, 0.005);
+	diffuseIbl *= MeR.r * ibl_strength;
+	specularIbl *= MeR.r * shadow; // removes highlights in shaded areas
 
 	if (params.ibl_mode == 0) {
-		color = (diffuseIbl + specularIbl) * MeR.r * shadow;
+		color = diffuseIbl + specularIbl;
 	} else if (params.ibl_mode == 1) {
-		color = diffuseIbl * MeR.r * shadow;
+		color = diffuseIbl;
 	} else if (params.ibl_mode == 2) {
-		color = specularIbl * MeR.r * shadow;
+		color = specularIbl;
 	}
 
 	// directional light contribution

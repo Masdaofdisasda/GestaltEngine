@@ -44,7 +44,9 @@ namespace gestalt {
       repository_ = repository;
       resource_loader_.init(gpu);
 
-      per_frame_data_buffer = create_buffer(
+      per_frame_data_buffer[0] = create_buffer(
+          sizeof(PerFrameData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+      per_frame_data_buffer[1] = create_buffer(
           sizeof(PerFrameData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
       

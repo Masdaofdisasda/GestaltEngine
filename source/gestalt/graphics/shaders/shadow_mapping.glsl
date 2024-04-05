@@ -13,15 +13,11 @@ float shadowFactor(vec4 shadowCoord, sampler2D shadowMap, float depthBias)
 {
 	vec3 shadowCoords = shadowCoord.xyz / shadowCoord.w;
 
-	float shadowSample = PCF( 13, shadowCoords.xy, shadowCoords.z + depthBias, shadowMap);
+	float shadowSample = PCF( 13, shadowCoords.xy, shadowCoords.z - depthBias, shadowMap);
 
-	return mix(0.01, 1.0, shadowSample);
+	return mix(0.00001, 1.0, shadowSample);
 }
 
 float calculateDynamicBias(vec3 normal, vec3 lightDir) {
-    float bias = 0.005; // Base bias
-    float angle = max(dot(normal, -lightDir), 0.0);
-    // Increase bias for glancing angles
-    bias += (1.0 - angle) * 0.005;
-    return bias;
+    return max(0.01 * (1.0 - dot(normal, -lightDir)), 0.005);  
 }

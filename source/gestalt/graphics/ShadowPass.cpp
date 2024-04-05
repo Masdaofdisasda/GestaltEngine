@@ -71,6 +71,8 @@ namespace gestalt {
 
       vkCmdBeginRendering(cmd, &renderInfo);
 
+      const char frameIndex = gpu_.get_current_frame();
+
       {
         // TODO this should be done elsewhere
         auto& cam = repository_->cameras.get(0);
@@ -81,15 +83,16 @@ namespace gestalt {
             = glm::inverse(cam.projection_matrix * cam.view_matrix);
 
         void* mapped_data;
-        VmaAllocation allocation = resource_manager_->per_frame_data_buffer.allocation;
+        VmaAllocation allocation = resource_manager_->per_frame_data_buffer[frameIndex].allocation;
         VK_CHECK(vmaMapMemory(gpu_.allocator, allocation, &mapped_data));
         const auto scene_uniform_data = static_cast<PerFrameData*>(mapped_data);
         *scene_uniform_data = registry_->per_frame_data_;
-        vmaUnmapMemory(gpu_.allocator, resource_manager_->per_frame_data_buffer.allocation);
+        vmaUnmapMemory(gpu_.allocator,
+                       resource_manager_->per_frame_data_buffer[frameIndex].allocation);
       }
 
       VkDescriptorBufferInfo buffer_info;
-      buffer_info.buffer = resource_manager_->per_frame_data_buffer.buffer;
+      buffer_info.buffer = resource_manager_->per_frame_data_buffer[frameIndex].buffer;
       buffer_info.offset = 0;
       buffer_info.range = sizeof(PerFrameData);
 

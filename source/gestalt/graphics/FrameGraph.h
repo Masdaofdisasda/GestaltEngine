@@ -141,7 +141,7 @@ namespace gestalt {
       std::shared_ptr<foundation::Repository> repository_;
     };
 
-    constexpr unsigned int FRAME_OVERLAP = 2;
+    constexpr unsigned char kFrameOverlap = 2;
 
     class FrameGraph {
 
@@ -173,11 +173,10 @@ namespace gestalt {
 
       bool resize_requested_{false};
       uint32_t swapchain_image_index_{0};
-      uint32_t frame_number_{0};
-      std::vector<FrameData> frames_{FRAME_OVERLAP};
+      std::vector<FrameData> frames_{kFrameOverlap};
       bool acquire_next_image();
       void present(VkCommandBuffer cmd);
-      FrameData& get_current_frame() { return frames_[frame_number_ % FRAME_OVERLAP]; }
+      FrameData& get_current_frame() { return frames_[gpu_.get_current_frame()]; }
       application::Window& get_window() { return window_; }
 
       void build_graph();

@@ -67,8 +67,10 @@ namespace gestalt {
 
       vkCmdBeginRendering(cmd, &renderInfo);
 
+      const char frameIndex = gpu_.get_current_frame();
+
       VkDescriptorBufferInfo buffer_info;
-      buffer_info.buffer = resource_manager_->per_frame_data_buffer.buffer;
+      buffer_info.buffer = resource_manager_->per_frame_data_buffer[frameIndex].buffer;
       buffer_info.offset = 0;
       buffer_info.range = sizeof(PerFrameData);
 
@@ -166,8 +168,10 @@ namespace gestalt {
 
       vkCmdBeginRendering(cmd, &renderInfo);
 
+      const char frameIndex = gpu_.get_current_frame();
+
       VkDescriptorBufferInfo buffer_info;
-      buffer_info.buffer = resource_manager_->per_frame_data_buffer.buffer;
+      buffer_info.buffer = resource_manager_->per_frame_data_buffer[frameIndex].buffer;
       buffer_info.offset = 0;
       buffer_info.range = sizeof(PerFrameData);
 

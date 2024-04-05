@@ -54,7 +54,7 @@ namespace gestalt {
       render_passes_.push_back(std::make_unique<TonemapPass>());
       render_passes_.push_back(std::make_unique<DebugAabbPass>());
 
-      for (int i = 0; i < FRAME_OVERLAP; i++) {
+      for (int i = 0; i < kFrameOverlap; i++) {
         std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> frame_sizes = {
             {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3},
             {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3},
@@ -411,8 +411,6 @@ namespace gestalt {
         resize_requested_ = true;
         return;
       }
-
-      frame_number_++;
     }
   }  // namespace graphics
 }  // namespace gestalt
