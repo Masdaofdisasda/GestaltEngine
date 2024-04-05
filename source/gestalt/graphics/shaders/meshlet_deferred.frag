@@ -2,6 +2,9 @@
 
 #extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_GOOGLE_include_directive : require
+#extension GL_EXT_shader_16bit_storage : require
+#extension GL_EXT_shader_explicit_arithmetic_types: require
+#extension GL_EXT_shader_explicit_arithmetic_types_float16: require
 #include "per_frame_structs.glsl"
 #include "input_structures.glsl"
 #include "normal_mapping.glsl"
@@ -23,11 +26,11 @@ vec3 sRGBToLinear(vec3 color) {
 
 void main() {
 
-	uint albedoIndex =			materialData[nonuniformEXT(inMaterialIndex)].albedo_tex_index;
-	uint metalicRoughIndex =	materialData[nonuniformEXT(inMaterialIndex)].metal_rough_tex_index;
-	uint normalIndex =			materialData[nonuniformEXT(inMaterialIndex)].normal_tex_index;
-	uint emissiveIndex =		materialData[nonuniformEXT(inMaterialIndex)].emissive_tex_index;
-	uint occlusionIndex =		materialData[nonuniformEXT(inMaterialIndex)].occlusion_tex_index;
+	uint16_t albedoIndex =			materialData[nonuniformEXT(inMaterialIndex)].albedo_tex_index;
+	uint16_t metalicRoughIndex =	materialData[nonuniformEXT(inMaterialIndex)].metal_rough_tex_index;
+	uint16_t normalIndex =			materialData[nonuniformEXT(inMaterialIndex)].normal_tex_index;
+	uint16_t emissiveIndex =		materialData[nonuniformEXT(inMaterialIndex)].emissive_tex_index;
+	uint16_t occlusionIndex =		materialData[nonuniformEXT(inMaterialIndex)].occlusion_tex_index;
 
     vec2 UV = inUV;
 	vec3 inNormal = normalize(inNormal_BiTanX.xyz);
@@ -53,12 +56,12 @@ void main() {
 		n = perturbNormal(n, normalize(viewPos - inPosition), normal_sample, UV);
 	}
 
-	vec4 Ke = vec4(materialData[nonuniformEXT(inMaterialIndex)].emissiveFactor, 1.0);
+	vec4 Ke = vec4(materialData[nonuniformEXT(inMaterialIndex)].emissiveColor, 1.0);
 	if(emissiveIndex != uint(-1)) {
 		Ke = texture(nonuniformEXT(textures[emissiveIndex]), UV);
-		Ke.rgb *= materialData[nonuniformEXT(inMaterialIndex)].emissiveFactor;
-		Ke.rgb = sRGBToLinear(Ke.rgb);
 	}
+		Ke.rgb *= materialData[nonuniformEXT(inMaterialIndex)].emissiveColor;
+		Ke.rgb = sRGBToLinear(Ke.rgb);
 
 	float Kao = 1.0;
 	if (occlusionIndex != uint(-1)) {

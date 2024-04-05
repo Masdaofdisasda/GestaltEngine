@@ -2,6 +2,7 @@
 #version 460
 
 #extension GL_GOOGLE_include_directive : require
+#extension GL_EXT_shader_16bit_storage : require
 #include "per_frame_structs.glsl"
 
 layout(push_constant) uniform PushConstants {

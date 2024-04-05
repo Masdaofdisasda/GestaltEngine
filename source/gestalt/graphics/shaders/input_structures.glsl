@@ -6,7 +6,6 @@ layout(set = 1, binding = 3) uniform sampler2D texBdrfLut;
 layout(set = 2, binding = 4) uniform sampler2D textures[];
 
 layout(std430, set = 3, binding = 5) readonly buffer MaterialConstants {
-
     uint16_t albedo_tex_index;
     uint16_t metal_rough_tex_index;
     uint16_t normal_tex_index;
