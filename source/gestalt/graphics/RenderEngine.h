@@ -1,6 +1,5 @@
 ﻿#pragma once
 
-#include <vector>
 #include <functional>
 
 #include "Gui.h"
@@ -11,7 +10,6 @@
 #include "InputSystem.h"
 #include "Gpu.h"
 #include "TmeTrackingService.h"
-#include "Camera.h"
 
 namespace gestalt {
   class RenderEngine {
@@ -38,10 +36,6 @@ namespace gestalt {
     void register_gui_actions();
 
     void update_scene() const;
-
-    std::vector<std::unique_ptr<CameraPositionerInterface>> camera_positioners_{1};
-    uint32_t current_camera_positioner_index_{0};
-    Camera active_camera_{};
 
     // utility services
     application::TimeTrackingService time_tracking_service_;

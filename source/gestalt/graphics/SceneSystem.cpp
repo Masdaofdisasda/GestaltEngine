@@ -384,6 +384,39 @@ namespace gestalt {
       resource_manager_->destroy_buffer(resource_manager_->light_data.view_proj_matrices);
     }
 
+
+    void CameraSystem::prepare() {
+        free_fly_camera_ = std::make_unique<FreeFlyCamera>();
+      free_fly_camera_->init(glm::vec3(7, 1.8, -7), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+        active_camera_ = std::make_unique<Camera>();
+      active_camera_->init(*free_fly_camera_);
+    }
+
+    void CameraSystem::update_cameras(const float delta_time, const Movement& movement, float aspect) {
+      aspect_ = aspect;
+              active_camera_->update(delta_time, movement);
+    }
+
+    void CameraSystem::update() {
+      glm::mat4 view = active_camera_->get_view_matrix();
+
+      // camera projection
+      glm::mat4 projection = glm::perspective(
+          glm::radians(70.f), aspect_, 0.1f,
+          1000.f);
+
+      // invert the Y direction on projection matrix so that we are more similar
+      // to opengl and gltf axis
+      projection[1][1] *= -1;
+
+      auto& camera = repository_->cameras.get(0);  // assume this as the main camera for now
+      camera.view_matrix = view;
+      camera.projection_matrix = projection;
+    }
+
+    void CameraSystem::cleanup() {
+    }
+
     glm::mat4 TransformSystem::get_model_matrix(const TransformComponent& transform) {
       return translate(glm::mat4(1.0f), transform.position) * mat4_cast(transform.rotation)
              * scale(glm::mat4(1.0f), glm::vec3(transform.scale));

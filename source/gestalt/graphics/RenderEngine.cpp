@@ -47,13 +47,6 @@ namespace gestalt {
     register_gui_actions();
     imgui_->init(gpu_, window_, frame_graph_->get_swapchain(), repository_, gui_actions_);
 
-    for (auto& cam : camera_positioners_) {
-      auto free_fly_camera_ptr = std::make_unique<FreeFlyCamera>();
-      free_fly_camera_ptr->init(glm::vec3(7, 1.8, -7), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-      cam = std::move(free_fly_camera_ptr);
-    }
-    active_camera_.init(*camera_positioners_.at(current_camera_positioner_index_));
-
     // everything went fine
     is_initialized_ = true;
   }
@@ -111,27 +104,13 @@ namespace gestalt {
   }
 
   void RenderEngine::update_scene() const {
-    // TODO move to camera system
-
-    glm::mat4 view = active_camera_.get_view_matrix();
-
-    // camera projection
-    glm::mat4 projection = glm::perspective(
-        glm::radians(70.f), (float)window_.extent.width / (float)window_.extent.height, 0.1f,
-        1000.f);
-
-    // invert the Y direction on projection matrix so that we are more similar
-    // to opengl and gltf axis
-    projection[1][1] *= -1;
-
-    auto& camera = repository_->cameras.get(0);  // assume this as the main camera
-    camera.view_matrix = view;
-    camera.projection_matrix = projection;
 
     frame_graph_->get_config().light_adaptation.delta_time
         = time_tracking_service_.get_delta_time();
 
-    scene_manager_->update_scene();
+    scene_manager_->update_scene(time_tracking_service_.get_delta_time(),
+                                 input_system_.get_movement(),
+                                 static_cast<float>(window_.extent.width) / static_cast<float>(window_.extent.height));
   }
 
   void RenderEngine::run() {
@@ -159,8 +138,6 @@ namespace gestalt {
 
         imgui_->update(e);
       }
-
-      active_camera_.update(time_tracking_service_.get_delta_time(), input_system_.get_movement());
 
       if (freeze_rendering_) {
         // throttle the speed to avoid the endless spinning

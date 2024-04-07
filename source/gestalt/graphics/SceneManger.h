@@ -1,9 +1,6 @@
 ﻿#pragma once
 
 #include <filesystem>
-#include <iosfwd>
-#include <iosfwd>
-#include <vector>
 #include <vector>
 
 #include "Components.h"
@@ -118,6 +115,7 @@ namespace gestalt {
 
       std::unique_ptr<MaterialSystem> material_system_;
       std::unique_ptr<SceneSystem> light_system_;
+      std::unique_ptr<CameraSystem> camera_system_;
       std::unique_ptr<SceneSystem> transform_system_;
       std::unique_ptr<SceneSystem> render_system_;
 
@@ -135,7 +133,7 @@ namespace gestalt {
                 const std::shared_ptr<foundation::Repository>& repository);
       void cleanup();
 
-      void update_scene();
+      void update_scene(float delta_time, const Movement& movement, float aspect);
 
       void request_scene(const std::string& path);
       ComponentFactory& get_component_factory() const { return *component_factory_; }

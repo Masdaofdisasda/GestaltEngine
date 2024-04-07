@@ -38,6 +38,8 @@ namespace gestalt {
       material_system_->init(gpu, resource_manager, repository);
       light_system_ = std::make_unique<LightSystem>();
       light_system_->init(gpu, resource_manager, repository);
+      camera_system_= std::make_unique<CameraSystem>();
+      camera_system_->init(gpu, resource_manager, repository);
       transform_system_ = std::make_unique<TransformSystem>();
       transform_system_->init(gpu, resource_manager, repository);
       render_system_ = std::make_unique<RenderSystem>();
@@ -276,7 +278,7 @@ namespace gestalt {
       node.parent = get_root_entity();
     }
 
-    void SceneManager::update_scene() {
+    void SceneManager::update_scene(const float delta_time, const Movement& movement, const float aspect) {
       if (!scene_path_.empty()) {
         load_scene(scene_path_);
         scene_path_.clear();
@@ -285,6 +287,8 @@ namespace gestalt {
 
       material_system_->update();
       light_system_->update();
+      camera_system_->update_cameras(delta_time, movement, aspect);
+      camera_system_->update();
       transform_system_->update();
       render_system_->update();
     }
