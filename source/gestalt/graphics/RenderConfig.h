@@ -53,7 +53,7 @@ namespace gestalt {
         float adaptation_speed_dark2light{.01f};
         float adaptation_speed_light2dark{.02f};
         float delta_time{0.16f};
-        float min_luminance{0.002f};
+        float min_luminance{0.0115f};
         float max_luminance{10.0f};
       } light_adaptation{};
 

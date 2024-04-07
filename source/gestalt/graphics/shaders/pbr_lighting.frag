@@ -70,7 +70,7 @@ void main() {
 
 	vec4 Kd = vec4(albedoMetal.rgb, 1.0);
 
-	vec3 n = normalize(normalRough.rgb * 2.0 - 1.0);
+	vec3 n = normalize(normalRough.rgb * 2.0 - 1.0); //TODO
 
 	vec4 Ke = vec4(emissiveOcclusion.rgb, 1.0);
 	
@@ -94,44 +94,83 @@ void main() {
 		shadow = shadowFactor(lightSpacePos, shadowMap, bias).r;
 	}
 
-	PBRInfo pbrInputs;
-	calculatePBRInputsMetallicRoughness(Kd, n, viewPos.xyz, worldPos, MeR, pbrInputs, texEnvMap, texEnvMapIrradiance, texBdrfLut);
-
-	vec3 color = vec3(0.0);
+	MaterialInfo materialInfo;
+	calculatePBRInputsMetallicRoughness(Kd, n, viewPos.xyz, worldPos, MeR, materialInfo);
 
 	// Calculate lighting contribution from image based lighting source (IBL)
-	vec3 diffuseIbl, specularIbl;
-	getIBLContribution(pbrInputs, n, pbrInputs.reflection, texEnvMap, texEnvMapIrradiance, texBdrfLut, diffuseIbl, specularIbl);
-	float ibl_strength = max(shadow, 0.005);
-	diffuseIbl *= MeR.r * ibl_strength;
-	specularIbl *= MeR.r * shadow; // removes highlights in shaded areas
-
 	if (params.ibl_mode == 0) {
-		color = diffuseIbl + specularIbl;
+		materialInfo.f_diffuse_ibl += getIBLRadianceLambertian(materialInfo);
+		materialInfo.f_specular_ibl += getIBLRadianceGGX(materialInfo);
 	} else if (params.ibl_mode == 1) {
-		color = diffuseIbl;
+		materialInfo.f_diffuse_ibl += getIBLRadianceLambertian(materialInfo);
 	} else if (params.ibl_mode == 2) {
-		color = specularIbl;
+		materialInfo.f_specular_ibl += getIBLRadianceGGX(materialInfo);
 	}
 
 	// directional light contribution
 	if (params.shading_mode == 0 || params.shading_mode == 1) {
 		for (int i = 0; i < params.num_dir_lights; ++i) {
-			color += calculatePBRLightContributionDir(pbrInputs, dirLight[i].color, dirLight[i].direction, dirLight[i].intensity) * shadow;
+
+		vec3 pointToLight = dirLight[i].direction;
+
+        // BSTF
+		vec3 n = materialInfo.n;
+		vec3 v = materialInfo.v;
+        vec3 l = normalize(pointToLight);   // Direction from surface point to light
+        vec3 h = normalize(l + v);          // Direction of the vector between l and v, called halfway vector
+		float NdotL = clamp(dot(n, l), 0.001, 1.0);
+        float NdotV = clamp(dot(n, v), 0.0, 1.0);
+		float NdotH = clamp(dot(n, h), 0.0, 1.0);
+		float LdotH = clamp(dot(l, h), 0.0, 1.0);
+		float VdotH = clamp(dot(v, h), 0.0, 1.0);
+
+		if (NdotL <= 0.0 && NdotV <= 0.0) { continue; }
+
+        // Calculation of analytical light
+        // https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
+        vec3 intensity = getDirectionalLighIntensity(dirLight[i].color, dirLight[i].intensity);
+        materialInfo.f_diffuse += shadow * intensity * NdotL *  BRDF_lambertian(materialInfo.f0, materialInfo.f90, materialInfo.c_diff, materialInfo.specularWeight, VdotH);
+        materialInfo.f_specular += shadow * intensity * NdotL * BRDF_specularGGX(materialInfo.f0, materialInfo.f90, materialInfo.alphaRoughness, materialInfo.specularWeight, VdotH, NdotL, NdotV, NdotH);
 		}
 	}
 
+	// point light contribution
 	if (params.shading_mode == 0 || params.shading_mode == 2) {
 		for (int i = 0; i < params.num_point_lights; ++i) {
-  			color += calculatePBRLightContributionPoint(pbrInputs, worldPos, pointLight[i].color, pointLight[i].position, pointLight[i].intensity);
+
+		vec3 pointToLight = pointLight[i].position - worldPos;
+
+        // BSTF
+		vec3 n = materialInfo.n;
+		vec3 v = materialInfo.v;
+        vec3 l = normalize(pointToLight);   // Direction from surface point to light
+        vec3 h = normalize(l + v);          // Direction of the vector between l and v, called halfway vector
+		float NdotL = clamp(dot(n, l), 0.001, 1.0);
+        float NdotV = clamp(dot(n, v), 0.0, 1.0);
+		float NdotH = clamp(dot(n, h), 0.0, 1.0);
+		float LdotH = clamp(dot(l, h), 0.0, 1.0);
+		float VdotH = clamp(dot(v, h), 0.0, 1.0);
+
+		if (NdotL <= 0.0 && NdotV <= 0.0) { continue; }
+
+        // Calculation of analytical light
+        // https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
+        vec3 intensity = getPointLighIntensity(pointLight[i].color, pointLight[i].intensity, pointToLight);
+        materialInfo.f_diffuse += intensity * NdotL *  BRDF_lambertian(materialInfo.f0, materialInfo.f90, materialInfo.c_diff, materialInfo.specularWeight, VdotH);
+        materialInfo.f_specular += intensity * NdotL * BRDF_specularGGX(materialInfo.f0, materialInfo.f90, materialInfo.alphaRoughness, materialInfo.specularWeight, VdotH, NdotL, NdotV, NdotH);
 		}
 	}
-	
-	color += Ke.rgb;
+
+	materialInfo.f_emissive = Ke.rgb;
+
+	float ao = MeR.r;
+	vec3 diffuse = materialInfo.f_diffuse + materialInfo.f_diffuse_ibl * ao;
+	vec3 specular = materialInfo.f_specular + materialInfo.f_specular_ibl * ao * shadow;
+
+	vec3 color = materialInfo.f_emissive + diffuse + specular;
 
 	if (params.debugMode == 0) {
 		outFragColor = vec4(color, 1.0);
-
 	} else if (params.debugMode == 1) {
 		outFragColor = vec4(Kd.rgb, 1.0);
 	} else if (params.debugMode == 2) {
