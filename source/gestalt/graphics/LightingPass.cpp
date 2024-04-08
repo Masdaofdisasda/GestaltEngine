@@ -12,7 +12,8 @@ namespace gestalt {
     void LightingPass::prepare() {
       fmt::print("preparing lighting pass\n");
 
-      descriptor_layouts_.push_back(resource_manager_->per_frame_data_layout);
+      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
+      descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
       descriptor_layouts_.push_back(resource_manager_->ibl_data.IblLayout);
       descriptor_layouts_.emplace_back(
           DescriptorLayoutBuilder()
@@ -84,9 +85,10 @@ namespace gestalt {
       vkCmdBeginRendering(cmd, &renderInfo);
 
       const char frameIndex = gpu_.get_current_frame();
+      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
 
       VkDescriptorBufferInfo buffer_info;
-      buffer_info.buffer = resource_manager_->per_frame_data_buffer[frameIndex].buffer;
+      buffer_info.buffer = per_frame_buffers.uniform_buffers[frameIndex].buffer;
       buffer_info.offset = 0;
       buffer_info.range = sizeof(PerFrameData);
 
@@ -134,7 +136,7 @@ namespace gestalt {
       vkCmdSetViewport(cmd, 0, 1, &viewport_);
       vkCmdSetScissor(cmd, 0, 1, &scissor_);
       registry_->config_.lighting.invViewProj
-          = glm::inverse(registry_->per_frame_data_.viewproj);
+          = per_frame_buffers.data.inv_viewproj;
       registry_->config_.lighting.num_dir_lights = repository_->directional_lights.size();
       registry_->config_.lighting.num_point_lights = repository_->point_lights.size();
 

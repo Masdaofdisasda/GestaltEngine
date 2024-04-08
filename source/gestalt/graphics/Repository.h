@@ -1,11 +1,29 @@
 ﻿#pragma once
 
+#include <typeindex>
+
 #include "vk_types.h"
 #include "Components.h"
 #include "GpuResources.h"
 
 namespace gestalt {
   namespace foundation {
+
+    class DataHolder {
+    public:
+      virtual ~DataHolder() = default;
+    };
+
+    template <typename T> class Holder : public DataHolder {
+    public:
+      T data;
+
+      // Constructor to initialize data if needed
+      Holder(const T& initialData) : data(initialData) {}
+      virtual ~Holder() = default;
+    };
+
+
     template <typename ComponentType> class ComponentContainer {
     public:
       size_t size() const { return components_.size(); }
@@ -79,7 +97,28 @@ namespace gestalt {
     } constexpr kLimits = {};
 
     class Repository {
+
+      
+    std::unordered_map<std::type_index, std::unique_ptr<DataHolder>> holders;
+
     public:
+
+      template <typename T> void add_buffer(const T& data) {
+        const auto typeIndex = std::type_index(typeid(T));
+        assert(holders.find(typeIndex) == holders.end()
+               && "Instance for this type already exists.");
+        holders[typeIndex] = std::make_unique<Holder<T>>(data);
+      }
+
+      template <typename T> T& get_buffer() {
+        const auto typeIndex = std::type_index(typeid(T));
+        assert(holders.find(typeIndex) != holders.end()
+               && "Instance for this type does not exist.");
+        auto holder = dynamic_cast<Holder<T>*>(holders[typeIndex].get());
+        assert(holder != nullptr && "Holder cast failed.");
+        return holder->data;
+      }
+
       struct default_material {
         TextureHandle color_image;
         TextureHandle metallic_roughness_image;
@@ -115,6 +154,8 @@ namespace gestalt {
       ComponentContainer<CameraComponent> camera_components;
       ComponentContainer<LightComponent> light_components;
       ComponentContainer<TransformComponent> transform_components;
+
+
     };
   }  // namespace foundation
 }  // namespace gestalt

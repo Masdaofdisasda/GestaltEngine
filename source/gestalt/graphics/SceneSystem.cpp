@@ -390,6 +390,23 @@ namespace gestalt {
       free_fly_camera_->init(glm::vec3(7, 1.8, -7), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
         active_camera_ = std::make_unique<Camera>();
       active_camera_->init(*free_fly_camera_);
+
+      PerFrameDataBuffers per_frame_data_buffers{};
+
+
+
+      per_frame_data_buffers.uniform_buffers[0] = resource_manager_->create_buffer(
+            sizeof(PerFrameData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        per_frame_data_buffers.uniform_buffers[1] = resource_manager_->create_buffer(
+            sizeof(PerFrameData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+        per_frame_data_buffers.descriptor_layout
+            = graphics::DescriptorLayoutBuilder() //TODO move dependecy to graphics
+              .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
+              .build(gpu_.device, true);
+
+      repository_->add_buffer(per_frame_data_buffers);
     }
 
     void CameraSystem::update_cameras(const float delta_time, const Movement& movement, float aspect) {
@@ -401,9 +418,7 @@ namespace gestalt {
       glm::mat4 view = active_camera_->get_view_matrix();
 
       // camera projection
-      glm::mat4 projection = glm::perspective(
-          glm::radians(70.f), aspect_, 0.1f,
-          1000.f);
+      glm::mat4 projection = glm::perspective(glm::radians(70.f), aspect_, 0.1f, 1000.f);
 
       // invert the Y direction on projection matrix so that we are more similar
       // to opengl and gltf axis
@@ -412,6 +427,21 @@ namespace gestalt {
       auto& camera = repository_->cameras.get(0);  // assume this as the main camera for now
       camera.view_matrix = view;
       camera.projection_matrix = projection;
+
+      const char frameIndex = gpu_.get_current_frame();
+
+      auto& buffers = repository_->get_buffer<PerFrameDataBuffers>();
+      buffers.data.view = camera.view_matrix; // is the camera object actually needed?
+      buffers.data.proj = camera.projection_matrix;
+      buffers.data.viewproj = camera.projection_matrix * camera.view_matrix;
+      buffers.data.inv_viewproj = glm::inverse(camera.projection_matrix * camera.view_matrix);
+
+      void* mapped_data;
+      VmaAllocation allocation = buffers.uniform_buffers[frameIndex].allocation;
+      VK_CHECK(vmaMapMemory(gpu_.allocator, allocation, &mapped_data));
+      const auto scene_uniform_data = static_cast<PerFrameData*>(mapped_data);
+      *scene_uniform_data = buffers.data;
+      vmaUnmapMemory(gpu_.allocator, buffers.uniform_buffers[frameIndex].allocation);
     }
 
     void CameraSystem::cleanup() {

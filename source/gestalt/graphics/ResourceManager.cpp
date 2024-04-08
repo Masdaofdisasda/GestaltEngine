@@ -43,19 +43,6 @@ namespace gestalt {
       gpu_ = gpu;
       repository_ = repository;
       resource_loader_.init(gpu);
-
-      per_frame_data_buffer[0] = create_buffer(
-          sizeof(PerFrameData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-      per_frame_data_buffer[1] = create_buffer(
-          sizeof(PerFrameData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-      
-
-      per_frame_data_layout
-          = DescriptorLayoutBuilder()
-                .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                             VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
-                .build(gpu_.device, true);
       
       ibl_data.IblLayout = DescriptorLayoutBuilder()
                                .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,

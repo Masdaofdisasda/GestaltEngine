@@ -13,7 +13,9 @@ namespace gestalt {
 
     void DirectionalDepthPass::prepare() {
       fmt::print("Preparing directional depth pass\n");
-      descriptor_layouts_.push_back(resource_manager_->per_frame_data_layout);
+
+      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
+      descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
       descriptor_layouts_.emplace_back(
           DescriptorLayoutBuilder()
               .add_binding(17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, false,
@@ -72,27 +74,10 @@ namespace gestalt {
       vkCmdBeginRendering(cmd, &renderInfo);
 
       const char frameIndex = gpu_.get_current_frame();
-
-      {
-        // TODO this should be done elsewhere
-        auto& cam = repository_->cameras.get(0);
-        registry_->per_frame_data_.proj = cam.projection_matrix;
-        registry_->per_frame_data_.view = cam.view_matrix;
-        registry_->per_frame_data_.viewproj = cam.projection_matrix * cam.view_matrix;
-        registry_->per_frame_data_.inv_viewproj
-            = glm::inverse(cam.projection_matrix * cam.view_matrix);
-
-        void* mapped_data;
-        VmaAllocation allocation = resource_manager_->per_frame_data_buffer[frameIndex].allocation;
-        VK_CHECK(vmaMapMemory(gpu_.allocator, allocation, &mapped_data));
-        const auto scene_uniform_data = static_cast<PerFrameData*>(mapped_data);
-        *scene_uniform_data = registry_->per_frame_data_;
-        vmaUnmapMemory(gpu_.allocator,
-                       resource_manager_->per_frame_data_buffer[frameIndex].allocation);
-      }
+      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
 
       VkDescriptorBufferInfo buffer_info;
-      buffer_info.buffer = resource_manager_->per_frame_data_buffer[frameIndex].buffer;
+      buffer_info.buffer = per_frame_buffers.uniform_buffers[frameIndex].buffer;
       buffer_info.offset = 0;
       buffer_info.range = sizeof(PerFrameData);
 

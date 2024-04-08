@@ -12,7 +12,8 @@ namespace gestalt {
     void DeferredPass::prepare() {
       fmt::print("preparing deferred pass\n");
 
-      descriptor_layouts_.push_back(resource_manager_->per_frame_data_layout);
+      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
+      descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
       descriptor_layouts_.push_back(resource_manager_->ibl_data.IblLayout);
       descriptor_layouts_.push_back(repository_->material_data.resource_layout);
       descriptor_layouts_.push_back(repository_->material_data.constants_layout);
@@ -79,9 +80,10 @@ namespace gestalt {
       vkCmdBeginRendering(cmd, &renderInfo);
 
       const char frameIndex = gpu_.get_current_frame();
+      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
 
       VkDescriptorBufferInfo buffer_info;
-      buffer_info.buffer = resource_manager_->per_frame_data_buffer[frameIndex].buffer;
+      buffer_info.buffer = per_frame_buffers.uniform_buffers[frameIndex].buffer;
       buffer_info.offset = 0;
       buffer_info.range = sizeof(PerFrameData);
 
@@ -138,7 +140,8 @@ namespace gestalt {
     void MeshletPass::prepare() {
       fmt::print("preparing deferred pass\n");
 
-      descriptor_layouts_.push_back(resource_manager_->per_frame_data_layout);
+      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
+      descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
       descriptor_layouts_.push_back(resource_manager_->ibl_data.IblLayout);
       descriptor_layouts_.push_back(repository_->material_data.resource_layout);
       descriptor_layouts_.push_back(repository_->material_data.constants_layout);
@@ -206,9 +209,10 @@ namespace gestalt {
       vkCmdBeginRendering(cmd, &renderInfo);
 
       const char frameIndex = gpu_.get_current_frame();
+      auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
 
       VkDescriptorBufferInfo buffer_info;
-      buffer_info.buffer = resource_manager_->per_frame_data_buffer[frameIndex].buffer;
+      buffer_info.buffer = per_frame_buffers.uniform_buffers[frameIndex].buffer;
       buffer_info.offset = 0;
       buffer_info.range = sizeof(PerFrameData);
 
@@ -253,7 +257,8 @@ namespace gestalt {
     void TransparentPass::prepare() {
       fmt::print("preparing transparent pass\n");
 
-      descriptor_layouts_.push_back(resource_manager_->per_frame_data_layout);
+      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
+      descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
       descriptor_layouts_.push_back(resource_manager_->ibl_data.IblLayout);
       descriptor_layouts_.push_back(repository_->material_data.resource_layout);
       descriptor_layouts_.push_back(repository_->material_data.constants_layout);
@@ -317,9 +322,10 @@ namespace gestalt {
       vkCmdBeginRendering(cmd, &renderInfo);
 
       const char frameIndex = gpu_.get_current_frame();
+      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
 
       VkDescriptorBufferInfo buffer_info;
-      buffer_info.buffer = resource_manager_->per_frame_data_buffer[frameIndex].buffer;
+      buffer_info.buffer = per_frame_buffers.uniform_buffers[frameIndex].buffer;
       buffer_info.offset = 0;
       buffer_info.range = sizeof(PerFrameData);
 
@@ -373,7 +379,8 @@ namespace gestalt {
     void DebugAabbPass::prepare() {
       fmt::print("preparing debug_aabb pass\n");
 
-      descriptor_layouts_.push_back(resource_manager_->per_frame_data_layout);
+      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
+      descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
 
       VkShaderModule meshFragShader;
       vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &meshFragShader);
@@ -424,9 +431,10 @@ namespace gestalt {
           = vkinit::rendering_info(color_image->getExtent2D(), &colorAttachment, &depthAttachment);
 
       const char frameIndex = gpu_.get_current_frame();
+      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
 
       VkDescriptorBufferInfo buffer_info;
-      buffer_info.buffer = resource_manager_->per_frame_data_buffer[frameIndex].buffer;
+      buffer_info.buffer = per_frame_buffers.uniform_buffers[frameIndex].buffer;
       buffer_info.offset = 0;
       buffer_info.range = sizeof(PerFrameData);
 

@@ -75,7 +75,6 @@ namespace gestalt {
     class ResourceRegistry {
     public:
       RenderConfig config_;
-      PerFrameData per_frame_data_;
 
       template <typename T> void add_resource(const std::string& id, std::shared_ptr<T> resource) {
         resources_[id] = resource;

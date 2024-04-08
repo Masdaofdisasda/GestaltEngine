@@ -11,7 +11,9 @@ namespace gestalt {
 
     void SkyboxPass::prepare() {
       fmt::print("Preparing skybox pass\n");
-      descriptor_layouts_.push_back(resource_manager_->per_frame_data_layout);
+
+      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
+      descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
       descriptor_layouts_.push_back(resource_manager_->light_data.light_layout);
 
       VkPipelineLayoutCreateInfo pipeline_layout_create_info{
@@ -68,9 +70,10 @@ namespace gestalt {
       vkCmdBeginRendering(cmd, &renderInfo);
 
       const char frameIndex = gpu_.get_current_frame();
+      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
 
       VkDescriptorBufferInfo buffer_info;
-      buffer_info.buffer = resource_manager_->per_frame_data_buffer[frameIndex].buffer;
+      buffer_info.buffer = per_frame_buffers.uniform_buffers[frameIndex].buffer;
       buffer_info.offset = 0;
       buffer_info.range = sizeof(PerFrameData);
 
@@ -113,7 +116,9 @@ namespace gestalt {
 
     void InfiniteGridPass::prepare() {
       fmt::print("Preparing skybox pass\n");
-      descriptor_layouts_.push_back(resource_manager_->per_frame_data_layout);
+
+      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
+      descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
 
       VkPipelineLayoutCreateInfo pipeline_layout_create_info{
           .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -169,9 +174,10 @@ namespace gestalt {
       vkCmdBeginRendering(cmd, &renderInfo);
 
       const char frameIndex = gpu_.get_current_frame();
+      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
 
       VkDescriptorBufferInfo buffer_info;
-      buffer_info.buffer = resource_manager_->per_frame_data_buffer[frameIndex].buffer;
+      buffer_info.buffer = per_frame_buffers.uniform_buffers[frameIndex].buffer;
       buffer_info.offset = 0;
       buffer_info.range = sizeof(PerFrameData);
 

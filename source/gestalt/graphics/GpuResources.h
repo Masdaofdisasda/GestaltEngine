@@ -63,5 +63,13 @@ namespace gestalt {
       VkDescriptorSetLayout constants_layout;
     };
 
+    // BUFFER TYPES
+
+    struct PerFrameDataBuffers{
+      PerFrameData data;
+      std::array<AllocatedBuffer, 2> uniform_buffers;
+      VkDescriptorSetLayout descriptor_layout;
+    };
+
   }  // namespace foundation
 }  // namespace gestalt
