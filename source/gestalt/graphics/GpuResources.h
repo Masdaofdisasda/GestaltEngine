@@ -71,13 +71,22 @@ namespace gestalt {
       VkDescriptorSetLayout descriptor_layout;
     };
 
-    struct LightData {
+    struct LightBuffers {
       AllocatedBuffer dir_light_buffer;
       AllocatedBuffer point_light_buffer;
       AllocatedBuffer view_proj_matrices;
 
-      VkDescriptorSet light_set = nullptr;
-      VkDescriptorSetLayout light_layout;
+      VkDescriptorSet descriptor_set = nullptr;
+      VkDescriptorSetLayout descriptor_layout;
+    };
+
+    struct MeshBuffers {
+      AllocatedBuffer indexBuffer;
+      AllocatedBuffer vertexPositionBuffer;
+      AllocatedBuffer vertexDataBuffer;
+
+      VkDescriptorSet vertex_set;
+      VkDescriptorSetLayout vertex_layout;
     };
 
   }  // namespace foundation

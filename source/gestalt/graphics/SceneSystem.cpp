@@ -9,20 +9,20 @@ namespace gestalt {
 
     void LightSystem::prepare() {
 
-      LightData light_data{};
+      LightBuffers light_data{};
 
-      light_data.light_layout
+      light_data.descriptor_layout
           = graphics::DescriptorLayoutBuilder()
             .add_binding(15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
                          false, kLimits.max_directional_lights)
             .add_binding(16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
                          false, kLimits.max_point_lights)
-            .add_binding(17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
+            .add_binding(17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT,
                          false, kLimits.max_directional_lights + kLimits.max_point_lights)
             .build(gpu_.device);
       
-      light_data.light_set
-          = resource_manager_->descriptorPool.allocate(gpu_.device, light_data.light_layout);
+      light_data.descriptor_set
+          = resource_manager_->descriptorPool.allocate(gpu_.device, light_data.descriptor_layout);
 
       constexpr size_t max_directional_lights = kLimits.max_directional_lights;
       constexpr size_t max_point_lights = kLimits.max_point_lights;
@@ -68,9 +68,9 @@ namespace gestalt {
         lightViewProjBufferInfos.push_back(bufferInfo);
       }
       writer_.write_buffer_array(17, lightViewProjBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
-      writer_.update_set(gpu_.device, light_data.light_set);
+      writer_.update_set(gpu_.device, light_data.descriptor_set);
 
-      repository_->add_buffer(light_data);
+      repository_->register_buffer(light_data);
     }
 
     void MaterialSystem::write_material(PbrMaterial& material, const uint32_t material_id) {
@@ -312,7 +312,7 @@ namespace gestalt {
 
     void LightSystem::update_directional_lights(
         std::unordered_map<entity, LightComponent>& lights) {
-      auto& light_data = repository_->get_buffer<LightData>();
+      auto& light_data = repository_->get_buffer<LightBuffers>();
 
       repository_->directional_lights.clear();
       for (auto& light_source : lights) {
@@ -346,7 +346,7 @@ namespace gestalt {
     }
 
     void LightSystem::update_point_lights(std::unordered_map<entity, LightComponent>& lights) {
-      auto& light_data = repository_->get_buffer<LightData>();
+      auto& light_data = repository_->get_buffer<LightBuffers>();
 
       repository_->point_lights.clear();
       for (auto& light_source : lights) {
@@ -382,7 +382,7 @@ namespace gestalt {
       }
 
       // changes in the scene graph can affect the light view-projection matrices
-      const auto& light_data = repository_->get_buffer<LightData>();
+      const auto& light_data = repository_->get_buffer<LightBuffers>();
       const auto& matrices = repository_->light_view_projections.data();
       void* mapped_data;
       VK_CHECK(
@@ -392,7 +392,7 @@ namespace gestalt {
     }
 
     void LightSystem::cleanup() {
-      const auto& [dir_light_buffer, point_light_buffer, view_proj_matrices, light_set, light_layout] = repository_->get_buffer<LightData>();
+      const auto& [dir_light_buffer, point_light_buffer, view_proj_matrices, light_set, light_layout] = repository_->get_buffer<LightBuffers>();
       resource_manager_->destroy_buffer(dir_light_buffer);
       resource_manager_->destroy_buffer(point_light_buffer);
       resource_manager_->destroy_buffer(view_proj_matrices);
@@ -420,7 +420,7 @@ namespace gestalt {
                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
               .build(gpu_.device, true);
 
-      repository_->add_buffer(per_frame_data_buffers);
+      repository_->register_buffer(per_frame_data_buffers);
     }
 
     void CameraSystem::update_cameras(const float delta_time, const Movement& movement, float aspect) {
@@ -640,27 +640,39 @@ namespace gestalt {
     }
 
     void RenderSystem::prepare() {
-      const size_t initial_vertex_position_buffer_size = 184521 * sizeof(GpuVertexPosition);
+      const size_t initial_vertex_position_buffer_size = 184521 * sizeof(GpuVertexPosition); //Note these are the min values to load bistro scene
       const size_t initial_vertex_data_buffer_size = 184521 * sizeof(GpuVertexData);
       const size_t initial_index_buffer_size = 786801 * sizeof(uint32_t);
 
+      MeshBuffers mesh_buffers{};
+
+      mesh_buffers.vertex_layout
+          = graphics::DescriptorLayoutBuilder()
+            .add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
+            .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
+            .build(gpu_.device);
+
+      mesh_buffers.vertex_set = resource_manager_->descriptorPool.allocate(gpu_.device, mesh_buffers.vertex_layout);
+
       // Create initially empty vertex buffer
-      resource_manager_->scene_geometry_.vertexPositionBuffer = resource_manager_->create_buffer(
+      mesh_buffers.vertexPositionBuffer = resource_manager_->create_buffer(
           initial_vertex_position_buffer_size,
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
               | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
           VMA_MEMORY_USAGE_GPU_ONLY);
-      resource_manager_->scene_geometry_.vertexDataBuffer = resource_manager_->create_buffer(
+      mesh_buffers.vertexDataBuffer = resource_manager_->create_buffer(
           initial_vertex_data_buffer_size,
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
               | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
           VMA_MEMORY_USAGE_GPU_ONLY);
 
       // Create initially empty index buffer
-      resource_manager_->scene_geometry_.indexBuffer = resource_manager_->create_buffer(
+      mesh_buffers.indexBuffer = resource_manager_->create_buffer(
           initial_index_buffer_size,
           VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
           VMA_MEMORY_USAGE_GPU_ONLY);
+
+      repository_->register_buffer(mesh_buffers);
     }
 
     void RenderSystem::update() {

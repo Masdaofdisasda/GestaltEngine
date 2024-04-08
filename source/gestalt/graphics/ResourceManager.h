@@ -60,13 +60,6 @@ namespace gestalt {
       void load_and_create_cubemap(const std::string& file_path, TextureHandle& cubemap);
 
     public:
-      struct GpuMeshBuffers {
-        AllocatedBuffer indexBuffer;
-        AllocatedBuffer vertexPositionBuffer;
-        VkDescriptorSet vertex_set;
-        VkDescriptorSetLayout vertex_layout;
-        AllocatedBuffer vertexDataBuffer;
-      } scene_geometry_;
 
       struct ibl_data {
         TextureHandle environment_map;

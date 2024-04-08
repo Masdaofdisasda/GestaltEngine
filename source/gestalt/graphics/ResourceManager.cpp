@@ -61,15 +61,6 @@ namespace gestalt {
       descriptorPool.init(gpu_.device, 1, sizes);
 
       ibl_data.IblSet = descriptorPool.allocate(gpu_.device, ibl_data.IblLayout);
-
-      scene_geometry_.vertex_layout
-          = DescriptorLayoutBuilder()
-                .add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
-                .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
-                .build(gpu_.device);
-
-      scene_geometry_.vertex_set
-          = descriptorPool.allocate(gpu_.device, scene_geometry_.vertex_layout);
     }
 
 
@@ -96,17 +87,18 @@ namespace gestalt {
       const size_t index_buffer_size = indices.size() * sizeof(uint32_t);
 
       // create vertex buffer
-      scene_geometry_.vertexPositionBuffer
+      auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
+      mesh_buffers.vertexPositionBuffer
           = create_buffer(vertex_position_buffer_size,
                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                           VMA_MEMORY_USAGE_GPU_ONLY);
-      scene_geometry_.vertexDataBuffer
+      mesh_buffers.vertexDataBuffer
           = create_buffer(vertex_data_buffer_size,
                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                           VMA_MEMORY_USAGE_GPU_ONLY);
 
       // create index buffer
-      scene_geometry_.indexBuffer = create_buffer(
+      mesh_buffers.indexBuffer = create_buffer(
           index_buffer_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
           VMA_MEMORY_USAGE_GPU_ONLY);
 
@@ -132,7 +124,7 @@ namespace gestalt {
           vertex_positions_copy.srcOffset = 0;
           vertex_positions_copy.size = vertex_position_buffer_size;
 
-          vkCmdCopyBuffer(cmd, staging.buffer, scene_geometry_.vertexPositionBuffer.buffer, 1,
+          vkCmdCopyBuffer(cmd, staging.buffer, mesh_buffers.vertexPositionBuffer.buffer, 1,
                           &vertex_positions_copy);
 
           VkBufferCopy vertex_data_copy;
@@ -140,7 +132,7 @@ namespace gestalt {
           vertex_data_copy.srcOffset = vertex_position_buffer_size;
           vertex_data_copy.size = vertex_data_buffer_size;
 
-          vkCmdCopyBuffer(cmd, staging.buffer, scene_geometry_.vertexDataBuffer.buffer, 1,
+          vkCmdCopyBuffer(cmd, staging.buffer, mesh_buffers.vertexDataBuffer.buffer, 1,
                           &vertex_data_copy);
 
           VkBufferCopy index_copy;
@@ -148,17 +140,17 @@ namespace gestalt {
           index_copy.srcOffset = vertex_position_buffer_size + vertex_data_buffer_size;
           index_copy.size = index_buffer_size;
 
-          vkCmdCopyBuffer(cmd, staging.buffer, scene_geometry_.indexBuffer.buffer, 1, &index_copy);
+          vkCmdCopyBuffer(cmd, staging.buffer, mesh_buffers.indexBuffer.buffer, 1, &index_copy);
         });
       vmaUnmapMemory(gpu_.allocator, allocation);
       destroy_buffer(staging);
 
       writer.clear();
-      writer.write_buffer(0, scene_geometry_.vertexPositionBuffer.buffer,
+      writer.write_buffer(0, mesh_buffers.vertexPositionBuffer.buffer,
                           vertex_position_buffer_size, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-      writer.write_buffer(1, scene_geometry_.vertexDataBuffer.buffer, vertex_data_buffer_size, 0,
+      writer.write_buffer(1, mesh_buffers.vertexDataBuffer.buffer, vertex_data_buffer_size, 0,
                           VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-      writer.update_set(gpu_.device, scene_geometry_.vertex_set);
+      writer.update_set(gpu_.device, mesh_buffers.vertex_set);
     }
 
     void ResourceManager::destroy_buffer(const AllocatedBuffer& buffer) {

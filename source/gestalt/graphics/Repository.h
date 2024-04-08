@@ -103,7 +103,7 @@ namespace gestalt {
 
     public:
 
-      template <typename T> void add_buffer(const T& data) {
+      template <typename T> void register_buffer(const T& data) {
         const auto typeIndex = std::type_index(typeid(T));
         assert(holders.find(typeIndex) == holders.end()
                && "Instance for this type already exists.");

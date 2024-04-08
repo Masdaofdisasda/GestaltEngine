@@ -13,9 +13,9 @@ namespace gestalt {
       fmt::print("Preparing skybox pass\n");
 
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
-      auto& light_data = repository_->get_buffer<LightData>();
+      auto& light_data = repository_->get_buffer<LightBuffers>();
       descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
-      descriptor_layouts_.push_back(light_data.light_layout);
+      descriptor_layouts_.push_back(light_data.descriptor_layout);
 
       VkPipelineLayoutCreateInfo pipeline_layout_create_info{
           .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -72,7 +72,7 @@ namespace gestalt {
 
       const char frameIndex = gpu_.get_current_frame();
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
-      auto& light_data = repository_->get_buffer<LightData>();
+      auto& light_data = repository_->get_buffer<LightBuffers>();
 
       VkDescriptorBufferInfo buffer_info;
       buffer_info.buffer = per_frame_buffers.uniform_buffers[frameIndex].buffer;
@@ -92,7 +92,7 @@ namespace gestalt {
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
       vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 1,
-                              &light_data.light_set, 0, nullptr);
+                              &light_data.descriptor_set, 0, nullptr);
 
       viewport_.width = static_cast<float>(color_image->getExtent2D().width);
       viewport_.height = static_cast<float>(color_image->getExtent2D().height);

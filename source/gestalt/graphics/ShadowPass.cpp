@@ -15,13 +15,11 @@ namespace gestalt {
       fmt::print("Preparing directional depth pass\n");
 
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
+      const auto& light_data = repository_->get_buffer<LightBuffers>();
+      const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
       descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
-      descriptor_layouts_.emplace_back(
-          DescriptorLayoutBuilder()
-              .add_binding(17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, false,
-                           kLimits.max_directional_lights + kLimits.max_point_lights)
-              .build(gpu_.device));
-      descriptor_layouts_.push_back(resource_manager_->scene_geometry_.vertex_layout);
+      descriptor_layouts_.push_back(light_data.descriptor_layout);
+      descriptor_layouts_.push_back(mesh_buffers.vertex_layout);
 
       VkShaderModule meshFragShader;
       vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &meshFragShader);
@@ -75,6 +73,8 @@ namespace gestalt {
 
       const char frameIndex = gpu_.get_current_frame();
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
+      const auto& light_data = repository_->get_buffer<LightBuffers>();
+      const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
 
       VkDescriptorBufferInfo buffer_info;
       buffer_info.buffer = per_frame_buffers.uniform_buffers[frameIndex].buffer;
@@ -89,28 +89,14 @@ namespace gestalt {
       descriptor_write.descriptorCount = 1;
       descriptor_write.pBufferInfo = &buffer_info;
 
-      vkCmdBindIndexBuffer(cmd, resource_manager_->scene_geometry_.indexBuffer.buffer, 0,
+      vkCmdBindIndexBuffer(cmd, mesh_buffers.indexBuffer.buffer, 0,
                            VK_INDEX_TYPE_UINT32);
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
-      auto& light_data = repository_->get_buffer<LightData>();
-      writer.clear();
-
-      std::vector<VkDescriptorBufferInfo> lightViewProjBufferInfos; //TODO : move this
-      for (int i = 0; i < kLimits.max_directional_lights + kLimits.max_point_lights; ++i) {
-        VkDescriptorBufferInfo bufferInfo = {};
-        bufferInfo.buffer = light_data.view_proj_matrices.buffer;
-        bufferInfo.offset = 64 * i;
-        bufferInfo.range = 64;
-        lightViewProjBufferInfos.push_back(bufferInfo);
-      }
-      writer.write_buffer_array(17, lightViewProjBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
-
       VkDescriptorSet descriptorSets[]
-          = {descriptor_set_, resource_manager_->scene_geometry_.vertex_set};
+          = {light_data.descriptor_set, mesh_buffers.vertex_set};
 
-      writer.update_set(gpu_.device, descriptor_set_);
       vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 2,
                               descriptorSets, 0, nullptr);
 
