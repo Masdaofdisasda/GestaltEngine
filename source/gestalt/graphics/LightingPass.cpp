@@ -13,6 +13,7 @@ namespace gestalt {
       fmt::print("preparing lighting pass\n");
 
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
+      const auto& light_data = repository_->get_buffer<LightData>();
       descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
       descriptor_layouts_.push_back(resource_manager_->ibl_data.IblLayout);
       descriptor_layouts_.emplace_back(
@@ -28,7 +29,7 @@ namespace gestalt {
               .add_binding(14, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                            VK_SHADER_STAGE_FRAGMENT_BIT)
               .build(gpu_.device));
-      descriptor_layouts_.push_back(resource_manager_->light_data.light_layout);
+      descriptor_layouts_.push_back(light_data.light_layout);
 
       VkShaderModule meshFragShader;
       vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &meshFragShader);
@@ -86,6 +87,7 @@ namespace gestalt {
 
       const char frameIndex = gpu_.get_current_frame();
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
+      auto& light_data = repository_->get_buffer<LightData>();
 
       VkDescriptorBufferInfo buffer_info;
       buffer_info.buffer = per_frame_buffers.uniform_buffers[frameIndex].buffer;
@@ -121,7 +123,7 @@ namespace gestalt {
                          VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
       writer.update_set(gpu_.device, descriptor_set_);
       VkDescriptorSet descriptorSets[] = {resource_manager_->ibl_data.IblSet, descriptor_set_,
-                                          resource_manager_->light_data.light_set};
+                                          light_data.light_set};
 
       gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                                      &descriptor_write);

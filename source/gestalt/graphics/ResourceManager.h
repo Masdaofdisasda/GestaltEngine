@@ -79,15 +79,6 @@ namespace gestalt {
         VkDescriptorSetLayout IblLayout;
       } ibl_data;
 
-      struct light_data {
-        AllocatedBuffer dir_light_buffer;
-        AllocatedBuffer point_light_buffer;
-        AllocatedBuffer view_proj_matrices;
-
-        VkDescriptorSet light_set = nullptr;
-        VkDescriptorSetLayout light_layout;
-      } light_data;
-
       DescriptorAllocatorGrowable* descriptor_pool;
 
       PoorMansResourceLoader resource_loader_;

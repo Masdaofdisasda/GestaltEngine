@@ -62,16 +62,6 @@ namespace gestalt {
 
       ibl_data.IblSet = descriptorPool.allocate(gpu_.device, ibl_data.IblLayout);
 
-      light_data.light_layout
-          = DescriptorLayoutBuilder()
-                .add_binding(15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
-                             false, kLimits.max_directional_lights)
-                .add_binding(16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
-                             false, kLimits.max_point_lights)
-                .add_binding(17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
-                             false, kLimits.max_directional_lights + kLimits.max_point_lights)
-                .build(gpu_.device);
-
       scene_geometry_.vertex_layout
           = DescriptorLayoutBuilder()
                 .add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)

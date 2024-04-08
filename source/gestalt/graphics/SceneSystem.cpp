@@ -8,8 +8,19 @@ namespace gestalt {
     using namespace foundation;
 
     void LightSystem::prepare() {
-      auto& light_data = resource_manager_->light_data;
 
+      LightData light_data{};
+
+      light_data.light_layout
+          = graphics::DescriptorLayoutBuilder()
+            .add_binding(15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
+                         false, kLimits.max_directional_lights)
+            .add_binding(16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
+                         false, kLimits.max_point_lights)
+            .add_binding(17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
+                         false, kLimits.max_directional_lights + kLimits.max_point_lights)
+            .build(gpu_.device);
+      
       light_data.light_set
           = resource_manager_->descriptorPool.allocate(gpu_.device, light_data.light_layout);
 
@@ -31,7 +42,7 @@ namespace gestalt {
       std::vector<VkDescriptorBufferInfo> dirBufferInfos;
       for (int i = 0; i < max_directional_lights; ++i) {
         VkDescriptorBufferInfo bufferInfo = {};
-        bufferInfo.buffer = resource_manager_->light_data.dir_light_buffer.buffer;
+        bufferInfo.buffer = light_data.dir_light_buffer.buffer;
         bufferInfo.offset = 32 * i;
         bufferInfo.range = 32;
         dirBufferInfos.push_back(bufferInfo);
@@ -41,7 +52,7 @@ namespace gestalt {
       std::vector<VkDescriptorBufferInfo> pointBufferInfos;
       for (int i = 0; i < max_point_lights; ++i) {
         VkDescriptorBufferInfo bufferInfo = {};
-        bufferInfo.buffer = resource_manager_->light_data.point_light_buffer.buffer;
+        bufferInfo.buffer = light_data.point_light_buffer.buffer;
         bufferInfo.offset = 32 * i;
         bufferInfo.range = 32;
         pointBufferInfos.push_back(bufferInfo);
@@ -51,13 +62,15 @@ namespace gestalt {
       std::vector<VkDescriptorBufferInfo> lightViewProjBufferInfos;
       for (int i = 0; i < max_lights; ++i) {
         VkDescriptorBufferInfo bufferInfo = {};
-        bufferInfo.buffer = resource_manager_->light_data.view_proj_matrices.buffer;
+        bufferInfo.buffer = light_data.view_proj_matrices.buffer;
         bufferInfo.offset = 64 * i;
         bufferInfo.range = 64;
         lightViewProjBufferInfos.push_back(bufferInfo);
       }
       writer_.write_buffer_array(17, lightViewProjBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
-      writer_.update_set(gpu_.device, resource_manager_->light_data.light_set);
+      writer_.update_set(gpu_.device, light_data.light_set);
+
+      repository_->add_buffer(light_data);
     }
 
     void MaterialSystem::write_material(PbrMaterial& material, const uint32_t material_id) {
@@ -299,7 +312,7 @@ namespace gestalt {
 
     void LightSystem::update_directional_lights(
         std::unordered_map<entity, LightComponent>& lights) {
-      auto& light_data = resource_manager_->light_data;
+      auto& light_data = repository_->get_buffer<LightData>();
 
       repository_->directional_lights.clear();
       for (auto& light_source : lights) {
@@ -333,7 +346,7 @@ namespace gestalt {
     }
 
     void LightSystem::update_point_lights(std::unordered_map<entity, LightComponent>& lights) {
-      auto& light_data = resource_manager_->light_data;
+      auto& light_data = repository_->get_buffer<LightData>();
 
       repository_->point_lights.clear();
       for (auto& light_source : lights) {
@@ -369,7 +382,7 @@ namespace gestalt {
       }
 
       // changes in the scene graph can affect the light view-projection matrices
-      const auto& light_data = resource_manager_->light_data;
+      const auto& light_data = repository_->get_buffer<LightData>();
       const auto& matrices = repository_->light_view_projections.data();
       void* mapped_data;
       VK_CHECK(
@@ -379,9 +392,10 @@ namespace gestalt {
     }
 
     void LightSystem::cleanup() {
-      resource_manager_->destroy_buffer(resource_manager_->light_data.dir_light_buffer);
-      resource_manager_->destroy_buffer(resource_manager_->light_data.point_light_buffer);
-      resource_manager_->destroy_buffer(resource_manager_->light_data.view_proj_matrices);
+      const auto& [dir_light_buffer, point_light_buffer, view_proj_matrices, light_set, light_layout] = repository_->get_buffer<LightData>();
+      resource_manager_->destroy_buffer(dir_light_buffer);
+      resource_manager_->destroy_buffer(point_light_buffer);
+      resource_manager_->destroy_buffer(view_proj_matrices);
     }
 
 

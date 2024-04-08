@@ -93,12 +93,14 @@ namespace gestalt {
                            VK_INDEX_TYPE_UINT32);
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
+
+      auto& light_data = repository_->get_buffer<LightData>();
       writer.clear();
 
-      std::vector<VkDescriptorBufferInfo> lightViewProjBufferInfos;
+      std::vector<VkDescriptorBufferInfo> lightViewProjBufferInfos; //TODO : move this
       for (int i = 0; i < kLimits.max_directional_lights + kLimits.max_point_lights; ++i) {
         VkDescriptorBufferInfo bufferInfo = {};
-        bufferInfo.buffer = resource_manager_->light_data.view_proj_matrices.buffer;
+        bufferInfo.buffer = light_data.view_proj_matrices.buffer;
         bufferInfo.offset = 64 * i;
         bufferInfo.range = 64;
         lightViewProjBufferInfos.push_back(bufferInfo);
