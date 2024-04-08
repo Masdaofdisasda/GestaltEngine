@@ -14,8 +14,9 @@ namespace gestalt {
 
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
       const auto& light_data = repository_->get_buffer<LightBuffers>();
+      const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
       descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
-      descriptor_layouts_.push_back(resource_manager_->ibl_data.IblLayout);
+      descriptor_layouts_.push_back(ibl_buffers.descriptor_layout);
       descriptor_layouts_.emplace_back(
           DescriptorLayoutBuilder()
               .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -87,6 +88,7 @@ namespace gestalt {
 
       const char frameIndex = gpu_.get_current_frame();
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
+      const auto& ibl_buffers= repository_->get_buffer<IblBuffers>();
       auto& light_data = repository_->get_buffer<LightBuffers>();
       const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
 
@@ -103,7 +105,7 @@ namespace gestalt {
       descriptor_write.descriptorCount = 1;
       descriptor_write.pBufferInfo = &buffer_info;
 
-      vkCmdBindIndexBuffer(cmd, mesh_buffers.indexBuffer.buffer, 0,
+      vkCmdBindIndexBuffer(cmd, mesh_buffers.index_buffer.buffer, 0,
                            VK_INDEX_TYPE_UINT32);
 
       writer.clear();
@@ -123,7 +125,7 @@ namespace gestalt {
                          VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL,
                          VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
       writer.update_set(gpu_.device, descriptor_set_);
-      VkDescriptorSet descriptorSets[] = {resource_manager_->ibl_data.IblSet, descriptor_set_,
+      VkDescriptorSet descriptorSets[] = {ibl_buffers.descriptor_set, descriptor_set_,
                                           light_data.descriptor_set};
 
       gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,

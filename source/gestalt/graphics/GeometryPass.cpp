@@ -13,12 +13,13 @@ namespace gestalt {
       fmt::print("preparing deferred pass\n");
 
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
+      const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
       const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
       descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
-      descriptor_layouts_.push_back(resource_manager_->ibl_data.IblLayout);
+      descriptor_layouts_.push_back(ibl_buffers.descriptor_layout);
       descriptor_layouts_.push_back(repository_->material_data.resource_layout);
       descriptor_layouts_.push_back(repository_->material_data.constants_layout);
-      descriptor_layouts_.push_back(mesh_buffers.vertex_layout);
+      descriptor_layouts_.push_back(mesh_buffers.descriptor_layout);
 
       VkShaderModule meshFragShader;
       vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &meshFragShader);
@@ -82,6 +83,7 @@ namespace gestalt {
 
       const char frameIndex = gpu_.get_current_frame();
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
+      const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
       const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
 
       VkDescriptorBufferInfo buffer_info;
@@ -97,14 +99,14 @@ namespace gestalt {
       descriptor_write.descriptorCount = 1;
       descriptor_write.pBufferInfo = &buffer_info;
 
-      vkCmdBindIndexBuffer(cmd, mesh_buffers.indexBuffer.buffer, 0,
+      vkCmdBindIndexBuffer(cmd, mesh_buffers.index_buffer.buffer, 0,
                            VK_INDEX_TYPE_UINT32);
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
       VkDescriptorSet descriptorSets[]
-          = {resource_manager_->ibl_data.IblSet, repository_->material_data.resource_set,
+          = {ibl_buffers.descriptor_set, repository_->material_data.resource_set,
           repository_->material_data.constants_set,
-             mesh_buffers.vertex_set};
+             mesh_buffers.descriptor_set};
 
       gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                                      &descriptor_write);
@@ -143,12 +145,13 @@ namespace gestalt {
       fmt::print("preparing deferred pass\n");
 
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
+      const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
       const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
       descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
-      descriptor_layouts_.push_back(resource_manager_->ibl_data.IblLayout);
+      descriptor_layouts_.push_back(ibl_buffers.descriptor_layout);
       descriptor_layouts_.push_back(repository_->material_data.resource_layout);
       descriptor_layouts_.push_back(repository_->material_data.constants_layout);
-      descriptor_layouts_.push_back(mesh_buffers.vertex_layout);
+      descriptor_layouts_.push_back(mesh_buffers.descriptor_layout);
 
       VkShaderModule fragShader;
       vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &fragShader);
@@ -213,6 +216,7 @@ namespace gestalt {
 
       const char frameIndex = gpu_.get_current_frame();
       auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
+      const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
       const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
 
       VkDescriptorBufferInfo buffer_info;
@@ -230,9 +234,9 @@ namespace gestalt {
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
       VkDescriptorSet descriptorSets[]
-          = {resource_manager_->ibl_data.IblSet, repository_->material_data.resource_set,
+          = {ibl_buffers.descriptor_set, repository_->material_data.resource_set,
              repository_->material_data.constants_set,
-             mesh_buffers.vertex_set};
+             mesh_buffers.descriptor_set};
 
       gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                                      &descriptor_write);
@@ -262,8 +266,9 @@ namespace gestalt {
       fmt::print("preparing transparent pass\n");
 
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
+      const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
       descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
-      descriptor_layouts_.push_back(resource_manager_->ibl_data.IblLayout);
+      descriptor_layouts_.push_back(ibl_buffers.descriptor_layout);
       descriptor_layouts_.push_back(repository_->material_data.resource_layout);
       descriptor_layouts_.push_back(repository_->material_data.constants_layout);
       descriptor_layouts_.emplace_back(DescriptorLayoutBuilder()
@@ -328,6 +333,7 @@ namespace gestalt {
       const char frameIndex = gpu_.get_current_frame();
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
       const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
+      const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
 
       VkDescriptorBufferInfo buffer_info;
       buffer_info.buffer = per_frame_buffers.uniform_buffers[frameIndex].buffer;
@@ -342,11 +348,11 @@ namespace gestalt {
       descriptor_write.descriptorCount = 1;
       descriptor_write.pBufferInfo = &buffer_info;
 
-      vkCmdBindIndexBuffer(cmd, mesh_buffers.indexBuffer.buffer, 0,
+      vkCmdBindIndexBuffer(cmd, mesh_buffers.index_buffer.buffer, 0,
                            VK_INDEX_TYPE_UINT32);
 
       VkDescriptorSet descriptorSets[]
-          = {resource_manager_->ibl_data.IblSet, repository_->material_data.resource_set,
+          = {ibl_buffers.descriptor_set, repository_->material_data.resource_set,
              repository_->material_data.constants_set, descriptor_set_};
 
       viewport_.width = static_cast<float>(depth_image->getExtent2D().width);

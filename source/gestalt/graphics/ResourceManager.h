@@ -61,17 +61,6 @@ namespace gestalt {
 
     public:
 
-      struct ibl_data {
-        TextureHandle environment_map;
-        TextureHandle environment_irradiance_map;
-        TextureHandle bdrfLUT;
-
-        VkSampler cube_map_sampler;
-
-        VkDescriptorSet IblSet;
-        VkDescriptorSetLayout IblLayout;
-      } ibl_data;
-
       DescriptorAllocatorGrowable* descriptor_pool;
 
       PoorMansResourceLoader resource_loader_;

@@ -43,15 +43,6 @@ namespace gestalt {
       gpu_ = gpu;
       repository_ = repository;
       resource_loader_.init(gpu);
-      
-      ibl_data.IblLayout = DescriptorLayoutBuilder()
-                               .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                            VK_SHADER_STAGE_FRAGMENT_BIT)
-                               .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                            VK_SHADER_STAGE_FRAGMENT_BIT)
-                               .add_binding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                            VK_SHADER_STAGE_FRAGMENT_BIT)
-                               .build(gpu_.device);
 
       std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes
           = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kLimits.max_textures},
@@ -60,7 +51,6 @@ namespace gestalt {
 
       descriptorPool.init(gpu_.device, 1, sizes);
 
-      ibl_data.IblSet = descriptorPool.allocate(gpu_.device, ibl_data.IblLayout);
     }
 
 
@@ -71,8 +61,6 @@ namespace gestalt {
       for (const auto& sampler : repository_->samplers.data()) {
         vkDestroySampler(gpu_.device, sampler, nullptr);
       }
-
-      vkDestroyDescriptorSetLayout(gpu_.device, ibl_data.IblLayout, nullptr);
       descriptorPool.destroy_pools(gpu_.device);
     }
 
@@ -88,17 +76,17 @@ namespace gestalt {
 
       // create vertex buffer
       auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
-      mesh_buffers.vertexPositionBuffer
+      mesh_buffers.vertex_position_buffer
           = create_buffer(vertex_position_buffer_size,
                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                           VMA_MEMORY_USAGE_GPU_ONLY);
-      mesh_buffers.vertexDataBuffer
+      mesh_buffers.vertex_data_buffer
           = create_buffer(vertex_data_buffer_size,
                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                           VMA_MEMORY_USAGE_GPU_ONLY);
 
       // create index buffer
-      mesh_buffers.indexBuffer = create_buffer(
+      mesh_buffers.index_buffer = create_buffer(
           index_buffer_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
           VMA_MEMORY_USAGE_GPU_ONLY);
 
@@ -124,7 +112,7 @@ namespace gestalt {
           vertex_positions_copy.srcOffset = 0;
           vertex_positions_copy.size = vertex_position_buffer_size;
 
-          vkCmdCopyBuffer(cmd, staging.buffer, mesh_buffers.vertexPositionBuffer.buffer, 1,
+          vkCmdCopyBuffer(cmd, staging.buffer, mesh_buffers.vertex_position_buffer.buffer, 1,
                           &vertex_positions_copy);
 
           VkBufferCopy vertex_data_copy;
@@ -132,7 +120,7 @@ namespace gestalt {
           vertex_data_copy.srcOffset = vertex_position_buffer_size;
           vertex_data_copy.size = vertex_data_buffer_size;
 
-          vkCmdCopyBuffer(cmd, staging.buffer, mesh_buffers.vertexDataBuffer.buffer, 1,
+          vkCmdCopyBuffer(cmd, staging.buffer, mesh_buffers.vertex_data_buffer.buffer, 1,
                           &vertex_data_copy);
 
           VkBufferCopy index_copy;
@@ -140,17 +128,17 @@ namespace gestalt {
           index_copy.srcOffset = vertex_position_buffer_size + vertex_data_buffer_size;
           index_copy.size = index_buffer_size;
 
-          vkCmdCopyBuffer(cmd, staging.buffer, mesh_buffers.indexBuffer.buffer, 1, &index_copy);
+          vkCmdCopyBuffer(cmd, staging.buffer, mesh_buffers.index_buffer.buffer, 1, &index_copy);
         });
       vmaUnmapMemory(gpu_.allocator, allocation);
       destroy_buffer(staging);
 
       writer.clear();
-      writer.write_buffer(0, mesh_buffers.vertexPositionBuffer.buffer,
+      writer.write_buffer(0, mesh_buffers.vertex_position_buffer.buffer,
                           vertex_position_buffer_size, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-      writer.write_buffer(1, mesh_buffers.vertexDataBuffer.buffer, vertex_data_buffer_size, 0,
+      writer.write_buffer(1, mesh_buffers.vertex_data_buffer.buffer, vertex_data_buffer_size, 0,
                           VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-      writer.update_set(gpu_.device, mesh_buffers.vertex_set);
+      writer.update_set(gpu_.device, mesh_buffers.descriptor_set);
     }
 
     void ResourceManager::destroy_buffer(const AllocatedBuffer& buffer) {
@@ -544,12 +532,14 @@ namespace gestalt {
       std::string env_file = base_path + "_environment" + extension;
       std::string irr_file = base_path + "_irradiance" + extension;
 
+      auto& Ibl_buffers = repository_->get_buffer<IblBuffers>();
+
       if (std::filesystem::exists(env_file) && std::filesystem::exists(irr_file)) {
         fmt::print("Loading environment map from file: {}\n", env_file);
-        load_and_create_cubemap(env_file, ibl_data.environment_map);
+        load_and_create_cubemap(env_file, Ibl_buffers.environment_map);
 
         fmt::print("Loading irradiance map from file: {}\n", irr_file);
-        load_and_create_cubemap(irr_file, ibl_data.environment_irradiance_map);
+        load_and_create_cubemap(irr_file, Ibl_buffers.environment_irradiance_map);
       } else {
         fmt::print("Loading HDR image from file: {}\n", file_path);
         int w, h, comp;
@@ -570,7 +560,7 @@ namespace gestalt {
 
         std::vector<float> img32_env(envDstW * envDstH * 4);
         float24to32(envDstW, envDstH, env_out.data(), img32_env.data());
-        ibl_data.environment_map = create_cubemap_from_HDR(img32_env, envDstH, envDstW);
+        Ibl_buffers.environment_map = create_cubemap_from_HDR(img32_env, envDstH, envDstW);
 
         // Process the HDR image for the irradiance map
         const int irrDstW = 256;
@@ -582,7 +572,8 @@ namespace gestalt {
 
         std::vector<float> img32_irr(irrDstW * irrDstH * 4);
         float24to32(irrDstW, irrDstH, irr_out.data(), img32_irr.data());
-        ibl_data.environment_irradiance_map = create_cubemap_from_HDR(img32_irr, irrDstH, irrDstW);
+        Ibl_buffers.environment_irradiance_map
+            = create_cubemap_from_HDR(img32_irr, irrDstH, irrDstW);
 
         // Cleanup
         stbi_image_free(original_img);
@@ -597,20 +588,20 @@ namespace gestalt {
       sampl.magFilter = VK_FILTER_LINEAR;
       sampl.minFilter = VK_FILTER_LINEAR;
       sampl.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-      vkCreateSampler(gpu_.device, &sampl, nullptr, &ibl_data.cube_map_sampler);
+      vkCreateSampler(gpu_.device, &sampl, nullptr, &Ibl_buffers.cube_map_sampler);
 
-      ibl_data.bdrfLUT = load_image("../../assets/bdrf_lut.png").value();
+      Ibl_buffers.bdrf_lut = load_image("../../assets/bdrf_lut.png").value();
 
       writer.clear();
-      writer.write_image(1, ibl_data.environment_map.imageView, ibl_data.cube_map_sampler,
+      writer.write_image(1, Ibl_buffers.environment_map.imageView, Ibl_buffers.cube_map_sampler,
                          VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-      writer.write_image(2, ibl_data.environment_irradiance_map.imageView,
-                         ibl_data.cube_map_sampler, VK_IMAGE_LAYOUT_GENERAL,
+      writer.write_image(2, Ibl_buffers.environment_irradiance_map.imageView,
+                         Ibl_buffers.cube_map_sampler, VK_IMAGE_LAYOUT_GENERAL,
                          VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
       writer.write_image(
-          3, ibl_data.bdrfLUT.imageView, repository_->default_material_.linearSampler,
+          3, Ibl_buffers.bdrf_lut.imageView, repository_->default_material_.linearSampler,
           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-      writer.update_set(gpu_.device, ibl_data.IblSet);
+      writer.update_set(gpu_.device, Ibl_buffers.descriptor_set);
     }
 
     TextureHandle ResourceManager::create_cubemap_from_HDR(std::vector<float>& image_data, int h,

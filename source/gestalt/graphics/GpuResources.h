@@ -81,13 +81,23 @@ namespace gestalt {
     };
 
     struct MeshBuffers {
-      AllocatedBuffer indexBuffer;
-      AllocatedBuffer vertexPositionBuffer;
-      AllocatedBuffer vertexDataBuffer;
+      AllocatedBuffer index_buffer;
+      AllocatedBuffer vertex_position_buffer;
+      AllocatedBuffer vertex_data_buffer;
 
-      VkDescriptorSet vertex_set;
-      VkDescriptorSetLayout vertex_layout;
+      VkDescriptorSet descriptor_set = nullptr;
+      VkDescriptorSetLayout descriptor_layout;
     };
 
+    struct IblBuffers {
+      TextureHandle environment_map;
+      TextureHandle environment_irradiance_map;
+      TextureHandle bdrf_lut;
+
+      VkSampler cube_map_sampler;
+
+      VkDescriptorSet descriptor_set = nullptr;
+      VkDescriptorSetLayout descriptor_layout;
+    };
   }  // namespace foundation
 }  // namespace gestalt

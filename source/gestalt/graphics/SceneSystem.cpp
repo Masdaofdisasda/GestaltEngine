@@ -258,6 +258,19 @@ namespace gestalt {
 
       create_defaults();
 
+      IblBuffers ibl_data{};
+
+      ibl_data.descriptor_layout = graphics::DescriptorLayoutBuilder()
+                           .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                        VK_SHADER_STAGE_FRAGMENT_BIT)
+                           .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                        VK_SHADER_STAGE_FRAGMENT_BIT)
+                           .add_binding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                        VK_SHADER_STAGE_FRAGMENT_BIT)
+                           .build(gpu_.device);
+
+      ibl_data.descriptor_set = resource_manager_->descriptorPool.allocate(gpu_.device, ibl_data.descriptor_layout);
+      repository_->register_buffer(ibl_data);
       
       resource_manager_->load_and_process_cubemap(R"(..\..\assets\san_giuseppe_bridge_4k.hdr)");
     }
@@ -273,7 +286,8 @@ namespace gestalt {
     }
 
     void MaterialSystem::cleanup() {
-	  //destroy material buffers
+      const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
+      vkDestroyDescriptorSetLayout(gpu_.device, ibl_buffers.descriptor_layout, nullptr);
     }
 
     glm::mat4 LightSystem::calculate_sun_view_proj(const glm::vec3 direction) const {
@@ -646,28 +660,28 @@ namespace gestalt {
 
       MeshBuffers mesh_buffers{};
 
-      mesh_buffers.vertex_layout
+      mesh_buffers.descriptor_layout
           = graphics::DescriptorLayoutBuilder()
             .add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
             .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
             .build(gpu_.device);
 
-      mesh_buffers.vertex_set = resource_manager_->descriptorPool.allocate(gpu_.device, mesh_buffers.vertex_layout);
+      mesh_buffers.descriptor_set = resource_manager_->descriptorPool.allocate(gpu_.device, mesh_buffers.descriptor_layout);
 
       // Create initially empty vertex buffer
-      mesh_buffers.vertexPositionBuffer = resource_manager_->create_buffer(
+      mesh_buffers.vertex_position_buffer = resource_manager_->create_buffer(
           initial_vertex_position_buffer_size,
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
               | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
           VMA_MEMORY_USAGE_GPU_ONLY);
-      mesh_buffers.vertexDataBuffer = resource_manager_->create_buffer(
+      mesh_buffers.vertex_data_buffer = resource_manager_->create_buffer(
           initial_vertex_data_buffer_size,
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
               | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
           VMA_MEMORY_USAGE_GPU_ONLY);
 
       // Create initially empty index buffer
-      mesh_buffers.indexBuffer = resource_manager_->create_buffer(
+      mesh_buffers.index_buffer = resource_manager_->create_buffer(
           initial_index_buffer_size,
           VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
           VMA_MEMORY_USAGE_GPU_ONLY);

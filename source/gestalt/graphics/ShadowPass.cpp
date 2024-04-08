@@ -19,7 +19,7 @@ namespace gestalt {
       const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
       descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
       descriptor_layouts_.push_back(light_data.descriptor_layout);
-      descriptor_layouts_.push_back(mesh_buffers.vertex_layout);
+      descriptor_layouts_.push_back(mesh_buffers.descriptor_layout);
 
       VkShaderModule meshFragShader;
       vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &meshFragShader);
@@ -89,13 +89,13 @@ namespace gestalt {
       descriptor_write.descriptorCount = 1;
       descriptor_write.pBufferInfo = &buffer_info;
 
-      vkCmdBindIndexBuffer(cmd, mesh_buffers.indexBuffer.buffer, 0,
+      vkCmdBindIndexBuffer(cmd, mesh_buffers.index_buffer.buffer, 0,
                            VK_INDEX_TYPE_UINT32);
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
       VkDescriptorSet descriptorSets[]
-          = {light_data.descriptor_set, mesh_buffers.vertex_set};
+          = {light_data.descriptor_set, mesh_buffers.descriptor_set};
 
       vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 2,
                               descriptorSets, 0, nullptr);
