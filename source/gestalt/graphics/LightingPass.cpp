@@ -55,7 +55,7 @@ namespace gestalt {
                       .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
                       .set_multisampling_none()
                       .disable_blending()
-                      .set_color_attachment_format(color_image->imageFormat)
+                      .set_color_attachment_format(color_image->getFormat())
                       .disable_depthtest()
                       .set_pipeline_layout(pipeline_layout_)
                       .build_pipeline(gpu_.device);

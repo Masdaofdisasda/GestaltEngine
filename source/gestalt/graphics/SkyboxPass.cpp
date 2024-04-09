@@ -45,8 +45,8 @@ namespace gestalt {
                       .set_multisampling_none()
                       .disable_blending()
                       .enable_depthtest(false, VK_COMPARE_OP_LESS_OR_EQUAL)
-                      .set_color_attachment_format(color_image->imageFormat)
-                      .set_depth_format(depth_image->imageFormat)
+                      .set_color_attachment_format(color_image->getFormat())
+                      .set_depth_format(depth_image->getFormat())
                       .set_pipeline_layout(pipeline_layout_)
                       .build_pipeline(gpu_.device);
 
@@ -60,7 +60,7 @@ namespace gestalt {
       const auto depth_image = registry_->get_resource<TextureHandle>("gbuffer_depth");
 
       VkRenderingAttachmentInfo colorAttachment
-          = vkinit::attachment_info(color_image->imageView, nullptr, color_image->currentLayout);
+          = vkinit::attachment_info(color_image->imageView, nullptr, color_image->getLayout());
 
       VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
           depth_image->imageView, nullptr, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
@@ -150,8 +150,8 @@ namespace gestalt {
                       .set_multisampling_none()
                       .disable_blending()
                       .enable_depthtest(false, VK_COMPARE_OP_LESS_OR_EQUAL)
-                      .set_color_attachment_format(color_image->imageFormat)
-                      .set_depth_format(depth_image->imageFormat)
+                      .set_color_attachment_format(color_image->getFormat())
+                      .set_depth_format(depth_image->getFormat())
                       .set_pipeline_layout(pipeline_layout_)
                       .build_pipeline(gpu_.device);
 
@@ -165,7 +165,7 @@ namespace gestalt {
       const auto depth_image = registry_->get_resource<TextureHandle>("skybox_depth");
 
       VkRenderingAttachmentInfo colorAttachment
-          = vkinit::attachment_info(color_image->imageView, nullptr, color_image->currentLayout);
+          = vkinit::attachment_info(color_image->imageView, nullptr, color_image->getLayout());
 
       VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
           depth_image->imageView, nullptr, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);

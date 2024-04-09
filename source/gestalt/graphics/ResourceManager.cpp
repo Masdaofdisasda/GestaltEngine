@@ -155,7 +155,7 @@ namespace gestalt {
                                                  VkImageUsageFlags usage, bool mipmapped,
                                                  bool cubemap) {
       TextureHandle newImage;
-      newImage.imageFormat = format;
+      newImage.setFormat(format);
       newImage.imageExtent = size;
 
       VkImageCreateInfo img_info;
@@ -295,7 +295,7 @@ namespace gestalt {
                                               VkDeviceSize imageSize, VkExtent3D imageExtent, bool mipmap) {
 
       ImageTask task;
-      task.image = image;
+      task.image = std::make_shared<TextureHandle>(image);
       task.dataCopy = new unsigned char[imageSize];
       memcpy(task.dataCopy, imageData, imageSize);
       task.imageSize = imageSize;
@@ -315,8 +315,7 @@ namespace gestalt {
       memcpy(data, task.dataCopy, task.imageSize);
       vmaUnmapMemory(gpu_.allocator, task.stagingBuffer.allocation);
 
-      vkutil::Transition(task.image.image)
-          .from(VK_IMAGE_LAYOUT_UNDEFINED)
+      vkutil::Transition(task.image)
           .to(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
           .withSource(VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0)
           .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
@@ -334,15 +333,14 @@ namespace gestalt {
       copyRegion.imageExtent = task.imageExtent;
 
       // copy the buffer into the image
-      vkCmdCopyBufferToImage(cmd, task.stagingBuffer.buffer, task.image.image,
+      vkCmdCopyBufferToImage(cmd, task.stagingBuffer.buffer, task.image->image,
                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 
       if (task.mipmap) {
-        vkutil::generate_mipmaps(cmd, task.image.image,
-            VkExtent2D{task.image.imageExtent.width, task.image.imageExtent.height});
+        vkutil::generate_mipmaps(cmd, task.image->image,
+            VkExtent2D{task.image->imageExtent.width, task.image->imageExtent.height});
       } else {
-        vkutil::Transition(task.image.image)
-            .from(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+        vkutil::Transition(task.image)
             .to(VK_IMAGE_LAYOUT_GENERAL)
             .withSource(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
             .withDestination(VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT)
@@ -360,8 +358,7 @@ namespace gestalt {
       memcpy(data, task.dataCopy, task.totalCubemapSizeBytes);
       vmaUnmapMemory(gpu_.allocator, task.stagingBuffer.allocation);
 
-      vkutil::Transition(task.image.image)
-          .from(VK_IMAGE_LAYOUT_UNDEFINED)
+      vkutil::Transition(task.image)
           .to(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
           .withSource(VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0)
           .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
@@ -380,7 +377,7 @@ namespace gestalt {
         copyRegion.imageSubresource.layerCount = 1;
         copyRegion.imageExtent = task.imageExtent;
 
-        vkCmdCopyBufferToImage(cmd, task.stagingBuffer.buffer, task.image.image,
+        vkCmdCopyBufferToImage(cmd, task.stagingBuffer.buffer, task.image->image,
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
       }
 
@@ -389,8 +386,7 @@ namespace gestalt {
         // cmd, new_image.image,
         // VkExtent2D{new_image.imageExtent.width, new_image.imageExtent.height});
       } else {
-        vkutil::Transition(task.image.image)
-            .from(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+        vkutil::Transition(task.image)
             .to(VK_IMAGE_LAYOUT_GENERAL)
             .withSource(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
             .withDestination(VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT)
@@ -409,7 +405,7 @@ namespace gestalt {
       size_t totalCubemapSizeBytes = faceSizeBytes * 6;
 
       CubemapTask task;
-      task.image = image;
+      task.image = std::make_shared<TextureHandle>(image);
       task.dataCopy = new unsigned char[totalCubemapSizeBytes];
       memcpy(task.dataCopy, imageData, totalCubemapSizeBytes);
       task.totalCubemapSizeBytes = totalCubemapSizeBytes;
@@ -618,9 +614,9 @@ namespace gestalt {
 
     void ResourceManager::create_color_frame_buffer(const VkExtent3D& extent,
                                                     TextureHandle& color_image) const {
-      assert(color_image.type == TextureType::kColor);
+      assert(color_image.getType() == TextureType::kColor);
       // hardcoding the draw format to 32 bit float
-      color_image.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+      color_image.setFormat(VK_FORMAT_R16G16B16A16_SFLOAT);
       color_image.imageExtent = extent;
 
       VkImageUsageFlags drawImageUsages{};
@@ -630,7 +626,7 @@ namespace gestalt {
       drawImageUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
 
       VkImageCreateInfo rimg_info
-          = vkinit::image_create_info(color_image.imageFormat, drawImageUsages, extent);
+          = vkinit::image_create_info(color_image.getFormat(), drawImageUsages, extent);
 
       // for the draw image, we want to allocate it from gpu local memory
       VmaAllocationCreateInfo rimg_allocinfo = {};
@@ -643,16 +639,16 @@ namespace gestalt {
 
       // build a image-view for the draw image to use for rendering
       VkImageViewCreateInfo rview_info = vkinit::imageview_create_info(
-          color_image.imageFormat, color_image.image, VK_IMAGE_ASPECT_COLOR_BIT);
+          color_image.getFormat(), color_image.image, VK_IMAGE_ASPECT_COLOR_BIT);
 
       VK_CHECK(vkCreateImageView(gpu_.device, &rview_info, nullptr, &color_image.imageView));
     }
 
     void ResourceManager::create_depth_frame_buffer(const VkExtent3D& extent,
                                                     TextureHandle& depth_image) const {
-      assert(depth_image.type == TextureType::kDepth);
+      assert(depth_image.getType() == TextureType::kDepth);
 
-      depth_image.imageFormat = VK_FORMAT_D32_SFLOAT;
+      depth_image.setFormat(VK_FORMAT_D32_SFLOAT);
       depth_image.imageExtent = extent;
       VkImageUsageFlags depthImageUsages{};
       depthImageUsages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
@@ -662,7 +658,7 @@ namespace gestalt {
       rimg_allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
       rimg_allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
       VkImageCreateInfo dimg_info
-          = vkinit::image_create_info(depth_image.imageFormat, depthImageUsages, extent);
+          = vkinit::image_create_info(depth_image.getFormat(), depthImageUsages, extent);
 
       // allocate and create the image
       vmaCreateImage(gpu_.allocator, &dimg_info, &rimg_allocinfo, &depth_image.image,
@@ -670,7 +666,7 @@ namespace gestalt {
 
       // build a image-view for the draw image to use for rendering
       VkImageViewCreateInfo dview_info = vkinit::imageview_create_info(
-          depth_image.imageFormat, depth_image.image, VK_IMAGE_ASPECT_DEPTH_BIT);
+          depth_image.getFormat(), depth_image.image, VK_IMAGE_ASPECT_DEPTH_BIT);
 
       VK_CHECK(vkCreateImageView(gpu_.device, &dview_info, nullptr, &depth_image.imageView));
     }

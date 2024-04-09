@@ -33,7 +33,12 @@ namespace gestalt {
       swapchain_extent = vkbSwapchain.extent;
       // store swapchain and its related images
       swapchain = vkbSwapchain.swapchain;
-      swapchain_images = vkbSwapchain.get_images().value();
+
+      for (const auto& _swapchainImage : vkbSwapchain.get_images().value()) {
+        foundation::TextureHandle handle{};
+        handle.image = _swapchainImage;
+        swapchain_images.push_back(std::make_shared<foundation::TextureHandle>(handle));
+      }
       swapchain_image_views = vkbSwapchain.get_image_views().value();
     }
 

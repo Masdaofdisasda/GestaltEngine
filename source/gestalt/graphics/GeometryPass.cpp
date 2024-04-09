@@ -49,8 +49,8 @@ namespace gestalt {
                       .disable_blending(3)
                       .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
                       .set_color_attachment_formats(
-                          {gbuffer_1->imageFormat, gbuffer_2->imageFormat, gbuffer_3->imageFormat})
-                      .set_depth_format(depth_image->imageFormat)
+                          {gbuffer_1->getFormat(), gbuffer_2->getFormat(), gbuffer_3->getFormat()})
+                      .set_depth_format(depth_image->getFormat())
                       .set_pipeline_layout(pipeline_layout_)
                       .build_pipeline(gpu_.device);
 
@@ -181,8 +181,8 @@ namespace gestalt {
                       .disable_blending(3)
                       .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
                       .set_color_attachment_formats(
-                          {gbuffer_1->imageFormat, gbuffer_2->imageFormat, gbuffer_3->imageFormat})
-                      .set_depth_format(depth_image->imageFormat)
+                          {gbuffer_1->getFormat(), gbuffer_2->getFormat(), gbuffer_3->getFormat()})
+                      .set_depth_format(depth_image->getFormat())
                       .set_pipeline_layout(pipeline_layout_)
                       .build_pipeline(gpu_.device);
 
@@ -302,8 +302,8 @@ namespace gestalt {
                       .set_multisampling_none()
                       .enable_blending_additive()
                       .enable_depthtest(false, VK_COMPARE_OP_LESS_OR_EQUAL)
-                      .set_color_attachment_format(color_image->imageFormat)
-                      .set_depth_format(depth_image->imageFormat)
+                      .set_color_attachment_format(color_image->getFormat())
+                      .set_depth_format(depth_image->getFormat())
                       .set_pipeline_layout(pipeline_layout_)
                       .build_pipeline(gpu_.device);
 
@@ -418,8 +418,8 @@ namespace gestalt {
                       .set_multisampling_none()
                       .disable_blending()
                       .enable_depthtest(false, VK_COMPARE_OP_LESS_OR_EQUAL)
-                      .set_color_attachment_format(color_image->imageFormat)
-                      .set_depth_format(depth_image->imageFormat)
+                      .set_color_attachment_format(color_image->getFormat())
+                      .set_depth_format(depth_image->getFormat())
                       .set_pipeline_layout(pipeline_layout_)
                       .build_pipeline(gpu_.device);
 

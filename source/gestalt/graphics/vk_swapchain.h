@@ -2,6 +2,7 @@
 
 #include "vk_types.h"
 #include "Gpu.h"
+#include "GpuResources.h"
 #include "Window.h"
 
 
@@ -9,7 +10,7 @@ namespace gestalt {
   namespace graphics {
 
     class VkSwapchain {
-      graphics::Gpu gpu_;
+      Gpu gpu_;
 
     public:
       VkSwapchainKHR swapchain;
@@ -17,10 +18,10 @@ namespace gestalt {
       VkExtent2D swapchain_extent;
       VkExtent2D draw_extent;
 
-      std::vector<VkImage> swapchain_images;
+      std::vector<std::shared_ptr<foundation::TextureHandle>> swapchain_images;
       std::vector<VkImageView> swapchain_image_views;
 
-      void init(const graphics::Gpu& gpu, const VkExtent3D& extent);
+      void init(const Gpu& gpu, const VkExtent3D& extent);
       void create_swapchain(uint32_t width, uint32_t height);
       void resize_swapchain(application::Window& window);
       void destroy_swapchain() const;

@@ -197,14 +197,14 @@ namespace gestalt {
   //< render_info
   //> subresource
   VkImageSubresourceRange vkinit::image_subresource_range(VkImageAspectFlags aspectMask) {
-    VkImageSubresourceRange subImage{};
-    subImage.aspectMask = aspectMask;
-    subImage.baseMipLevel = 0;
-    subImage.levelCount = VK_REMAINING_MIP_LEVELS;
-    subImage.baseArrayLayer = 0;
-    subImage.layerCount = VK_REMAINING_ARRAY_LAYERS;
+    VkImageSubresourceRange sub_image;
+    sub_image.aspectMask = aspectMask;
+    sub_image.baseMipLevel = 0;
+    sub_image.levelCount = VK_REMAINING_MIP_LEVELS;
+    sub_image.baseArrayLayer = 0;
+    sub_image.layerCount = VK_REMAINING_ARRAY_LAYERS;
 
-    return subImage;
+    return sub_image;
   }
   //< subresource
 

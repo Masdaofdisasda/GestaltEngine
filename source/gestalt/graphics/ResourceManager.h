@@ -16,7 +16,7 @@ namespace gestalt {
     class PoorMansResourceLoader {
         struct ImageTask {
           AllocatedBuffer stagingBuffer;
-          TextureHandle image;
+          std::shared_ptr<TextureHandle> image;
           unsigned char* dataCopy;
           VkDeviceSize imageSize;
           VkExtent3D imageExtent;
@@ -25,7 +25,7 @@ namespace gestalt {
 
         struct CubemapTask {
           AllocatedBuffer stagingBuffer;
-          TextureHandle image;
+          std::shared_ptr<TextureHandle> image;
           unsigned char* dataCopy;
           VkDeviceSize totalCubemapSizeBytes;
           VkDeviceSize faceSizeBytes;

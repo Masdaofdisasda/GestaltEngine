@@ -42,7 +42,7 @@ namespace gestalt {
                       .set_multisampling_none()
                       .disable_blending()
                       .disable_depthtest()
-                      .set_color_attachment_format(color_image->imageFormat)
+                      .set_color_attachment_format(color_image->getFormat())
                       .set_pipeline_layout(pipeline_layout_)
                       .build_pipeline(gpu_.device);
     }
@@ -113,7 +113,7 @@ namespace gestalt {
                          .set_multisampling_none()
                          .disable_blending()
                          .disable_depthtest()
-                         .set_color_attachment_format(color_image->imageFormat)
+                         .set_color_attachment_format(color_image->getFormat())
                          .set_pipeline_layout(pipeline_layout_);
 
       blur_x_pipeline_
@@ -131,8 +131,8 @@ namespace gestalt {
           blur_x_descriptor_set_ = resource_manager_->descriptor_pool->allocate(
               gpu_.device, descriptor_layouts_.at(0));
 
-          vkutil::transition_read(cmd, *image_x);
-          vkutil::transition_write(cmd, *image_y);
+          vkutil::Transition(image_x).toLayoutRead().andSubmitTo(cmd);
+          vkutil::Transition(image_y).toLayoutWrite().andSubmitTo(cmd);
 
           VkRenderingAttachmentInfo newColorAttachment
               = vkinit::attachment_info(image_y->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -159,8 +159,8 @@ namespace gestalt {
           blur_y_descriptor_set_ = resource_manager_->descriptor_pool->allocate(
               gpu_.device, descriptor_layouts_.at(0));
 
-          vkutil::transition_read(cmd, *image_y);
-          vkutil::transition_write(cmd, *image_x);
+          vkutil::Transition(image_y).toLayoutRead().andSubmitTo(cmd);
+          vkutil::Transition(image_x).toLayoutWrite().andSubmitTo(cmd);
 
           VkRenderingAttachmentInfo newColorAttachment
               = vkinit::attachment_info(image_x->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -231,7 +231,7 @@ namespace gestalt {
                       .set_multisampling_none()
                       .disable_blending()
                       .disable_depthtest()
-                      .set_color_attachment_format(color_image->imageFormat)
+                      .set_color_attachment_format(color_image->getFormat())
                       .set_pipeline_layout(pipeline_layout_)
                       .build_pipeline(gpu_.device);
     }
@@ -309,7 +309,7 @@ namespace gestalt {
                       .set_multisampling_none()
                       .disable_blending()
                       .disable_depthtest()
-                      .set_color_attachment_format(color_image->imageFormat)
+                      .set_color_attachment_format(color_image->getFormat())
                       .set_pipeline_layout(pipeline_layout_)
                       .build_pipeline(gpu_.device);
     }
@@ -326,8 +326,8 @@ namespace gestalt {
       const auto scene_color = registry_->get_resource<TextureHandle>("scene_ssao");
       const auto color_image = registry_->get_resource<TextureHandle>("lum_64");
 
-      vkutil::transition_read(cmd, *scene_color);
-     vkutil::transition_write(cmd, *color_image);
+      vkutil::Transition(scene_color).toLayoutRead().andSubmitTo(cmd);
+      vkutil::Transition(color_image).toLayoutWrite().andSubmitTo(cmd);
 
       VkRenderingAttachmentInfo newColorAttachment
           = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -386,7 +386,7 @@ namespace gestalt {
                       .set_multisampling_none()
                       .disable_blending()
                       .disable_depthtest()
-                      .set_color_attachment_format(color_image->imageFormat)
+                      .set_color_attachment_format(color_image->getFormat())
                       .set_pipeline_layout(pipeline_layout_)
                       .build_pipeline(gpu_.device);
     }
@@ -413,8 +413,8 @@ namespace gestalt {
         const auto color_image
             = registry_->get_resource<TextureHandle>(deps_.write_resources.at(i).second->getId());
 
-        vkutil::transition_read(cmd, *scene_color);
-        vkutil::transition_write(cmd, *color_image);
+        vkutil::Transition(scene_color).toLayoutRead().andSubmitTo(cmd);
+        vkutil::Transition(color_image).toLayoutWrite().andSubmitTo(cmd);
 
         VkRenderingAttachmentInfo newColorAttachment
             = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -479,7 +479,7 @@ namespace gestalt {
                       .set_multisampling_none()
                       .disable_blending()
                       .disable_depthtest()
-                      .set_color_attachment_format(color_image->imageFormat)
+                      .set_color_attachment_format(color_image->getFormat())
                       .set_pipeline_layout(pipeline_layout_)
                       .build_pipeline(gpu_.device);
     }
@@ -499,9 +499,9 @@ namespace gestalt {
       std::shared_ptr<TextureHandle> new_lum
           = registry_->get_resource<TextureHandle>("lum_1_new");
 
-      vkutil::transition_read(cmd, *current_lum);
-      vkutil::transition_read(cmd, *avg_lum);
-      vkutil::transition_write(cmd, *new_lum);
+      vkutil::Transition(current_lum).toLayoutRead().andSubmitTo(cmd);
+      vkutil::Transition(avg_lum).toLayoutRead().andSubmitTo(cmd);
+      vkutil::Transition(new_lum).toLayoutWrite().andSubmitTo(cmd);
 
       VkRenderingAttachmentInfo newColorAttachment
           = vkinit::attachment_info(new_lum->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
@@ -579,7 +579,7 @@ namespace gestalt {
                       .set_multisampling_none()
                       .disable_blending()
                       .disable_depthtest()
-                      .set_color_attachment_format(color_image->imageFormat)
+                      .set_color_attachment_format(color_image->getFormat())
                       .set_pipeline_layout(pipeline_layout_)
                       .build_pipeline(gpu_.device);
     }

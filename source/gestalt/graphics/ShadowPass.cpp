@@ -46,7 +46,7 @@ namespace gestalt {
                       .disable_blending()
                       .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
                       .enable_dynamic_depth_bias()
-                      .set_depth_format(depth_image->imageFormat)
+                      .set_depth_format(depth_image->getFormat())
                       .set_pipeline_layout(pipeline_layout_)
                       .build_pipeline(gpu_.device);
 

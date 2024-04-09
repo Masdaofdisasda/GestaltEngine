@@ -276,7 +276,7 @@ namespace gestalt {
             || std::dynamic_pointer_cast<DepthImageResource>(read)) {
           std::shared_ptr<foundation::TextureHandle> resource
               = resource_registry_->get_resource<foundation::TextureHandle>(read->getId());
-          vkutil::transition_read(cmd, *resource);
+          vkutil::Transition(resource).toLayoutRead().andSubmitTo(cmd);
         }
       }
 
@@ -286,7 +286,7 @@ namespace gestalt {
             || std::dynamic_pointer_cast<DepthImageResource>(write.second)) {
           std::shared_ptr<foundation::TextureHandle> resource
               = resource_registry_->get_resource<foundation::TextureHandle>(write.second->getId());
-          vkutil::transition_write(cmd, *resource);
+          vkutil::Transition(resource).toLayoutWrite().andSubmitTo(cmd);
         }
       }
 
@@ -358,24 +358,24 @@ namespace gestalt {
 
       const auto color_image = resource_registry_->get_resource<foundation::TextureHandle>("scene_debug_aabb");
 
-      vkutil::transition_image(cmd, color_image->image, color_image->currentLayout,
-                               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-      color_image->currentLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-      vkutil::transition_image(cmd, swapchain_->swapchain_images[swapchain_image_index_],
-                               VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+      vkutil::Transition(color_image).to(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL).andSubmitTo(cmd);
+      vkutil::Transition(swapchain_->swapchain_images[swapchain_image_index_])
+          .to(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+          .andSubmitTo(cmd);
 
       vkutil::copy_image_to_image(cmd, color_image->image,
-                                  swapchain_->swapchain_images[swapchain_image_index_],
+                                  swapchain_->swapchain_images[swapchain_image_index_]->image,
                                   color_image->getExtent2D(), get_window().extent);
-      vkutil::transition_image(cmd, swapchain_->swapchain_images[swapchain_image_index_],
-                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                               VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+      vkutil::Transition(swapchain_->swapchain_images[swapchain_image_index_])
+          .to(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+          .andSubmitTo(cmd);
 
       imgui_->draw(cmd, swapchain_->swapchain_image_views[swapchain_image_index_]);
 
-      vkutil::transition_image(cmd, swapchain_->swapchain_images[swapchain_image_index_],
-                               VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                               VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+      vkutil::Transition(swapchain_->swapchain_images[swapchain_image_index_])
+          .to(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+          .andSubmitTo(cmd);
 
       present(cmd);
     }
