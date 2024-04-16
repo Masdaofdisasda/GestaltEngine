@@ -174,7 +174,7 @@ namespace gestalt {
                 = static_cast<uint32_t>(window_.extent.height * image_resource->get_scale());
           }
           resource_manager_->create_color_frame_buffer(
-              {image->getExtent2D().width, image->getExtent2D().height, 1}, *image.get());
+              {image->getExtent2D().width, image->getExtent2D().height, 1}, image);
           resource_registry_->add_resource(image_resource->getId(), image);
         } else if (auto image_resource = std::dynamic_pointer_cast<DepthImageResource>(r)) {
           if (resource_registry_->get_resource<foundation::TextureHandle>(image_resource->getId())) {
@@ -191,7 +191,7 @@ namespace gestalt {
                 = static_cast<uint32_t>(window_.extent.height * image_resource->get_scale());
           }
           resource_manager_->create_depth_frame_buffer(
-              {image->getExtent2D().width, image->getExtent2D().height, 1}, *image.get());
+              {image->getExtent2D().width, image->getExtent2D().height, 1}, image);
           resource_registry_->add_resource(image_resource->getId(), image);
         } else if (auto buffer = std::dynamic_pointer_cast<BufferResource>(r)) {
           // TODO: create buffer
@@ -274,9 +274,9 @@ namespace gestalt {
            const auto& read : reads) {
         if (std::dynamic_pointer_cast<ColorImageResource>(read)
             || std::dynamic_pointer_cast<DepthImageResource>(read)) {
-          std::shared_ptr<foundation::TextureHandle> resource
-              = resource_registry_->get_resource<foundation::TextureHandle>(read->getId());
-          vkutil::Transition(resource).toLayoutRead().andSubmitTo(cmd);
+          std::shared_ptr<TextureHandle> resource
+              = resource_registry_->get_resource<TextureHandle>(read->getId());
+          vkutil::TransitionImage(resource).toLayoutRead().andSubmitTo(cmd);
         }
       }
 
@@ -284,9 +284,9 @@ namespace gestalt {
            const auto& write : writes) {
         if (std::dynamic_pointer_cast<ColorImageResource>(write.second)
             || std::dynamic_pointer_cast<DepthImageResource>(write.second)) {
-          std::shared_ptr<foundation::TextureHandle> resource
-              = resource_registry_->get_resource<foundation::TextureHandle>(write.second->getId());
-          vkutil::Transition(resource).toLayoutWrite().andSubmitTo(cmd);
+          std::shared_ptr<TextureHandle> resource
+              = resource_registry_->get_resource<TextureHandle>(write.second->getId());
+          vkutil::TransitionImage(resource).toLayoutWrite().andSubmitTo(cmd);
         }
       }
 
@@ -357,25 +357,40 @@ namespace gestalt {
       repository_->main_draw_context_.transparent_surfaces.clear();
 
       const auto color_image = resource_registry_->get_resource<foundation::TextureHandle>("scene_debug_aabb");
+      const auto swapchain_image = swapchain_->swapchain_images[swapchain_image_index_];
 
-      vkutil::Transition(color_image).to(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL).andSubmitTo(cmd);
-      vkutil::Transition(swapchain_->swapchain_images[swapchain_image_index_])
+      vkutil::TransitionImage(color_image)
+          .to(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+          .withSource(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)
+          .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
+          .andSubmitTo(cmd);
+      vkutil::TransitionImage(swapchain_image)
           .to(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+          .withSource(VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0)
+          .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
           .andSubmitTo(cmd);
 
-      vkutil::copy_image_to_image(cmd, color_image->image,
-                                  swapchain_->swapchain_images[swapchain_image_index_]->image,
-                                  color_image->getExtent2D(), get_window().extent);
+      vkutil::CopyImage(color_image).toImage(swapchain_image)
+          .andSubmitTo(cmd);
 
-      vkutil::Transition(swapchain_->swapchain_images[swapchain_image_index_])
+      vkutil::TransitionImage(swapchain_image)
           .to(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+          .withSource(VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                      VK_ACCESS_2_TRANSFER_WRITE_BIT)  // Wait for the copy to finish
+          .withDestination(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                           VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)
           .andSubmitTo(cmd);
 
-      imgui_->draw(cmd, swapchain_->swapchain_image_views[swapchain_image_index_]);
+      imgui_->draw(cmd, swapchain_image->imageView);
 
-      vkutil::Transition(swapchain_->swapchain_images[swapchain_image_index_])
+      vkutil::TransitionImage(swapchain_image)
           .to(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+          .withSource(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                      VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)
+          .withDestination(VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
+                           0)
           .andSubmitTo(cmd);
+      swapchain_image->setFormat(VK_FORMAT_UNDEFINED);
 
       present(cmd);
     }

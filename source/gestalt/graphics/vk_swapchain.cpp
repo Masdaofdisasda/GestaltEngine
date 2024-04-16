@@ -27,6 +27,7 @@ namespace gestalt {
                                         .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
                                         .set_desired_extent(width, height)
                                         .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+                                        .set_desired_min_image_count(2)
                                         .build()
                                         .value();
 
@@ -37,9 +38,18 @@ namespace gestalt {
       for (const auto& _swapchainImage : vkbSwapchain.get_images().value()) {
         foundation::TextureHandle handle{};
         handle.image = _swapchainImage;
+        handle.setFormat(swapchain_image_format);
+        handle.setLayout(VK_IMAGE_LAYOUT_UNDEFINED);
+        handle.imageExtent = {swapchain_extent.width, swapchain_extent.height, 1};
+
         swapchain_images.push_back(std::make_shared<foundation::TextureHandle>(handle));
       }
-      swapchain_image_views = vkbSwapchain.get_image_views().value();
+
+      const auto views = vkbSwapchain.get_image_views().value();
+
+      for (size_t i = 0; i < views.size(); i++) {
+        swapchain_images[i]->imageView = views[i];
+      }
     }
 
     void VkSwapchain::resize_swapchain(Window& window) {
@@ -56,8 +66,8 @@ namespace gestalt {
       vkDestroySwapchainKHR(gpu_.device, swapchain, nullptr);
 
       // destroy swapchain resources
-      for (auto& _swapchainImageView : swapchain_image_views) {
-        vkDestroyImageView(gpu_.device, _swapchainImageView, nullptr);
+      for (auto& _swapchainImage : swapchain_images) {
+        vkDestroyImageView(gpu_.device, _swapchainImage->imageView, nullptr);
       }
     }
 

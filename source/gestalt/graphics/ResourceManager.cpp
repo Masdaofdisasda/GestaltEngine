@@ -154,7 +154,8 @@ namespace gestalt {
     TextureHandle ResourceManager::create_image(VkExtent3D size, VkFormat format,
                                                  VkImageUsageFlags usage, bool mipmapped,
                                                  bool cubemap) {
-      TextureHandle newImage;
+
+      TextureHandle newImage{cubemap ? TextureType::kCubeMap : TextureType::kColor};
       newImage.setFormat(format);
       newImage.imageExtent = size;
 
@@ -315,7 +316,7 @@ namespace gestalt {
       memcpy(data, task.dataCopy, task.imageSize);
       vmaUnmapMemory(gpu_.allocator, task.stagingBuffer.allocation);
 
-      vkutil::Transition(task.image)
+      vkutil::TransitionImage(task.image)
           .to(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
           .withSource(VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0)
           .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
@@ -337,15 +338,14 @@ namespace gestalt {
                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 
       if (task.mipmap) {
-        vkutil::generate_mipmaps(cmd, task.image->image,
-            VkExtent2D{task.image->imageExtent.width, task.image->imageExtent.height});
-      } else {
-        vkutil::Transition(task.image)
-            .to(VK_IMAGE_LAYOUT_GENERAL)
-            .withSource(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
-            .withDestination(VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT)
-            .andSubmitTo(cmd);
+        vkutil::generate_mipmaps(cmd, task.image);
       }
+
+      vkutil::TransitionImage(task.image)
+          .to(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+          .withSource(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
+          .withDestination(VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT)
+          .andSubmitTo(cmd);
     }
 
     void PoorMansResourceLoader::execute_cubemap_task(CubemapTask & task) {
@@ -358,7 +358,7 @@ namespace gestalt {
       memcpy(data, task.dataCopy, task.totalCubemapSizeBytes);
       vmaUnmapMemory(gpu_.allocator, task.stagingBuffer.allocation);
 
-      vkutil::Transition(task.image)
+      vkutil::TransitionImage(task.image)
           .to(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
           .withSource(VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0)
           .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
@@ -386,8 +386,8 @@ namespace gestalt {
         // cmd, new_image.image,
         // VkExtent2D{new_image.imageExtent.width, new_image.imageExtent.height});
       } else {
-        vkutil::Transition(task.image)
-            .to(VK_IMAGE_LAYOUT_GENERAL)
+        vkutil::TransitionImage(task.image)
+            .to(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
             .withSource(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
             .withDestination(VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT)
             .andSubmitTo(cmd);
@@ -590,9 +590,10 @@ namespace gestalt {
 
       writer.clear();
       writer.write_image(1, Ibl_buffers.environment_map.imageView, Ibl_buffers.cube_map_sampler,
-                         VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
       writer.write_image(2, Ibl_buffers.environment_irradiance_map.imageView,
-                         Ibl_buffers.cube_map_sampler, VK_IMAGE_LAYOUT_GENERAL,
+                         Ibl_buffers.cube_map_sampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                          VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
       writer.write_image(
           3, Ibl_buffers.bdrf_lut.imageView, repository_->default_material_.linearSampler,
@@ -613,11 +614,11 @@ namespace gestalt {
     }
 
     void ResourceManager::create_color_frame_buffer(const VkExtent3D& extent,
-                                                    TextureHandle& color_image) const {
-      assert(color_image.getType() == TextureType::kColor);
+                                                    std::shared_ptr<TextureHandle>& color_image) const {
+      assert(color_image->getType() == TextureType::kColor);
       // hardcoding the draw format to 32 bit float
-      color_image.setFormat(VK_FORMAT_R16G16B16A16_SFLOAT);
-      color_image.imageExtent = extent;
+      color_image->setFormat(VK_FORMAT_R16G16B16A16_SFLOAT);
+      color_image->imageExtent = extent;
 
       VkImageUsageFlags drawImageUsages{};
       drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -626,7 +627,7 @@ namespace gestalt {
       drawImageUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
 
       VkImageCreateInfo rimg_info
-          = vkinit::image_create_info(color_image.getFormat(), drawImageUsages, extent);
+          = vkinit::image_create_info(color_image->getFormat(), drawImageUsages, extent);
 
       // for the draw image, we want to allocate it from gpu local memory
       VmaAllocationCreateInfo rimg_allocinfo = {};
@@ -634,22 +635,21 @@ namespace gestalt {
       rimg_allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
       // allocate and create the image
-      vmaCreateImage(gpu_.allocator, &rimg_info, &rimg_allocinfo, &color_image.image,
-                     &color_image.allocation, nullptr);
+      VK_CHECK(vmaCreateImage(gpu_.allocator, &rimg_info, &rimg_allocinfo, &color_image->image,
+                     &color_image->allocation, nullptr));
 
       // build a image-view for the draw image to use for rendering
       VkImageViewCreateInfo rview_info = vkinit::imageview_create_info(
-          color_image.getFormat(), color_image.image, VK_IMAGE_ASPECT_COLOR_BIT);
+          color_image->getFormat(), color_image->image, VK_IMAGE_ASPECT_COLOR_BIT);
 
-      VK_CHECK(vkCreateImageView(gpu_.device, &rview_info, nullptr, &color_image.imageView));
+      VK_CHECK(vkCreateImageView(gpu_.device, &rview_info, nullptr, &color_image->imageView));
     }
 
-    void ResourceManager::create_depth_frame_buffer(const VkExtent3D& extent,
-                                                    TextureHandle& depth_image) const {
-      assert(depth_image.getType() == TextureType::kDepth);
+    void ResourceManager::create_depth_frame_buffer(const VkExtent3D& extent, std::shared_ptr<TextureHandle>& depth_image) const {
+      assert(depth_image->getType() == TextureType::kDepth);
 
-      depth_image.setFormat(VK_FORMAT_D32_SFLOAT);
-      depth_image.imageExtent = extent;
+      depth_image->setFormat(VK_FORMAT_D32_SFLOAT);
+      depth_image->imageExtent = extent;
       VkImageUsageFlags depthImageUsages{};
       depthImageUsages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
       depthImageUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -658,17 +658,17 @@ namespace gestalt {
       rimg_allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
       rimg_allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
       VkImageCreateInfo dimg_info
-          = vkinit::image_create_info(depth_image.getFormat(), depthImageUsages, extent);
+          = vkinit::image_create_info(depth_image->getFormat(), depthImageUsages, extent);
 
       // allocate and create the image
-      vmaCreateImage(gpu_.allocator, &dimg_info, &rimg_allocinfo, &depth_image.image,
-                     &depth_image.allocation, nullptr);
+      vmaCreateImage(gpu_.allocator, &dimg_info, &rimg_allocinfo, &depth_image->image,
+                     &depth_image->allocation, nullptr);
 
       // build a image-view for the draw image to use for rendering
       VkImageViewCreateInfo dview_info = vkinit::imageview_create_info(
-          depth_image.getFormat(), depth_image.image, VK_IMAGE_ASPECT_DEPTH_BIT);
+          depth_image->getFormat(), depth_image->image, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-      VK_CHECK(vkCreateImageView(gpu_.device, &dview_info, nullptr, &depth_image.imageView));
+      VK_CHECK(vkCreateImageView(gpu_.device, &dview_info, nullptr, &depth_image->imageView));
     }
 
     void ResourceManager::destroy_image(const TextureHandle& img) {

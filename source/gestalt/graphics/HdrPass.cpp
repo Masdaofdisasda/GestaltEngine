@@ -54,8 +54,8 @@ namespace gestalt {
       const auto scene_ssao = registry_->get_resource<TextureHandle>("scene_ssao");
       const auto color_image = registry_->get_resource<TextureHandle>("scene_bright");
 
-      VkRenderingAttachmentInfo newColorAttachment
-          = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+      VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
+          color_image->imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
       VkRenderingInfo newRenderInfo
           = vkinit::rendering_info({effect_size_, effect_size_}, &newColorAttachment, nullptr);
       vkCmdBeginRendering(cmd, &newRenderInfo);
@@ -131,11 +131,11 @@ namespace gestalt {
           blur_x_descriptor_set_ = resource_manager_->descriptor_pool->allocate(
               gpu_.device, descriptor_layouts_.at(0));
 
-          vkutil::Transition(image_x).toLayoutRead().andSubmitTo(cmd);
-          vkutil::Transition(image_y).toLayoutWrite().andSubmitTo(cmd);
+          vkutil::TransitionImage(image_x).toLayoutRead().andSubmitTo(cmd);
+          vkutil::TransitionImage(image_y).toLayoutWrite().andSubmitTo(cmd);
 
-          VkRenderingAttachmentInfo newColorAttachment
-              = vkinit::attachment_info(image_y->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+          VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
+              image_y->imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
           VkRenderingInfo newRenderInfo
               = vkinit::rendering_info({effect_size_, effect_size_}, &newColorAttachment, nullptr);
           vkCmdBeginRendering(cmd, &newRenderInfo);
@@ -159,11 +159,11 @@ namespace gestalt {
           blur_y_descriptor_set_ = resource_manager_->descriptor_pool->allocate(
               gpu_.device, descriptor_layouts_.at(0));
 
-          vkutil::Transition(image_y).toLayoutRead().andSubmitTo(cmd);
-          vkutil::Transition(image_x).toLayoutWrite().andSubmitTo(cmd);
+          vkutil::TransitionImage(image_y).toLayoutRead().andSubmitTo(cmd);
+          vkutil::TransitionImage(image_x).toLayoutWrite().andSubmitTo(cmd);
 
-          VkRenderingAttachmentInfo newColorAttachment
-              = vkinit::attachment_info(image_x->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+          VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
+              image_x->imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
           VkRenderingInfo newRenderInfo
               = vkinit::rendering_info({effect_size_, effect_size_}, &newColorAttachment, nullptr);
           vkCmdBeginRendering(cmd, &newRenderInfo);
@@ -244,8 +244,8 @@ namespace gestalt {
       const auto color_image
           = registry_->get_resource<TextureHandle>("bloom_blurred_intermediate");
 
-      VkRenderingAttachmentInfo newColorAttachment
-          = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+      VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
+          color_image->imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
       VkRenderingInfo newRenderInfo
           = vkinit::rendering_info({effect_size_, effect_size_}, &newColorAttachment, nullptr);
       vkCmdBeginRendering(cmd, &newRenderInfo);
@@ -326,11 +326,11 @@ namespace gestalt {
       const auto scene_color = registry_->get_resource<TextureHandle>("scene_ssao");
       const auto color_image = registry_->get_resource<TextureHandle>("lum_64");
 
-      vkutil::Transition(scene_color).toLayoutRead().andSubmitTo(cmd);
-      vkutil::Transition(color_image).toLayoutWrite().andSubmitTo(cmd);
+      vkutil::TransitionImage(scene_color).toLayoutRead().andSubmitTo(cmd);
+      vkutil::TransitionImage(color_image).toLayoutWrite().andSubmitTo(cmd);
 
-      VkRenderingAttachmentInfo newColorAttachment
-          = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+      VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
+          color_image->imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
       VkRenderingInfo newRenderInfo
           = vkinit::rendering_info(color_image->getExtent2D(), &newColorAttachment, nullptr);
       vkCmdBeginRendering(cmd, &newRenderInfo);
@@ -413,11 +413,11 @@ namespace gestalt {
         const auto color_image
             = registry_->get_resource<TextureHandle>(deps_.write_resources.at(i).second->getId());
 
-        vkutil::Transition(scene_color).toLayoutRead().andSubmitTo(cmd);
-        vkutil::Transition(color_image).toLayoutWrite().andSubmitTo(cmd);
+        vkutil::TransitionImage(scene_color).toLayoutRead().andSubmitTo(cmd);
+        vkutil::TransitionImage(color_image).toLayoutWrite().andSubmitTo(cmd);
 
-        VkRenderingAttachmentInfo newColorAttachment
-            = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+        VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
+            color_image->imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
         VkRenderingInfo newRenderInfo
             = vkinit::rendering_info(color_image->getExtent2D(), &newColorAttachment, nullptr);
         vkCmdBeginRendering(cmd, &newRenderInfo);
@@ -499,12 +499,12 @@ namespace gestalt {
       std::shared_ptr<TextureHandle> new_lum
           = registry_->get_resource<TextureHandle>("lum_1_new");
 
-      vkutil::Transition(current_lum).toLayoutRead().andSubmitTo(cmd);
-      vkutil::Transition(avg_lum).toLayoutRead().andSubmitTo(cmd);
-      vkutil::Transition(new_lum).toLayoutWrite().andSubmitTo(cmd);
+      vkutil::TransitionImage(current_lum).toLayoutRead().andSubmitTo(cmd);
+      vkutil::TransitionImage(avg_lum).toLayoutRead().andSubmitTo(cmd);
+      vkutil::TransitionImage(new_lum).toLayoutWrite().andSubmitTo(cmd);
 
-      VkRenderingAttachmentInfo newColorAttachment
-          = vkinit::attachment_info(new_lum->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+      VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
+          new_lum->imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
       VkRenderingInfo newRenderInfo
           = vkinit::rendering_info(new_lum->getExtent2D(), &newColorAttachment, nullptr);
       vkCmdBeginRendering(cmd, &newRenderInfo);
@@ -594,8 +594,8 @@ namespace gestalt {
       const auto lum_image = registry_->get_resource<TextureHandle>("lum_1_adapted");
       const auto depth_image = registry_->get_resource<TextureHandle>("directional_shadow_map");
 
-      VkRenderingAttachmentInfo newColorAttachment
-          = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+      VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
+          color_image->imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
       VkRenderingInfo newRenderInfo
           = vkinit::rendering_info(color_image->getExtent2D(), &newColorAttachment, nullptr);
       vkCmdBeginRendering(cmd, &newRenderInfo);

@@ -19,7 +19,6 @@ namespace gestalt {
       VkExtent2D draw_extent;
 
       std::vector<std::shared_ptr<foundation::TextureHandle>> swapchain_images;
-      std::vector<VkImageView> swapchain_image_views;
 
       void init(const Gpu& gpu, const VkExtent3D& extent);
       void create_swapchain(uint32_t width, uint32_t height);

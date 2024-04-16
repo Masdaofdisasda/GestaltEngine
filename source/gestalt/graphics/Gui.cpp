@@ -100,8 +100,8 @@ namespace gestalt {
     }
 
     void Gui::draw(VkCommandBuffer cmd, VkImageView target_image_view) {
-      VkRenderingAttachmentInfo colorAttachment
-          = vkinit::attachment_info(target_image_view, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+      VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(
+          target_image_view, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
       VkRenderingInfo renderInfo
           = vkinit::rendering_info(swapchain_->swapchain_extent, &colorAttachment, nullptr);
 

@@ -78,8 +78,8 @@ namespace gestalt {
       const auto gbuffer_depth = registry_->get_resource<TextureHandle>("gbuffer_depth");
       const auto shadow_map = registry_->get_resource<TextureHandle>("directional_shadow_map");
 
-      VkRenderingAttachmentInfo colorAttachment
-          = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+      VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(
+          color_image->imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
       VkRenderingInfo renderInfo
           = vkinit::rendering_info(color_image->getExtent2D(), &colorAttachment, nullptr);

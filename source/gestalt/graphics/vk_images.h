@@ -12,32 +12,49 @@ namespace gestalt {
 
     namespace vkutil {
 
-      class Transition {
+      class TransitionImage {
       public:
-        explicit Transition(const std::shared_ptr<foundation::TextureHandle>& image) {
-          imageBarrier.image = image->image;
-          image_ = image;
-        }
+        explicit TransitionImage(const std::shared_ptr<foundation::TextureHandle>& image);
 
-        Transition& to(const VkImageLayout new_layout);
+        TransitionImage& to(VkImageLayout new_layout);
 
-        Transition& withSource(VkPipelineStageFlags2 src_stage_mask, VkAccessFlags2 src_access_mask);
+        TransitionImage& withSource(VkPipelineStageFlags2 src_stage_mask,
+                                    VkAccessFlags2 src_access_mask);
 
-        Transition& withDestination(VkPipelineStageFlags2 dst_stage_mask,
-                                    VkAccessFlags2 dst_access_mask);
-        Transition& toLayoutRead();
-        Transition& toLayoutWrite();
+        TransitionImage& withDestination(VkPipelineStageFlags2 dst_stage_mask,
+                                         VkAccessFlags2 dst_access_mask);
+        TransitionImage& toLayoutRead();
+        TransitionImage& toLayoutWrite();
 
         void andSubmitTo(const VkCommandBuffer cmd);
 
       private:
-        std::shared_ptr <foundation::TextureHandle> image_;
-        VkImageMemoryBarrier2 imageBarrier{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+        std::shared_ptr<foundation::TextureHandle> image_;
+        VkImageMemoryBarrier2 imageBarrier{
+          .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+        };
       };
 
-      void copy_image_to_image(VkCommandBuffer cmd, VkImage source, VkImage destination,
-                               VkExtent2D srcSize, VkExtent2D dstSize);
-      void generate_mipmaps(VkCommandBuffer cmd, VkImage image, VkExtent2D imageSize);
+      class CopyImage {
+      public:
+        explicit CopyImage(const std::shared_ptr<foundation::TextureHandle>& source) {
+          source_ = source;
+        }
+
+        CopyImage& toImage(const std::shared_ptr<foundation::TextureHandle>& destination) {
+          destination_ = destination;
+
+          return *this;
+        }
+
+        void andSubmitTo(const VkCommandBuffer cmd) const;
+
+      private:
+        std::shared_ptr<foundation::TextureHandle> source_;
+        std::shared_ptr<foundation::TextureHandle> destination_;
+      };
+
+      void generate_mipmaps(VkCommandBuffer cmd, std::shared_ptr<foundation::TextureHandle>& handle);
     };  // namespace vkutil
   }     // namespace graphics
 }  // namespace gestalt

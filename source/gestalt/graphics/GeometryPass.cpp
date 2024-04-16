@@ -71,9 +71,12 @@ namespace gestalt {
           depth_image->imageView, &depth_clear, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
       std::array attachment_begin_infos{
-          vkinit::attachment_info(gbuffer_1->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL),
-          vkinit::attachment_info(gbuffer_2->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL),
-          vkinit::attachment_info(gbuffer_3->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL)};
+          vkinit::attachment_info(gbuffer_1->imageView, nullptr,
+                                  VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL),
+          vkinit::attachment_info(gbuffer_2->imageView, nullptr,
+                                  VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL),
+          vkinit::attachment_info(gbuffer_3->imageView, nullptr,
+                                  VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)};
 
       VkRenderingInfo renderInfo = vkinit::rendering_info_for_gbuffer(
           gbuffer_1->getExtent2D(), attachment_begin_infos.data(), attachment_begin_infos.size(),
@@ -204,9 +207,12 @@ namespace gestalt {
           depth_image->imageView, &depth_clear, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
       std::array attachment_begin_infos{
-          vkinit::attachment_info(gbuffer_1->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL),
-          vkinit::attachment_info(gbuffer_2->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL),
-          vkinit::attachment_info(gbuffer_3->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL)};
+          vkinit::attachment_info(gbuffer_1->imageView, nullptr,
+                                  VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL),
+          vkinit::attachment_info(gbuffer_2->imageView, nullptr,
+                                  VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL),
+          vkinit::attachment_info(gbuffer_3->imageView, nullptr,
+                                  VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)};
 
       VkRenderingInfo renderInfo = vkinit::rendering_info_for_gbuffer(
           gbuffer_1->getExtent2D(), attachment_begin_infos.data(), attachment_begin_infos.size(),
@@ -320,8 +326,8 @@ namespace gestalt {
 
       const auto shadow_map = registry_->get_resource<TextureHandle>("directional_shadow_map");
 
-      VkRenderingAttachmentInfo colorAttachment
-          = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+      VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(
+          color_image->imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
       VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
           depth_image->imageView, nullptr, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
@@ -433,8 +439,8 @@ namespace gestalt {
       const auto color_image = registry_->get_resource<TextureHandle>("scene_final");
       const auto depth_image = registry_->get_resource<TextureHandle>("grid_depth");
 
-      VkRenderingAttachmentInfo colorAttachment
-          = vkinit::attachment_info(color_image->imageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+      VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(
+          color_image->imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
       VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
           depth_image->imageView, nullptr, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 

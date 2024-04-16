@@ -12,11 +12,20 @@ namespace gestalt {
   namespace graphics {
     using namespace foundation;
 
-    vkutil::Transition& vkutil::Transition::to(const VkImageLayout new_layout) {
+    vkutil::TransitionImage::TransitionImage(
+        const std::shared_ptr<foundation::TextureHandle>& image) {
+      image_ = image;
+
+      imageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+      imageBarrier.srcAccessMask = 0;
+      imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
+      imageBarrier.dstAccessMask = 0;
+    }
+
+    vkutil::TransitionImage& vkutil::TransitionImage::to(const VkImageLayout new_layout) {
       imageBarrier.oldLayout = image_->getLayout();
 
       imageBarrier.newLayout = new_layout;
-      image_->setLayout(new_layout);
 
       const auto aspectMask_ = (new_layout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL
                                 || new_layout == VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL)
@@ -27,21 +36,30 @@ namespace gestalt {
       return *this;
     }
 
-    vkutil::Transition& vkutil::Transition::withSource(VkPipelineStageFlags2 src_stage_mask,
+    vkutil::TransitionImage& vkutil::TransitionImage::withSource(VkPipelineStageFlags2 src_stage_mask,
                                                        VkAccessFlags2 src_access_mask) {
       imageBarrier.srcStageMask = src_stage_mask;
       imageBarrier.srcAccessMask = src_access_mask;
       return *this;
     }
 
-    vkutil::Transition& vkutil::Transition::withDestination(VkPipelineStageFlags2 dst_stage_mask,
+    vkutil::TransitionImage& vkutil::TransitionImage::withDestination(VkPipelineStageFlags2 dst_stage_mask,
                                                             VkAccessFlags2 dst_access_mask) {
       imageBarrier.dstStageMask = dst_stage_mask;
       imageBarrier.dstAccessMask = dst_access_mask;
       return *this;
     }
 
-    void vkutil::Transition::andSubmitTo(const VkCommandBuffer cmd) {
+    void vkutil::TransitionImage::andSubmitTo(const VkCommandBuffer cmd) {
+
+      imageBarrier.image = image_->image;
+
+      if (image_->getType() ==TextureType::kCubeMap) {
+        imageBarrier.subresourceRange.baseMipLevel = 0;
+        imageBarrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+        imageBarrier.subresourceRange.baseArrayLayer = 0;
+        imageBarrier.subresourceRange.layerCount = 6;
+      }
 
       VkDependencyInfo depInfo{};
       depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
@@ -51,13 +69,15 @@ namespace gestalt {
       depInfo.pImageMemoryBarriers = &imageBarrier;
 
       if (imageBarrier.subresourceRange.aspectMask == 0) { return;} // image already in the desired layout
+
+      image_->setLayout(imageBarrier.newLayout);
       vkCmdPipelineBarrier2(cmd, &depInfo);
 
       image_ = nullptr;
       imageBarrier = {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
     }
 
-    vkutil::Transition& vkutil::Transition::toLayoutRead() {
+    vkutil::TransitionImage& vkutil::TransitionImage::toLayoutRead() {
       constexpr auto color_read_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
       constexpr auto depth_read_layout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL;
 
@@ -70,8 +90,6 @@ namespace gestalt {
         imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
         imageBarrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
 
-        image_->setLayout(color_read_layout);
-
       } else if (image_->getType() == TextureType::kDepth && image_->getLayout() != depth_read_layout) {
         imageBarrier.subresourceRange = vkinit::image_subresource_range(VK_IMAGE_ASPECT_DEPTH_BIT);
         imageBarrier.oldLayout = image_->getLayout();
@@ -81,15 +99,13 @@ namespace gestalt {
         imageBarrier.srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
         imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
         imageBarrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
-
-        image_->setLayout(depth_read_layout);
       }
 
       return *this;
     }
 
-    vkutil::Transition& vkutil::Transition::toLayoutWrite() {
-      constexpr auto color_write_layout = VK_IMAGE_LAYOUT_GENERAL;
+    vkutil::TransitionImage& vkutil::TransitionImage::toLayoutWrite() {
+      constexpr auto color_write_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
       constexpr auto depth_write_layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
 
       if (image_->getType() == TextureType::kColor && image_->getLayout() != color_write_layout) {
@@ -101,8 +117,6 @@ namespace gestalt {
         imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
         imageBarrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
 
-        image_->setLayout(color_write_layout);
-
       } else if (image_->getType() == TextureType::kDepth && image_->getLayout() != depth_write_layout) {
         imageBarrier.subresourceRange = vkinit::image_subresource_range(VK_IMAGE_ASPECT_DEPTH_BIT);
         imageBarrier.oldLayout = image_->getLayout();
@@ -112,23 +126,21 @@ namespace gestalt {
         imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT
                                     | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
         imageBarrier.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-
-        image_->setLayout(depth_write_layout);
       }
 
       return *this;
     }
 
-    void vkutil::copy_image_to_image(VkCommandBuffer cmd, VkImage source, VkImage destination,
-                                     VkExtent2D srcSize, VkExtent2D dstSize) {
+    void vkutil::CopyImage::andSubmitTo(const VkCommandBuffer cmd) const {
+
       VkImageBlit2 blitRegion{.sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2, .pNext = nullptr};
 
-      blitRegion.srcOffsets[1].x = srcSize.width;
-      blitRegion.srcOffsets[1].y = srcSize.height;
+      blitRegion.srcOffsets[1].x = static_cast<int32_t>(source_->imageExtent.width);
+      blitRegion.srcOffsets[1].y = static_cast<int32_t>(source_->imageExtent.height);
       blitRegion.srcOffsets[1].z = 1;
 
-      blitRegion.dstOffsets[1].x = dstSize.width;
-      blitRegion.dstOffsets[1].y = dstSize.height;
+      blitRegion.dstOffsets[1].x = static_cast<int32_t>(destination_->imageExtent.width);
+      blitRegion.dstOffsets[1].y = static_cast<int32_t>(destination_->imageExtent.height);
       blitRegion.dstOffsets[1].z = 1;
 
       blitRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -142,10 +154,10 @@ namespace gestalt {
       blitRegion.dstSubresource.mipLevel = 0;
 
       VkBlitImageInfo2 blitInfo{.sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2, .pNext = nullptr};
-      blitInfo.dstImage = destination;
-      blitInfo.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-      blitInfo.srcImage = source;
-      blitInfo.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+      blitInfo.dstImage = destination_->image;
+      blitInfo.dstImageLayout = destination_->getLayout();
+      blitInfo.srcImage = source_->image;
+      blitInfo.srcImageLayout = source_->getLayout();
       blitInfo.filter = VK_FILTER_LINEAR;
       blitInfo.regionCount = 1;
       blitInfo.pRegions = &blitRegion;
@@ -153,8 +165,12 @@ namespace gestalt {
       vkCmdBlitImage2(cmd, &blitInfo);
     }
 
-    void vkutil::generate_mipmaps(VkCommandBuffer cmd, VkImage image, VkExtent2D imageSize) {
-      int mipLevels = int(std::floor(std::log2(std::max(imageSize.width, imageSize.height)))) + 1;
+    void vkutil::generate_mipmaps(VkCommandBuffer cmd, std::shared_ptr<foundation::TextureHandle>& handle) {
+
+        VkExtent2D imageSize = {handle->imageExtent.width, handle->imageExtent.height};
+      int mipLevels = int(std::floor(std::log2(
+                          std::max(handle->imageExtent.width, handle->imageExtent.height))))
+                      + 1;
       for (int mip = 0; mip < mipLevels; mip++) {
         VkExtent2D halfSize = imageSize;
         halfSize.width /= 2;
@@ -175,7 +191,7 @@ namespace gestalt {
         imageBarrier.subresourceRange = vkinit::image_subresource_range(aspectMask);
         imageBarrier.subresourceRange.levelCount = 1;
         imageBarrier.subresourceRange.baseMipLevel = mip;
-        imageBarrier.image = image;
+        imageBarrier.image = handle->image;
 
         VkDependencyInfo depInfo{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO, .pNext = nullptr};
         depInfo.imageMemoryBarrierCount = 1;
@@ -205,9 +221,9 @@ namespace gestalt {
           blitRegion.dstSubresource.mipLevel = mip + 1;
 
           VkBlitImageInfo2 blitInfo{.sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2, .pNext = nullptr};
-          blitInfo.dstImage = image;
+          blitInfo.dstImage = handle->image;
           blitInfo.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-          blitInfo.srcImage = image;
+          blitInfo.srcImage = handle->image;
           blitInfo.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
           blitInfo.filter = VK_FILTER_LINEAR;
           blitInfo.regionCount = 1;
@@ -217,13 +233,8 @@ namespace gestalt {
 
           imageSize = halfSize;
         }
+        handle->setLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
       }
-
-      // transition all mip levels into the final read_only layout
-      TextureHandle handle{};
-      handle.image = image;
-      Transition(std::make_shared<TextureHandle>(handle))
-          .to(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL).andSubmitTo(cmd);
     }
   }  // namespace graphics
 }  // namespace gestalt
