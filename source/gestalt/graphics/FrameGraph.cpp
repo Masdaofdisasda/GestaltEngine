@@ -37,27 +37,23 @@ namespace gestalt {
 
       resource_registry_->init(gpu_);
 
-      render_passes_.push_back(
-          std::make_unique<DirectionalDepthPass>());
+      render_passes_.push_back(std::make_unique<DirectionalDepthPass>());
       render_passes_.push_back(std::make_unique<DeferredPass>());
-
       // render_passes_.push_back(std::make_unique<meshlet_pass>());
-
       render_passes_.push_back(std::make_unique<LightingPass>());
-      /*
-      render_passes_.push_back(std::make_unique<SkyboxPass>()); */
-      render_passes_.push_back(std::make_unique<InfiniteGridPass>());/*
-      render_passes_.push_back(std::make_unique<SsaoFilterPass>());
-      render_passes_.push_back(std::make_unique<SsaoBlurPass>());
-      render_passes_.push_back(std::make_unique<SsaoFinalPass>());
-      render_passes_.push_back(std::make_unique<BrightPass>());
-      render_passes_.push_back(std::make_unique<BloomBlurPass>());
-      render_passes_.push_back(std::make_unique<StreaksPass>());
-      render_passes_.push_back(std::make_unique<LuminancePass>());
-      render_passes_.push_back(std::make_unique<LuminanceDownscalePass>());
-      render_passes_.push_back(std::make_unique<LightAdaptationPass>());
-      render_passes_.push_back(std::make_unique<TonemapPass>());
-      render_passes_.push_back(std::make_unique<DebugAabbPass>());*/
+      render_passes_.push_back(std::make_unique<SkyboxPass>());
+      render_passes_.push_back(std::make_unique<InfiniteGridPass>()); /*
+       render_passes_.push_back(std::make_unique<SsaoFilterPass>());
+       render_passes_.push_back(std::make_unique<SsaoBlurPass>());
+       render_passes_.push_back(std::make_unique<SsaoFinalPass>());
+       render_passes_.push_back(std::make_unique<BrightPass>());
+       render_passes_.push_back(std::make_unique<BloomBlurPass>());
+       render_passes_.push_back(std::make_unique<StreaksPass>());
+       render_passes_.push_back(std::make_unique<LuminancePass>());
+       render_passes_.push_back(std::make_unique<LuminanceDownscalePass>());
+       render_passes_.push_back(std::make_unique<LightAdaptationPass>());
+       render_passes_.push_back(std::make_unique<TonemapPass>());
+       render_passes_.push_back(std::make_unique<DebugAabbPass>());*/
 
       for (int i = 0; i < kFrameOverlap; i++) {
         std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> frame_sizes = {
@@ -99,31 +95,26 @@ namespace gestalt {
     }
 
     void FrameGraph::execute(size_t id, VkCommandBuffer cmd) {
-
-        auto renderDependencies = render_passes_.at(id)->get_dependencies();
+      auto renderDependencies = render_passes_.at(id)->get_dependencies();
 
       for (auto& dependency : renderDependencies.image_attachments) {
         switch (dependency.usage) {
-           case ImageUsageType::kRead:
-               vkutil::TransitionImage(dependency.attachment.image)
-                .toLayoutRead().andSubmitTo(cmd);
-          break;
+          case ImageUsageType::kRead:
+            vkutil::TransitionImage(dependency.attachment.image).toLayoutRead().andSubmitTo(cmd);
+            break;
           case ImageUsageType::kWrite:
-              vkutil::TransitionImage(dependency.attachment.image)
-                .toLayoutWrite().andSubmitTo(cmd);
-          break;
+            vkutil::TransitionImage(dependency.attachment.image).toLayoutWrite().andSubmitTo(cmd);
+            break;
           case ImageUsageType::kDepthStencilRead:
-              vkutil::TransitionImage(dependency.attachment.image)
-                .toLayoutWrite().andSubmitTo(cmd);
-          break;
+            vkutil::TransitionImage(dependency.attachment.image).toLayoutWrite().andSubmitTo(cmd);
+            break;
         }
       }
 
-      //fmt::print("Executing {}\n", render_passes_[id]->get_name());
+      // fmt::print("Executing {}\n", render_passes_[id]->get_name());
       render_passes_[id]->execute(cmd);
 
       // increase attachment count TODO
-
     }
 
     bool FrameGraph::acquire_next_image() {
@@ -158,9 +149,9 @@ namespace gestalt {
     }
 
     void FrameGraph::execute_passes() {
-      //create_resources();
+      // create_resources();
 
-      //build_graph();
+      // build_graph();
 
       if (resize_requested_) {
         swapchain_->resize_swapchain(window_);
@@ -186,7 +177,8 @@ namespace gestalt {
 
       vkutil::TransitionImage(color_image)
           .to(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
-          .withSource(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)
+          .withSource(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                      VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)
           .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
           .andSubmitTo(cmd);
       vkutil::TransitionImage(swapchain_image)
@@ -195,8 +187,7 @@ namespace gestalt {
           .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
           .andSubmitTo(cmd);
 
-      vkutil::CopyImage(color_image).toImage(swapchain_image)
-          .andSubmitTo(cmd);
+      vkutil::CopyImage(color_image).toImage(swapchain_image).andSubmitTo(cmd);
 
       vkutil::TransitionImage(swapchain_image)
           .to(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
@@ -212,8 +203,7 @@ namespace gestalt {
           .to(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
           .withSource(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
                       VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)
-          .withDestination(VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
-                           0)
+          .withDestination(VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, 0)
           .andSubmitTo(cmd);
       swapchain_image->setFormat(VK_FORMAT_UNDEFINED);
 
@@ -292,7 +282,6 @@ namespace gestalt {
       VkExtent2D extent = {0, 0};
 
       for (auto& attachment : dependencies_.image_attachments) {
-
         // only write and depth attachments are considered
         if (attachment.usage == ImageUsageType::kWrite
             || attachment.usage == ImageUsageType::kDepthStencilRead) {
@@ -338,10 +327,12 @@ namespace gestalt {
 
       VkRenderingInfo renderInfo;
       if (colorAttachments.empty()) {
-               renderInfo = vkinit::rendering_info(extent, nullptr, depthAttachment.sType ? &depthAttachment : nullptr);
+        renderInfo = vkinit::rendering_info(extent, nullptr,
+                                            depthAttachment.sType ? &depthAttachment : nullptr);
       } else {
-               renderInfo = vkinit::rendering_info_for_gbuffer(extent, colorAttachments.data(), colorAttachments.size(),
-                                                              depthAttachment.sType ? &depthAttachment : nullptr);
+        renderInfo = vkinit::rendering_info_for_gbuffer(
+            extent, colorAttachments.data(), colorAttachments.size(),
+            depthAttachment.sType ? &depthAttachment : nullptr);
       }
 
       vkCmdBeginRendering(cmd, &renderInfo);
@@ -377,10 +368,10 @@ namespace gestalt {
       }
 
       if (!color_formats.empty()) {
-        if (color_formats.size() == 1) { // single color attachment
-                   builder.set_color_attachment_format(color_formats[0]);
-        } else { // multiple color attachments
-                   builder.set_color_attachment_formats(color_formats);
+        if (color_formats.size() == 1) {  // single color attachment
+          builder.set_color_attachment_format(color_formats[0]);
+        } else {  // multiple color attachments
+          builder.set_color_attachment_formats(color_formats);
         }
       }
 

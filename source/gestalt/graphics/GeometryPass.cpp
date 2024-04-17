@@ -62,14 +62,12 @@ namespace gestalt {
       const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
       const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
 
-      vkCmdBindIndexBuffer(cmd, mesh_buffers.index_buffer.buffer, 0,
-                           VK_INDEX_TYPE_UINT32);
+      vkCmdBindIndexBuffer(cmd, mesh_buffers.index_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
       VkDescriptorSet descriptorSets[]
           = {per_frame_buffers.descriptor_sets[frameIndex], ibl_buffers.descriptor_set,
-             repository_->material_data.resource_set,
-          repository_->material_data.constants_set,
+             repository_->material_data.resource_set, repository_->material_data.constants_set,
              mesh_buffers.descriptor_set};
       vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 5,
                               descriptorSets, 0, nullptr);
