@@ -61,8 +61,6 @@ namespace gestalt {
       void prepare() override;
       void cleanup() override;
       void execute(VkCommandBuffer cmd) override;
-      RenderPassDependency& get_dependencies() override { return dependencies_;
-      }
       std::string get_name() const override { return "Infinite Grid Pass"; }
     };
   }  // namespace graphics

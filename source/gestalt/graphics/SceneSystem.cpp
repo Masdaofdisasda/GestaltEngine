@@ -414,25 +414,30 @@ namespace gestalt {
 
 
     void CameraSystem::prepare() {
-        free_fly_camera_ = std::make_unique<FreeFlyCamera>();
+      free_fly_camera_ = std::make_unique<FreeFlyCamera>();
       free_fly_camera_->init(glm::vec3(7, 1.8, -7), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-        active_camera_ = std::make_unique<Camera>();
+      active_camera_ = std::make_unique<Camera>();
       active_camera_->init(*free_fly_camera_);
 
       PerFrameDataBuffers per_frame_data_buffers{};
 
+      per_frame_data_buffers.descriptor_layout
+          = graphics::DescriptorLayoutBuilder()  // TODO move dependecy to graphics
+                .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                             VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
+                .build(gpu_.device);
 
-
-      per_frame_data_buffers.uniform_buffers[0] = resource_manager_->create_buffer(
+      for (int i = 0; i < 2; ++i) {
+        per_frame_data_buffers.uniform_buffers[i] = resource_manager_->create_buffer(
             sizeof(PerFrameData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-        per_frame_data_buffers.uniform_buffers[1] = resource_manager_->create_buffer(
-            sizeof(PerFrameData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+        per_frame_data_buffers.descriptor_sets[i] = resource_manager_->descriptorPool.allocate(
+            gpu_.device, per_frame_data_buffers.descriptor_layout);
 
-        per_frame_data_buffers.descriptor_layout
-            = graphics::DescriptorLayoutBuilder() //TODO move dependecy to graphics
-              .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
-              .build(gpu_.device, true);
+        writer_.clear();
+        writer_.write_buffer(0, per_frame_data_buffers.uniform_buffers[i].buffer,
+                             sizeof(PerFrameData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+        writer_.update_set(gpu_.device, per_frame_data_buffers.descriptor_sets[i]);
+      }
 
       repository_->register_buffer(per_frame_data_buffers);
     }

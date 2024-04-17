@@ -64,11 +64,6 @@ namespace gestalt {
         int num_streaks{4};
       } streaks{};
 
-      struct ShadowParams {
-        float shadow_bias{1.f};
-        float shadow_slope_bias{1.f};
-      } shadow{};
-
       struct LightingParams {
         glm::mat4 invViewProj;
         int debug_mode{0};

@@ -24,7 +24,6 @@ namespace gestalt {
 
 
       std::function<void(std::function<void(VkCommandBuffer)>)> immediate_submit;
-      PFN_vkCmdPushDescriptorSetKHR vkCmdPushDescriptorSetKHR;
       PFN_vkCmdDrawMeshTasksIndirectCountEXT vkCmdDrawMeshTasksIndirectCountEXT;
 
       void init(

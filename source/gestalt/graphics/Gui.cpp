@@ -581,10 +581,6 @@ namespace gestalt {
           config.lighting.shadow_mode = current_shadow_mode;
         }
 
-        ImGui::SliderFloat("Shadow Bias", &config.shadow.shadow_bias, 1.0f, 2.0f, "%.4f");
-        ImGui::SliderFloat("Shadow Slope Bias", &config.shadow.shadow_slope_bias, 1.0f, 2.0f,
-                           "%.4f");
-
         const char* shading_mode_options[]
             = {"All", "Only Directional Light", "Only Point Light", "Only Spot Light", "None"};
         int current_shading_mode = config.lighting.shading_mode;

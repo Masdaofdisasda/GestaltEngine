@@ -80,20 +80,21 @@ namespace gestalt {
 
     class ResourceRegistry {
     public:
+      void init(const Gpu& gpu);
 
-       void init(const Gpu& gpu) {
-                gpu_ = gpu;
-       }
-
-       VkShaderModule get_shader(const ShaderProgram& shader_program);
+      VkShaderModule get_shader(const ShaderProgram& shader_program);
       void clear_shader_cache();
 
-       RenderConfig config_;
+      RenderConfig config_;
 
       struct RenderPassAttachments {
         ImageAttachment scene_color{.image = std::make_shared<TextureHandle>(TextureType::kColor)};
         ImageAttachment scene_depth{.image = std::make_shared<TextureHandle>(TextureType::kDepth)};
+        ImageAttachment shadow_map{.image = std::make_shared<TextureHandle>(TextureType::kDepth),
+                                   .extent = {2048, 2048}};
       } attachments_;
+
+      std::vector<ImageAttachment> attachment_list_;
 
     private:
       Gpu gpu_ = {};
@@ -102,20 +103,27 @@ namespace gestalt {
 
     class RenderPass {
     public:
+      RenderPass() = default;
       void init(const Gpu& gpu, const std::shared_ptr<ResourceManager>& resource_manager,
                 const std::shared_ptr<ResourceRegistry>& registry,
-                const std::shared_ptr<foundation::Repository>& repository) {
+                const std::shared_ptr<Repository>& repository) {
         gpu_ = gpu;
         resource_manager_ = resource_manager;
         registry_ = registry;
         repository_ = repository;
 
         prepare();
+
       }
+      RenderPassDependency& get_dependencies() { return dependencies_; }
+
+      RenderPass(const RenderPass&) = delete;
+      RenderPass& operator=(const RenderPass&) = delete;
+      RenderPass(RenderPass&&) = delete;
+      RenderPass& operator=(RenderPass&&) = delete;
       virtual ~RenderPass() = default;
 
       virtual void execute(VkCommandBuffer cmd) = 0;
-      virtual RenderPassDependency& get_dependencies() = 0;
       virtual std::string get_name() const = 0;
       virtual void cleanup() = 0;
 
@@ -143,7 +151,7 @@ namespace gestalt {
       Gpu gpu_ = {};
       std::shared_ptr<ResourceManager> resource_manager_;
       std::shared_ptr<ResourceRegistry> registry_;
-      std::shared_ptr<foundation::Repository> repository_;
+      std::shared_ptr<Repository> repository_;
     };
 
     class VkSwapchain {

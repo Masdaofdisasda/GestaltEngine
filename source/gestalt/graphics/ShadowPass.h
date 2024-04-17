@@ -5,34 +5,12 @@
 
 namespace gestalt {
   namespace graphics {
-      /*
     class DirectionalDepthPass final : public RenderPass {
-      std::string vertex_shader_source_ = "../shaders/shadow_geometry.vert.spv";
-      std::string fragment_shader_source_ = "../shaders/shadow_depth.frag.spv";
-      std::string name_ = "Direction Depth Pass";
-
-      VkExtent2D effect_size_{2048, 2048};
-
-      ShaderPassDependencyInfo deps_ = {
-          .read_resources = {},
-          .write_resources = {{"directional_shadow_map", std::make_shared<DepthImageResource>(
-                                                             "directional_depth", effect_size_)}},
-      };
 
       VkPushConstantRange push_constant_range_{
           .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
           .offset = 0,
           .size = sizeof(GpuDrawPushConstants),
-      };
-
-      VkViewport viewport_{
-          .x = 0,
-          .y = 0,
-          .minDepth = 0.f,
-          .maxDepth = 1.f,
-      };
-      VkRect2D scissor_{
-          .offset = {0, 0},
       };
 
       descriptor_writer writer;
@@ -46,9 +24,8 @@ namespace gestalt {
       void prepare() override;
       void cleanup() override;
       void execute(VkCommandBuffer cmd) override;
-      ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
-      std::string get_name() const override { return name_; }
+      std::string get_name() const override { return "Direction Depth Pass"; }
     };
-      */
+      
   }  // namespace graphics
 }  // namespace gestalt

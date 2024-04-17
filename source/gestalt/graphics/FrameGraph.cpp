@@ -37,9 +37,9 @@ namespace gestalt {
 
       resource_registry_->init(gpu_);
 
-      /*
       render_passes_.push_back(
-          std::make_unique<DirectionalDepthPass>());  // TODO investigate sorting
+          std::make_unique<DirectionalDepthPass>());
+      /*
       render_passes_.push_back(std::make_unique<DeferredPass>());
 
       // render_passes_.push_back(std::make_unique<meshlet_pass>());
@@ -81,32 +81,20 @@ namespace gestalt {
     }
 
     void FrameGraph::create_resources() {
-      auto& color = resource_registry_->attachments_.scene_color;
-      if (color.extent.width == 0 && color.extent.height == 0) {
-        color.image->imageExtent = {static_cast<uint32_t>(window_.extent.width * color.scale),
-                                    static_cast<uint32_t>(window_.extent.height * color.scale), 1};
-      } else {
-        color.image->imageExtent = color.extent;
-      }
+      for (auto& image_attachment : resource_registry_->attachment_list_) {
+        if (image_attachment.extent.width == 0 && image_attachment.extent.height == 0) {
+          image_attachment.image->imageExtent
+              = {static_cast<uint32_t>(window_.extent.width * image_attachment.scale),
+                 static_cast<uint32_t>(window_.extent.height * image_attachment.scale), 1};
+        } else {
+          image_attachment.image->imageExtent = image_attachment.extent;
+        }
 
-      if (color.image->getType() == foundation::TextureType::kColor) {
-               resource_manager_->create_color_frame_buffer(color.image);
-      } else if (color.image->getType() == foundation::TextureType::kDepth) {
-               resource_manager_->create_depth_frame_buffer(color.image);
-      }
-
-      auto& depth = resource_registry_->attachments_.scene_depth;
-      if (depth.extent.width == 0 && depth.extent.height == 0) {
-        depth.image->imageExtent = {static_cast<uint32_t>(window_.extent.width * depth.scale),
-                                    static_cast<uint32_t>(window_.extent.height * depth.scale), 1};
-      } else {
-        depth.image->imageExtent = depth.extent;
-      }
-
-      if (depth.image->getType() == foundation::TextureType::kColor) {
-        resource_manager_->create_color_frame_buffer(depth.image);
-      } else if (depth.image->getType() == foundation::TextureType::kDepth) {
-        resource_manager_->create_depth_frame_buffer(depth.image);
+        if (image_attachment.image->getType() == TextureType::kColor) {
+          resource_manager_->create_color_frame_buffer(image_attachment.image);
+        } else if (image_attachment.image->getType() == TextureType::kDepth) {
+          resource_manager_->create_depth_frame_buffer(image_attachment.image);
+        }
       }
     }
 
@@ -261,6 +249,15 @@ namespace gestalt {
       }
     }
 
+    void ResourceRegistry::init(const Gpu& gpu) {
+      gpu_ = gpu;
+
+      attachment_list_.push_back(attachments_.scene_color);
+      attachment_list_.push_back(attachments_.scene_depth);
+      attachment_list_.push_back(attachments_.shadow_map);
+
+    }
+
     VkShaderModule ResourceRegistry::get_shader(const ShaderProgram& shader_program) {
       const std::string& shader_path = "../shaders/" + shader_program.source_path;
 
@@ -300,7 +297,8 @@ namespace gestalt {
 
             if (attachment.clear_operation == ImageClearOperation::kClear) {
               VkClearValue clear = {.color = {0.0f, 0.0f, 0.0f, 1.0f}};
-              colorAttachment = vkinit::attachment_info(image->imageView, &clear, image->getLayout());
+              colorAttachment
+                  = vkinit::attachment_info(image->imageView, &clear, image->getLayout());
             } else {
               colorAttachment
                   = vkinit::attachment_info(image->imageView, nullptr, image->getLayout());
@@ -312,7 +310,8 @@ namespace gestalt {
 
             if (attachment.clear_operation == ImageClearOperation::kClear) {
               VkClearValue clear = {.depthStencil = {1.0f, 0}};
-              depthAttachment = vkinit::depth_attachment_info(image->imageView, &clear, image->getLayout());
+              depthAttachment
+                  = vkinit::depth_attachment_info(image->imageView, &clear, image->getLayout());
             } else {
               depthAttachment
                   = vkinit::depth_attachment_info(image->imageView, nullptr, image->getLayout());
@@ -326,7 +325,9 @@ namespace gestalt {
       scissor_.extent.width = extent.width;
       scissor_.extent.height = extent.height;
 
-      auto renderInfo = vkinit::rendering_info(extent, &colorAttachment, &depthAttachment);
+      const auto renderInfo
+          = vkinit::rendering_info(extent, colorAttachment.sType ? &colorAttachment : nullptr,
+                                   depthAttachment.sType ? &depthAttachment : nullptr);
 
       vkCmdBeginRendering(cmd, &renderInfo);
     }

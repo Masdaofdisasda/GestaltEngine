@@ -23,7 +23,7 @@
 namespace gestalt {
   namespace foundation {
 
-    struct PerFrameData {
+    struct alignas(128) PerFrameData {
       glm::mat4 view{1.f};
       glm::mat4 proj{1.f};
       glm::mat4 viewproj{1.f};

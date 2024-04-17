@@ -119,13 +119,14 @@ namespace gestalt {
     void InfiniteGridPass::prepare() {
       fmt::print("Preparing skybox pass\n");
 
-      dependencies_
-          = RenderPassDependencyBuilder()
-                .add_shader(ShaderStage::kVertex, "infinite_grid.vert.spv")
-                .add_shader(ShaderStage::kFragment, "infinite_grid.frag.spv")
-                .add_image_attachment(registry_->attachments_.scene_color, ImageUsageType::kWrite, ImageClearOperation::kClear)
-          .add_image_attachment(registry_->attachments_.scene_depth, ImageUsageType::kWrite, ImageClearOperation::kClear)
-                     .build();
+      dependencies_ = RenderPassDependencyBuilder()
+                          .add_shader(ShaderStage::kVertex, "infinite_grid.vert.spv")
+                          .add_shader(ShaderStage::kFragment, "infinite_grid.frag.spv")
+                          .add_image_attachment(registry_->attachments_.scene_color,
+                                                ImageUsageType::kWrite, ImageClearOperation::kClear)
+                          .add_image_attachment(registry_->attachments_.scene_depth,
+                                                ImageUsageType::kWrite, ImageClearOperation::kClear)
+                          .build();
 
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
       descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
@@ -146,9 +147,9 @@ namespace gestalt {
       VkShaderModule fragment_shader;
       for (auto& shader_dependency : dependencies_.shaders) {
         if (shader_dependency.stage == ShaderStage::kVertex) {
-            vertex_shader = registry_->get_shader(shader_dependency);
+          vertex_shader = registry_->get_shader(shader_dependency);
         } else if (shader_dependency.stage == ShaderStage::kFragment) {
-            fragment_shader = registry_->get_shader(shader_dependency);
+          fragment_shader = registry_->get_shader(shader_dependency);
         }
       }
 
@@ -170,27 +171,18 @@ namespace gestalt {
     }
 
     void InfiniteGridPass::execute(const VkCommandBuffer cmd) {
-
       begin_renderpass(cmd);
 
       const char frameIndex = gpu_.get_current_frame();
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
 
-      VkDescriptorBufferInfo buffer_info;
-      buffer_info.buffer = per_frame_buffers.uniform_buffers[frameIndex].buffer;
-      buffer_info.offset = 0;
-      buffer_info.range = sizeof(PerFrameData);
+      vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
-      VkWriteDescriptorSet descriptor_write = {};
-      descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      descriptor_write.dstBinding = 0;
-      descriptor_write.dstArrayElement = 0;
-      descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-      descriptor_write.descriptorCount = 1;
-      descriptor_write.pBufferInfo = &buffer_info;
+      VkDescriptorSet descriptorSets[] = {per_frame_buffers.descriptor_sets[frameIndex]};
 
-      gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
-                                     &descriptor_write);
+      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
+                              descriptorSets, 0, nullptr);
+
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
       vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                          sizeof(RenderConfig::GridParams), &registry_->config_.grid);
@@ -205,6 +197,5 @@ namespace gestalt {
       vkDestroyPipelineLayout(gpu_.device, pipeline_layout_, nullptr);
       vkDestroyPipeline(gpu_.device, pipeline_, nullptr);
     }
-
   }  // namespace graphics
 }  // namespace gestalt

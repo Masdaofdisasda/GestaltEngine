@@ -8,7 +8,6 @@
 
 namespace gestalt {
   namespace graphics {
-      /*
     using namespace foundation;
 
     void DirectionalDepthPass::prepare() {
@@ -21,11 +20,19 @@ namespace gestalt {
       descriptor_layouts_.push_back(light_data.descriptor_layout);
       descriptor_layouts_.push_back(mesh_buffers.descriptor_layout);
 
-      VkShaderModule meshFragShader;
-      vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &meshFragShader);
+      dependencies_ = RenderPassDependencyBuilder().add_shader(ShaderStage::kVertex, "shadow_geometry.vert.spv")
+      .add_shader(ShaderStage::kFragment, "shadow_depth.frag.spv")
+      .add_image_attachment(registry_->attachments_.shadow_map, ImageUsageType::kWrite, ImageClearOperation::kClear).build();
 
-      VkShaderModule meshVertexShader;
-      vkutil::load_shader_module(vertex_shader_source_.c_str(), gpu_.device, &meshVertexShader);
+      VkShaderModule vertex_shader;
+      VkShaderModule fragment_shader;
+      for (auto& shader_dependency : dependencies_.shaders) {
+        if (shader_dependency.stage == ShaderStage::kVertex) {
+          vertex_shader = registry_->get_shader(shader_dependency);
+        } else if (shader_dependency.stage == ShaderStage::kFragment) {
+          fragment_shader = registry_->get_shader(shader_dependency);
+        }
+      }
 
       VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
       mesh_layout_info.setLayoutCount = descriptor_layouts_.size();
@@ -35,23 +42,19 @@ namespace gestalt {
 
       VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
 
-      const auto depth_image = registry_->get_resource<TextureHandle>("directional_depth");
+      const auto depth_image = registry_->attachments_.shadow_map.image;
 
       pipeline_ = PipelineBuilder()
-                      .set_shaders(meshVertexShader, meshFragShader)
+                      .set_shaders(vertex_shader, fragment_shader)
                       .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
                       .set_polygon_mode(VK_POLYGON_MODE_FILL)
                       .set_cull_mode(VK_CULL_MODE_FRONT_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE)
                       .set_multisampling_none()
                       .disable_blending()
                       .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-                      .enable_dynamic_depth_bias()
                       .set_depth_format(depth_image->getFormat())
                       .set_pipeline_layout(pipeline_layout_)
                       .build_pipeline(gpu_.device);
-
-      vkDestroyShaderModule(gpu_.device, meshFragShader, nullptr);
-      vkDestroyShaderModule(gpu_.device, meshVertexShader, nullptr);
     }
 
     void DirectionalDepthPass::cleanup() { vkDestroyPipeline(gpu_.device, pipeline_, nullptr); }
@@ -60,58 +63,23 @@ namespace gestalt {
       descriptor_set_
           = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(1));
 
-      const auto depth_image = registry_->get_resource<TextureHandle>("directional_depth");
-
-      VkClearValue depth_clear = {.depthStencil = {1.f, 0}};
-      VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
-          depth_image->imageView, &depth_clear, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-
-      VkRenderingInfo renderInfo
-          = vkinit::rendering_info(depth_image->getExtent2D(), nullptr, &depthAttachment);
-
-      vkCmdBeginRendering(cmd, &renderInfo);
+      begin_renderpass(cmd);
 
       const char frameIndex = gpu_.get_current_frame();
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
       const auto& light_data = repository_->get_buffer<LightBuffers>();
       const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
 
-      VkDescriptorBufferInfo buffer_info;
-      buffer_info.buffer = per_frame_buffers.uniform_buffers[frameIndex].buffer;
-      buffer_info.offset = 0;
-      buffer_info.range = sizeof(PerFrameData);
-
-      VkWriteDescriptorSet descriptor_write = {};
-      descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      descriptor_write.dstBinding = 0;
-      descriptor_write.dstArrayElement = 0;
-      descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-      descriptor_write.descriptorCount = 1;
-      descriptor_write.pBufferInfo = &buffer_info;
-
       vkCmdBindIndexBuffer(cmd, mesh_buffers.index_buffer.buffer, 0,
                            VK_INDEX_TYPE_UINT32);
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
-      VkDescriptorSet descriptorSets[]
-          = {light_data.descriptor_set, mesh_buffers.descriptor_set};
+      VkDescriptorSet descriptorSets[] = {per_frame_buffers.descriptor_sets[frameIndex],
+                                          light_data.descriptor_set, mesh_buffers.descriptor_set};
 
-      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 2,
+      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 3,
                               descriptorSets, 0, nullptr);
-
-      gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
-                                     &descriptor_write);
-
-      // Depth bias (and slope) are used to avoid shadowing artifacts
-      // Constant depth bias factor (always applied)
-      float depthBiasConstant = registry_->config_.shadow.shadow_bias;
-      // Slope depth bias factor, applied depending on polygon's slope
-      float depthBiasSlope = 1.75f;
-      vkCmdSetDepthBias(cmd, depthBiasConstant, 0.0f, depthBiasSlope);
-      viewport_.width = static_cast<float>(depth_image->getExtent2D().width);
-      viewport_.height = static_cast<float>(depth_image->getExtent2D().height);
-      scissor_.extent = depth_image->getExtent2D();
       vkCmdSetViewport(cmd, 0, 1, &viewport_);
       vkCmdSetScissor(cmd, 0, 1, &scissor_);
 
@@ -133,6 +101,6 @@ namespace gestalt {
       }
 
       vkCmdEndRendering(cmd);
-    } */
+    }
   }  // namespace graphics
 }  // namespace gestalt

@@ -66,7 +66,7 @@ namespace gestalt {
       mesh_shader_features.meshShader = true;
 
       std::vector extensions
-          = {VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME, VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
+          = {VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
              VK_NV_MESH_SHADER_EXTENSION_NAME, VK_EXT_MESH_SHADER_EXTENSION_NAME};
 
       vkb::PhysicalDeviceSelector selector{vkb_inst};
@@ -120,13 +120,6 @@ namespace gestalt {
       allocatorInfo.instance = instance;
       allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
       vmaCreateAllocator(&allocatorInfo, &allocator);
-
-      vkCmdPushDescriptorSetKHR = reinterpret_cast<PFN_vkCmdPushDescriptorSetKHR>(
-          vkGetDeviceProcAddr(device, "vkCmdPushDescriptorSetKHR"));
-
-      if (!vkCmdPushDescriptorSetKHR) {
-        throw std::runtime_error("Failed to load vkCmdPushDescriptorSetKHR");
-      }
 
       vkCmdDrawMeshTasksIndirectCountEXT = reinterpret_cast<PFN_vkCmdDrawMeshTasksIndirectCountEXT>(
           vkGetDeviceProcAddr(device, "vkCmdDrawMeshTasksIndirectCountEXT"));
