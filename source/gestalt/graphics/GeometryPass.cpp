@@ -21,26 +21,22 @@ namespace gestalt {
       descriptor_layouts_.push_back(repository_->material_data.constants_layout);
       descriptor_layouts_.push_back(mesh_buffers.descriptor_layout);
 
-      dependencies_ = RenderPassDependencyBuilder()
-                          .add_shader(ShaderStage::kVertex, "geometry.vert.spv")
-                          .add_shader(ShaderStage::kFragment, "geometry_deferred.frag.spv")
-                          .add_image_attachment(registry_->attachments_.gbuffer1,
-                                                ImageUsageType::kWrite, ImageClearOperation::kClear)
-                          .add_image_attachment(registry_->attachments_.gbuffer2,
-                                                ImageUsageType::kWrite, ImageClearOperation::kClear)
-                          .add_image_attachment(registry_->attachments_.gbuffer3,
-                                                ImageUsageType::kWrite, ImageClearOperation::kClear)
-                          .add_image_attachment(registry_->attachments_.scene_depth,
-                                                ImageUsageType::kWrite, ImageClearOperation::kClear)
-                          .build();
+      dependencies_
+          = RenderPassDependencyBuilder()
+                .add_shader(ShaderStage::kVertex, "geometry.vert.spv")
+                .add_shader(ShaderStage::kFragment, "geometry_deferred.frag.spv")
+                .add_image_attachment(registry_->attachments_.gbuffer1, ImageUsageType::kWrite,
+                                      ImageClearOperation::kClear)
+                .add_image_attachment(registry_->attachments_.gbuffer2, ImageUsageType::kWrite,
+                                      ImageClearOperation::kClear)
+                .add_image_attachment(registry_->attachments_.gbuffer3, ImageUsageType::kWrite,
+                                      ImageClearOperation::kClear)
+                .add_image_attachment(registry_->attachments_.scene_depth, ImageUsageType::kWrite,
+                                      ImageClearOperation::kClear)
+                .set_push_constant_range(sizeof(GpuDrawPushConstants), VK_SHADER_STAGE_VERTEX_BIT)
+                .build();
 
-      VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
-      mesh_layout_info.setLayoutCount = descriptor_layouts_.size();
-      mesh_layout_info.pSetLayouts = descriptor_layouts_.data();
-      mesh_layout_info.pPushConstantRanges = &push_constant_range_;
-      mesh_layout_info.pushConstantRangeCount = 1;
-
-      VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
+      create_pipeline_layout();
 
       pipeline_ = create_pipeline()
                       .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)

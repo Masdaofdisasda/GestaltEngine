@@ -11,30 +11,22 @@ namespace gestalt {
     void SkyboxPass::prepare() {
       fmt::print("Preparing {}\n", get_name());
 
-      dependencies_ = RenderPassDependencyBuilder()
-                          .add_shader(ShaderStage::kVertex, "skybox.vert.spv")
-                          .add_shader(ShaderStage::kFragment, "skybox.frag.spv")
-                          .add_image_attachment(registry_->attachments_.scene_color,
-                                                ImageUsageType::kWrite)
-      .add_image_attachment(registry_->attachments_.scene_depth, ImageUsageType::kWrite)
-                          .build();
+      dependencies_
+          = RenderPassDependencyBuilder()
+                .add_shader(ShaderStage::kVertex, "skybox.vert.spv")
+                .add_shader(ShaderStage::kFragment, "skybox.frag.spv")
+                .add_image_attachment(registry_->attachments_.scene_color, ImageUsageType::kWrite)
+                .add_image_attachment(registry_->attachments_.scene_depth, ImageUsageType::kWrite)
+                .set_push_constant_range(sizeof(RenderConfig::SkyboxParams),
+                                         VK_SHADER_STAGE_FRAGMENT_BIT)
+                .build();
 
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
       auto& light_data = repository_->get_buffer<LightBuffers>();
       descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
       descriptor_layouts_.push_back(light_data.descriptor_layout);
 
-      VkPipelineLayoutCreateInfo pipeline_layout_create_info{
-          .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-          .pNext = nullptr,
-          .setLayoutCount = static_cast<uint32_t>(descriptor_layouts_.size()),
-          .pSetLayouts = descriptor_layouts_.data(),
-          .pushConstantRangeCount = 1,
-          .pPushConstantRanges = &push_constant_range_,
-      };
-
-      VK_CHECK(vkCreatePipelineLayout(gpu_.device, &pipeline_layout_create_info, nullptr,
-                                      &pipeline_layout_));
+      create_pipeline_layout();
 
       pipeline_ = create_pipeline()
                       .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
@@ -47,15 +39,14 @@ namespace gestalt {
     }
 
     void SkyboxPass::execute(const VkCommandBuffer cmd) {
-
       begin_renderpass(cmd);
 
       const char frameIndex = gpu_.get_current_frame();
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
       auto& light_data = repository_->get_buffer<LightBuffers>();
 
-      VkDescriptorSet descriptorSets[] = {per_frame_buffers.descriptor_sets[frameIndex],
-                                          light_data.descriptor_set};
+      VkDescriptorSet descriptorSets[]
+          = {per_frame_buffers.descriptor_sets[frameIndex], light_data.descriptor_set};
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
       vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 2,
@@ -78,14 +69,13 @@ namespace gestalt {
     void InfiniteGridPass::prepare() {
       fmt::print("Preparing {}\n", get_name());
 
-      dependencies_ = RenderPassDependencyBuilder()
-                          .add_shader(ShaderStage::kVertex, "infinite_grid.vert.spv")
-                          .add_shader(ShaderStage::kFragment, "infinite_grid.frag.spv")
-                          .add_image_attachment(registry_->attachments_.scene_color,
-                                                ImageUsageType::kWrite)
-                          .add_image_attachment(registry_->attachments_.scene_depth,
-                                                ImageUsageType::kWrite)
-                          .build();
+      dependencies_
+          = RenderPassDependencyBuilder()
+                .add_shader(ShaderStage::kVertex, "infinite_grid.vert.spv")
+                .add_shader(ShaderStage::kFragment, "infinite_grid.frag.spv")
+                .add_image_attachment(registry_->attachments_.scene_color, ImageUsageType::kWrite)
+                .add_image_attachment(registry_->attachments_.scene_depth, ImageUsageType::kWrite)
+                .build();
 
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
       descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);

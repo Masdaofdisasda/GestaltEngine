@@ -8,12 +8,6 @@
 namespace gestalt {
   namespace graphics {
     class LightingPass final : public RenderPass {
-
-      VkPushConstantRange push_constant_range_{
-          .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-          .offset = 0,
-          .size = sizeof(RenderConfig::LightingParams),
-      };
       descriptor_writer writer_;
       VkDescriptorSet descriptor_set_ = nullptr;
     public:

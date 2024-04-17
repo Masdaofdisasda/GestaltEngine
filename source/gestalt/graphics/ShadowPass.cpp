@@ -25,15 +25,10 @@ namespace gestalt {
                           .add_shader(ShaderStage::kFragment, "shadow_depth.frag.spv")
                           .add_image_attachment(registry_->attachments_.shadow_map,
                                                 ImageUsageType::kWrite, ImageClearOperation::kClear)
+                .set_push_constant_range(sizeof(GpuDrawPushConstants), VK_SHADER_STAGE_VERTEX_BIT)
                           .build();
 
-      VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
-      mesh_layout_info.setLayoutCount = descriptor_layouts_.size();
-      mesh_layout_info.pSetLayouts = descriptor_layouts_.data();
-      mesh_layout_info.pPushConstantRanges = &push_constant_range_;
-      mesh_layout_info.pushConstantRangeCount = 1;
-
-      VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
+      create_pipeline_layout();
 
       pipeline_ = create_pipeline()
                       .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)

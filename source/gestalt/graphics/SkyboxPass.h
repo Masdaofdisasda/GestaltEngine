@@ -8,13 +8,6 @@
 namespace gestalt {
   namespace graphics {
     class SkyboxPass final : public RenderPass {
-
-      VkPushConstantRange push_constant_range_{
-          .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-          .offset = 0,
-          .size = sizeof(RenderConfig::SkyboxParams),
-      };
-
     public:
       void prepare() override;
       void cleanup() override;

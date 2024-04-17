@@ -60,12 +60,15 @@ namespace gestalt {
     struct RenderPassDependency {
       std::vector<ShaderProgram> shaders;
       std::vector<ImageDependency> image_attachments;
+      VkPushConstantRange push_constant_range;
     };
 
     class RenderPassDependencyBuilder {
       RenderPassDependency dependency_{};
+
     public:
-      RenderPassDependencyBuilder& add_shader(const ShaderStage stage, const std::string& source_path) {
+      RenderPassDependencyBuilder& add_shader(const ShaderStage stage,
+                                              const std::string& source_path) {
         dependency_.shaders.push_back({stage, source_path});
         return *this;
       }
@@ -74,6 +77,15 @@ namespace gestalt {
                                                         const ImageClearOperation clear_operation
                                                         = ImageClearOperation::kDontCare) {
         dependency_.image_attachments.push_back({attachment, usage, clear_operation});
+        return *this;
+      }
+      RenderPassDependencyBuilder& set_push_constant_range(uint32_t size,
+                                                           VkShaderStageFlags stage_flags) {
+        dependency_.push_constant_range = {
+            .stageFlags = stage_flags,
+            .offset = 0,
+            .size = size,
+        };
         return *this;
       }
       RenderPassDependency build() { return dependency_; }
@@ -117,7 +129,6 @@ namespace gestalt {
         repository_ = repository;
 
         prepare();
-
       }
       RenderPassDependency& get_dependencies() { return dependencies_; }
 
@@ -137,6 +148,7 @@ namespace gestalt {
       void begin_renderpass(VkCommandBuffer cmd);
 
       PipelineBuilder create_pipeline();
+      void create_pipeline_layout();
 
       RenderPassDependency dependencies_{};
 
@@ -180,15 +192,13 @@ namespace gestalt {
     constexpr unsigned char kFrameOverlap = 2;
 
     class FrameGraph {
-
       Gpu gpu_ = {};
       application::Window window_;
       std::shared_ptr<ResourceManager> resource_manager_;
       std::shared_ptr<foundation::Repository> repository_;
       std::shared_ptr<application::Gui> imgui_;
 
-      std::shared_ptr<ResourceRegistry> resource_registry_
-          = std::make_shared<ResourceRegistry>();
+      std::shared_ptr<ResourceRegistry> resource_registry_ = std::make_shared<ResourceRegistry>();
 
       std::shared_ptr<VkSwapchain> swapchain_ = std::make_unique<VkSwapchain>();
       std::unique_ptr<VkCommand> commands_ = std::make_unique<VkCommand>();

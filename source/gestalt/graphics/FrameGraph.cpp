@@ -378,6 +378,20 @@ namespace gestalt {
       return builder.set_pipeline_layout(pipeline_layout_);
     }
 
+    void RenderPass::create_pipeline_layout() {
+      VkPipelineLayoutCreateInfo pipeline_layout_create_info{
+          .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+          .pNext = nullptr,
+          .setLayoutCount = static_cast<uint32_t>(descriptor_layouts_.size()),
+          .pSetLayouts = descriptor_layouts_.data(),
+          .pushConstantRangeCount = 1,
+          .pPushConstantRanges = &dependencies_.push_constant_range,
+      };
+
+      VK_CHECK(vkCreatePipelineLayout(gpu_.device, &pipeline_layout_create_info, nullptr,
+                                      &pipeline_layout_));
+    }
+
     void VkSwapchain::init(const Gpu& gpu, const VkExtent3D& extent) {
       gpu_ = gpu;
 
