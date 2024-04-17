@@ -7,7 +7,7 @@
 
 namespace gestalt {
   namespace graphics {
-
+      /*
     class DeferredPass final : public RenderPass {
       std::string vertex_shader_source_ = "../shaders/geometry.vert.spv";
       std::string fragment_shader_source_ = "../shaders/geometry_deferred.frag.spv";
@@ -183,6 +183,6 @@ namespace gestalt {
       void execute(VkCommandBuffer cmd) override;
       ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
       std::string get_name() const override { return name_; }
-    };
+    };*/
   }  // namespace graphics
 }  // namespace gestalt

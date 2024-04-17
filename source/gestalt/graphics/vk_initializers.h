@@ -35,8 +35,8 @@ namespace gestalt {
                                                     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
     VkRenderingInfo rendering_info(VkExtent2D renderExtent,
-                                   VkRenderingAttachmentInfo* colorAttachment,
-                                   VkRenderingAttachmentInfo* depthAttachment);
+                                   const VkRenderingAttachmentInfo* colorAttachment,
+                                   const VkRenderingAttachmentInfo* depthAttachment);
     VkRenderingInfo rendering_info_for_gbuffer(VkExtent2D renderExtent,
                                                VkRenderingAttachmentInfo* colorAttachments,
                                                uint32_t colorAttachmentCount,

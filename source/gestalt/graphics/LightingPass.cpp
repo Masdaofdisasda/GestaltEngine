@@ -7,7 +7,7 @@
 
 namespace gestalt {
   namespace graphics {
-
+      /*
     using namespace foundation;
     void LightingPass::prepare() {
       fmt::print("preparing lighting pass\n");
@@ -149,6 +149,6 @@ namespace gestalt {
                          sizeof(RenderConfig::LightingParams), &registry_->config_.lighting);
       vkCmdDraw(cmd, 3, 1, 0, 0);
       vkCmdEndRendering(cmd);
-    }
+    } */
   }  // namespace graphics
 }  // namespace gestalt

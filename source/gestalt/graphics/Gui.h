@@ -2,7 +2,6 @@
 
 #include "vk_types.h"
 #include "Gpu.h"
-#include "vk_swapchain.h"
 #include "SceneManger.h"
 
 namespace gestalt::graphics {
@@ -28,7 +27,6 @@ namespace gestalt {
     class Gui {
       graphics::Gpu gpu_ = {};
       Window window_;
-      std::shared_ptr<graphics::VkSwapchain> swapchain_;
       std::shared_ptr<foundation::Repository> repository_;
       GuiCapabilities actions_;
 
@@ -66,12 +64,13 @@ namespace gestalt {
       void check_file_dialog();
 
     public:
-      void init(graphics::Gpu& gpu, Window& window, const std::shared_ptr<graphics::VkSwapchain>& swapchain,
-                const std::shared_ptr<foundation::Repository>& repository, GuiCapabilities& actions);
+      void init(graphics::Gpu& gpu, Window& window,
+                VkFormat swapchainFormat, const std::shared_ptr<foundation::Repository>& repository, GuiCapabilities
+                & actions);
 
       void cleanup();
 
-      void draw(VkCommandBuffer cmd, VkImageView target_image_view);
+      void draw(VkCommandBuffer cmd, const std::shared_ptr<foundation::TextureHandle>& swapchain);
 
       void update(const SDL_Event& e);
 

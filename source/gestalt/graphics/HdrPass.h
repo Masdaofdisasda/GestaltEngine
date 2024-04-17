@@ -6,6 +6,7 @@
 
 namespace gestalt {
   namespace graphics {
+    /*
     class BrightPass final : public RenderPass {
       std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
       std::string fragment_shader_source_ = "../shaders/hdr_bright_pass.frag.spv";
@@ -321,6 +322,6 @@ namespace gestalt {
       void execute(VkCommandBuffer cmd) override;
       ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
       std::string get_name() const override { return name_; }
-    };
+    };*/
   }  // namespace graphics
 }  // namespace gestalt

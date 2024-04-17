@@ -20,11 +20,10 @@ namespace gestalt {
     using namespace gestalt::foundation;
     using namespace gestalt::graphics;
 
-    void Gui::init(Gpu& gpu, Window& window, const std::shared_ptr<VkSwapchain>& swapchain,
+    void Gui::init(Gpu& gpu, Window& window, VkFormat swapchainFormat,
                    const std::shared_ptr<Repository>& repository, GuiCapabilities& actions) {
       gpu_ = gpu;
       window_ = window;
-      swapchain_ = swapchain;
       repository_ = repository;
       actions_ = actions;
 
@@ -64,7 +63,7 @@ namespace gestalt {
       VkPipelineRenderingCreateInfoKHR pipelineRenderingCreateInfo = {
           .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
           .colorAttachmentCount = 1,
-          .pColorAttachmentFormats = &swapchain_->swapchain_image_format,
+          .pColorAttachmentFormats = &swapchainFormat,
       };
 
       // this initializes imgui for Vulkan
@@ -99,11 +98,11 @@ namespace gestalt {
       //deletion_service_.push_function([this]() { ImGui_ImplVulkan_Shutdown(); });
     }
 
-    void Gui::draw(VkCommandBuffer cmd, VkImageView target_image_view) {
+    void Gui::draw(VkCommandBuffer cmd, const std::shared_ptr<TextureHandle>& swapchain) {
       VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(
-          target_image_view, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+          swapchain->imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
       VkRenderingInfo renderInfo
-          = vkinit::rendering_info(swapchain_->swapchain_extent, &colorAttachment, nullptr);
+          = vkinit::rendering_info(swapchain->getExtent2D(), &colorAttachment, nullptr);
 
       vkCmdBeginRendering(cmd, &renderInfo);
 

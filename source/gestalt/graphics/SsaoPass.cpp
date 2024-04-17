@@ -6,7 +6,7 @@
 
 namespace gestalt {
   namespace graphics {
-
+      /*
     using namespace foundation;
 
     void SsaoFilterPass::prepare() {
@@ -287,6 +287,6 @@ namespace gestalt {
     void SsaoFinalPass::cleanup() {
       vkDestroyPipelineLayout(gpu_.device, pipeline_layout_, nullptr);
       vkDestroyPipeline(gpu_.device, pipeline_, nullptr);
-    }
+    }*/
   }  // namespace graphics
 }  // namespace gestalt

@@ -7,6 +7,7 @@
 
 namespace gestalt {
   namespace graphics {
+    /*
     class SkyboxPass final : public RenderPass {
       std::string vertex_shader_source_ = "../shaders/skybox.vert.spv";
       std::string fragment_shader_source_ = "../shaders/skybox.frag.spv";
@@ -46,18 +47,9 @@ namespace gestalt {
       ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
       std::string get_name() const override { return name_; }
     };
+    */
 
     class InfiniteGridPass final : public RenderPass {
-      std::string vertex_shader_source_ = "../shaders/infinite_grid.vert.spv";
-      std::string fragment_shader_source_ = "../shaders/infinite_grid.frag.spv";
-      std::string name_ = "Infinite Grid Pass";
-
-      ShaderPassDependencyInfo deps_ = {
-          .read_resources = {},
-          .write_resources
-          = {{"grid_color", std::make_shared<ColorImageResource>("skybox_color", 1.f)},
-             {"grid_depth", std::make_shared<DepthImageResource>("skybox_depth", 1.f)}},
-      };
 
       VkPushConstantRange push_constant_range{
           .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -65,26 +57,13 @@ namespace gestalt {
           .size = sizeof(RenderConfig::GridParams),
       };
 
-      VkViewport viewport_{
-          .x = 0,
-          .y = 0,
-          .minDepth = 0.f,
-          .maxDepth = 1.f,
-      };
-      VkRect2D scissor_{
-          .offset = {0, 0},
-      };
-
-      VkPipeline pipeline_ = nullptr;
-      VkPipelineLayout pipeline_layout_ = nullptr;
-      std::vector<VkDescriptorSetLayout> descriptor_layouts_;
-
     public:
       void prepare() override;
       void cleanup() override;
       void execute(VkCommandBuffer cmd) override;
-      ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
-      std::string get_name() const override { return name_; }
+      RenderPassDependency& get_dependencies() override { return dependencies_;
+      }
+      std::string get_name() const override { return "Infinite Grid Pass"; }
     };
   }  // namespace graphics
 }  // namespace gestalt

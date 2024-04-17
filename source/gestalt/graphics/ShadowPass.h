@@ -5,7 +5,7 @@
 
 namespace gestalt {
   namespace graphics {
-
+      /*
     class DirectionalDepthPass final : public RenderPass {
       std::string vertex_shader_source_ = "../shaders/shadow_geometry.vert.spv";
       std::string fragment_shader_source_ = "../shaders/shadow_depth.frag.spv";
@@ -49,5 +49,6 @@ namespace gestalt {
       ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
       std::string get_name() const override { return name_; }
     };
+      */
   }  // namespace graphics
 }  // namespace gestalt

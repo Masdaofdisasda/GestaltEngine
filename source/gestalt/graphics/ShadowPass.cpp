@@ -8,7 +8,7 @@
 
 namespace gestalt {
   namespace graphics {
-
+      /*
     using namespace foundation;
 
     void DirectionalDepthPass::prepare() {
@@ -133,6 +133,6 @@ namespace gestalt {
       }
 
       vkCmdEndRendering(cmd);
-    }
+    } */
   }  // namespace graphics
 }  // namespace gestalt

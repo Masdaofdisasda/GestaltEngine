@@ -45,7 +45,7 @@ namespace gestalt {
     frame_graph_->init(gpu_, window_, resource_manager_, repository_, imgui_);
 
     register_gui_actions();
-    imgui_->init(gpu_, window_, frame_graph_->get_swapchain(), repository_, gui_actions_);
+    imgui_->init(gpu_, window_, frame_graph_->get_swapchain_format(), repository_, gui_actions_);
 
     // everything went fine
     is_initialized_ = true;

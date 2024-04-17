@@ -8,7 +8,7 @@ namespace gestalt {
   namespace graphics {
 
     using namespace foundation;
-
+    /*
     void DeferredPass::prepare() {
       fmt::print("preparing deferred pass\n");
 
@@ -490,6 +490,6 @@ namespace gestalt {
       }
 
       vkCmdEndRendering(cmd);
-    }
+    }*/
   }  // namespace graphics
 }  // namespace gestalt

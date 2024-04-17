@@ -14,8 +14,10 @@
 #include "ShadowPass.h"
 #include "SkyboxPass.h"
 #include "SsaoPass.h"
+#include "VkBootstrap.h"
 #include "vk_images.h"
 #include "vk_initializers.h"
+#include "vk_pipelines.h"
 
 namespace gestalt {
   namespace graphics {
@@ -33,15 +35,18 @@ namespace gestalt {
       commands_->init(gpu_, frames_);
       sync_->init(gpu_, frames_);
 
+      resource_registry_->init(gpu_);
+
+      /*
       render_passes_.push_back(
           std::make_unique<DirectionalDepthPass>());  // TODO investigate sorting
       render_passes_.push_back(std::make_unique<DeferredPass>());
+
       // render_passes_.push_back(std::make_unique<meshlet_pass>());
+
       render_passes_.push_back(std::make_unique<LightingPass>());
-      render_passes_.push_back(std::make_unique<SkyboxPass>());
-      render_passes_.push_back(std::make_unique<InfiniteGridPass>());
-      // render_passes_.push_back(std::make_unique<geometry_pass>());
-      // render_passes_.push_back(std::make_unique<transparent_pass>());
+      render_passes_.push_back(std::make_unique<SkyboxPass>()); */
+      render_passes_.push_back(std::make_unique<InfiniteGridPass>());/*
       render_passes_.push_back(std::make_unique<SsaoFilterPass>());
       render_passes_.push_back(std::make_unique<SsaoBlurPass>());
       render_passes_.push_back(std::make_unique<SsaoFinalPass>());
@@ -52,7 +57,7 @@ namespace gestalt {
       render_passes_.push_back(std::make_unique<LuminanceDownscalePass>());
       render_passes_.push_back(std::make_unique<LightAdaptationPass>());
       render_passes_.push_back(std::make_unique<TonemapPass>());
-      render_passes_.push_back(std::make_unique<DebugAabbPass>());
+      render_passes_.push_back(std::make_unique<DebugAabbPass>());*/
 
       for (int i = 0; i < kFrameOverlap; i++) {
         std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> frame_sizes = {
@@ -67,238 +72,66 @@ namespace gestalt {
       }
 
       create_resources();
-      // the shader pipelines need acccess to their resources to be created
-      resource_registry_->direct_original_mapping = direct_original_mapping_;
 
       for (auto& pass : render_passes_) {
         pass->init(gpu_, resource_manager_, resource_registry_, repository_);
       }
 
-      resource_registry_->direct_original_mapping.clear();
-    }
-
-    std::string FrameGraph::get_final_transformation(const std::string& original) {
-      std::string current = original;
-      while (resource_transformations_.find(current) != resource_transformations_.end()) {
-        current = resource_transformations_[current];
-      }
-      return current;
-    }
-
-    void FrameGraph::calculate_resource_transform() {
-      resource_transformations_.clear();
-      std::unordered_map<std::string, std::string> resource_predecessors;
-
-      for (auto& pass : render_passes_) {
-        auto t = pass->get_dependencies();
-        for (auto& r : t.write_resources) {
-          resource_transformations_[r.second->getId()] = r.first;
-          resource_predecessors[r.first] = r.second->getId();
-        }
-      }
-
-      for (const auto& pair : resource_predecessors) {
-        std::string originalId = pair.second;  // Start with the immediate predecessor
-        std::string currentId = pair.first;
-
-        // Trace back to the original source
-        while (resource_predecessors.find(originalId) != resource_predecessors.end()) {
-          originalId = resource_predecessors[originalId];
-        }
-
-        // Now, originalId is the original source for currentId
-        direct_original_mapping_[currentId] = originalId;
-      }
-
-      std::unordered_set<std::string> values;
-      for (const auto& pair : resource_transformations_) {
-        values.insert(pair.second);
-      }
-
-      std::unordered_set<std::string> originalKeys;
-      for (const auto& pair : resource_transformations_) {
-        if (values.find(pair.first) == values.end()) {
-          // If the key is not in the set of values, it's an original key
-          originalKeys.insert(pair.first);
-        }
-      }
-
-      resource_pairs_.clear();
-      for (const auto& key : originalKeys) {
-        resource_pairs_.emplace_back(key, get_final_transformation(key));
-        direct_original_mapping_[key] = key;
-      }
+      resource_registry_->clear_shader_cache();
     }
 
     void FrameGraph::create_resources() {
-      for (auto [original, final] : resource_pairs_) {
-        resource_registry_->update_resource_id(final, original);
+      auto& color = resource_registry_->attachments_.scene_color;
+      if (color.extent.width == 0 && color.extent.height == 0) {
+        color.image->imageExtent = {static_cast<uint32_t>(window_.extent.width * color.scale),
+                                    static_cast<uint32_t>(window_.extent.height * color.scale), 1};
+      } else {
+        color.image->imageExtent = color.extent;
       }
 
-      std::unordered_map<std::string, std::shared_ptr<ShaderResource>> resource_map;
-
-      for (auto& pass : render_passes_) {
-        auto t = pass->get_dependencies();
-        for (auto& r : t.read_resources) {
-          resource_map[r->getId()] = r;
-        }
-        for (auto& r : t.write_resources) {
-          resource_map[r.second->getId()] = r.second;
-        }
+      if (color.image->getType() == foundation::TextureType::kColor) {
+               resource_manager_->create_color_frame_buffer(color.image);
+      } else if (color.image->getType() == foundation::TextureType::kDepth) {
+               resource_manager_->create_depth_frame_buffer(color.image);
       }
 
-      calculate_resource_transform();
-
-      for (const auto& original_id : resource_pairs_ | std::views::keys) {
-        auto id = original_id;
-        while (resource_transformations_.contains(id)) {
-          id = resource_transformations_[id];
-          resource_map.erase(id);
-        }
+      auto& depth = resource_registry_->attachments_.scene_depth;
+      if (depth.extent.width == 0 && depth.extent.height == 0) {
+        depth.image->imageExtent = {static_cast<uint32_t>(window_.extent.width * depth.scale),
+                                    static_cast<uint32_t>(window_.extent.height * depth.scale), 1};
+      } else {
+        depth.image->imageExtent = depth.extent;
       }
 
-      for (auto& r : resource_map | std::views::values) {
-        if (auto image_resource = std::dynamic_pointer_cast<ColorImageResource>(r)) {
-          if (resource_registry_->get_resource<foundation::TextureHandle>(
-                  image_resource->getId())) {
-            continue;
-          }
-
-          auto image = std::make_shared<foundation::TextureHandle>(foundation::TextureType::kColor);
-          image->imageExtent
-              = {image_resource->get_extent().width, image_resource->get_extent().height, 1};
-          if (image->imageExtent.height == 0 && image->imageExtent.width == 0) {
-            image->imageExtent.width
-                = static_cast<uint32_t>(window_.extent.width * image_resource->get_scale());
-            image->imageExtent.height
-                = static_cast<uint32_t>(window_.extent.height * image_resource->get_scale());
-          }
-          resource_manager_->create_color_frame_buffer(
-              {image->getExtent2D().width, image->getExtent2D().height, 1}, image);
-          resource_registry_->add_resource(image_resource->getId(), image);
-        } else if (auto image_resource = std::dynamic_pointer_cast<DepthImageResource>(r)) {
-          if (resource_registry_->get_resource<foundation::TextureHandle>(image_resource->getId())) {
-            continue;
-          }
-
-          auto image = std::make_shared<foundation::TextureHandle>(foundation::TextureType::kDepth);
-          image->imageExtent
-              = {image_resource->get_extent().width, image_resource->get_extent().height, 1};
-          if (image->imageExtent.height == 0 && image->imageExtent.width == 0) {
-            image->imageExtent.width
-                = static_cast<uint32_t>(window_.extent.width * image_resource->get_scale());
-            image->imageExtent.height
-                = static_cast<uint32_t>(window_.extent.height * image_resource->get_scale());
-          }
-          resource_manager_->create_depth_frame_buffer(
-              {image->getExtent2D().width, image->getExtent2D().height, 1}, image);
-          resource_registry_->add_resource(image_resource->getId(), image);
-        } else if (auto buffer = std::dynamic_pointer_cast<BufferResource>(r)) {
-          // TODO: create buffer
-        }
-      }
-    }
-
-    void FrameGraph::build_graph() {
-      graph_.clear();
-
-      // Initialize in_degree for all passes to 0.
-      for (size_t i = 0; i < render_passes_.size(); ++i) {
-        in_degree_[i] = 0;
-      }
-
-      populate_graph();
-
-      topological_sort();
-    }
-
-    void FrameGraph::populate_graph() {
-      // Map each resource to the last pass that writes to it.
-      std::unordered_map<std::string, size_t> last_writer;
-
-      for (size_t i = 0; i < render_passes_.size(); ++i) {
-        auto& pass = render_passes_[i];
-
-        // Update graph and in_degree based on write dependencies.
-        for (const auto& resource : pass->get_dependencies().write_resources) {
-          // If there's a previous writer, add a dependency from that writer to this pass.
-          if (last_writer.find(resource.second->getId()) != last_writer.end()) {
-            size_t writer_pass_index = last_writer[resource.second->getId()];
-            graph_[writer_pass_index].push_back(i);
-            in_degree_[i]++;
-          }
-          // Update the last writer of the resource to this pass.
-          last_writer[resource.second->getId()] = i;
-        }
-
-        // (Optional) Handle read dependencies similarly if needed.
-      }
-    }
-
-    void FrameGraph::topological_sort() {
-      sorted_passes_.clear();
-
-      std::queue<size_t> q;
-
-      // Find all passes with no incoming edge and add them to the queue.
-      for (const auto& in_deg : in_degree_) {
-        if (in_deg.second == 0) {
-          q.push(in_deg.first);
-        }
-      }
-
-      while (!q.empty()) {
-        size_t current_pass = q.front();
-        q.pop();
-        sorted_passes_.push_back(current_pass);
-
-        // For each pass dependent on the current pass.
-        for (auto& dep_pass : graph_[current_pass]) {
-          // Decrease the in-degree of the dependent pass.
-          if (--in_degree_[dep_pass] == 0) {
-            // If no more dependencies, add it to the queue.
-            q.push(dep_pass);
-          }
-        }
-      }
-
-      // Check for cycles in the graph (if the graph is not a DAG).
-      if (sorted_passes_.size() != render_passes_.size()) {
-        // For simplicity, we'll just clear the sorted_passes indicating an error.
-        sorted_passes_.clear();
+      if (depth.image->getType() == foundation::TextureType::kColor) {
+        resource_manager_->create_color_frame_buffer(depth.image);
+      } else if (depth.image->getType() == foundation::TextureType::kDepth) {
+        resource_manager_->create_depth_frame_buffer(depth.image);
       }
     }
 
     void FrameGraph::execute(size_t id, VkCommandBuffer cmd) {
-      for (const auto& reads = render_passes_[id]->get_dependencies().read_resources;
-           const auto& read : reads) {
-        if (std::dynamic_pointer_cast<ColorImageResource>(read)
-            || std::dynamic_pointer_cast<DepthImageResource>(read)) {
-          std::shared_ptr<TextureHandle> resource
-              = resource_registry_->get_resource<TextureHandle>(read->getId());
-          vkutil::TransitionImage(resource).toLayoutRead().andSubmitTo(cmd);
-        }
-      }
 
-      for (const auto& writes = render_passes_[id]->get_dependencies().write_resources;
-           const auto& write : writes) {
-        if (std::dynamic_pointer_cast<ColorImageResource>(write.second)
-            || std::dynamic_pointer_cast<DepthImageResource>(write.second)) {
-          std::shared_ptr<TextureHandle> resource
-              = resource_registry_->get_resource<TextureHandle>(write.second->getId());
-          vkutil::TransitionImage(resource).toLayoutWrite().andSubmitTo(cmd);
+        auto renderDependencies = render_passes_.at(id)->get_dependencies();
+
+      for (auto& dependency : renderDependencies.image_attachments) {
+        switch (dependency.usage) {
+           case ImageUsageType::kRead:
+               vkutil::TransitionImage(dependency.attachment.image)
+                .toLayoutRead().andSubmitTo(cmd);
+          case ImageUsageType::kWrite:
+              vkutil::TransitionImage(dependency.attachment.image)
+                .toLayoutWrite().andSubmitTo(cmd);
+          case ImageUsageType::kDepthStencilRead:
+              vkutil::TransitionImage(dependency.attachment.image)
+                .toLayoutWrite().andSubmitTo(cmd);
         }
       }
 
       render_passes_[id]->execute(cmd);
 
-      for (const auto& writes = render_passes_[id]->get_dependencies().write_resources;
-           const auto& write : writes) {
-        if (std::dynamic_pointer_cast<ColorImageResource>(write.second)
-            || std::dynamic_pointer_cast<DepthImageResource>(write.second)) {
-          resource_registry_->update_resource_id(write.second->getId(), write.first);
-        }
-      }
+      // increase attachment count TODO
+
     }
 
     bool FrameGraph::acquire_next_image() {
@@ -333,9 +166,9 @@ namespace gestalt {
     }
 
     void FrameGraph::execute_passes() {
-      create_resources();
+      //create_resources();
 
-      build_graph();
+      //build_graph();
 
       if (resize_requested_) {
         swapchain_->resize_swapchain(window_);
@@ -348,15 +181,15 @@ namespace gestalt {
 
       VkCommandBuffer cmd = start_draw();
 
-      for (const size_t index : sorted_passes_) {
+      for (size_t i = 0; i < render_passes_.size(); i++) {
         ZoneScopedN("Execute Pass");
-        execute(index, cmd);
+        execute(i, cmd);
       }
 
       repository_->main_draw_context_.opaque_surfaces.clear();
       repository_->main_draw_context_.transparent_surfaces.clear();
 
-      const auto color_image = resource_registry_->get_resource<foundation::TextureHandle>("scene_debug_aabb");
+      const auto color_image = resource_registry_->attachments_.scene_color.image;
       const auto swapchain_image = swapchain_->swapchain_images[swapchain_image_index_];
 
       vkutil::TransitionImage(color_image)
@@ -381,7 +214,7 @@ namespace gestalt {
                            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)
           .andSubmitTo(cmd);
 
-      imgui_->draw(cmd, swapchain_image->imageView);
+      imgui_->draw(cmd, swapchain_image);
 
       vkutil::TransitionImage(swapchain_image)
           .to(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
@@ -425,6 +258,140 @@ namespace gestalt {
       if (presentResult == VK_ERROR_OUT_OF_DATE_KHR) {
         resize_requested_ = true;
         return;
+      }
+    }
+
+    VkShaderModule ResourceRegistry::get_shader(const ShaderProgram& shader_program) {
+      const std::string& shader_path = "../shaders/" + shader_program.source_path;
+
+      if (const auto it = shader_cache_.find(shader_path); it != shader_cache_.end()) {
+        return it->second;
+      }
+
+      VkShaderModule shader_module;
+      vkutil::load_shader_module(shader_path.c_str(), gpu_.device, &shader_module);
+
+      shader_cache_[shader_path] = shader_module;
+
+      return shader_module;
+    }
+
+    void ResourceRegistry::clear_shader_cache() {
+      for (const auto& shader_module : shader_cache_ | std::views::values) {
+        vkDestroyShaderModule(gpu_.device, shader_module, nullptr);
+      }
+      shader_cache_.clear();
+    }
+
+    void RenderPass::begin_renderpass(VkCommandBuffer cmd) {
+      VkRenderingAttachmentInfo colorAttachment = {};
+      VkRenderingAttachmentInfo depthAttachment = {};
+      VkExtent2D extent = {0, 0};
+
+      for (auto& attachment : dependencies_.image_attachments) {
+        if (attachment.usage == ImageUsageType::kWrite
+            || attachment.usage == ImageUsageType::kDepthStencilRead) {
+          std::shared_ptr<TextureHandle>& image = attachment.attachment.image;
+
+          if (image->getType() == TextureType::kColor) {
+            if (extent.width == 0 && extent.height == 0) {
+              extent = {image->imageExtent.width, image->imageExtent.height};
+            }
+
+            if (attachment.clear_operation == ImageClearOperation::kClear) {
+              VkClearValue clear = {.color = {0.0f, 0.0f, 0.0f, 1.0f}};
+              colorAttachment = vkinit::attachment_info(image->imageView, &clear, image->getLayout());
+            } else {
+              colorAttachment
+                  = vkinit::attachment_info(image->imageView, nullptr, image->getLayout());
+            }
+          } else if (image->getType() == TextureType::kDepth) {
+            if (extent.width == 0 && extent.height == 0) {
+              extent = {image->imageExtent.width, image->imageExtent.height};
+            }
+
+            if (attachment.clear_operation == ImageClearOperation::kClear) {
+              VkClearValue clear = {.depthStencil = {1.0f, 0}};
+              depthAttachment = vkinit::depth_attachment_info(image->imageView, &clear, image->getLayout());
+            } else {
+              depthAttachment
+                  = vkinit::depth_attachment_info(image->imageView, nullptr, image->getLayout());
+            }
+          }
+        }
+      }
+
+      viewport_.width = static_cast<float>(extent.width);
+      viewport_.height = static_cast<float>(extent.height);
+      scissor_.extent.width = extent.width;
+      scissor_.extent.height = extent.height;
+
+      auto renderInfo = vkinit::rendering_info(extent, &colorAttachment, &depthAttachment);
+
+      vkCmdBeginRendering(cmd, &renderInfo);
+    }
+
+    void VkSwapchain::init(const Gpu& gpu, const VkExtent3D& extent) {
+      gpu_ = gpu;
+
+      create_swapchain(extent.width, extent.height);
+    }
+
+    void VkSwapchain::create_swapchain(const uint32_t width, const uint32_t height) {
+      vkb::SwapchainBuilder swapchainBuilder{gpu_.chosen_gpu, gpu_.device, gpu_.surface};
+
+      swapchain_image_format = VK_FORMAT_B8G8R8A8_UNORM;
+
+      vkb::Swapchain vkbSwapchain = swapchainBuilder
+                                        //.use_default_format_selection()
+                                        .set_desired_format(VkSurfaceFormatKHR{
+                                            .format = swapchain_image_format,
+                                            .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
+                                        // use vsync present mode
+                                        .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
+                                        .set_desired_extent(width, height)
+                                        .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+                                        .set_desired_min_image_count(2)
+                                        .build()
+                                        .value();
+
+      swapchain_extent = vkbSwapchain.extent;
+      // store swapchain and its related images
+      swapchain = vkbSwapchain.swapchain;
+
+      for (const auto& _swapchainImage : vkbSwapchain.get_images().value()) {
+        foundation::TextureHandle handle{};
+        handle.image = _swapchainImage;
+        handle.setFormat(swapchain_image_format);
+        handle.setLayout(VK_IMAGE_LAYOUT_UNDEFINED);
+        handle.imageExtent = {swapchain_extent.width, swapchain_extent.height, 1};
+
+        swapchain_images.push_back(std::make_shared<foundation::TextureHandle>(handle));
+      }
+
+      const auto views = vkbSwapchain.get_image_views().value();
+
+      for (size_t i = 0; i < views.size(); i++) {
+        swapchain_images[i]->imageView = views[i];
+      }
+    }
+
+    void VkSwapchain::resize_swapchain(application::Window& window) {
+      vkDeviceWaitIdle(gpu_.device);
+
+      destroy_swapchain();
+
+      window.update_window_size();
+
+      create_swapchain(window.extent.width, window.extent.height);
+    }
+
+    void VkSwapchain::destroy_swapchain() const {
+      vkDestroySwapchainKHR(gpu_.device, swapchain, nullptr);
+
+      // destroy swapchain resources
+      for (auto& _swapchainImage : swapchain_images) {
+        vkDestroyImageView(gpu_.device, _swapchainImage->imageView, nullptr);
       }
     }
   }  // namespace graphics

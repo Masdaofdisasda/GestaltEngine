@@ -8,7 +8,7 @@ namespace gestalt {
   namespace graphics {
 
     using namespace foundation;
-
+    /*
     void SkyboxPass::prepare() {
       fmt::print("Preparing skybox pass\n");
 
@@ -115,9 +115,17 @@ namespace gestalt {
       vkDestroyPipelineLayout(gpu_.device, pipeline_layout_, nullptr);
       vkDestroyPipeline(gpu_.device, pipeline_, nullptr);
     }
-
+    */
     void InfiniteGridPass::prepare() {
       fmt::print("Preparing skybox pass\n");
+
+      dependencies_
+          = RenderPassDependencyBuilder()
+                .add_shader(ShaderStage::kVertex, "infinite_grid.vert.spv")
+                .add_shader(ShaderStage::kFragment, "infinite_grid.frag.spv")
+                .add_image_attachment(registry_->attachments_.scene_color, ImageUsageType::kWrite, ImageClearOperation::kClear)
+          .add_image_attachment(registry_->attachments_.scene_depth, ImageUsageType::kWrite, ImageClearOperation::kClear)
+                     .build();
 
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
       descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
@@ -135,12 +143,17 @@ namespace gestalt {
                                       &pipeline_layout_));
 
       VkShaderModule vertex_shader;
-      vkutil::load_shader_module(vertex_shader_source_.c_str(), gpu_.device, &vertex_shader);
       VkShaderModule fragment_shader;
-      vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &fragment_shader);
+      for (auto& shader_dependency : dependencies_.shaders) {
+        if (shader_dependency.stage == ShaderStage::kVertex) {
+            vertex_shader = registry_->get_shader(shader_dependency);
+        } else if (shader_dependency.stage == ShaderStage::kFragment) {
+            fragment_shader = registry_->get_shader(shader_dependency);
+        }
+      }
 
-      const auto color_image = registry_->get_resource<TextureHandle>("skybox_color");
-      const auto depth_image = registry_->get_resource<TextureHandle>("skybox_depth");
+      const auto color_image = registry_->attachments_.scene_color.image;
+      const auto depth_image = registry_->attachments_.scene_depth.image;
 
       pipeline_ = PipelineBuilder()
                       .set_shaders(vertex_shader, fragment_shader)
@@ -154,26 +167,11 @@ namespace gestalt {
                       .set_depth_format(depth_image->getFormat())
                       .set_pipeline_layout(pipeline_layout_)
                       .build_pipeline(gpu_.device);
-
-      // Clean up shader modules after pipeline creation
-      vkDestroyShaderModule(gpu_.device, vertex_shader, nullptr);
-      vkDestroyShaderModule(gpu_.device, fragment_shader, nullptr);
     }
 
     void InfiniteGridPass::execute(const VkCommandBuffer cmd) {
-      const auto color_image = registry_->get_resource<TextureHandle>("skybox_color");
-      const auto depth_image = registry_->get_resource<TextureHandle>("skybox_depth");
 
-      VkRenderingAttachmentInfo colorAttachment
-          = vkinit::attachment_info(color_image->imageView, nullptr, color_image->getLayout());
-
-      VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
-          depth_image->imageView, nullptr, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-
-      VkRenderingInfo renderInfo
-          = vkinit::rendering_info(color_image->getExtent2D(), &colorAttachment, &depthAttachment);
-
-      vkCmdBeginRendering(cmd, &renderInfo);
+      begin_renderpass(cmd);
 
       const char frameIndex = gpu_.get_current_frame();
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
@@ -196,11 +194,7 @@ namespace gestalt {
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
       vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                          sizeof(RenderConfig::GridParams), &registry_->config_.grid);
-      viewport_.width = static_cast<float>(color_image->getExtent2D().width);
-      viewport_.height = static_cast<float>(color_image->getExtent2D().height);
       vkCmdSetViewport(cmd, 0, 1, &viewport_);
-      scissor_.extent.width = color_image->getExtent2D().width;
-      scissor_.extent.height = color_image->getExtent2D().height;
       vkCmdSetScissor(cmd, 0, 1, &scissor_);
       vkCmdDraw(cmd, 6, 1, 0, 0);  // 6 vertices for the grid
 

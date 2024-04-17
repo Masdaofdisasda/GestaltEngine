@@ -613,11 +613,11 @@ namespace gestalt {
                             VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT, false);
     }
 
-    void ResourceManager::create_color_frame_buffer(const VkExtent3D& extent,
-                                                    std::shared_ptr<TextureHandle>& color_image) const {
+    void ResourceManager::create_color_frame_buffer(const std::shared_ptr<TextureHandle>& color_image) const {
       assert(color_image->getType() == TextureType::kColor);
       // hardcoding the draw format to 32 bit float
       color_image->setFormat(VK_FORMAT_R16G16B16A16_SFLOAT);
+      const VkExtent3D extent = { color_image->imageExtent.width, color_image->imageExtent.height, 1 };
       color_image->imageExtent = extent;
 
       VkImageUsageFlags drawImageUsages{};
@@ -645,10 +645,12 @@ namespace gestalt {
       VK_CHECK(vkCreateImageView(gpu_.device, &rview_info, nullptr, &color_image->imageView));
     }
 
-    void ResourceManager::create_depth_frame_buffer(const VkExtent3D& extent, std::shared_ptr<TextureHandle>& depth_image) const {
+    void ResourceManager::create_depth_frame_buffer(std::shared_ptr<TextureHandle>& depth_image) const {
       assert(depth_image->getType() == TextureType::kDepth);
 
       depth_image->setFormat(VK_FORMAT_D32_SFLOAT);
+      const VkExtent3D extent
+          = {depth_image->imageExtent.width, depth_image->imageExtent.height, 1};
       depth_image->imageExtent = extent;
       VkImageUsageFlags depthImageUsages{};
       depthImageUsages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;

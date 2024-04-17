@@ -161,8 +161,8 @@ namespace gestalt {
   //< depth_info
   //> render_info
   VkRenderingInfo vkinit::rendering_info(VkExtent2D renderExtent,
-                                         VkRenderingAttachmentInfo* colorAttachment,
-                                         VkRenderingAttachmentInfo* depthAttachment) {
+                                         const VkRenderingAttachmentInfo* colorAttachment,
+                                         const VkRenderingAttachmentInfo* depthAttachment) {
     VkRenderingInfo renderInfo{};
     renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
     renderInfo.pNext = nullptr;

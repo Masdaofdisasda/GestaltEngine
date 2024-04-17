@@ -6,110 +6,98 @@
 #include "Gui.h"
 #include "RenderConfig.h"
 #include "Repository.h"
-#include "vk_swapchain.h"
 #include "vk_sync.h"
 
 namespace gestalt {
   namespace graphics {
 
-    class ShaderResource {
-    public:
-      virtual ~ShaderResource() = default;
-
-      virtual std::string getId() const = 0;
+    enum class ShaderStage : uint32_t {
+      kVertex = VK_SHADER_STAGE_VERTEX_BIT,
+      kTessellationControl = VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT,
+      kTessellationEvaluation = VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT,
+      kGeometry = VK_SHADER_STAGE_GEOMETRY_BIT,
+      kFragment = VK_SHADER_STAGE_FRAGMENT_BIT,
+      kCompute = VK_SHADER_STAGE_COMPUTE_BIT,
+      kRayGen = VK_SHADER_STAGE_RAYGEN_BIT_KHR,
+      kAnyHit = VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
+      kClosestHit = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
+      kMiss = VK_SHADER_STAGE_MISS_BIT_KHR,
+      kIntersection = VK_SHADER_STAGE_INTERSECTION_BIT_KHR,
+      kCallable = VK_SHADER_STAGE_CALLABLE_BIT_KHR,
+      kTask = VK_SHADER_STAGE_TASK_BIT_NV,
+      kMesh = VK_SHADER_STAGE_MESH_BIT_NV
     };
 
-    class ColorImageResource final : public ShaderResource {
-
-      std::string id;
-      float scale_ = 1.0f;
-      VkExtent2D extent_ = {0, 0};
-
-      std::shared_ptr<foundation::TextureHandle> image_;
-
-    public:
-      ColorImageResource(std::string id, VkExtent2D extent) : id(std::move(id)), extent_(extent) {}
-
-      ColorImageResource(std::string id, const float scale) : id(std::move(id)), scale_(scale) {}
-
-      std::string getId() const override { return id; }
-      float get_scale() const { return scale_; }
-      VkExtent2D get_extent() const { return extent_; }
-      void set_image(const std::shared_ptr<foundation::TextureHandle>& image) { image_ = image; }
+    struct ShaderProgram {
+      ShaderStage stage;
+      std::string source_path;
     };
 
-    class DepthImageResource final : public ShaderResource {
-
-      std::string id;
-      float scale_ = 1.0f;
-      VkExtent2D extent_ = {0, 0};
-
-      std::shared_ptr<foundation::TextureHandle> image_;
-
-    public:
-      DepthImageResource(std::string id, VkExtent2D extent) : id(std::move(id)), extent_(extent) {}
-      DepthImageResource(std::string id, const float scale) : id(std::move(id)), scale_(scale) {}
-
-      std::string getId() const override { return id; }
-      float get_scale() const { return scale_; }
-      VkExtent2D get_extent() const { return extent_; }
-      void set_image(const std::shared_ptr<foundation::TextureHandle>& image) { image_ = image; }
+    struct ImageAttachment {
+      std::shared_ptr<TextureHandle> image;
+      float scale = 1.0f;
+      VkExtent3D extent = {0, 0, 1};
     };
 
-    class BufferResource final : public ShaderResource {
-      std::string id;
-      VkDeviceSize size;
-
-    public:
-      BufferResource(const std::string& id, VkDeviceSize size) : id(id), size(size) {}
-
-      std::string getId() const override { return id; }
-      VkDeviceSize get_size() const { return size; }
+    enum class ImageUsageType {
+      kRead,
+      kWrite,
+      kDepthStencilRead,  // used for depth testing
     };
 
-    struct ShaderPassDependencyInfo {
-      std::vector<std::shared_ptr<ShaderResource>> read_resources;
-      std::vector<std::pair<std::string, std::shared_ptr<ShaderResource>>> write_resources;
+    enum class ImageClearOperation {
+      kClear,
+      kDontCare,
+    };
+
+    struct ImageDependency {
+      ImageAttachment attachment;
+      ImageUsageType usage;
+      ImageClearOperation clear_operation;
+    };
+
+    struct RenderPassDependency {
+      std::vector<ShaderProgram> shaders;
+      std::vector<ImageDependency> image_attachments;
+    };
+
+    class RenderPassDependencyBuilder {
+      RenderPassDependency dependency_{};
+    public:
+      RenderPassDependencyBuilder& add_shader(const ShaderStage stage, const std::string& source_path) {
+        dependency_.shaders.push_back({stage, source_path});
+        return *this;
+      }
+      RenderPassDependencyBuilder& add_image_attachment(const ImageAttachment& attachment,
+                                                        const ImageUsageType usage,
+                                                        const ImageClearOperation clear_operation
+                                                        = ImageClearOperation::kDontCare) {
+        dependency_.image_attachments.push_back({attachment, usage, clear_operation});
+        return *this;
+      }
+      RenderPassDependency build() { return dependency_; }
     };
 
     class ResourceRegistry {
     public:
-      RenderConfig config_;
 
-      template <typename T> void add_resource(const std::string& id, std::shared_ptr<T> resource) {
-        resources_[id] = resource;
-      }
+       void init(const Gpu& gpu) {
+                gpu_ = gpu;
+       }
 
-      template <typename T> std::shared_ptr<T> get_resource(const std::string& id) {
-        if (const auto it = resources_.find(id); it != resources_.end()) {
-          return std::dynamic_pointer_cast<T>(it->second);
-        }
-        if (const auto direct_it = direct_original_mapping.find(id);
-            direct_it != direct_original_mapping.end()) {
-          const std::string& original_id = direct_it->second;
-          if (const auto original_it = resources_.find(original_id);
-              original_it != resources_.end()) {
-            return std::dynamic_pointer_cast<T>(original_it->second);
-          }
-        }
-        return nullptr;
-      }
+       VkShaderModule get_shader(const ShaderProgram& shader_program);
+      void clear_shader_cache();
 
-      bool update_resource_id(const std::string& oldId, const std::string& newId) {
-        auto it = resources_.find(oldId);
-        if (it == resources_.end()) {
-          return false;
-        }
-        resources_[newId] = it->second;
-        resources_.erase(it);
-        return true;
-      }
+       RenderConfig config_;
 
-      // TODO replace this with a more general solution
-      std::unordered_map<std::string, std::string> direct_original_mapping;
+      struct RenderPassAttachments {
+        ImageAttachment scene_color{.image = std::make_shared<TextureHandle>(TextureType::kColor)};
+        ImageAttachment scene_depth{.image = std::make_shared<TextureHandle>(TextureType::kDepth)};
+      } attachments_;
 
     private:
-      std::unordered_map<std::string, std::shared_ptr<TextureHandle>> resources_;
+      Gpu gpu_ = {};
+      std::unordered_map<std::string, VkShaderModule> shader_cache_{};
     };
 
     class RenderPass {
@@ -127,17 +115,52 @@ namespace gestalt {
       virtual ~RenderPass() = default;
 
       virtual void execute(VkCommandBuffer cmd) = 0;
-      virtual ShaderPassDependencyInfo& get_dependencies() = 0;
+      virtual RenderPassDependency& get_dependencies() = 0;
       virtual std::string get_name() const = 0;
       virtual void cleanup() = 0;
 
     protected:
       virtual void prepare() = 0;
 
+      void begin_renderpass(VkCommandBuffer cmd);
+
+      RenderPassDependency dependencies_{};
+
+      VkViewport viewport_{
+          .x = 0,
+          .y = 0,
+          .minDepth = 0.f,
+          .maxDepth = 1.f,
+      };
+      VkRect2D scissor_{
+          .offset = {0, 0},
+      };
+
+      VkPipeline pipeline_ = nullptr;
+      VkPipelineLayout pipeline_layout_ = nullptr;
+      std::vector<VkDescriptorSetLayout> descriptor_layouts_;
+
       Gpu gpu_ = {};
       std::shared_ptr<ResourceManager> resource_manager_;
       std::shared_ptr<ResourceRegistry> registry_;
       std::shared_ptr<foundation::Repository> repository_;
+    };
+
+    class VkSwapchain {
+      Gpu gpu_;
+
+    public:
+      VkSwapchainKHR swapchain;
+      VkFormat swapchain_image_format;
+      VkExtent2D swapchain_extent;
+      VkExtent2D draw_extent;
+
+      std::vector<std::shared_ptr<foundation::TextureHandle>> swapchain_images;
+
+      void init(const Gpu& gpu, const VkExtent3D& extent);
+      void create_swapchain(uint32_t width, uint32_t height);
+      void resize_swapchain(application::Window& window);
+      void destroy_swapchain() const;
     };
 
     constexpr unsigned char kFrameOverlap = 2;
@@ -158,17 +181,6 @@ namespace gestalt {
       std::unique_ptr<vk_sync> sync_ = std::make_unique<vk_sync>();
 
       std::vector<std::unique_ptr<RenderPass>> render_passes_;
-      // Maps each shader pass to indices of passes it depends on (those that write resources it
-      // reads).
-      std::unordered_map<size_t, std::vector<size_t>> graph_;
-      // Tracks how many passes each pass depends on.
-      std::unordered_map<size_t, size_t> in_degree_;
-      std::vector<size_t> sorted_passes_;
-
-      std::unordered_map<std::string, std::string> direct_original_mapping_;
-      std::unordered_map<std::string, std::string> resource_transformations_;
-      // tracks the inital and final state of each written resource
-      std::vector<std::pair<std::string, std::string>> resource_pairs_;
 
       bool resize_requested_{false};
       uint32_t swapchain_image_index_{0};
@@ -178,11 +190,7 @@ namespace gestalt {
       FrameData& get_current_frame() { return frames_[gpu_.get_current_frame()]; }
       application::Window& get_window() { return window_; }
 
-      void build_graph();
-      void populate_graph();
-      void topological_sort();
       std::string get_final_transformation(const std::string& original);
-      void calculate_resource_transform();
       void create_resources();
       VkCommandBuffer start_draw();
       void execute(size_t id, VkCommandBuffer cmd);
@@ -200,7 +208,7 @@ namespace gestalt {
       RenderConfig& get_config() { return resource_registry_->config_; }
       vk_sync& get_sync() const { return *sync_; }
       VkCommand& get_commands() const { return *commands_; }
-      std::shared_ptr<VkSwapchain> get_swapchain() const { return swapchain_; }
+      VkFormat get_swapchain_format() const { return swapchain_->swapchain_image_format; }
     };
   }  // namespace graphics
 }  // namespace gestalt
