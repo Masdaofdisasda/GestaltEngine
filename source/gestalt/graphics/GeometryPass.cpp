@@ -8,9 +8,9 @@ namespace gestalt {
   namespace graphics {
 
     using namespace foundation;
-    /*
+
     void DeferredPass::prepare() {
-      fmt::print("preparing deferred pass\n");
+      fmt::print("Preparing {}\n", get_name());
 
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
       const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
@@ -21,11 +21,18 @@ namespace gestalt {
       descriptor_layouts_.push_back(repository_->material_data.constants_layout);
       descriptor_layouts_.push_back(mesh_buffers.descriptor_layout);
 
-      VkShaderModule meshFragShader;
-      vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &meshFragShader);
-
-      VkShaderModule meshVertexShader;
-      vkutil::load_shader_module(vertex_shader_source_.c_str(), gpu_.device, &meshVertexShader);
+      dependencies_ = RenderPassDependencyBuilder()
+                          .add_shader(ShaderStage::kVertex, "geometry.vert.spv")
+                          .add_shader(ShaderStage::kFragment, "geometry_deferred.frag.spv")
+                          .add_image_attachment(registry_->attachments_.gbuffer1,
+                                                ImageUsageType::kWrite, ImageClearOperation::kClear)
+                          .add_image_attachment(registry_->attachments_.gbuffer2,
+                                                ImageUsageType::kWrite, ImageClearOperation::kClear)
+                          .add_image_attachment(registry_->attachments_.gbuffer3,
+                                                ImageUsageType::kWrite, ImageClearOperation::kClear)
+                          .add_image_attachment(registry_->attachments_.scene_depth,
+                                                ImageUsageType::kWrite, ImageClearOperation::kClear)
+                          .build();
 
       VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
       mesh_layout_info.setLayoutCount = descriptor_layouts_.size();
@@ -35,90 +42,37 @@ namespace gestalt {
 
       VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
 
-      const auto gbuffer_1 = registry_->get_resource<TextureHandle>("gbuffer_1");
-      const auto gbuffer_2 = registry_->get_resource<TextureHandle>("gbuffer_2");
-      const auto gbuffer_3 = registry_->get_resource<TextureHandle>("gbuffer_3");
-      const auto depth_image = registry_->get_resource<TextureHandle>("gbuffer_d");
-
-      pipeline_ = PipelineBuilder()
-                      .set_shaders(meshVertexShader, meshFragShader)
+      pipeline_ = create_pipeline()
                       .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
                       .set_polygon_mode(VK_POLYGON_MODE_FILL)
                       .set_cull_mode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE)
                       .set_multisampling_none()
                       .disable_blending(3)
                       .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-                      .set_color_attachment_formats(
-                          {gbuffer_1->getFormat(), gbuffer_2->getFormat(), gbuffer_3->getFormat()})
-                      .set_depth_format(depth_image->getFormat())
-                      .set_pipeline_layout(pipeline_layout_)
                       .build_pipeline(gpu_.device);
-
-      vkDestroyShaderModule(gpu_.device, meshFragShader, nullptr);
-      vkDestroyShaderModule(gpu_.device, meshVertexShader, nullptr);
     }
 
     void DeferredPass::cleanup() { vkDestroyPipeline(gpu_.device, pipeline_, nullptr); }
 
     void DeferredPass::execute(VkCommandBuffer cmd) {
-      const auto gbuffer_1 = registry_->get_resource<TextureHandle>("gbuffer_1");
-      const auto gbuffer_2 = registry_->get_resource<TextureHandle>("gbuffer_2");
-      const auto gbuffer_3 = registry_->get_resource<TextureHandle>("gbuffer_3");
-      const auto depth_image = registry_->get_resource<TextureHandle>("gbuffer_d");
-
-      VkClearValue depth_clear = {.depthStencil = {1.f, 0}};
-      VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
-          depth_image->imageView, &depth_clear, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-
-      std::array attachment_begin_infos{
-          vkinit::attachment_info(gbuffer_1->imageView, nullptr,
-                                  VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL),
-          vkinit::attachment_info(gbuffer_2->imageView, nullptr,
-                                  VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL),
-          vkinit::attachment_info(gbuffer_3->imageView, nullptr,
-                                  VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)};
-
-      VkRenderingInfo renderInfo = vkinit::rendering_info_for_gbuffer(
-          gbuffer_1->getExtent2D(), attachment_begin_infos.data(), attachment_begin_infos.size(),
-          &depthAttachment);
-
-      vkCmdBeginRendering(cmd, &renderInfo);
+      begin_renderpass(cmd);
 
       const char frameIndex = gpu_.get_current_frame();
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
       const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
       const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
 
-      VkDescriptorBufferInfo buffer_info;
-      buffer_info.buffer = per_frame_buffers.uniform_buffers[frameIndex].buffer;
-      buffer_info.offset = 0;
-      buffer_info.range = sizeof(PerFrameData);
-
-      VkWriteDescriptorSet descriptor_write = {};
-      descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      descriptor_write.dstBinding = 0;
-      descriptor_write.dstArrayElement = 0;
-      descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-      descriptor_write.descriptorCount = 1;
-      descriptor_write.pBufferInfo = &buffer_info;
-
       vkCmdBindIndexBuffer(cmd, mesh_buffers.index_buffer.buffer, 0,
                            VK_INDEX_TYPE_UINT32);
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
       VkDescriptorSet descriptorSets[]
-          = {ibl_buffers.descriptor_set, repository_->material_data.resource_set,
+          = {per_frame_buffers.descriptor_sets[frameIndex], ibl_buffers.descriptor_set,
+             repository_->material_data.resource_set,
           repository_->material_data.constants_set,
              mesh_buffers.descriptor_set};
-
-      gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
-                                     &descriptor_write);
-      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 4,
+      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 5,
                               descriptorSets, 0, nullptr);
-
-      viewport_.width = static_cast<float>(depth_image->getExtent2D().width);
-      viewport_.height = static_cast<float>(depth_image->getExtent2D().height);
-      scissor_.extent = depth_image->getExtent2D();
       vkCmdSetViewport(cmd, 0, 1, &viewport_);
       vkCmdSetScissor(cmd, 0, 1, &scissor_);
 
@@ -143,7 +97,7 @@ namespace gestalt {
 
       vkCmdEndRendering(cmd);
     }
-
+    /*
     void MeshletPass::prepare() {
       fmt::print("preparing deferred pass\n");
 

@@ -6,6 +6,7 @@
 #include "Gui.h"
 #include "RenderConfig.h"
 #include "Repository.h"
+#include "vk_pipelines.h"
 #include "vk_sync.h"
 
 namespace gestalt {
@@ -92,6 +93,9 @@ namespace gestalt {
         ImageAttachment scene_depth{.image = std::make_shared<TextureHandle>(TextureType::kDepth)};
         ImageAttachment shadow_map{.image = std::make_shared<TextureHandle>(TextureType::kDepth),
                                    .extent = {2048, 2048}};
+        ImageAttachment gbuffer1{.image = std::make_shared<TextureHandle>(TextureType::kColor)};
+        ImageAttachment gbuffer2{.image = std::make_shared<TextureHandle>(TextureType::kColor)};
+        ImageAttachment gbuffer3{.image = std::make_shared<TextureHandle>(TextureType::kColor)};
       } attachments_;
 
       std::vector<ImageAttachment> attachment_list_;
@@ -131,6 +135,8 @@ namespace gestalt {
       virtual void prepare() = 0;
 
       void begin_renderpass(VkCommandBuffer cmd);
+
+      PipelineBuilder create_pipeline();
 
       RenderPassDependency dependencies_{};
 

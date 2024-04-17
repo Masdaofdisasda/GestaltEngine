@@ -13,13 +13,6 @@ namespace gestalt {
           .size = sizeof(GpuDrawPushConstants),
       };
 
-      descriptor_writer writer;
-
-      VkPipeline pipeline_ = nullptr;
-      VkPipelineLayout pipeline_layout_ = nullptr;
-      std::vector<VkDescriptorSetLayout> descriptor_layouts_;
-      VkDescriptorSet descriptor_set_ = nullptr;
-
     public:
       void prepare() override;
       void cleanup() override;

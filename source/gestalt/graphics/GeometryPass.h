@@ -7,20 +7,7 @@
 
 namespace gestalt {
   namespace graphics {
-      /*
     class DeferredPass final : public RenderPass {
-      std::string vertex_shader_source_ = "../shaders/geometry.vert.spv";
-      std::string fragment_shader_source_ = "../shaders/geometry_deferred.frag.spv";
-      std::string name_ = "Deferred Pass";
-
-      ShaderPassDependencyInfo deps_ = {
-          .read_resources = {},
-          .write_resources
-          = {{"gbuffer_1_final", std::make_shared<ColorImageResource>("gbuffer_1", 1.f)},
-             {"gbuffer_2_final", std::make_shared<ColorImageResource>("gbuffer_2", 1.f)},
-             {"gbuffer_3_final", std::make_shared<ColorImageResource>("gbuffer_3", 1.f)},
-             {"gbuffer_depth", std::make_shared<DepthImageResource>("gbuffer_d", 1.f)}},
-      };
 
       VkPushConstantRange push_constant_range_{
           .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
@@ -28,31 +15,14 @@ namespace gestalt {
           .size = sizeof(GpuDrawPushConstants),
       };
 
-      VkViewport viewport_{
-          .x = 0,
-          .y = 0,
-          .minDepth = 0.f,
-          .maxDepth = 1.f,
-      };
-      VkRect2D scissor_{
-          .offset = {0, 0},
-      };
-
-      descriptor_writer writer;
-
-      VkPipeline pipeline_ = nullptr;
-      VkPipelineLayout pipeline_layout_ = nullptr;
-      std::vector<VkDescriptorSetLayout> descriptor_layouts_;
-      VkDescriptorSet descriptor_set_ = nullptr;
-
     public:
       void prepare() override;
       void cleanup() override;
       void execute(VkCommandBuffer cmd) override;
-      ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
-      std::string get_name() const override { return name_; }
+      std::string get_name() const override { return "Deferred Pass"; }
     };
 
+    /*
     class MeshletPass final : public RenderPass {
       std::string mesh_shader_source_ = "../shaders/geometry.mesh.spv";
       std::string task_shader_source_ = "../shaders/geometry.task.spv";
@@ -92,7 +62,6 @@ namespace gestalt {
       ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
       std::string get_name() const override { return name_; }
     };
-
     class TransparentPass final : public RenderPass {
       std::string vertex_shader_source_ = "../shaders/geometry.vert.spv";
       std::string fragment_shader_source_ = "../shaders/transparent.frag.spv";

@@ -39,11 +39,11 @@ namespace gestalt {
 
       render_passes_.push_back(
           std::make_unique<DirectionalDepthPass>());
-      /*
       render_passes_.push_back(std::make_unique<DeferredPass>());
 
       // render_passes_.push_back(std::make_unique<meshlet_pass>());
 
+      /*
       render_passes_.push_back(std::make_unique<LightingPass>());
       render_passes_.push_back(std::make_unique<SkyboxPass>()); */
       render_passes_.push_back(std::make_unique<InfiniteGridPass>());/*
@@ -255,7 +255,9 @@ namespace gestalt {
       attachment_list_.push_back(attachments_.scene_color);
       attachment_list_.push_back(attachments_.scene_depth);
       attachment_list_.push_back(attachments_.shadow_map);
-
+      attachment_list_.push_back(attachments_.gbuffer1);
+      attachment_list_.push_back(attachments_.gbuffer2);
+      attachment_list_.push_back(attachments_.gbuffer3);
     }
 
     VkShaderModule ResourceRegistry::get_shader(const ShaderProgram& shader_program) {
@@ -281,7 +283,7 @@ namespace gestalt {
     }
 
     void RenderPass::begin_renderpass(VkCommandBuffer cmd) {
-      VkRenderingAttachmentInfo colorAttachment = {};
+      std::vector<VkRenderingAttachmentInfo> colorAttachments;
       VkRenderingAttachmentInfo depthAttachment = {};
       VkExtent2D extent = {0, 0};
 
@@ -297,11 +299,11 @@ namespace gestalt {
 
             if (attachment.clear_operation == ImageClearOperation::kClear) {
               VkClearValue clear = {.color = {0.0f, 0.0f, 0.0f, 1.0f}};
-              colorAttachment
-                  = vkinit::attachment_info(image->imageView, &clear, image->getLayout());
+              colorAttachments.push_back(
+                  vkinit::attachment_info(image->imageView, &clear, image->getLayout()));
             } else {
-              colorAttachment
-                  = vkinit::attachment_info(image->imageView, nullptr, image->getLayout());
+              colorAttachments.push_back(
+                  vkinit::attachment_info(image->imageView, nullptr, image->getLayout()));
             }
           } else if (image->getType() == TextureType::kDepth) {
             if (extent.width == 0 && extent.height == 0) {
@@ -325,11 +327,56 @@ namespace gestalt {
       scissor_.extent.width = extent.width;
       scissor_.extent.height = extent.height;
 
-      const auto renderInfo
-          = vkinit::rendering_info(extent, colorAttachment.sType ? &colorAttachment : nullptr,
-                                   depthAttachment.sType ? &depthAttachment : nullptr);
+      VkRenderingInfo renderInfo;
+
+      if (colorAttachments.empty()) {
+               renderInfo = vkinit::rendering_info(extent, nullptr, depthAttachment.sType ? &depthAttachment : nullptr);
+      } else {
+               renderInfo = vkinit::rendering_info_for_gbuffer(extent, colorAttachments.data(), colorAttachments.size(),
+                                                              depthAttachment.sType ? &depthAttachment : nullptr);
+      }
 
       vkCmdBeginRendering(cmd, &renderInfo);
+    }
+
+    PipelineBuilder RenderPass::create_pipeline() {
+      VkShaderModule vertex_shader;
+      VkShaderModule fragment_shader;
+      std::vector<VkFormat> color_formats;
+
+      // add vertex and fragment shaders
+      for (auto& shader_dependency : dependencies_.shaders) {
+        if (shader_dependency.stage == ShaderStage::kVertex) {
+          vertex_shader = registry_->get_shader(shader_dependency);
+        } else if (shader_dependency.stage == ShaderStage::kFragment) {
+          fragment_shader = registry_->get_shader(shader_dependency);
+        }
+      }
+      auto builder = PipelineBuilder().set_shaders(vertex_shader, fragment_shader);
+
+      // add color and depth attachments
+      for (auto& attachment : dependencies_.image_attachments) {
+        if (attachment.usage == ImageUsageType::kWrite
+            || attachment.usage == ImageUsageType::kDepthStencilRead) {
+          std::shared_ptr<TextureHandle>& image = attachment.attachment.image;
+
+          if (image->getType() == TextureType::kColor) {
+            color_formats.push_back(image->getFormat());
+          } else if (image->getType() == TextureType::kDepth) {
+            builder.set_depth_format(image->getFormat());
+          }
+        }
+      }
+
+      if (!color_formats.empty()) {
+        if (color_formats.size() == 1) { // single color attachment
+                   builder.set_color_attachment_format(color_formats[0]);
+        } else { // multiple color attachments
+                   builder.set_color_attachment_formats(color_formats);
+        }
+      }
+
+      return builder.set_pipeline_layout(pipeline_layout_);
     }
 
     void VkSwapchain::init(const Gpu& gpu, const VkExtent3D& extent) {

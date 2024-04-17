@@ -117,15 +117,15 @@ namespace gestalt {
     }
     */
     void InfiniteGridPass::prepare() {
-      fmt::print("Preparing skybox pass\n");
+      fmt::print("Preparing {}\n", get_name());
 
       dependencies_ = RenderPassDependencyBuilder()
                           .add_shader(ShaderStage::kVertex, "infinite_grid.vert.spv")
                           .add_shader(ShaderStage::kFragment, "infinite_grid.frag.spv")
                           .add_image_attachment(registry_->attachments_.scene_color,
-                                                ImageUsageType::kWrite, ImageClearOperation::kClear)
+                                                ImageUsageType::kWrite)
                           .add_image_attachment(registry_->attachments_.scene_depth,
-                                                ImageUsageType::kWrite, ImageClearOperation::kClear)
+                                                ImageUsageType::kWrite)
                           .build();
 
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
@@ -143,30 +143,13 @@ namespace gestalt {
       VK_CHECK(vkCreatePipelineLayout(gpu_.device, &pipeline_layout_create_info, nullptr,
                                       &pipeline_layout_));
 
-      VkShaderModule vertex_shader;
-      VkShaderModule fragment_shader;
-      for (auto& shader_dependency : dependencies_.shaders) {
-        if (shader_dependency.stage == ShaderStage::kVertex) {
-          vertex_shader = registry_->get_shader(shader_dependency);
-        } else if (shader_dependency.stage == ShaderStage::kFragment) {
-          fragment_shader = registry_->get_shader(shader_dependency);
-        }
-      }
-
-      const auto color_image = registry_->attachments_.scene_color.image;
-      const auto depth_image = registry_->attachments_.scene_depth.image;
-
-      pipeline_ = PipelineBuilder()
-                      .set_shaders(vertex_shader, fragment_shader)
+      pipeline_ = create_pipeline()
                       .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
                       .set_polygon_mode(VK_POLYGON_MODE_FILL)
                       .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
                       .set_multisampling_none()
                       .disable_blending()
                       .enable_depthtest(false, VK_COMPARE_OP_LESS_OR_EQUAL)
-                      .set_color_attachment_format(color_image->getFormat())
-                      .set_depth_format(depth_image->getFormat())
-                      .set_pipeline_layout(pipeline_layout_)
                       .build_pipeline(gpu_.device);
     }
 

@@ -11,7 +11,7 @@ namespace gestalt {
     using namespace foundation;
 
     void DirectionalDepthPass::prepare() {
-      fmt::print("Preparing directional depth pass\n");
+      fmt::print("Preparing {}\n", get_name());
 
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
       const auto& light_data = repository_->get_buffer<LightBuffers>();
@@ -20,19 +20,12 @@ namespace gestalt {
       descriptor_layouts_.push_back(light_data.descriptor_layout);
       descriptor_layouts_.push_back(mesh_buffers.descriptor_layout);
 
-      dependencies_ = RenderPassDependencyBuilder().add_shader(ShaderStage::kVertex, "shadow_geometry.vert.spv")
-      .add_shader(ShaderStage::kFragment, "shadow_depth.frag.spv")
-      .add_image_attachment(registry_->attachments_.shadow_map, ImageUsageType::kWrite, ImageClearOperation::kClear).build();
-
-      VkShaderModule vertex_shader;
-      VkShaderModule fragment_shader;
-      for (auto& shader_dependency : dependencies_.shaders) {
-        if (shader_dependency.stage == ShaderStage::kVertex) {
-          vertex_shader = registry_->get_shader(shader_dependency);
-        } else if (shader_dependency.stage == ShaderStage::kFragment) {
-          fragment_shader = registry_->get_shader(shader_dependency);
-        }
-      }
+      dependencies_ = RenderPassDependencyBuilder()
+                          .add_shader(ShaderStage::kVertex, "shadow_geometry.vert.spv")
+                          .add_shader(ShaderStage::kFragment, "shadow_depth.frag.spv")
+                          .add_image_attachment(registry_->attachments_.shadow_map,
+                                                ImageUsageType::kWrite, ImageClearOperation::kClear)
+                          .build();
 
       VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
       mesh_layout_info.setLayoutCount = descriptor_layouts_.size();
@@ -42,26 +35,19 @@ namespace gestalt {
 
       VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
 
-      const auto depth_image = registry_->attachments_.shadow_map.image;
-
-      pipeline_ = PipelineBuilder()
-                      .set_shaders(vertex_shader, fragment_shader)
+      pipeline_ = create_pipeline()
                       .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
                       .set_polygon_mode(VK_POLYGON_MODE_FILL)
                       .set_cull_mode(VK_CULL_MODE_FRONT_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE)
                       .set_multisampling_none()
                       .disable_blending()
                       .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-                      .set_depth_format(depth_image->getFormat())
-                      .set_pipeline_layout(pipeline_layout_)
                       .build_pipeline(gpu_.device);
     }
 
     void DirectionalDepthPass::cleanup() { vkDestroyPipeline(gpu_.device, pipeline_, nullptr); }
 
     void DirectionalDepthPass::execute(VkCommandBuffer cmd) {
-      descriptor_set_
-          = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(1));
 
       begin_renderpass(cmd);
 
