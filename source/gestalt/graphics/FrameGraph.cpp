@@ -43,8 +43,8 @@ namespace gestalt {
 
       // render_passes_.push_back(std::make_unique<meshlet_pass>());
 
-      /*
       render_passes_.push_back(std::make_unique<LightingPass>());
+      /*
       render_passes_.push_back(std::make_unique<SkyboxPass>()); */
       render_passes_.push_back(std::make_unique<InfiniteGridPass>());/*
       render_passes_.push_back(std::make_unique<SsaoFilterPass>());
@@ -107,15 +107,19 @@ namespace gestalt {
            case ImageUsageType::kRead:
                vkutil::TransitionImage(dependency.attachment.image)
                 .toLayoutRead().andSubmitTo(cmd);
+          break;
           case ImageUsageType::kWrite:
               vkutil::TransitionImage(dependency.attachment.image)
                 .toLayoutWrite().andSubmitTo(cmd);
+          break;
           case ImageUsageType::kDepthStencilRead:
               vkutil::TransitionImage(dependency.attachment.image)
                 .toLayoutWrite().andSubmitTo(cmd);
+          break;
         }
       }
 
+      //fmt::print("Executing {}\n", render_passes_[id]->get_name());
       render_passes_[id]->execute(cmd);
 
       // increase attachment count TODO
@@ -288,10 +292,13 @@ namespace gestalt {
       VkExtent2D extent = {0, 0};
 
       for (auto& attachment : dependencies_.image_attachments) {
+
+        // only write and depth attachments are considered
         if (attachment.usage == ImageUsageType::kWrite
             || attachment.usage == ImageUsageType::kDepthStencilRead) {
           std::shared_ptr<TextureHandle>& image = attachment.attachment.image;
 
+          // if the image is a color attachment
           if (image->getType() == TextureType::kColor) {
             if (extent.width == 0 && extent.height == 0) {
               extent = {image->imageExtent.width, image->imageExtent.height};
@@ -305,6 +312,8 @@ namespace gestalt {
               colorAttachments.push_back(
                   vkinit::attachment_info(image->imageView, nullptr, image->getLayout()));
             }
+
+            // if the image is a depth attachment
           } else if (image->getType() == TextureType::kDepth) {
             if (extent.width == 0 && extent.height == 0) {
               extent = {image->imageExtent.width, image->imageExtent.height};
@@ -328,7 +337,6 @@ namespace gestalt {
       scissor_.extent.height = extent.height;
 
       VkRenderingInfo renderInfo;
-
       if (colorAttachments.empty()) {
                renderInfo = vkinit::rendering_info(extent, nullptr, depthAttachment.sType ? &depthAttachment : nullptr);
       } else {
