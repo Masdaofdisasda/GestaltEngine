@@ -10,7 +10,7 @@ namespace gestalt {
     class SkyboxPass final : public RenderPass {
     public:
       void prepare() override;
-      void cleanup() override;
+      void destroy() override;
       void execute(VkCommandBuffer cmd) override;
       std::string get_name() const override { return "Skybox Pass"; }
     };
@@ -26,7 +26,7 @@ namespace gestalt {
 
     public:
       void prepare() override;
-      void cleanup() override;
+      void destroy() override;
       void execute(VkCommandBuffer cmd) override;
       std::string get_name() const override { return "Infinite Grid Pass"; }
     };

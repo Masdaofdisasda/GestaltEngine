@@ -18,6 +18,7 @@ namespace gestalt {
       // make the vulkan instance, with basic debug features
       auto inst_ret = builder.set_app_name("Gestalt Application")
                           .request_validation_layers(use_validation_layers)
+                          .enable_extension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME)
                           .use_default_debug_messenger()
                           .require_api_version(1, 3, 0)
                           .build();

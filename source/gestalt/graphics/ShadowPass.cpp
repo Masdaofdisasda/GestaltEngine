@@ -40,7 +40,7 @@ namespace gestalt {
                       .build_pipeline(gpu_.device);
     }
 
-    void DirectionalDepthPass::cleanup() { vkDestroyPipeline(gpu_.device, pipeline_, nullptr); }
+    void DirectionalDepthPass::destroy() {  }
 
     void DirectionalDepthPass::execute(VkCommandBuffer cmd) {
 

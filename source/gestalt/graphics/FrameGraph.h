@@ -44,6 +44,7 @@ namespace gestalt {
       kRead,
       kWrite,
       kDepthStencilRead,  // used for depth testing
+      kCombined         // used for both read and write 
     };
 
     enum class ImageClearOperation {
@@ -102,12 +103,38 @@ namespace gestalt {
 
       struct RenderPassAttachments {
         ImageAttachment scene_color{.image = std::make_shared<TextureHandle>(TextureType::kColor)};
+        ImageAttachment final_color{.image = std::make_shared<TextureHandle>(TextureType::kColor)};
         ImageAttachment scene_depth{.image = std::make_shared<TextureHandle>(TextureType::kDepth)};
         ImageAttachment shadow_map{.image = std::make_shared<TextureHandle>(TextureType::kDepth),
                                    .extent = {2048, 2048}};
         ImageAttachment gbuffer1{.image = std::make_shared<TextureHandle>(TextureType::kColor)};
         ImageAttachment gbuffer2{.image = std::make_shared<TextureHandle>(TextureType::kColor)};
         ImageAttachment gbuffer3{.image = std::make_shared<TextureHandle>(TextureType::kColor)};
+
+        ImageAttachment bright_pass{.image = std::make_shared<TextureHandle>(TextureType::kColor),
+                                    .extent = {512, 512}};
+        ImageAttachment scene_bloom{.image = std::make_shared<TextureHandle>(TextureType::kColor),
+                                    .extent = {512, 512}};
+
+        ImageAttachment lum_64{.image = std::make_shared<TextureHandle>(TextureType::kColor),
+                               .extent = {64, 64}};
+        ImageAttachment lum_32{.image = std::make_shared<TextureHandle>(TextureType::kColor),
+                               .extent = {32, 32}};
+        ImageAttachment lum_16{.image = std::make_shared<TextureHandle>(TextureType::kColor),
+                               .extent = {16, 16}};
+        ImageAttachment lum_8{.image = std::make_shared<TextureHandle>(TextureType::kColor),
+                              .extent = {8, 8}};
+        ImageAttachment lum_4{.image = std::make_shared<TextureHandle>(TextureType::kColor),
+                              .extent = {4, 4}};
+        ImageAttachment lum_2{.image = std::make_shared<TextureHandle>(TextureType::kColor),
+                              .extent = {2, 2}};
+        ImageAttachment lum_1{.image = std::make_shared<TextureHandle>(TextureType::kColor),
+                              .extent = {1, 1}};
+
+        ImageAttachment lum_A{.image = std::make_shared<TextureHandle>(TextureType::kColor),
+                                .extent = {1, 1}};
+        ImageAttachment lum_B{.image = std::make_shared<TextureHandle>(TextureType::kColor),
+                                .extent = {1, 1}};
       } attachments_;
 
       std::vector<ImageAttachment> attachment_list_;
@@ -140,10 +167,11 @@ namespace gestalt {
 
       virtual void execute(VkCommandBuffer cmd) = 0;
       virtual std::string get_name() const = 0;
-      virtual void cleanup() = 0;
+      virtual void cleanup();
 
     protected:
       virtual void prepare() = 0;
+      virtual void destroy() = 0;
 
       void begin_renderpass(VkCommandBuffer cmd);
 

@@ -61,9 +61,8 @@ namespace gestalt {
       vkCmdEndRendering(cmd);
     }
 
-    void SkyboxPass::cleanup() {
-      vkDestroyPipelineLayout(gpu_.device, pipeline_layout_, nullptr);
-      vkDestroyPipeline(gpu_.device, pipeline_, nullptr);
+    void SkyboxPass::destroy() {
+
     }
 
     void InfiniteGridPass::prepare() {
@@ -125,9 +124,8 @@ namespace gestalt {
       vkCmdEndRendering(cmd);
     }
 
-    void InfiniteGridPass::cleanup() {
-      vkDestroyPipelineLayout(gpu_.device, pipeline_layout_, nullptr);
-      vkDestroyPipeline(gpu_.device, pipeline_, nullptr);
+    void InfiniteGridPass::destroy() {
+
     }
   }  // namespace graphics
 }  // namespace gestalt

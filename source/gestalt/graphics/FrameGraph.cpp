@@ -42,17 +42,18 @@ namespace gestalt {
       // render_passes_.push_back(std::make_unique<meshlet_pass>());
       render_passes_.push_back(std::make_unique<LightingPass>());
       render_passes_.push_back(std::make_unique<SkyboxPass>());
-      render_passes_.push_back(std::make_unique<InfiniteGridPass>()); /*
+      /*
        render_passes_.push_back(std::make_unique<SsaoFilterPass>());
        render_passes_.push_back(std::make_unique<SsaoBlurPass>());
-       render_passes_.push_back(std::make_unique<SsaoFinalPass>());
-       render_passes_.push_back(std::make_unique<BrightPass>());
-       render_passes_.push_back(std::make_unique<BloomBlurPass>());
-       render_passes_.push_back(std::make_unique<StreaksPass>());
+       render_passes_.push_back(std::make_unique<SsaoFinalPass>());*/
        render_passes_.push_back(std::make_unique<LuminancePass>());
        render_passes_.push_back(std::make_unique<LuminanceDownscalePass>());
        render_passes_.push_back(std::make_unique<LightAdaptationPass>());
+       render_passes_.push_back(std::make_unique<BrightPass>());
+       render_passes_.push_back(std::make_unique<BloomBlurPass>());
+      render_passes_.push_back(std::make_unique<InfiniteGridPass>());
        render_passes_.push_back(std::make_unique<TonemapPass>());
+      /*
        render_passes_.push_back(std::make_unique<DebugAabbPass>());*/
 
       for (int i = 0; i < kFrameOverlap; i++) {
@@ -111,7 +112,7 @@ namespace gestalt {
         }
       }
 
-      // fmt::print("Executing {}\n", render_passes_[id]->get_name());
+      //fmt::print("Executing {}\n", render_passes_[id]->get_name());
       render_passes_[id]->execute(cmd);
 
       // increase attachment count TODO
@@ -172,7 +173,7 @@ namespace gestalt {
       repository_->main_draw_context_.opaque_surfaces.clear();
       repository_->main_draw_context_.transparent_surfaces.clear();
 
-      const auto color_image = resource_registry_->attachments_.scene_color.image;
+      const auto color_image = resource_registry_->attachments_.final_color.image;
       const auto swapchain_image = swapchain_->swapchain_images[swapchain_image_index_];
 
       vkutil::TransitionImage(color_image)
@@ -247,11 +248,27 @@ namespace gestalt {
       gpu_ = gpu;
 
       attachment_list_.push_back(attachments_.scene_color);
+      attachment_list_.push_back(attachments_.final_color);
       attachment_list_.push_back(attachments_.scene_depth);
       attachment_list_.push_back(attachments_.shadow_map);
+
       attachment_list_.push_back(attachments_.gbuffer1);
       attachment_list_.push_back(attachments_.gbuffer2);
       attachment_list_.push_back(attachments_.gbuffer3);
+
+      attachment_list_.push_back(attachments_.bright_pass);
+      attachment_list_.push_back(attachments_.scene_bloom);
+
+      attachment_list_.push_back(attachments_.lum_64);
+      attachment_list_.push_back(attachments_.lum_32);
+      attachment_list_.push_back(attachments_.lum_16);
+      attachment_list_.push_back(attachments_.lum_8);
+      attachment_list_.push_back(attachments_.lum_4);
+      attachment_list_.push_back(attachments_.lum_2);
+      attachment_list_.push_back(attachments_.lum_1);
+
+      attachment_list_.push_back(attachments_.lum_A);
+      attachment_list_.push_back(attachments_.lum_B);
     }
 
     VkShaderModule ResourceRegistry::get_shader(const ShaderProgram& shader_program) {
@@ -274,6 +291,12 @@ namespace gestalt {
         vkDestroyShaderModule(gpu_.device, shader_module, nullptr);
       }
       shader_cache_.clear();
+    }
+
+    void RenderPass::cleanup() {
+          destroy();
+	  vkDestroyPipelineLayout(gpu_.device, pipeline_layout_, nullptr);
+	  vkDestroyPipeline(gpu_.device, pipeline_, nullptr);
     }
 
     void RenderPass::begin_renderpass(VkCommandBuffer cmd) {
@@ -384,9 +407,13 @@ namespace gestalt {
           .pNext = nullptr,
           .setLayoutCount = static_cast<uint32_t>(descriptor_layouts_.size()),
           .pSetLayouts = descriptor_layouts_.data(),
-          .pushConstantRangeCount = 1,
-          .pPushConstantRanges = &dependencies_.push_constant_range,
       };
+
+      if (dependencies_.push_constant_range.size != 0) {
+        pipeline_layout_create_info.pushConstantRangeCount = 1;
+        pipeline_layout_create_info.pPushConstantRanges = &dependencies_.push_constant_range;
+      }
+
 
       VK_CHECK(vkCreatePipelineLayout(gpu_.device, &pipeline_layout_create_info, nullptr,
                                       &pipeline_layout_));

@@ -48,7 +48,7 @@ namespace gestalt {
                       .build_pipeline(gpu_.device);
     }
 
-    void DeferredPass::cleanup() { vkDestroyPipeline(gpu_.device, pipeline_, nullptr); }
+    void DeferredPass::destroy() { }
 
     void DeferredPass::execute(VkCommandBuffer cmd) {
       begin_renderpass(cmd);

@@ -58,7 +58,7 @@ namespace gestalt {
                       .build_pipeline(gpu_.device);
     }
 
-    void LightingPass::cleanup() { vkDestroyPipeline(gpu_.device, pipeline_, nullptr); }
+    void LightingPass::destroy() {  }
 
     void LightingPass::execute(VkCommandBuffer cmd) {
       descriptor_set_

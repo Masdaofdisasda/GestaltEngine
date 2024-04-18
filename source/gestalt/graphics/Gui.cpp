@@ -625,7 +625,7 @@ namespace gestalt {
 
       if (ImGui::CollapsingHeader("HDR Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Checkbox("Enable HDR", &config.enable_hdr);
-        ImGui::SliderInt("Bloom Quality", &config.bloom_quality, 1, 4);
+        ImGui::SliderInt("Bloom Quality", &config.bloom_quality, 1, 9);
         const char* toneMappingOptions[]
             = {"Reinhard Extended", "Uncharted 2", "ACES approximation", "ACES fitted"};
         int currentOption = config.hdr.toneMappingOption;
