@@ -613,7 +613,7 @@ namespace gestalt {
                             VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT, false);
     }
 
-    void ResourceManager::create_color_frame_buffer(const std::shared_ptr<TextureHandle>& color_image) const {
+    void ResourceManager::create_color_frame_buffer(const std::shared_ptr<TextureHandle>& color_image, bool debug) const {
       assert(color_image->getType() == TextureType::kColor);
       // hardcoding the draw format to 32 bit float
       color_image->setFormat(VK_FORMAT_R16G16B16A16_SFLOAT);
@@ -625,6 +625,9 @@ namespace gestalt {
       drawImageUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
       drawImageUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
       drawImageUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
+      if (debug) {
+               drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+      }
 
       VkImageCreateInfo rimg_info
           = vkinit::image_create_info(color_image->getFormat(), drawImageUsages, extent);

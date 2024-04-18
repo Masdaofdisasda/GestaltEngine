@@ -61,6 +61,9 @@ namespace gestalt {
     };
     gui_actions_.get_render_config
         = [this]() -> graphics::RenderConfig& { return frame_graph_->get_config(); };
+    gui_actions_.get_debug_image = [this]() -> std::shared_ptr<foundation::TextureHandle> {
+           return frame_graph_->get_debug_image();
+    };
   }
 
   void RenderEngine::immediate_submit(std::function<void(VkCommandBuffer cmd)> function) {

@@ -115,6 +115,41 @@ namespace gestalt {
       //fmt::print("Executing {}\n", render_passes_[id]->get_name());
       render_passes_[id]->execute(cmd);
 
+      if ( render_passes_[id]->get_name() == "Luminance Pass" ) {
+        if (debug_texture_ != nullptr) return;
+
+        const auto copyImg = resource_registry_->attachments_.scene_color;
+        debug_texture_ = std::make_shared<foundation::TextureHandle>(copyImg.image->getType());
+        debug_texture_->imageExtent = copyImg.image->imageExtent;
+        resource_manager_->create_color_frame_buffer(debug_texture_, true);
+
+
+        vkutil::TransitionImage(copyImg.image)
+            .to(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+            .withSource(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)
+            .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
+            .andSubmitTo(cmd);
+        vkutil::TransitionImage(debug_texture_)
+            .to(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+            .withSource(VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0)
+            .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
+            .andSubmitTo(cmd);
+
+        vkutil::CopyImage(copyImg.image)
+            .toImage(debug_texture_)
+            .andSubmitTo(cmd);
+
+        vkutil::TransitionImage(debug_texture_)
+            .toLayoutRead()
+            .withSource(VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                        VK_ACCESS_2_TRANSFER_WRITE_BIT)  // Wait for the copy to finish
+            .andSubmitTo(cmd);
+
+        imgui_->set_descriptor_set(copyImg.image->imageView,
+                                   repository_->default_material_.linearSampler);
+      }
+
       // increase attachment count TODO
     }
 

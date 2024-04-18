@@ -20,6 +20,11 @@ namespace gestalt {
     using namespace gestalt::foundation;
     using namespace gestalt::graphics;
 
+    void Gui::set_descriptor_set(VkImageView image_view, VkSampler sampler) {
+      descriptor_set_ = ImGui_ImplVulkan_AddTexture(sampler, image_view,
+                                                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    }
+
     void Gui::init(Gpu& gpu, Window& window, VkFormat swapchainFormat,
                    const std::shared_ptr<Repository>& repository, GuiCapabilities& actions) {
       gpu_ = gpu;
@@ -51,6 +56,11 @@ namespace gestalt {
 
       VkDescriptorPool imguiPool;
       VK_CHECK(vkCreateDescriptorPool(gpu_.device, &pool_info, nullptr, &imguiPool));
+
+      descriptor_set_layout_ = DescriptorLayoutBuilder()
+                                   .add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                                VK_SHADER_STAGE_FRAGMENT_BIT)
+                                   .build(gpu_.device);
 
       // 2: initialize imgui library
 
@@ -87,15 +97,14 @@ namespace gestalt {
 
       // clear font textures from cpu data
       ImGui_ImplVulkan_DestroyFontsTexture();
-
     }
 
     void Gui::cleanup() {
       // add the destroy the imgui created structures
       // NOTE: i think ImGui_ImplVulkan_Shutdown() destroy the imguiPool
-      //deletion_service_.push(imguiPool);
-      //deletion_service_.push_function([this]() { ImGui::DestroyContext(); });
-      //deletion_service_.push_function([this]() { ImGui_ImplVulkan_Shutdown(); });
+      // deletion_service_.push(imguiPool);
+      // deletion_service_.push_function([this]() { ImGui::DestroyContext(); });
+      // deletion_service_.push_function([this]() { ImGui_ImplVulkan_Shutdown(); });
     }
 
     void Gui::draw(VkCommandBuffer cmd, const std::shared_ptr<TextureHandle>& swapchain) {
@@ -244,7 +253,7 @@ namespace gestalt {
 
           if (ImGui::BeginMenu("Add Camera")) {
             if (ImGui::MenuItem("Free Fly Camera")) {
-              //actions_.add_camera();
+              // actions_.add_camera();
             }
             if (ImGui::MenuItem("Orbit Camera")) {
               // Code to add an Orbit Camera
@@ -457,6 +466,14 @@ namespace gestalt {
       }
 
       menu_bar();
+
+      const auto debugImg = actions_.get_debug_image();
+      if (debugImg != nullptr) {
+        const auto extend = actions_.get_debug_image()->getExtent2D();
+        ImGui::Begin("Texture Window");
+        ImGui::Image(descriptor_set_, ImVec2(extend.width, extend.height));
+        ImGui::End();
+      }
 
       if (show_scene_hierarchy_) {
         scene_graph();
@@ -837,9 +854,9 @@ namespace gestalt {
               }
             }
           }
-          
+
           if (ImGui::CollapsingHeader("Normal", ImGuiTreeNodeFlags_DefaultOpen)) {
-              // normal factor? 
+            // normal factor?
             bool use_texture = (config.constants.flags & kNormalTextureFlag) != 0;
 
             if (ImGui::Checkbox("Use Normal Texture", &use_texture)) {
@@ -857,7 +874,8 @@ namespace gestalt {
             if (ImGui::ColorPicker3("Emissive Color", &config.constants.emissiveColor.x)) {
               material.is_dirty = true;
             }
-            if (ImGui::SliderFloat("Emissive Strength", &config.constants.emissiveStrength, 0.0f, 10.0f, "%.2f")) {
+            if (ImGui::SliderFloat("Emissive Strength", &config.constants.emissiveStrength, 0.0f,
+                                   10.0f, "%.2f")) {
               material.is_dirty = true;
             }
             bool use_texture = (config.constants.flags & kEmissiveTextureFlag) != 0;
@@ -874,8 +892,8 @@ namespace gestalt {
           }
 
           if (ImGui::CollapsingHeader("Occlusion", ImGuiTreeNodeFlags_DefaultOpen)) {
-            if (ImGui::DragFloat("Occlusion Strength", &config.constants.occlusionStrength, 0.01f, 0.0f,
-                             10.0f, "%.2f")) {
+            if (ImGui::DragFloat("Occlusion Strength", &config.constants.occlusionStrength, 0.01f,
+                                 0.0f, 10.0f, "%.2f")) {
               material.is_dirty = true;
             }
             bool use_texture = (config.constants.flags & kOcclusionTextureFlag) != 0;
@@ -898,7 +916,7 @@ namespace gestalt {
             material.is_dirty = true;
           }
           if (ImGui::DragFloat("Alpha Cutoff", &config.constants.alpha_cutoff, 0.01f, 0.0f, 1.0f,
-                           "%.2f")) {
+                               "%.2f")) {
             material.is_dirty = true;
           }
 

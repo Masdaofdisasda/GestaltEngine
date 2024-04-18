@@ -234,6 +234,8 @@ namespace gestalt {
 
       std::vector<std::unique_ptr<RenderPass>> render_passes_;
 
+      std::shared_ptr<TextureHandle> debug_texture_;
+
       bool resize_requested_{false};
       uint32_t swapchain_image_index_{0};
       std::vector<FrameData> frames_{kFrameOverlap};
@@ -241,8 +243,6 @@ namespace gestalt {
       void present(VkCommandBuffer cmd);
       FrameData& get_current_frame() { return frames_[gpu_.get_current_frame()]; }
       application::Window& get_window() { return window_; }
-
-      std::string get_final_transformation(const std::string& original);
       void create_resources();
       VkCommandBuffer start_draw();
       void execute(size_t id, VkCommandBuffer cmd);
@@ -261,6 +261,9 @@ namespace gestalt {
       vk_sync& get_sync() const { return *sync_; }
       VkCommand& get_commands() const { return *commands_; }
       VkFormat get_swapchain_format() const { return swapchain_->swapchain_image_format; }
+      std::shared_ptr<TextureHandle> get_debug_image() const {
+          return debug_texture_;
+      }
     };
   }  // namespace graphics
 }  // namespace gestalt

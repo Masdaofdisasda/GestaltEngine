@@ -86,7 +86,8 @@ namespace gestalt {
       std::optional<TextureHandle> load_image(const std::string& filepath);
       void load_and_process_cubemap(const std::string& file_path);
       TextureHandle create_cubemap_from_HDR(std::vector<float>& image_data, int h, int w);
-      void create_color_frame_buffer(const std::shared_ptr<TextureHandle>& color_image) const;
+      void create_color_frame_buffer(const std::shared_ptr<TextureHandle>& color_image,
+                                     bool debug = false) const;
       void create_depth_frame_buffer(std::shared_ptr<TextureHandle>& depth_image) const;
       TextureHandle create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
                                               bool mipmapped = false, bool cubemap = false);

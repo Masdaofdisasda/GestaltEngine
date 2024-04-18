@@ -22,6 +22,7 @@ namespace gestalt {
       std::function<foundation::EngineStats&()> get_stats;
       std::function<ComponentFactory&()> get_component_factory;
       std::function<graphics::RenderConfig&()> get_render_config;
+      std::function<std::shared_ptr<foundation::TextureHandle>()> get_debug_image;
     };
 
     class Gui {
@@ -64,6 +65,11 @@ namespace gestalt {
       void check_file_dialog();
 
     public:
+      VkDescriptorSet descriptor_set_;
+      VkDescriptorSetLayout descriptor_set_layout_;
+
+      void set_descriptor_set(VkImageView image_view, VkSampler sampler);
+
       void init(graphics::Gpu& gpu, Window& window,
                 VkFormat swapchainFormat, const std::shared_ptr<foundation::Repository>& repository, GuiCapabilities
                 & actions);
