@@ -68,7 +68,7 @@ namespace gestalt {
       VkDescriptorSet descriptor_set_;
       VkDescriptorSetLayout descriptor_set_layout_;
 
-      void set_descriptor_set(VkImageView image_view, VkSampler sampler);
+      void set_debug_texture(VkImageView image_view, VkSampler sampler);
 
       void init(graphics::Gpu& gpu, Window& window,
                 VkFormat swapchainFormat, const std::shared_ptr<foundation::Repository>& repository, GuiCapabilities

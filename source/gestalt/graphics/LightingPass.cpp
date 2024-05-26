@@ -1,4 +1,4 @@
-﻿#include "LightingPass.h"
+﻿#include "RenderPass.h"
 
 #include "vk_images.h"
 #include "vk_initializers.h"
@@ -35,13 +35,13 @@ namespace gestalt {
           = RenderPassDependencyBuilder()
                 .add_shader(ShaderStage::kVertex, "fullscreen.vert.spv")
                 .add_shader(ShaderStage::kFragment, "pbr_lighting.frag.spv")
-                .add_image_attachment(registry_->attachments_.gbuffer1, ImageUsageType::kRead)
-                .add_image_attachment(registry_->attachments_.gbuffer2, ImageUsageType::kRead)
-                .add_image_attachment(registry_->attachments_.gbuffer3, ImageUsageType::kRead)
-                .add_image_attachment(registry_->attachments_.scene_depth, ImageUsageType::kRead)
-                .add_image_attachment(registry_->attachments_.shadow_map, ImageUsageType::kRead)
-                .add_image_attachment(registry_->attachments_.scene_color, ImageUsageType::kWrite,
-                                      ImageClearOperation::kClear)
+                .add_image_attachment(registry_->attachments_.gbuffer1, ImageUsageType::kRead, 1)
+                .add_image_attachment(registry_->attachments_.gbuffer2, ImageUsageType::kRead, 1)
+                .add_image_attachment(registry_->attachments_.gbuffer3, ImageUsageType::kRead, 1)
+                .add_image_attachment(registry_->attachments_.shadow_map, ImageUsageType::kRead, 1)
+                .add_image_attachment(registry_->attachments_.scene_color, ImageUsageType::kWrite, 0)
+                .add_image_attachment(registry_->attachments_.scene_depth, ImageUsageType::kRead,
+                                      1)
                 .set_push_constant_range(sizeof(RenderConfig::LightingParams),
                                          VK_SHADER_STAGE_FRAGMENT_BIT)
                 .build();

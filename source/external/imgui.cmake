@@ -9,6 +9,7 @@ file(GLOB IMGUI_SOURCES ${imgui_SOURCE_DIR}/*.cpp
 )
 
 add_library(DearImGui ${IMGUI_SOURCES})
+#add_library(imgui::imgui ALIAS DearImGui) # required for ImNodeFlow
 
 target_include_directories(DearImGui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
 
@@ -18,11 +19,16 @@ target_include_directories(DearImGui PRIVATE "${Vulkan_INCLUDE_DIRS}")
 
 set_property(TARGET DearImGui PROPERTY FOLDER "External/ImGUI")
 
-# Add ImGuiNodeEditor CPMAddPackage( NAME ImGuiNodeEditor GITHUB_REPOSITORY thedmd/imgui-node-editor
-# GIT_TAG v0.9.3 DOWNLOAD_ONLY YES )
+# Add ImNodeFlow
+#CPMAddPackage(
+#  NAME ImNodeFlow
+#  GITHUB_REPOSITORY Fattorino/ImNodeFlow
+#  GIT_TAG v1.2.1
+#  SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/includes/ImNodeFlow"
+#)
 
-# Add ImPlot CPMAddPackage( NAME implot GITHUB_REPOSITORY epezent/implot GIT_TAG v0.13 # Specify a
-# specific commit or tag if needed )
+#target_include_directories(ImNodeFlow PRIVATE "${imgui_SOURCE_DIR}")
+#set_property(TARGET ImNodeFlow PROPERTY FOLDER "External/ImGUI")
 
 # Add ImGuiFileDialog
 CPMAddPackage(
@@ -34,7 +40,7 @@ CPMAddPackage(
 target_include_directories(ImGuiFileDialog PRIVATE "${imgui_SOURCE_DIR}")
 set_property(TARGET ImGuiFileDialog PROPERTY FOLDER "External/ImGUI")
 
-# Add ImGuizmo TODO needs older ImGui version
+# Add ImGuizmo
 CPMAddPackage(
   NAME ImGuizmo
   GITHUB_REPOSITORY CedricGuillemet/ImGuizmo

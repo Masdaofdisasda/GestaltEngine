@@ -57,13 +57,6 @@ namespace gestalt {
         float max_luminance{10.0f};
       } light_adaptation{};
 
-      struct StreaksParams {
-        float intensity{.04f};
-        float attenuation{1.f};
-        int streak_samples{6};
-        int num_streaks{4};
-      } streaks{};
-
       struct LightingParams {
         glm::mat4 invViewProj;
         int debug_mode{0};

@@ -1,5 +1,5 @@
 ﻿#pragma once
-#include "ShadowPass.h"
+#include "RenderPass.h"
 
 #include "vk_images.h"
 #include "vk_initializers.h"
@@ -24,7 +24,7 @@ namespace gestalt {
                           .add_shader(ShaderStage::kVertex, "shadow_geometry.vert.spv")
                           .add_shader(ShaderStage::kFragment, "shadow_depth.frag.spv")
                           .add_image_attachment(registry_->attachments_.shadow_map,
-                                                ImageUsageType::kWrite, ImageClearOperation::kClear)
+                                                ImageUsageType::kWrite, 0, ImageClearOperation::kClear)
                 .set_push_constant_range(sizeof(GpuDrawPushConstants), VK_SHADER_STAGE_VERTEX_BIT)
                           .build();
 

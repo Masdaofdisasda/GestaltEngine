@@ -1,4 +1,4 @@
-﻿#include "GeometryPass.h"
+﻿#include "RenderPass.h"
 
 #include "vk_images.h"
 #include "vk_initializers.h"
@@ -25,13 +25,10 @@ namespace gestalt {
           = RenderPassDependencyBuilder()
                 .add_shader(ShaderStage::kVertex, "geometry.vert.spv")
                 .add_shader(ShaderStage::kFragment, "geometry_deferred.frag.spv")
-                .add_image_attachment(registry_->attachments_.gbuffer1, ImageUsageType::kWrite,
-                                      ImageClearOperation::kClear)
-                .add_image_attachment(registry_->attachments_.gbuffer2, ImageUsageType::kWrite,
-                                      ImageClearOperation::kClear)
-                .add_image_attachment(registry_->attachments_.gbuffer3, ImageUsageType::kWrite,
-                                      ImageClearOperation::kClear)
-                .add_image_attachment(registry_->attachments_.scene_depth, ImageUsageType::kWrite,
+                .add_image_attachment(registry_->attachments_.gbuffer1, ImageUsageType::kWrite)
+                .add_image_attachment(registry_->attachments_.gbuffer2, ImageUsageType::kWrite)
+                .add_image_attachment(registry_->attachments_.gbuffer3, ImageUsageType::kWrite)
+                .add_image_attachment(registry_->attachments_.scene_depth, ImageUsageType::kWrite, 0,
                                       ImageClearOperation::kClear)
                 .set_push_constant_range(sizeof(GpuDrawPushConstants), VK_SHADER_STAGE_VERTEX_BIT)
                 .build();

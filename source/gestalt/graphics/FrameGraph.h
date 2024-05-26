@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "Gui.h"
@@ -38,13 +39,14 @@ namespace gestalt {
       std::shared_ptr<TextureHandle> image;
       float scale = 1.0f;
       VkExtent3D extent = {0, 0, 1};
+      uint32_t version = 0;
     };
 
     enum class ImageUsageType {
       kRead,
       kWrite,
       kDepthStencilRead,  // used for depth testing
-      kCombined         // used for both read and write 
+      kCombined           // used for both read and write
     };
 
     enum class ImageClearOperation {
@@ -56,6 +58,7 @@ namespace gestalt {
       ImageAttachment attachment;
       ImageUsageType usage;
       ImageClearOperation clear_operation;
+      uint32_t required_version = 0;
     };
 
     struct RenderPassDependency {
@@ -75,9 +78,11 @@ namespace gestalt {
       }
       RenderPassDependencyBuilder& add_image_attachment(const ImageAttachment& attachment,
                                                         const ImageUsageType usage,
+                                                        const uint32_t required_version = 0,
                                                         const ImageClearOperation clear_operation
                                                         = ImageClearOperation::kDontCare) {
-        dependency_.image_attachments.push_back({attachment, usage, clear_operation});
+        dependency_.image_attachments.push_back(
+            {attachment, usage, clear_operation, required_version});
         return *this;
       }
       RenderPassDependencyBuilder& set_push_constant_range(uint32_t size,
@@ -113,7 +118,7 @@ namespace gestalt {
 
         ImageAttachment bright_pass{.image = std::make_shared<TextureHandle>(TextureType::kColor),
                                     .extent = {512, 512}};
-        ImageAttachment scene_bloom{.image = std::make_shared<TextureHandle>(TextureType::kColor),
+        ImageAttachment blur_y{.image = std::make_shared<TextureHandle>(TextureType::kColor),
                                     .extent = {512, 512}};
 
         ImageAttachment lum_64{.image = std::make_shared<TextureHandle>(TextureType::kColor),
@@ -132,9 +137,9 @@ namespace gestalt {
                               .extent = {1, 1}};
 
         ImageAttachment lum_A{.image = std::make_shared<TextureHandle>(TextureType::kColor),
-                                .extent = {1, 1}};
+                              .extent = {1, 1}};
         ImageAttachment lum_B{.image = std::make_shared<TextureHandle>(TextureType::kColor),
-                                .extent = {1, 1}};
+                              .extent = {1, 1}};
       } attachments_;
 
       std::vector<ImageAttachment> attachment_list_;
@@ -217,22 +222,47 @@ namespace gestalt {
       void destroy_swapchain() const;
     };
 
+    class FrameGraphWIP {
+    public:
+      explicit FrameGraphWIP(const std::vector<std::shared_ptr<RenderPass>>& render_passes);
+
+      void AddEdge(const std::shared_ptr<RenderPass>& u, const std::shared_ptr<RenderPass>& v);
+
+      // Topological Sort using Kahn's Algorithm
+      void topologicalSort();
+
+      [[nodiscard]] std::vector<std::shared_ptr<RenderPass>> get_sorted_passes() const;
+
+    private:
+      struct ImageWriter {
+        std::shared_ptr<RenderPass> pass;
+        uint32_t version;
+      };
+
+      std::unordered_map<std::shared_ptr<TextureHandle>, ImageWriter> writer_map;
+      std::unordered_map<std::shared_ptr<RenderPass>,
+                         std::unordered_set<std::shared_ptr<RenderPass>>>
+          adj_;
+      std::unordered_map<std::shared_ptr<RenderPass>, int> in_degree_;
+      std::vector<std::shared_ptr<RenderPass>> sorted_passes_;
+    };
+
     constexpr unsigned char kFrameOverlap = 2;
 
     class FrameGraph {
       Gpu gpu_ = {};
       application::Window window_;
       std::shared_ptr<ResourceManager> resource_manager_;
-      std::shared_ptr<foundation::Repository> repository_;
+      std::shared_ptr<Repository> repository_;
       std::shared_ptr<application::Gui> imgui_;
 
       std::shared_ptr<ResourceRegistry> resource_registry_ = std::make_shared<ResourceRegistry>();
 
-      std::shared_ptr<VkSwapchain> swapchain_ = std::make_unique<VkSwapchain>();
+      std::shared_ptr<VkSwapchain> swapchain_ = std::make_shared<VkSwapchain>();
       std::unique_ptr<VkCommand> commands_ = std::make_unique<VkCommand>();
       std::unique_ptr<vk_sync> sync_ = std::make_unique<vk_sync>();
 
-      std::vector<std::unique_ptr<RenderPass>> render_passes_;
+      std::vector<std::shared_ptr<RenderPass>> render_passes_;
 
       std::shared_ptr<TextureHandle> debug_texture_;
 
@@ -245,14 +275,13 @@ namespace gestalt {
       application::Window& get_window() { return window_; }
       void create_resources();
       VkCommandBuffer start_draw();
-      void execute(size_t id, VkCommandBuffer cmd);
+      void execute(const std::shared_ptr<RenderPass>& render_pass, VkCommandBuffer cmd);
 
     public:
       void init(const Gpu& gpu, const application::Window& window,
                 const std::shared_ptr<ResourceManager>& resource_manager,
                 const std::shared_ptr<foundation::Repository>& repository,
                 const std::shared_ptr<application::Gui>& imgui_gui);
-
       void execute_passes();
 
       void cleanup();
@@ -261,9 +290,7 @@ namespace gestalt {
       vk_sync& get_sync() const { return *sync_; }
       VkCommand& get_commands() const { return *commands_; }
       VkFormat get_swapchain_format() const { return swapchain_->swapchain_image_format; }
-      std::shared_ptr<TextureHandle> get_debug_image() const {
-          return debug_texture_;
-      }
+      std::shared_ptr<TextureHandle> get_debug_image() const { return debug_texture_; }
     };
   }  // namespace graphics
 }  // namespace gestalt

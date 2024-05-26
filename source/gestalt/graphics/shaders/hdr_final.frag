@@ -104,7 +104,7 @@ vec3 linearToSrgb(vec3 linearColor) {
 void main() {
     vec3 sceneColor = texture(texScene, uv).rgb;
     vec3 bloomColor = texture(texBloom, uv).rgb;
-	vec3 avgLuminance = max(texture(texLuminance, vec2(0.5, 0.5)).rgb, vec3(0.0001));
+	vec3 avgLuminance = max(texture(texLuminance, vec2(0.5, 0.5)).rrr, vec3(0.0000001));
 
     vec3 exposureAdjustment = 1.0 / avgLuminance;
     sceneColor *= exposureAdjustment * params.exposure;

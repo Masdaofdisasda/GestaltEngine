@@ -1,4 +1,4 @@
-﻿#include "SkyboxPass.h"
+﻿#include "RenderPass.h"
 
 #include "vk_images.h"
 #include "vk_initializers.h"
@@ -15,8 +15,8 @@ namespace gestalt {
           = RenderPassDependencyBuilder()
                 .add_shader(ShaderStage::kVertex, "skybox.vert.spv")
                 .add_shader(ShaderStage::kFragment, "skybox.frag.spv")
-                .add_image_attachment(registry_->attachments_.scene_color, ImageUsageType::kWrite)
-                .add_image_attachment(registry_->attachments_.scene_depth, ImageUsageType::kWrite)
+                .add_image_attachment(registry_->attachments_.scene_color, ImageUsageType::kWrite, 1)
+                .add_image_attachment(registry_->attachments_.scene_depth, ImageUsageType::kWrite, 1)
                 .set_push_constant_range(sizeof(RenderConfig::SkyboxParams),
                                          VK_SHADER_STAGE_FRAGMENT_BIT)
                 .build();
@@ -72,24 +72,16 @@ namespace gestalt {
           = RenderPassDependencyBuilder()
                 .add_shader(ShaderStage::kVertex, "infinite_grid.vert.spv")
                 .add_shader(ShaderStage::kFragment, "infinite_grid.frag.spv")
-                .add_image_attachment(registry_->attachments_.scene_color, ImageUsageType::kWrite)
-                .add_image_attachment(registry_->attachments_.scene_depth, ImageUsageType::kWrite)
+                .add_image_attachment(registry_->attachments_.scene_color, ImageUsageType::kWrite, 1)
+                .add_image_attachment(registry_->attachments_.scene_depth, ImageUsageType::kWrite, 1)
+      .set_push_constant_range( sizeof(RenderConfig::GridParams),
+                               VK_SHADER_STAGE_FRAGMENT_BIT)
                 .build();
 
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
       descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
 
-      VkPipelineLayoutCreateInfo pipeline_layout_create_info{
-          .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-          .pNext = nullptr,
-          .setLayoutCount = static_cast<uint32_t>(descriptor_layouts_.size()),
-          .pSetLayouts = descriptor_layouts_.data(),
-          .pushConstantRangeCount = 1,
-          .pPushConstantRanges = &push_constant_range,
-      };
-
-      VK_CHECK(vkCreatePipelineLayout(gpu_.device, &pipeline_layout_create_info, nullptr,
-                                      &pipeline_layout_));
+      create_pipeline_layout();
 
       pipeline_ = create_pipeline()
                       .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)

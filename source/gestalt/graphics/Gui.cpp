@@ -20,7 +20,12 @@ namespace gestalt {
     using namespace gestalt::foundation;
     using namespace gestalt::graphics;
 
-    void Gui::set_descriptor_set(VkImageView image_view, VkSampler sampler) {
+    void Gui::set_debug_texture(VkImageView image_view, VkSampler sampler) {
+
+      if (descriptor_set_ != nullptr) {
+        ImGui_ImplVulkan_RemoveTexture(descriptor_set_);
+      }
+
       descriptor_set_ = ImGui_ImplVulkan_AddTexture(sampler, image_view,
                                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
@@ -658,13 +663,6 @@ namespace gestalt {
         ImGui::ColorPicker4("Lift", &config.hdr.lift[0], ImGuiColorEditFlags_Float);
         ImGui::ColorPicker4("Gamma", &config.hdr.gamma[0], ImGuiColorEditFlags_Float);
         ImGui::ColorPicker4("Gain", &config.hdr.gain[0], ImGuiColorEditFlags_Float);
-      }
-
-      if (ImGui::CollapsingHeader("Streak Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::SliderFloat("Intensity", &config.streaks.intensity, 0.0f, 2.0f);
-        ImGui::SliderFloat("Attenuation", &config.streaks.attenuation, 0.0f, 2.0f);
-        ImGui::SliderInt("Streak Samples", &config.streaks.streak_samples, 1, 10);
-        ImGui::SliderInt("Number of Streaks", &config.streaks.num_streaks, 1, 10);
       }
     }
 

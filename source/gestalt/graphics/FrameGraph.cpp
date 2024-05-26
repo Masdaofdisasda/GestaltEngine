@@ -7,12 +7,8 @@
 #include <tracy/Tracy.hpp>
 
 #include "Gui.h"
-#include "GeometryPass.h"
-#include "HdrPass.h"
-#include "LightingPass.h"
+#include "RenderPass.h"
 #include "Repository.h"
-#include "ShadowPass.h"
-#include "SkyboxPass.h"
 #include "SsaoPass.h"
 #include "VkBootstrap.h"
 #include "vk_images.h"
@@ -23,7 +19,7 @@ namespace gestalt {
   namespace graphics {
     void FrameGraph::init(const Gpu& gpu, const application::Window& window,
                           const std::shared_ptr<ResourceManager>& resource_manager,
-                          const std::shared_ptr<foundation::Repository>& repository,
+                          const std::shared_ptr<Repository>& repository,
                           const std::shared_ptr<application::Gui>& imgui_gui) {
       gpu_ = gpu;
       window_ = window;
@@ -37,22 +33,22 @@ namespace gestalt {
 
       resource_registry_->init(gpu_);
 
-      render_passes_.push_back(std::make_unique<DirectionalDepthPass>());
-      render_passes_.push_back(std::make_unique<DeferredPass>());
+      render_passes_.push_back(std::make_shared<DirectionalDepthPass>());
+      render_passes_.push_back(std::make_shared<DeferredPass>());
       // render_passes_.push_back(std::make_unique<meshlet_pass>());
-      render_passes_.push_back(std::make_unique<LightingPass>());
-      render_passes_.push_back(std::make_unique<SkyboxPass>());
+      render_passes_.push_back(std::make_shared<LightingPass>());
+      render_passes_.push_back(std::make_shared<SkyboxPass>());
       /*
        render_passes_.push_back(std::make_unique<SsaoFilterPass>());
        render_passes_.push_back(std::make_unique<SsaoBlurPass>());
        render_passes_.push_back(std::make_unique<SsaoFinalPass>());*/
-       render_passes_.push_back(std::make_unique<LuminancePass>());
-       render_passes_.push_back(std::make_unique<LuminanceDownscalePass>());
-       render_passes_.push_back(std::make_unique<LightAdaptationPass>());
-       render_passes_.push_back(std::make_unique<BrightPass>());
-       render_passes_.push_back(std::make_unique<BloomBlurPass>());
-      render_passes_.push_back(std::make_unique<InfiniteGridPass>());
-       render_passes_.push_back(std::make_unique<TonemapPass>());
+      render_passes_.push_back(std::make_shared<LuminancePass>());
+      render_passes_.push_back(std::make_shared<LuminanceDownscalePass>());
+      render_passes_.push_back(std::make_shared<LightAdaptationPass>());
+      render_passes_.push_back(std::make_shared<BrightPass>());
+      render_passes_.push_back(std::make_shared<BloomBlurPass>());
+      render_passes_.push_back(std::make_shared<InfiniteGridPass>());
+      render_passes_.push_back(std::make_shared<TonemapPass>());
       /*
        render_passes_.push_back(std::make_unique<DebugAabbPass>());*/
 
@@ -95,8 +91,8 @@ namespace gestalt {
       }
     }
 
-    void FrameGraph::execute(size_t id, VkCommandBuffer cmd) {
-      auto renderDependencies = render_passes_.at(id)->get_dependencies();
+    void FrameGraph::execute(const std::shared_ptr<RenderPass>& render_pass, VkCommandBuffer cmd) {
+      auto renderDependencies = render_pass->get_dependencies();
 
       for (auto& dependency : renderDependencies.image_attachments) {
         switch (dependency.usage) {
@@ -105,24 +101,28 @@ namespace gestalt {
             break;
           case ImageUsageType::kWrite:
             vkutil::TransitionImage(dependency.attachment.image).toLayoutWrite().andSubmitTo(cmd);
+            dependency.attachment.version++;
             break;
           case ImageUsageType::kDepthStencilRead:
             vkutil::TransitionImage(dependency.attachment.image).toLayoutWrite().andSubmitTo(cmd);
             break;
+          case ImageUsageType::kCombined:
+            dependency.attachment.version++;
+            break;
+
         }
       }
 
       //fmt::print("Executing {}\n", render_passes_[id]->get_name());
-      render_passes_[id]->execute(cmd);
+      render_pass->execute(cmd);
 
-      if ( render_passes_[id]->get_name() == "Luminance Pass" ) {
+      if (false && render_pass->get_name() == "Bloom Blur Pass") {
         if (debug_texture_ != nullptr) return;
 
-        const auto copyImg = resource_registry_->attachments_.scene_color;
+        const auto copyImg = resource_registry_->attachments_.bright_pass;
         debug_texture_ = std::make_shared<foundation::TextureHandle>(copyImg.image->getType());
         debug_texture_->imageExtent = copyImg.image->imageExtent;
         resource_manager_->create_color_frame_buffer(debug_texture_, true);
-
 
         vkutil::TransitionImage(copyImg.image)
             .to(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
@@ -136,9 +136,7 @@ namespace gestalt {
             .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
             .andSubmitTo(cmd);
 
-        vkutil::CopyImage(copyImg.image)
-            .toImage(debug_texture_)
-            .andSubmitTo(cmd);
+        vkutil::CopyImage(copyImg.image).toImage(debug_texture_).andSubmitTo(cmd);
 
         vkutil::TransitionImage(debug_texture_)
             .toLayoutRead()
@@ -146,11 +144,9 @@ namespace gestalt {
                         VK_ACCESS_2_TRANSFER_WRITE_BIT)  // Wait for the copy to finish
             .andSubmitTo(cmd);
 
-        imgui_->set_descriptor_set(copyImg.image->imageView,
-                                   repository_->default_material_.linearSampler);
+        imgui_->set_debug_texture(copyImg.image->imageView,
+                                  repository_->default_material_.linearSampler);
       }
-
-      // increase attachment count TODO
     }
 
     bool FrameGraph::acquire_next_image() {
@@ -185,9 +181,9 @@ namespace gestalt {
     }
 
     void FrameGraph::execute_passes() {
-      // create_resources();
 
-      // build_graph();
+      FrameGraphWIP frame_graph{render_passes_};
+      frame_graph.topologicalSort();
 
       if (resize_requested_) {
         swapchain_->resize_swapchain(window_);
@@ -200,9 +196,9 @@ namespace gestalt {
 
       VkCommandBuffer cmd = start_draw();
 
-      for (size_t i = 0; i < render_passes_.size(); i++) {
+      for (auto& renderpass: render_passes_) {
         ZoneScopedN("Execute Pass");
-        execute(i, cmd);
+        execute(renderpass, cmd);
       }
 
       repository_->main_draw_context_.opaque_surfaces.clear();
@@ -292,7 +288,7 @@ namespace gestalt {
       attachment_list_.push_back(attachments_.gbuffer3);
 
       attachment_list_.push_back(attachments_.bright_pass);
-      attachment_list_.push_back(attachments_.scene_bloom);
+      attachment_list_.push_back(attachments_.blur_y);
 
       attachment_list_.push_back(attachments_.lum_64);
       attachment_list_.push_back(attachments_.lum_32);
@@ -329,9 +325,9 @@ namespace gestalt {
     }
 
     void RenderPass::cleanup() {
-          destroy();
-	  vkDestroyPipelineLayout(gpu_.device, pipeline_layout_, nullptr);
-	  vkDestroyPipeline(gpu_.device, pipeline_, nullptr);
+      destroy();
+      vkDestroyPipelineLayout(gpu_.device, pipeline_layout_, nullptr);
+      vkDestroyPipeline(gpu_.device, pipeline_, nullptr);
     }
 
     void RenderPass::begin_renderpass(VkCommandBuffer cmd) {
@@ -449,7 +445,6 @@ namespace gestalt {
         pipeline_layout_create_info.pPushConstantRanges = &dependencies_.push_constant_range;
       }
 
-
       VK_CHECK(vkCreatePipelineLayout(gpu_.device, &pipeline_layout_create_info, nullptr,
                                       &pipeline_layout_));
     }
@@ -516,6 +511,67 @@ namespace gestalt {
       for (auto& _swapchainImage : swapchain_images) {
         vkDestroyImageView(gpu_.device, _swapchainImage->imageView, nullptr);
       }
+    }
+
+    FrameGraphWIP::FrameGraphWIP(const std::vector<std::shared_ptr<RenderPass>>& render_passes) {
+      for (const auto& pass : render_passes) {
+        auto deps = pass->get_dependencies();
+        // Update the writer map and track versions
+        for (const auto& dep : deps.image_attachments) {
+          if (dep.usage == ImageUsageType::kWrite || dep.usage == ImageUsageType::kCombined) {
+            writer_map[dep.attachment.image] = {pass, dep.attachment.version + 1};
+          }
+        }
+
+        // Setup edges based on reading dependencies
+        for (const auto& dep : deps.image_attachments) {
+          if (dep.usage == ImageUsageType::kRead || dep.usage == ImageUsageType::kCombined
+              || dep.usage == ImageUsageType::kDepthStencilRead) {
+            auto it = writer_map.find(dep.attachment.image);
+            if (it != writer_map.end() && it->second.version == dep.attachment.version) {
+              AddEdge(it->second.pass, pass);
+            }
+          }
+        }
+      }
+    }
+
+    void FrameGraphWIP::AddEdge(const std::shared_ptr<RenderPass>& u, const std::shared_ptr<RenderPass>& v) {
+      adj_[u].insert(v);
+      in_degree_[v]++;
+    }
+
+    void FrameGraphWIP::topologicalSort() {
+      std::deque<std::shared_ptr<RenderPass>> queue;
+
+      // Find all vertices with in-degree 0
+      for (auto& node : in_degree_) {
+        if (node.second == 0 && adj_.find(node.first) != adj_.end()) {
+          queue.push_back(node.first);
+        }
+      }
+
+      while (!queue.empty()) {
+        std::shared_ptr<RenderPass> v = queue.front();
+        queue.pop_front();
+        sorted_passes_.push_back(v);
+
+        // For each node u adjacent to v in the graph
+        for (auto u : adj_[v]) {
+          in_degree_[u]--;
+          if (in_degree_[u] == 0) {
+            queue.push_back(u);
+          }
+        }
+      }
+
+      if (sorted_passes_.size() != adj_.size()) {
+        throw std::runtime_error("Cycle detected in the graph, cannot perform topological sort.");
+      }
+    }
+
+    std::vector<std::shared_ptr<RenderPass>> FrameGraphWIP::get_sorted_passes() const {
+      return sorted_passes_;
     }
   }  // namespace graphics
 }  // namespace gestalt
