@@ -1,6 +1,6 @@
 message(STATUS "Configuring graphics module...")
 
-file(GLOB_RECURSE HEADER_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
+file(GLOB_RECURSE HEADER_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp")
 file(GLOB_RECURSE SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
 
 add_library(${GRAPHICS_MODULE} ${HEADER_FILES} ${SOURCE_FILES})
@@ -24,3 +24,5 @@ target_include_directories(
          "${ImGuizmo_SOURCE_DIR}"
          "${SDL2_INCLUDE_DIR}"
 )
+
+target_link_libraries(${GRAPHICS_MODULE} PUBLIC ${APPLICATION_MODULE} ${FOUNDATION_MODULE})

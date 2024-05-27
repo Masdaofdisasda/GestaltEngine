@@ -4,11 +4,11 @@
 #include <unordered_set>
 #include <vector>
 
-#include "Gui.h"
-#include "RenderConfig.h"
-#include "Repository.h"
-#include "vk_pipelines.h"
-#include "vk_sync.h"
+#include "Gui.hpp"
+#include "RenderConfig.hpp"
+#include "Repository.hpp"
+#include "vk_pipelines.hpp"
+#include "vk_sync.hpp"
 
 namespace gestalt {
   namespace graphics {

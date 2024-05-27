@@ -1,6 +1,6 @@
-﻿#include "vk_commands.h"
+﻿#include "vk_commands.hpp"
 
-#include "vk_initializers.h"
+#include "vk_initializers.hpp"
 
 namespace gestalt {
 

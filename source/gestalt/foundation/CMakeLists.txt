@@ -1,7 +1,13 @@
-# Create a library for the module
-add_library(${FOUNDATION_MODULE} test.hpp test.cpp)
-# Specify C++20 for modules
+message(STATUS "Configuring foundation module...")
+
+file(GLOB_RECURSE HEADER_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp")
+file(GLOB_RECURSE SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
+
+add_library(${FOUNDATION_MODULE} ${HEADER_FILES} ${SOURCE_FILES})
+
 target_compile_features(${FOUNDATION_MODULE} PRIVATE cxx_std_20)
 
-# Include source files or modules
-target_sources(${FOUNDATION_MODULE} PRIVATE test.hpp test.cpp)
+target_include_directories(
+  ${FOUNDATION_MODULE}
+  PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"
+)

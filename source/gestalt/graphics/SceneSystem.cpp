@@ -1,4 +1,4 @@
-﻿#include "SceneSystem.h"
+﻿#include "SceneSystem.hpp"
 
 #include <glm/detail/_noise.hpp>
 

@@ -1,7 +1,7 @@
-#include "ResourceManager.h"
+#include "ResourceManager.hpp"
 
-#include "vk_images.h"
-#include "vk_initializers.h"
+#include "vk_images.hpp"
+#include "vk_initializers.hpp"
 
 #include <stb_image.h>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -10,8 +10,8 @@
 #include <fastgltf/core.hpp>
 #include <fastgltf/glm_element_traits.hpp>
 
-#include "Components.h"
-#include "CubemapUtils.h"
+#include "Components.hpp"
+#include "CubemapUtils.hpp"
 
 
 namespace gestalt {
@@ -39,7 +39,7 @@ namespace gestalt {
       return newBuffer;
     }
 
-    void ResourceManager::init(const Gpu& gpu, const std::shared_ptr<Repository> repository) {
+    void ResourceManager::init(const Gpu& gpu, const std::shared_ptr<Repository>& repository) {
       gpu_ = gpu;
       repository_ = repository;
       resource_loader_.init(gpu);

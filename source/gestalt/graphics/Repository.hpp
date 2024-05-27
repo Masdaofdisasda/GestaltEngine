@@ -2,9 +2,9 @@
 
 #include <typeindex>
 
-#include "vk_types.h"
-#include "Components.h"
-#include "GpuResources.h"
+#include "vk_types.hpp"
+#include "Components.hpp"
+#include "GpuResources.hpp"
 
 namespace gestalt {
   namespace foundation {

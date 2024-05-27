@@ -1,4 +1,4 @@
-﻿#include "Gui.h"
+﻿#include "Gui.hpp"
 
 #include <imgui.h>
 #include <imgui_impl_sdl2.h>
@@ -11,8 +11,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/random.hpp>
 
-#include "vk_initializers.h"
-#include "RenderConfig.h"
+#include "vk_initializers.hpp"
+#include "RenderConfig.hpp"
 
 namespace gestalt {
   namespace application {

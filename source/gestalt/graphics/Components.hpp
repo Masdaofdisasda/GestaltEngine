@@ -1,10 +1,10 @@
 ﻿#pragma once
 #include <vector>
-#include "vk_types.h"
+#include "vk_types.hpp"
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/transform.hpp>
 
-#include "GpuResources.h"
+#include "GpuResources.hpp"
 
 
 namespace gestalt {

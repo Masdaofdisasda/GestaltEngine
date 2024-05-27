@@ -2,10 +2,10 @@
 #include <queue>
 #include <fastgltf/types.hpp>
 
-#include "Repository.h"
-#include "Gpu.h"
-#include "vk_types.h"
-#include "vk_descriptors.h"
+#include "Repository.hpp"
+#include "Gpu.hpp"
+#include "vk_types.hpp"
+#include "vk_descriptors.hpp"
 
 
 namespace gestalt {
@@ -67,7 +67,7 @@ namespace gestalt {
       DescriptorAllocatorGrowable descriptorPool;  // TODO hide this
       descriptor_writer writer;
 
-      void init(const Gpu& gpu, const std::shared_ptr<Repository> repository);
+      void init(const Gpu& gpu, const std::shared_ptr<Repository>& repository);
 
       void cleanup();
 

@@ -1,4 +1,4 @@
-#include "graphics/RenderEngine.h"
+#include "graphics/RenderEngine.hpp"
 
 int main(int argc, char* argv[]) {
 

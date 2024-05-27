@@ -2,14 +2,14 @@
 
 #include <functional>
 
-#include "Gui.h"
-#include "vk_types.h"
-#include "SceneManger.h"
-#include "Window.h"
-#include "FrameGraph.h"
-#include "InputSystem.h"
-#include "Gpu.h"
-#include "TmeTrackingService.h"
+#include "Gui.hpp"
+#include "vk_types.hpp"
+#include "SceneManger.hpp"
+#include "Window.hpp"
+#include "FrameGraph.hpp"
+#include "InputSystem.hpp"
+#include "Gpu.hpp"
+#include "TmeTrackingService.hpp"
 
 namespace gestalt {
   class RenderEngine {

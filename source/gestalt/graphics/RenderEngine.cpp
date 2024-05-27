@@ -1,4 +1,4 @@
-﻿#include "RenderEngine.h"
+﻿#include "RenderEngine.hpp"
 
 #if 0
 #define VMA_DEBUG_INITIALIZE_ALLOCATIONS 1
@@ -16,8 +16,8 @@
 #include <glm/gtx/transform.hpp>
 #include <tracy/Tracy.hpp>
 
-#include <vk_initializers.h>
-#include <vk_types.h>
+#include "vk_initializers.hpp"
+#include "vk_types.hpp"
 
 #include <chrono>
 #include <thread>

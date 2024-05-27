@@ -1,11 +1,11 @@
-#include "camera.h"
+#include "camera.hpp"
 
 #include <fmt/core.h>
 
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/quaternion.hpp>
 
-#include "InputSystem.h"
+#include "InputSystem.hpp"
 
 namespace gestalt {
   namespace application {

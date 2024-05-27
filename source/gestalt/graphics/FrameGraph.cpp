@@ -1,4 +1,4 @@
-﻿#include "FrameGraph.h"
+﻿#include "FrameGraph.hpp"
 
 #include <queue>
 #include <set>
@@ -6,14 +6,14 @@
 
 #include <tracy/Tracy.hpp>
 
-#include "Gui.h"
-#include "RenderPass.h"
-#include "Repository.h"
-#include "SsaoPass.h"
-#include "VkBootstrap.h"
-#include "vk_images.h"
-#include "vk_initializers.h"
-#include "vk_pipelines.h"
+#include "Gui.hpp"
+#include "RenderPass.hpp"
+#include "Repository.hpp"
+#include "SsaoPass.hpp"
+#include <VkBootstrap.h>
+#include "vk_images.hpp"
+#include "vk_initializers.hpp"
+#include "vk_pipelines.hpp"
 
 namespace gestalt {
   namespace graphics {

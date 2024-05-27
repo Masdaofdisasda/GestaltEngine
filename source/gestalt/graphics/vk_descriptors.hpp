@@ -1,9 +1,9 @@
 ﻿#pragma once
 
-#include <vk_types.h>
+#include "vk_types.hpp"
 
-#include "DeletionService.h"
-#include "Gpu.h"
+#include "DeletionService.hpp"
+#include "Gpu.hpp"
 
 namespace gestalt {
   namespace graphics {

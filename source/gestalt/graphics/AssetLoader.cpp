@@ -5,7 +5,7 @@
 
 #include <meshoptimizer.h>
 
-#include "SceneManger.h"
+#include "SceneManger.hpp"
 
 namespace gestalt {
   namespace application {

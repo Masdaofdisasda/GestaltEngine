@@ -1,8 +1,8 @@
 ﻿#pragma once
 
-#include "vk_commands.h"
-#include "Gpu.h"
-#include "vk_types.h"
+#include "vk_commands.hpp"
+#include "Gpu.hpp"
+#include "vk_types.hpp"
 
 namespace gestalt {
   namespace graphics {

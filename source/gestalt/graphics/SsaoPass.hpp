@@ -1,8 +1,8 @@
 ﻿#pragma once
 
-#include "FrameGraph.h"
-#include "vk_types.h"
-#include "vk_descriptors.h"
+#include "FrameGraph.hpp"
+#include "vk_types.hpp"
+#include "vk_descriptors.hpp"
 
 namespace gestalt {
   namespace graphics {/*

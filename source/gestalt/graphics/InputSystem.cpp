@@ -1,4 +1,4 @@
-#include "InputSystem.h"
+#include "InputSystem.hpp"
 
 #include <fmt/core.h>
 

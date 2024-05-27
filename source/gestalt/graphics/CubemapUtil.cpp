@@ -1,12 +1,12 @@
 ﻿
-#include "CubemapUtils.h"
+#include "CubemapUtils.hpp"
 #include <cstdio>
 #include <glm/ext.hpp>
 #include <glm/glm.hpp>
 #include <vector>
 
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
-#include "stb_image_resize2.h"
+#include <stb_image_resize2.h>
 
 namespace Math {
   static constexpr float PI = 3.14159265359f;

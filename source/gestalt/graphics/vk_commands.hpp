@@ -1,11 +1,11 @@
 ﻿#pragma once
 
-#include "Gpu.h"
+#include "Gpu.hpp"
 
-#include <vk_types.h>
+#include <vk_types.hpp>
 
-#include "DeletionService.h"
-#include "vk_descriptors.h"
+#include "DeletionService.hpp"
+#include "vk_descriptors.hpp"
 
 namespace gestalt {
 

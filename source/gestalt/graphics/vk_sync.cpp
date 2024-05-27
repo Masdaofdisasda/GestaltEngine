@@ -1,6 +1,6 @@
-﻿#include "vk_sync.h"
+﻿#include "vk_sync.hpp"
 
-#include "vk_initializers.h"
+#include "vk_initializers.hpp"
 
 namespace gestalt {
   namespace graphics {

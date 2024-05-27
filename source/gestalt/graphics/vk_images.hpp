@@ -3,7 +3,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include "GpuResources.h"
+#include "GpuResources.hpp"
 
 
 namespace gestalt {

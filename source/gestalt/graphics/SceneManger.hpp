@@ -3,9 +3,9 @@
 #include <filesystem>
 #include <vector>
 
-#include "Components.h"
-#include "ResourceManager.h"
-#include "SceneSystem.h"
+#include "Components.hpp"
+#include "ResourceManager.hpp"
+#include "SceneSystem.hpp"
 
 namespace gestalt {
   namespace application {

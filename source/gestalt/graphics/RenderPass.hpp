@@ -1,7 +1,7 @@
 ﻿#pragma once
 
-#include "FrameGraph.h"
-#include "vk_types.h"
+#include "FrameGraph.hpp"
+#include "vk_types.hpp"
 
 namespace gestalt {
   namespace graphics {

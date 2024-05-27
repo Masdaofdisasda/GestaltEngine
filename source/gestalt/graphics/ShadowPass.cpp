@@ -1,9 +1,9 @@
 ﻿#pragma once
-#include "RenderPass.h"
+#include "RenderPass.hpp"
 
-#include "vk_images.h"
-#include "vk_initializers.h"
-#include "vk_pipelines.h"
+#include "vk_images.hpp"
+#include "vk_initializers.hpp"
+#include "vk_pipelines.hpp"
 
 
 namespace gestalt {

@@ -1,9 +1,9 @@
 ﻿#pragma once
 
-#include "Components.h"
-#include "Camera.h"
-#include "ResourceManager.h"
-#include "Gpu.h"
+#include "Components.hpp"
+#include "Camera.hpp"
+#include "ResourceManager.hpp"
+#include "Gpu.hpp"
 
 namespace gestalt {
   namespace application {

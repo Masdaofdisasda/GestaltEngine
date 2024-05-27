@@ -1,8 +1,8 @@
 ﻿#pragma once
 
-#include "vk_types.h"
-#include "Gpu.h"
-#include "SceneManger.h"
+#include "vk_types.hpp"
+#include "Gpu.hpp"
+#include "SceneManger.hpp"
 
 namespace gestalt::graphics {
   struct RenderConfig;

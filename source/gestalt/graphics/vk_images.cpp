@@ -1,11 +1,11 @@
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include <stb_image.h>
 
-#include <vk_images.h>
-#include <vk_initializers.h>
+#include "vk_images.hpp"
+#include "vk_initializers.hpp"
 
-#include "GpuResources.h"
+#include "GpuResources.hpp"
 
 namespace gestalt {
 
