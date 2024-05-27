@@ -154,7 +154,7 @@ namespace gestalt {
 
       frame_graph_->execute_passes();
 
-      gpu_.next_frame();
+      graphics::gpu_frame.next_frame();
 
       FrameMark;
     }

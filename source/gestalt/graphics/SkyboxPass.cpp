@@ -41,12 +41,12 @@ namespace gestalt {
     void SkyboxPass::execute(const VkCommandBuffer cmd) {
       begin_renderpass(cmd);
 
-      const char frameIndex = gpu_.get_current_frame();
+      const auto frame = gpu_frame.get_current_frame();
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
       auto& light_data = repository_->get_buffer<LightBuffers>();
 
       VkDescriptorSet descriptorSets[]
-          = {per_frame_buffers.descriptor_sets[frameIndex], light_data.descriptor_set};
+          = {per_frame_buffers.descriptor_sets[frame], light_data.descriptor_set};
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
       vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 2,
@@ -96,12 +96,12 @@ namespace gestalt {
     void InfiniteGridPass::execute(const VkCommandBuffer cmd) {
       begin_renderpass(cmd);
 
-      const char frameIndex = gpu_.get_current_frame();
+      const auto frame = gpu_frame.get_current_frame();
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
-      VkDescriptorSet descriptorSets[] = {per_frame_buffers.descriptor_sets[frameIndex]};
+      VkDescriptorSet descriptorSets[] = {per_frame_buffers.descriptor_sets[frame]};
 
       vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                               descriptorSets, 0, nullptr);

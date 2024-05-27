@@ -46,7 +46,7 @@ namespace gestalt {
 
       begin_renderpass(cmd);
 
-      const char frameIndex = gpu_.get_current_frame();
+      const auto frame = gpu_frame.get_current_frame();
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
       const auto& light_data = repository_->get_buffer<LightBuffers>();
       const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
@@ -56,7 +56,7 @@ namespace gestalt {
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
-      VkDescriptorSet descriptorSets[] = {per_frame_buffers.descriptor_sets[frameIndex],
+      VkDescriptorSet descriptorSets[] = {per_frame_buffers.descriptor_sets[frame],
                                           light_data.descriptor_set, mesh_buffers.descriptor_set};
 
       vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 3,

@@ -74,6 +74,12 @@ namespace gestalt {
     }
 
     void FrameGraph::create_resources() {
+      VkCommandBuffer cmd = get_current_frame().main_command_buffer;
+      VkCommandBufferBeginInfo cmdBeginInfo
+          = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+      VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
+
       for (auto& image_attachment : resource_registry_->attachment_list_) {
         if (image_attachment.extent.width == 0 && image_attachment.extent.height == 0) {
           image_attachment.image->imageExtent
@@ -85,10 +91,50 @@ namespace gestalt {
 
         if (image_attachment.image->getType() == TextureType::kColor) {
           resource_manager_->create_color_frame_buffer(image_attachment.image);
+
+          vkutil::TransitionImage(image_attachment.image)
+              .to(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+              .withSource(VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0)
+              .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
+              .andSubmitTo(cmd);
+
+          VkImageSubresourceRange clearRange = {};
+          clearRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+          clearRange.baseMipLevel = 0;
+          clearRange.levelCount = 1;
+          clearRange.baseArrayLayer = 0;
+          clearRange.layerCount = 1;
+          vkCmdClearColorImage(cmd, image_attachment.image->image,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                               &image_attachment.initial_value.color, 1, &clearRange);
+
+
         } else if (image_attachment.image->getType() == TextureType::kDepth) {
           resource_manager_->create_depth_frame_buffer(image_attachment.image);
+
+          vkutil::TransitionImage(image_attachment.image)
+              .to(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+              .withSource(VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0)
+              .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
+              .andSubmitTo(cmd);
+
+          VkImageSubresourceRange clearRange = {};
+          clearRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+          if (image_attachment.image->getFormat() == VK_FORMAT_D32_SFLOAT_S8_UINT
+              || image_attachment.image->getFormat() == VK_FORMAT_D24_UNORM_S8_UINT) {
+            clearRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+          }
+          clearRange.baseMipLevel = 0;
+          clearRange.levelCount = 1;
+          clearRange.baseArrayLayer = 0;
+          clearRange.layerCount = 1;
+          vkCmdClearDepthStencilImage(cmd, image_attachment.image->image,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                               &image_attachment.initial_value.depthStencil, 1, &clearRange);
         }
       }
+
+      VK_CHECK(vkEndCommandBuffer(cmd));
     }
 
     void FrameGraph::execute(const std::shared_ptr<RenderPass>& render_pass, VkCommandBuffer cmd) {
@@ -122,7 +168,7 @@ namespace gestalt {
         const auto copyImg = resource_registry_->attachments_.bright_pass;
         debug_texture_ = std::make_shared<foundation::TextureHandle>(copyImg.image->getType());
         debug_texture_->imageExtent = copyImg.image->imageExtent;
-        resource_manager_->create_color_frame_buffer(debug_texture_, true);
+        resource_manager_->create_color_frame_buffer(debug_texture_);
 
         vkutil::TransitionImage(copyImg.image)
             .to(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
@@ -274,6 +320,26 @@ namespace gestalt {
         return;
       }
     }
+
+    RenderPassDependencyBuilder& RenderPassDependencyBuilder::add_image_attachment(
+        const ImageAttachment& attachment, const ImageUsageType usage,
+        const uint32_t required_version, const ImageClearOperation clear_operation) {
+      dependency_.image_attachments.push_back(
+          {attachment, usage, clear_operation, required_version});
+      return *this;
+    }
+
+    RenderPassDependencyBuilder& RenderPassDependencyBuilder::set_push_constant_range(uint32_t size,
+        VkShaderStageFlags stage_flags) {
+      dependency_.push_constant_range = {
+          .stageFlags = stage_flags,
+          .offset = 0,
+          .size = size,
+      };
+      return *this;
+    }
+
+    RenderPassDependency RenderPassDependencyBuilder::build() { return dependency_; }
 
     void ResourceRegistry::init(const Gpu& gpu) {
       gpu_ = gpu;

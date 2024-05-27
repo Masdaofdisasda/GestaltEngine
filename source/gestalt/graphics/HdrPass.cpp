@@ -210,19 +210,13 @@ namespace gestalt {
           = RenderPassDependencyBuilder()
                 .add_shader(ShaderStage::kVertex, "fullscreen.vert.spv")
                 .add_shader(ShaderStage::kFragment, "downscale2x2.frag.spv")
-                .add_image_attachment(registry_->attachments_.lum_64, ImageUsageType::kRead, 1, ImageClearOperation::kClear)
-                .add_image_attachment(registry_->attachments_.lum_32, ImageUsageType::kWrite, 0,
-                                      ImageClearOperation::kClear)
-                .add_image_attachment(registry_->attachments_.lum_16, ImageUsageType::kCombined, 0,
-                                      ImageClearOperation::kClear)
-                .add_image_attachment(registry_->attachments_.lum_8, ImageUsageType::kCombined, 0,
-                                      ImageClearOperation::kClear)
-                .add_image_attachment(registry_->attachments_.lum_4, ImageUsageType::kCombined, 0,
-                                      ImageClearOperation::kClear)
-                .add_image_attachment(registry_->attachments_.lum_2, ImageUsageType::kCombined, 0,
-                                      ImageClearOperation::kClear)
-                .add_image_attachment(registry_->attachments_.lum_1, ImageUsageType::kCombined, 0,
-                                      ImageClearOperation::kClear)
+                .add_image_attachment(registry_->attachments_.lum_64, ImageUsageType::kRead, 1)
+                .add_image_attachment(registry_->attachments_.lum_32, ImageUsageType::kWrite)
+                .add_image_attachment(registry_->attachments_.lum_16, ImageUsageType::kCombined)
+                .add_image_attachment(registry_->attachments_.lum_8, ImageUsageType::kCombined)
+                .add_image_attachment(registry_->attachments_.lum_4, ImageUsageType::kCombined)
+                .add_image_attachment(registry_->attachments_.lum_2, ImageUsageType::kCombined)
+                .add_image_attachment(registry_->attachments_.lum_1, ImageUsageType::kCombined)
                 .build();
 
       create_pipeline_layout();
@@ -315,18 +309,20 @@ namespace gestalt {
       descriptor_set_
           = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(0));
 
-      char currentFrame = gpu_.get_current_frame();
+      const auto frame = gpu_frame.get_current_frame();
 
       const auto current_lum = registry_->attachments_.lum_1.image;
-      const auto avg_lum = currentFrame == 0 ? registry_->attachments_.lum_A.image : registry_->attachments_.lum_B.image;
-      const auto new_lum = currentFrame == 0 ? registry_->attachments_.lum_B.image : registry_->attachments_.lum_A.image;
+      const auto avg_lum
+          = frame == 0 ? registry_->attachments_.lum_A.image : registry_->attachments_.lum_B.image;
+      const auto new_lum
+          = frame == 0 ? registry_->attachments_.lum_B.image : registry_->attachments_.lum_A.image;
 
       vkutil::TransitionImage(current_lum).toLayoutRead().andSubmitTo(cmd);
       vkutil::TransitionImage(avg_lum).toLayoutRead().andSubmitTo(cmd);
       vkutil::TransitionImage(new_lum).toLayoutWrite().andSubmitTo(cmd);
 
       VkRenderingAttachmentInfo newColorAttachment = vkinit::attachment_info(
-          new_lum->imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+          new_lum->imageView, nullptr, new_lum->getLayout());
       VkRenderingInfo newRenderInfo
           = vkinit::rendering_info(new_lum->getExtent2D(), &newColorAttachment, nullptr);
       vkCmdBeginRendering(cmd, &newRenderInfo);
@@ -397,11 +393,13 @@ namespace gestalt {
     void TonemapPass::execute(VkCommandBuffer cmd) {
       descriptor_set_
           = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(0));
-      char currentFrame = gpu_.get_current_frame();
+
+      const auto frame = gpu_frame.get_current_frame();
       const auto scene_linear = registry_->attachments_.scene_color.image;
       const auto scene_bloom = registry_->attachments_.bright_pass.image;
-      const auto lum_image = currentFrame == 0 ? registry_->attachments_.lum_B.image
+      const auto lum_image = frame == 0 ? registry_->attachments_.lum_B.image
                                             : registry_->attachments_.lum_A.image;
+
       begin_renderpass(cmd);
 
       writer.clear();

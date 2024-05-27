@@ -461,7 +461,7 @@ namespace gestalt {
       camera.view_matrix = view;
       camera.projection_matrix = projection;
 
-      const char frameIndex = gpu_.get_current_frame();
+      const auto frame = graphics::gpu_frame.get_current_frame();
 
       auto& buffers = repository_->get_buffer<PerFrameDataBuffers>();
       buffers.data.view = camera.view_matrix; // is the camera object actually needed?
@@ -470,11 +470,11 @@ namespace gestalt {
       buffers.data.inv_viewproj = glm::inverse(camera.projection_matrix * camera.view_matrix);
 
       void* mapped_data;
-      VmaAllocation allocation = buffers.uniform_buffers[frameIndex].allocation;
+      const VmaAllocation allocation = buffers.uniform_buffers[frame].allocation;
       VK_CHECK(vmaMapMemory(gpu_.allocator, allocation, &mapped_data));
       const auto scene_uniform_data = static_cast<PerFrameData*>(mapped_data);
       *scene_uniform_data = buffers.data;
-      vmaUnmapMemory(gpu_.allocator, buffers.uniform_buffers[frameIndex].allocation);
+      vmaUnmapMemory(gpu_.allocator, buffers.uniform_buffers[frame].allocation);
     }
 
     void CameraSystem::cleanup() {

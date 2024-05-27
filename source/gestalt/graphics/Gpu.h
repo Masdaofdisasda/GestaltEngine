@@ -8,7 +8,6 @@ namespace gestalt {
   namespace graphics {
 
     class Gpu {
-      uint32_t frame_number_{0};
 
     public:
       VkInstance instance;
@@ -29,9 +28,16 @@ namespace gestalt {
       void init(
           bool use_validation_layers, application::Window& window,
           std::function<void(std::function<void(VkCommandBuffer)>)> immediate_submit_function);
-      void next_frame();
-      uint32_t get_current_frame() const;
       void cleanup();
     };
+    
+    inline struct GpuFrame {
+      void next_frame() { frame_number++; }
+      [[nodiscard]] uint8_t get_current_frame() const { return frame_number % 2; }
+
+    private:
+      uint64_t frame_number{0};
+    } gpu_frame;
+
   }  // namespace graphics
 }  // namespace gestalt

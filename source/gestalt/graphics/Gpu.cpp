@@ -129,14 +129,6 @@ namespace gestalt {
       }
     }
 
-    void Gpu::next_frame() {
-	  frame_number_++;
-    }
-
-    uint32_t Gpu::get_current_frame() const {
-      return frame_number_ % 2;
-    }
-
     void Gpu::cleanup() {
       vmaDestroyAllocator(allocator);
       vkDestroyDevice(device, nullptr);

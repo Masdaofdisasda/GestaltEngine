@@ -39,19 +39,20 @@ namespace gestalt {
       std::shared_ptr<TextureHandle> image;
       float scale = 1.0f;
       VkExtent3D extent = {0, 0, 1};
+      VkClearValue initial_value{};
       uint32_t version = 0;
     };
 
     enum class ImageUsageType {
-      kRead,
-      kWrite,
-      kDepthStencilRead,  // used for depth testing
-      kCombined           // used for both read and write
+      kRead,               // will only be read as input to the shader
+      kWrite,              // will only be written as attachment by the shader
+      kDepthStencilRead,  // used only for depth testing
+      kCombined           // will be used for read or write operations (eg. ping-pong passes)
     };
 
     enum class ImageClearOperation {
-      kClear,
-      kDontCare,
+      kClear,     // clear the image before rendering
+      kDontCare,  // don't clear the image
     };
 
     struct ImageDependency {
@@ -80,21 +81,11 @@ namespace gestalt {
                                                         const ImageUsageType usage,
                                                         const uint32_t required_version = 0,
                                                         const ImageClearOperation clear_operation
-                                                        = ImageClearOperation::kDontCare) {
-        dependency_.image_attachments.push_back(
-            {attachment, usage, clear_operation, required_version});
-        return *this;
-      }
+                                                        = ImageClearOperation::kDontCare);
+
       RenderPassDependencyBuilder& set_push_constant_range(uint32_t size,
-                                                           VkShaderStageFlags stage_flags) {
-        dependency_.push_constant_range = {
-            .stageFlags = stage_flags,
-            .offset = 0,
-            .size = size,
-        };
-        return *this;
-      }
-      RenderPassDependency build() { return dependency_; }
+                                                           VkShaderStageFlags stage_flags);
+      RenderPassDependency build();
     };
 
     class ResourceRegistry {
@@ -119,7 +110,7 @@ namespace gestalt {
         ImageAttachment bright_pass{.image = std::make_shared<TextureHandle>(TextureType::kColor),
                                     .extent = {512, 512}};
         ImageAttachment blur_y{.image = std::make_shared<TextureHandle>(TextureType::kColor),
-                                    .extent = {512, 512}};
+                               .extent = {512, 512}};
 
         ImageAttachment lum_64{.image = std::make_shared<TextureHandle>(TextureType::kColor),
                                .extent = {64, 64}};
@@ -137,9 +128,11 @@ namespace gestalt {
                               .extent = {1, 1}};
 
         ImageAttachment lum_A{.image = std::make_shared<TextureHandle>(TextureType::kColor),
-                              .extent = {1, 1}};
+                              .extent = {1, 1},
+                              .initial_value = {{1.f, 1.f, 1.f, 1.f}}};
         ImageAttachment lum_B{.image = std::make_shared<TextureHandle>(TextureType::kColor),
-                              .extent = {1, 1}};
+                              .extent = {1, 1},
+                              .initial_value = {{1.f, 1.f, 1.f, 1.f}}};
       } attachments_;
 
       std::vector<ImageAttachment> attachment_list_;
@@ -271,7 +264,7 @@ namespace gestalt {
       std::vector<FrameData> frames_{kFrameOverlap};
       bool acquire_next_image();
       void present(VkCommandBuffer cmd);
-      FrameData& get_current_frame() { return frames_[gpu_.get_current_frame()]; }
+      FrameData& get_current_frame() { return frames_[gpu_frame.get_current_frame()]; }
       application::Window& get_window() { return window_; }
       void create_resources();
       VkCommandBuffer start_draw();

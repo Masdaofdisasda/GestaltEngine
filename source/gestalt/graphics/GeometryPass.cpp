@@ -50,7 +50,7 @@ namespace gestalt {
     void DeferredPass::execute(VkCommandBuffer cmd) {
       begin_renderpass(cmd);
 
-      const char frameIndex = gpu_.get_current_frame();
+      const auto frame = gpu_frame.get_current_frame();
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
       const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
       const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
@@ -59,7 +59,7 @@ namespace gestalt {
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
       VkDescriptorSet descriptorSets[]
-          = {per_frame_buffers.descriptor_sets[frameIndex], ibl_buffers.descriptor_set,
+          = {per_frame_buffers.descriptor_sets[frame], ibl_buffers.descriptor_set,
              repository_->material_data.resource_set, repository_->material_data.constants_set,
              mesh_buffers.descriptor_set};
       vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 5,
