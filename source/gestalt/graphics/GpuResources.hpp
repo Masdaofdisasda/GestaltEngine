@@ -2,19 +2,18 @@
 
 #include "vk_types.hpp"
 
-namespace gestalt {
-  namespace foundation {
+namespace gestalt::foundation {
 
     struct alignas(4) GpuVertexPosition {
       glm::vec3 position{0.f};
-      float padding{0.f};
+      float32 padding{0.f};
     };
 
     struct alignas(4) GpuVertexData {
-      uint8_t normal[4];
-      uint8_t tangent[4];
-      uint16_t uv[2];
-      float padding{0.f};
+      uint8 normal[4];
+      uint8 tangent[4];
+      uint16 uv[2];
+      float32 padding{0.f};
     };
 
     enum class TextureType { kColor, kDepth, kCubeMap };
@@ -110,5 +109,5 @@ namespace gestalt {
       VkDescriptorSet descriptor_set = nullptr;
       VkDescriptorSetLayout descriptor_layout;
     };
-  }  // namespace foundation
+
 }  // namespace gestalt

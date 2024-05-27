@@ -1,13 +1,14 @@
 ﻿#pragma once
 
+#include "common.hpp"
+
 #include <typeindex>
 
 #include "vk_types.hpp"
 #include "Components.hpp"
 #include "GpuResources.hpp"
 
-namespace gestalt {
-  namespace foundation {
+namespace gestalt::foundation {
 
     class DataHolder {
     public:
@@ -157,5 +158,4 @@ namespace gestalt {
 
 
     };
-  }  // namespace foundation
-}  // namespace gestalt
+}  // namespace gestalt::foundation

@@ -12,7 +12,7 @@
 #include "TmeTrackingService.hpp"
 
 namespace gestalt {
-  class RenderEngine {
+  class GameEngine {
   public:
     void init();
     void cleanup();

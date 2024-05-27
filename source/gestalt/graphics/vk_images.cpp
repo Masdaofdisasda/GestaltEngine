@@ -7,13 +7,10 @@
 
 #include "GpuResources.hpp"
 
-namespace gestalt {
-
-  namespace graphics {
-    using namespace foundation;
+namespace gestalt::graphics {
 
     vkutil::TransitionImage::TransitionImage(
-        const std::shared_ptr<foundation::TextureHandle>& image) {
+        const std::shared_ptr<TextureHandle>& image) {
       image_ = image;
 
       imageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
@@ -175,7 +172,7 @@ namespace gestalt {
       vkCmdBlitImage2(cmd, &blitInfo);
     }
 
-    void vkutil::generate_mipmaps(VkCommandBuffer cmd, std::shared_ptr<foundation::TextureHandle>& handle) {
+    void vkutil::generate_mipmaps(VkCommandBuffer cmd, std::shared_ptr<TextureHandle>& handle) {
 
         VkExtent2D imageSize = {handle->imageExtent.width, handle->imageExtent.height};
       int mipLevels = int(std::floor(std::log2(
@@ -246,5 +243,4 @@ namespace gestalt {
         handle->setLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
       }
     }
-  }  // namespace graphics
 }  // namespace gestalt

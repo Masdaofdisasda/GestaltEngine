@@ -5,8 +5,7 @@
 #include "DeletionService.hpp"
 #include "Gpu.hpp"
 
-namespace gestalt {
-  namespace graphics {
+namespace gestalt::graphics {
     
   struct DescriptorLayoutBuilder {
     std::vector<VkDescriptorSetLayoutBinding> bindings;
@@ -40,7 +39,7 @@ namespace gestalt {
   struct DescriptorAllocator {
     struct pool_size_ratio {
       VkDescriptorType type;
-      float ratio;
+      float32 ratio;
     };
 
     VkDescriptorPool pool;
@@ -73,7 +72,7 @@ namespace gestalt {
     std::vector<PoolSizeRatio> ratios;
     std::vector<VkDescriptorPool> fullPools;
     std::vector<VkDescriptorPool> readyPools;
-    uint32_t setsPerPool;
+    uint32 setsPerPool;
   };
 
   struct FrameData {
@@ -84,5 +83,4 @@ namespace gestalt {
     VkCommandBuffer main_command_buffer;
     DescriptorAllocatorGrowable descriptor_pool;
   };
-  }  // namespace graphics
 }  // namespace gestalt

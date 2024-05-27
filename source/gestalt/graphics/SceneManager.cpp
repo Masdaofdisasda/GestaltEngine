@@ -8,10 +8,7 @@
 
 #include <glm/gtx/matrix_decompose.hpp>
 
-namespace gestalt {
-  namespace application {
-
-    using namespace foundation;
+namespace gestalt::application {
 
     void SceneManager::init(const graphics::Gpu& gpu,
                             const std::shared_ptr<graphics::ResourceManager>& resource_manager,
@@ -192,7 +189,7 @@ namespace gestalt {
       link_entity_to_parent(entity, parent);
 
       auto& transform = repository_->transform_components.get(entity).value().get();
-      transform.rotation = glm::quat(glm::lookAt(glm::vec3(0), direction, glm::vec3(0, 1, 0)));
+      transform.rotation = glm::quat(lookAt(glm::vec3(0), direction, glm::vec3(0, 1, 0)));
 
       const LightComponent light{
           .type = LightType::kDirectional,
@@ -215,7 +212,7 @@ namespace gestalt {
       link_entity_to_parent(entity, parent);
 
       auto& transform = repository_->transform_components.get(entity).value().get();
-      transform.rotation = glm::quat(glm::lookAt(glm::vec3(0), direction, glm::vec3(0, 1, 0)));
+      transform.rotation = glm::quat(lookAt(glm::vec3(0), direction, glm::vec3(0, 1, 0)));
       transform.position = position;
 
       const LightComponent light{
@@ -304,5 +301,4 @@ namespace gestalt {
       root_node.get().name = "root";
     }
 
-  }  // namespace application
 }  // namespace gestalt

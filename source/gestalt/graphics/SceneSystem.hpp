@@ -5,14 +5,13 @@
 #include "ResourceManager.hpp"
 #include "Gpu.hpp"
 
-namespace gestalt {
-  namespace application {
+namespace gestalt::application {
     struct Movement;
 
     class SceneSystem {
     public:
       void init(const graphics::Gpu& gpu, const std::shared_ptr<graphics::ResourceManager>& resource_manager,
-                const std::shared_ptr<foundation::Repository>& repository) {
+                const std::shared_ptr<Repository>& repository) {
         gpu_ = gpu;
         resource_manager_ = resource_manager;
         repository_ = repository;
@@ -29,7 +28,7 @@ namespace gestalt {
 
       graphics::Gpu gpu_ = {};
       std::shared_ptr<graphics::ResourceManager> resource_manager_;
-      std::shared_ptr<foundation::Repository> repository_;
+      std::shared_ptr<Repository> repository_;
     };
 
     class MaterialSystem final : public SceneSystem {
@@ -39,7 +38,7 @@ namespace gestalt {
       void prepare() override;
       void update() override;
       void cleanup() override;
-      void write_material(foundation::PbrMaterial& material, uint32_t material_id);
+      void write_material(PbrMaterial& material, uint32_t material_id);
     };
 
     class LightSystem final : public SceneSystem {
@@ -47,8 +46,8 @@ namespace gestalt {
 
 
       glm::mat4 calculate_sun_view_proj(const glm::vec3 direction) const;
-      void update_directional_lights(std::unordered_map<foundation::entity, foundation::LightComponent>& lights);
-      void update_point_lights(std::unordered_map<foundation::entity, foundation::LightComponent>& lights);
+      void update_directional_lights(std::unordered_map<entity, LightComponent>& lights);
+      void update_point_lights(std::unordered_map<entity, LightComponent>& lights);
 
     public:
       void prepare() override;
@@ -60,7 +59,7 @@ namespace gestalt {
       graphics::descriptor_writer writer_;
       std::unique_ptr<Camera> active_camera_;
       std::unique_ptr<FreeFlyCamera> free_fly_camera_; // move to components
-      float aspect_{1.f};
+      float32 aspect_{1.f};
 
     public:
       void prepare() override;
@@ -70,13 +69,13 @@ namespace gestalt {
     };
 
     class TransformSystem final : public SceneSystem {
-      void mark_children_dirty(foundation::entity entity);
-      void mark_as_dirty(foundation::entity entity);
-      void update_aabb(foundation::entity entity, const glm::mat4& parent_transform);
-      void mark_parent_dirty(foundation::entity entity);
+      void mark_children_dirty(entity entity);
+      void mark_as_dirty(entity entity);
+      void update_aabb(entity entity, const glm::mat4& parent_transform);
+      void mark_parent_dirty(entity entity);
 
     public:
-      static glm::mat4 get_model_matrix(const foundation::TransformComponent& transform);
+      static glm::mat4 get_model_matrix(const TransformComponent& transform);
 
       void prepare() override;
       void update() override;
@@ -85,7 +84,7 @@ namespace gestalt {
 
     class RenderSystem final : public SceneSystem {
       size_t meshes_ = 0;
-      void traverse_scene(const foundation::entity entity, const glm::mat4& parent_transform);
+      void traverse_scene(const entity entity, const glm::mat4& parent_transform);
 
     public:
       void prepare() override;
@@ -104,5 +103,4 @@ namespace gestalt {
       void update() override;
       void cleanup() override;
     };
-  }  // namespace application
 }  // namespace gestalt

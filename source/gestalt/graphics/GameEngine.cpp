@@ -1,4 +1,4 @@
-﻿#include "RenderEngine.hpp"
+﻿#include "GameEngine.hpp"
 
 #if 0
 #define VMA_DEBUG_INITIALIZE_ALLOCATIONS 1
@@ -25,11 +25,11 @@
 
 namespace gestalt {
 
-  RenderEngine* loaded_engine = nullptr;
+  GameEngine* loaded_engine = nullptr;
 
   constexpr bool use_validation_layers = true;
 
-  void RenderEngine::init() {
+  void GameEngine::init() {
     assert(loaded_engine == nullptr);
     loaded_engine = this;
 
@@ -51,7 +51,7 @@ namespace gestalt {
     is_initialized_ = true;
   }
 
-  void RenderEngine::register_gui_actions() {
+  void GameEngine::register_gui_actions() {
     gui_actions_.exit = [this]() { quit_ = true; };
     gui_actions_.load_gltf
         = [this](std::string path) { scene_manager_->request_scene(std::move(path)); };
@@ -66,7 +66,7 @@ namespace gestalt {
     };
   }
 
-  void RenderEngine::immediate_submit(std::function<void(VkCommandBuffer cmd)> function) {
+  void GameEngine::immediate_submit(std::function<void(VkCommandBuffer cmd)> function) {
     VK_CHECK(vkResetFences(gpu_.device, 1, &frame_graph_->get_sync().imgui_fence));
     VK_CHECK(vkResetCommandBuffer(frame_graph_->get_commands().imgui_command_buffer, 0));
 
@@ -93,7 +93,7 @@ namespace gestalt {
         vkWaitForFences(gpu_.device, 1, &frame_graph_->get_sync().imgui_fence, true, 9999999999));
   }
 
-  void RenderEngine::cleanup() {
+  void GameEngine::cleanup() {
     if (is_initialized_) {
       vkDeviceWaitIdle(gpu_.device);
 
@@ -106,7 +106,7 @@ namespace gestalt {
     }
   }
 
-  void RenderEngine::update_scene() const {
+  void GameEngine::update_scene() const {
 
     frame_graph_->get_config().light_adaptation.delta_time
         = time_tracking_service_.get_delta_time();
@@ -116,7 +116,7 @@ namespace gestalt {
                                  static_cast<float>(window_.extent.width) / static_cast<float>(window_.extent.height));
   }
 
-  void RenderEngine::run() {
+  void GameEngine::run() {
     // begin clock
     auto start = std::chrono::system_clock::now();  // todo replace with timetracker
 

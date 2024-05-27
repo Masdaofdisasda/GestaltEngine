@@ -87,7 +87,7 @@ void convolveDiffuse(const vec3* data, int srcW, int srcH, int dstW, int dstH, v
         const float theta2 = float(y1) / float(srcH) * Math::PI;
         const float phi2 = float(x1) / float(srcW) * Math::TWOPI;
         const vec3 V2 = vec3(sin(theta2) * cos(phi2), sin(theta2) * sin(phi2), cos(theta2));
-        const float D = std::max(0.0f, glm::dot(V1, V2));
+        const float D = std::max(0.0f, dot(V1, V2));
         if (D > 0.01f) {
           color += scratch[y1 * srcW + x1] * D;
           weight += D;

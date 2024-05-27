@@ -2,10 +2,7 @@
 
 #include <glm/detail/_noise.hpp>
 
-namespace gestalt {
-  namespace application {
-
-    using namespace foundation;
+namespace gestalt::application {
 
     void LightSystem::prepare() {
 
@@ -295,7 +292,7 @@ namespace gestalt {
 
       glm::vec3 center = (min + max) * 0.5f;
       glm::vec3 size = max - min;
-      float radius = glm::length(size) * 0.5f;
+      float radius = length(size) * 0.5f;
       glm::vec3 lightPosition = center + direction * radius;
 
       // Calculate the tight orthographic frustum
@@ -305,7 +302,7 @@ namespace gestalt {
       float farPlane = radius * 2.f;  // Far plane distance
 
       // Calculate the view matrix for the light
-      glm::mat4 lightView = glm::lookAt(lightPosition, center, glm::vec3(0.0f, 1.0f, 0.0f));
+      glm::mat4 lightView = lookAt(lightPosition, center, glm::vec3(0.0f, 1.0f, 0.0f));
 
       // Calculate the projection matrix for the light
       glm::mat4 lightProjection
@@ -336,7 +333,7 @@ namespace gestalt {
         }
 
         auto& rotation = repository_->transform_components.get(entity).value().get().rotation;
-        glm::vec3 direction = glm::normalize(glm::vec3(0, 0, -1.f) * rotation);
+        glm::vec3 direction = normalize(glm::vec3(0, 0, -1.f) * rotation);
 
         auto& view_proj
             = repository_->light_view_projections.get(light.light_view_projections.at(0));
@@ -467,7 +464,7 @@ namespace gestalt {
       buffers.data.view = camera.view_matrix; // is the camera object actually needed?
       buffers.data.proj = camera.projection_matrix;
       buffers.data.viewproj = camera.projection_matrix * camera.view_matrix;
-      buffers.data.inv_viewproj = glm::inverse(camera.projection_matrix * camera.view_matrix);
+      buffers.data.inv_viewproj = inverse(camera.projection_matrix * camera.view_matrix);
 
       void* mapped_data;
       const VmaAllocation allocation = buffers.uniform_buffers[frame].allocation;
@@ -715,5 +712,4 @@ namespace gestalt {
 
     void HierarchySystem::cleanup() {}
 
-  }  // namespace application
 }  // namespace gestalt

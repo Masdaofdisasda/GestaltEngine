@@ -8,10 +8,7 @@
 #include "vk_descriptors.hpp"
 
 
-namespace gestalt {
-  namespace graphics {
-
-    using namespace foundation;
+namespace gestalt::graphics {
 
     class PoorMansResourceLoader {
       struct ImageTask {
@@ -91,6 +88,4 @@ namespace gestalt {
                                  bool mipmapped = false, bool cubemap = false);
       void destroy_image(const TextureHandle& img);
     };
-
-  }  // namespace graphics
 }  // namespace gestalt

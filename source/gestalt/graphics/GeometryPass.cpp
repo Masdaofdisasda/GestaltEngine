@@ -4,10 +4,7 @@
 #include "vk_initializers.hpp"
 #include "vk_pipelines.hpp"
 
-namespace gestalt {
-  namespace graphics {
-
-    using namespace foundation;
+namespace gestalt::graphics {
 
     void DeferredPass::prepare() {
       fmt::print("Preparing {}\n", get_name());
@@ -436,5 +433,4 @@ namespace gestalt {
 
       vkCmdEndRendering(cmd);
     }*/
-  }  // namespace graphics
 }  // namespace gestalt

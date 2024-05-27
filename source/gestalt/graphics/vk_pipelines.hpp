@@ -1,8 +1,7 @@
 ﻿#pragma once 
 #include <vk_types.hpp>
 
-namespace gestalt {
-  namespace graphics {
+namespace gestalt::graphics {
 
     class PipelineBuilder {
     public:
@@ -50,5 +49,5 @@ namespace gestalt {
       void load_shader_module(const char* filePath, VkDevice device,
                               VkShaderModule* outShaderModule);
     };
-  }  // namespace graphics
+
 }  // namespace gestalt

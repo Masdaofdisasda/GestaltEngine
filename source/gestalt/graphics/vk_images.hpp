@@ -6,15 +6,11 @@
 #include "GpuResources.hpp"
 
 
-namespace gestalt {
-
-  namespace graphics {
-
-    namespace vkutil {
+namespace gestalt::graphics::vkutil {
 
       class TransitionImage {
       public:
-        explicit TransitionImage(const std::shared_ptr<foundation::TextureHandle>& image);
+        explicit TransitionImage(const std::shared_ptr<TextureHandle>& image);
 
         TransitionImage& to(VkImageLayout new_layout);
 
@@ -29,7 +25,7 @@ namespace gestalt {
         void andSubmitTo(const VkCommandBuffer cmd);
 
       private:
-        std::shared_ptr<foundation::TextureHandle> image_;
+        std::shared_ptr<TextureHandle> image_;
         VkImageMemoryBarrier2 imageBarrier{
           .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
         };
@@ -37,11 +33,11 @@ namespace gestalt {
 
       class CopyImage {
       public:
-        explicit CopyImage(const std::shared_ptr<foundation::TextureHandle>& source) {
+        explicit CopyImage(const std::shared_ptr<TextureHandle>& source) {
           source_ = source;
         }
 
-        CopyImage& toImage(const std::shared_ptr<foundation::TextureHandle>& destination) {
+        CopyImage& toImage(const std::shared_ptr<TextureHandle>& destination) {
           destination_ = destination;
 
           return *this;
@@ -50,11 +46,10 @@ namespace gestalt {
         void andSubmitTo(const VkCommandBuffer cmd) const;
 
       private:
-        std::shared_ptr<foundation::TextureHandle> source_;
-        std::shared_ptr<foundation::TextureHandle> destination_;
+        std::shared_ptr<TextureHandle> source_;
+        std::shared_ptr<TextureHandle> destination_;
       };
 
-      void generate_mipmaps(VkCommandBuffer cmd, std::shared_ptr<foundation::TextureHandle>& handle);
-    };  // namespace vkutil
-  }     // namespace graphics
+      void generate_mipmaps(VkCommandBuffer cmd, std::shared_ptr<TextureHandle>& handle);
+
 }  // namespace gestalt

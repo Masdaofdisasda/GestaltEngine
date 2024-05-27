@@ -1,8 +1,7 @@
 ﻿#include "Window.hpp"
 
 
-namespace gestalt {
-  namespace application {
+namespace gestalt::application {
 
     void Window::init(const VkExtent2D window_extent) {
       extent = window_extent;
@@ -28,5 +27,4 @@ namespace gestalt {
 
     void Window::cleanup() const { SDL_DestroyWindow(handle); }
 
-  }  // namespace application
 }  // namespace gestalt

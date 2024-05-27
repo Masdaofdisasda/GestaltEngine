@@ -2,11 +2,10 @@
 
 #include <fmt/core.h>
 
-namespace gestalt {
-  namespace application {
+namespace gestalt::application {
 
-    void InputSystem::handle_event(const SDL_Event& e, uint32_t window_size_x,
-                                   uint32_t window_size_y) {
+    void InputSystem::handle_event(const SDL_Event& e, uint32 window_size_x,
+                                   uint32 window_size_y) {
       switch (e.type) {
         case SDL_MOUSEMOTION:
           handle_mouse_motion(e, window_size_x, window_size_y);
@@ -75,6 +74,4 @@ namespace gestalt {
           break;
       }
     }
-
-  }  // namespace application
 }  // namespace gestalt

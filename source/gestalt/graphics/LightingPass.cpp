@@ -5,9 +5,8 @@
 #include "vk_pipelines.hpp"
 
 
-namespace gestalt {
-  namespace graphics {
-    using namespace foundation;
+namespace gestalt:: graphics {
+
     void LightingPass::prepare() {
       fmt::print("preparing lighting pass\n");
 
@@ -112,5 +111,4 @@ namespace gestalt {
       vkCmdDraw(cmd, 3, 1, 0, 0);
       vkCmdEndRendering(cmd);
     }
-  }  // namespace graphics
 }  // namespace gestalt

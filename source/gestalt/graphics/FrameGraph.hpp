@@ -10,8 +10,7 @@
 #include "vk_pipelines.hpp"
 #include "vk_sync.hpp"
 
-namespace gestalt {
-  namespace graphics {
+namespace gestalt::graphics {
 
     enum class ShaderStage : uint32_t {
       kVertex = VK_SHADER_STAGE_VERTEX_BIT,
@@ -37,7 +36,7 @@ namespace gestalt {
 
     struct ImageAttachment {
       std::shared_ptr<TextureHandle> image;
-      float scale{1.0f};
+      float32 scale{1.0f};
       VkExtent3D extent{0, 0, 1};
       VkFormat format{VK_FORMAT_UNDEFINED};
       VkClearValue initial_value{};
@@ -219,11 +218,11 @@ namespace gestalt {
       VkExtent2D swapchain_extent;
       VkExtent2D draw_extent;
 
-      std::vector<std::shared_ptr<foundation::TextureHandle>> swapchain_images;
+      std::vector<std::shared_ptr<TextureHandle>> swapchain_images;
 
       void init(const Gpu& gpu, const VkExtent3D& extent);
       void create_swapchain(uint32_t width, uint32_t height);
-      void resize_swapchain(application::Window& window);
+      void resize_swapchain(Window& window);
       void destroy_swapchain() const;
     };
 
@@ -256,10 +255,10 @@ namespace gestalt {
 
     class FrameGraph {
       Gpu gpu_ = {};
-      application::Window window_;
+      Window window_;
       std::shared_ptr<ResourceManager> resource_manager_;
       std::shared_ptr<Repository> repository_;
-      std::shared_ptr<application::Gui> imgui_;
+      std::shared_ptr<Gui> imgui_;
 
       std::shared_ptr<ResourceRegistry> resource_registry_ = std::make_shared<ResourceRegistry>();
 
@@ -277,16 +276,16 @@ namespace gestalt {
       bool acquire_next_image();
       void present(VkCommandBuffer cmd);
       FrameData& get_current_frame() { return frames_[gpu_frame.get_current_frame()]; }
-      application::Window& get_window() { return window_; }
+      Window& get_window() { return window_; }
       void create_resources();
       VkCommandBuffer start_draw();
       void execute(const std::shared_ptr<RenderPass>& render_pass, VkCommandBuffer cmd);
 
     public:
-      void init(const Gpu& gpu, const application::Window& window,
+      void init(const Gpu& gpu, const Window& window,
                 const std::shared_ptr<ResourceManager>& resource_manager,
-                const std::shared_ptr<foundation::Repository>& repository,
-                const std::shared_ptr<application::Gui>& imgui_gui);
+                const std::shared_ptr<Repository>& repository,
+                const std::shared_ptr<Gui>& imgui_gui);
       void execute_passes();
 
       void cleanup();
@@ -297,5 +296,5 @@ namespace gestalt {
       VkFormat get_swapchain_format() const { return swapchain_->swapchain_image_format; }
       std::shared_ptr<TextureHandle> get_debug_image() const { return debug_texture_; }
     };
-  }  // namespace graphics
+
 }  // namespace gestalt

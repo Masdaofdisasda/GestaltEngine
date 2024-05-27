@@ -1,7 +1,6 @@
-﻿#include <vk_descriptors.h>
+﻿#include "vk_descriptors.hpp"
 
-namespace gestalt {
-  namespace graphics {
+namespace gestalt::graphics {
     DescriptorLayoutBuilder& DescriptorLayoutBuilder::add_binding(uint32_t binding,
                                                                   VkDescriptorType type,
                                                                   VkShaderStageFlags shader_stages,
@@ -285,5 +284,4 @@ namespace gestalt {
       }
       fullPools.clear();
     }
-  }  // namespace graphics
 }  // namespace gestalt

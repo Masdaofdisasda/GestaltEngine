@@ -14,10 +14,7 @@
 #include "CubemapUtils.hpp"
 
 
-namespace gestalt {
-  namespace graphics {
-    using namespace application;
-    using namespace foundation;
+namespace gestalt::graphics {
 
     AllocatedBuffer ResourceManager::create_buffer(size_t allocSize, VkBufferUsageFlags usage,
                                                    VmaMemoryUsage memoryUsage) {
@@ -664,5 +661,4 @@ namespace gestalt {
       vkDestroyImageView(gpu_.device, img.imageView, nullptr);
       vmaDestroyImage(gpu_.allocator, img.image, img.allocation);
     }
-  }  // namespace graphics
 }  // namespace gestalt

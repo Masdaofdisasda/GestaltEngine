@@ -4,9 +4,8 @@
 #include "vk_initializers.hpp"
 #include "vk_pipelines.hpp"
 
-namespace gestalt {
-  namespace graphics {
-    using namespace foundation;
+namespace gestalt::graphics {
+
     void BrightPass::prepare() {
       fmt::print("Preparing {}\n", get_name());
 
@@ -426,5 +425,4 @@ namespace gestalt {
     }
 
     void TonemapPass::destroy() {}
-  }  // namespace graphics
 }  // namespace gestalt

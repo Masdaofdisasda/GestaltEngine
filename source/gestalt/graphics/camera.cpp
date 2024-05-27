@@ -7,23 +7,22 @@
 
 #include "InputSystem.hpp"
 
-namespace gestalt {
-  namespace application {
-    void FreeFlyCamera::update(double delta_seconds, const application::Movement& movement) {
+namespace gestalt::application {
+    void FreeFlyCamera::update(double delta_seconds, const Movement& movement) {
       auto mouse_pos = glm::vec2(movement.mouse_position_x, movement.mouse_position_y);
       if (movement.right_mouse_button) {
         const glm::vec2 delta = mouse_pos - mouse_pos_;
         glm::quat deltaQuat
             = glm::quat(glm::vec3(mouse_speed * delta.y, mouse_speed * delta.x, 0.0f));
         glm::quat unclamped_rotation = deltaQuat * camera_orientation_;
-        float pitch = glm::pitch(unclamped_rotation);
-        float yaw = glm::yaw(unclamped_rotation);
+        float32 pitch = glm::pitch(unclamped_rotation);
+        float32 yaw = glm::yaw(unclamped_rotation);
 
         if ((std::abs(yaw) >= 0.01
              || (std::abs(pitch) <= glm::half_pi<float>())))  // clamp y-rotation
           camera_orientation_ = unclamped_rotation;
 
-        camera_orientation_ = glm::normalize(camera_orientation_);
+        camera_orientation_ = normalize(camera_orientation_);
         set_up_vector(up_);
       }
       mouse_pos_ = mouse_pos;
@@ -61,7 +60,7 @@ namespace gestalt {
           float maxSpeed = max_speed;
         }
         const float maxSpeed = movement.run ? max_speed * fast_coef : max_speed;
-        if (length(move_speed_) > maxSpeed) move_speed_ = glm::normalize(move_speed_) * maxSpeed;
+        if (length(move_speed_) > maxSpeed) move_speed_ = normalize(move_speed_) * maxSpeed;
       }
 
       camera_position_ += move_speed_ * static_cast<float>(delta_seconds);
@@ -75,5 +74,4 @@ namespace gestalt {
       const glm::vec3 dir = -glm::vec3(view[0][2], view[1][2], view[2][2]);
       camera_orientation_ = lookAtRH(camera_position_, camera_position_ + dir, up);
     }
-  }  // namespace application
 }  // namespace gestalt

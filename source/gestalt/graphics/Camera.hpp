@@ -1,10 +1,11 @@
 #pragma once
 
+#include "common.hpp"
+
 #include <glm/gtc/quaternion.hpp>
 
 
-namespace gestalt {
-  namespace application {
+namespace gestalt::application {
     struct Movement;
 
     class CameraPositionerInterface {
@@ -19,7 +20,7 @@ namespace gestalt {
 
       [[nodiscard]] virtual glm::quat get_orientation() const = 0;
 
-      virtual void update(double delta_seconds, const application::Movement& movement) = 0;
+      virtual void update(double delta_seconds, const Movement& movement) = 0;
     };
 
     class Camera final {
@@ -53,7 +54,7 @@ namespace gestalt {
         set_up_vector(up);
       }
 
-      void update(double delta_seconds, const application::Movement& movement) override;
+      void update(double delta_seconds, const Movement& movement) override;
 
       [[nodiscard]] glm::mat4 get_view_matrix() const override {
         const glm::mat4 t = translate(glm::mat4(1.0f), -camera_position_);
@@ -76,12 +77,12 @@ namespace gestalt {
       [[nodiscard]] glm::quat get_orientation() const override { return camera_orientation_; }
 
     private:
-      float mouse_speed = 4.5f;
-      float acceleration = .01f;
-      float damping = 15.f;     // changes deceleration speed
-      float max_speed = .05f;   // clamps movement
-      float fast_coef = 5.f;    // l-ctrl mode uses this
-      float slow_coef = .001f;  // l-alt mode uses this
+      float32 mouse_speed = 4.5f;
+      float32 acceleration = .01f;
+      float32 damping = 15.f;   // changes deceleration speed
+      float32 max_speed = .05f;  // clamps movement
+      float32 fast_coef = 5.f;   // l-ctrl mode uses this
+      float32 slow_coef = .001f;  // l-alt mode uses this
 
       glm::vec2 mouse_pos_ = glm::vec2(0);
       glm::vec3 camera_position_ = glm::vec3(0.0f, 0.0f, 5.0f);
@@ -90,5 +91,4 @@ namespace gestalt {
       glm::vec3 move_speed_ = glm::vec3(0.0f);
     };
 
-  }  // namespace application
-}  // namespace gestalt
+}  // namespace gestalt::application

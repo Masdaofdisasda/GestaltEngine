@@ -1,8 +1,6 @@
 ﻿#pragma once
 
-
-namespace gestalt {
-  namespace graphics {
+namespace gestalt::graphics {
 
     struct GpuDrawPushConstants {
       glm::mat4 worldMatrix;
@@ -15,9 +13,9 @@ namespace gestalt {
 
       struct SkyboxParams {
         glm::vec3 betaR = glm::vec3(5.22e-6, 9.19e-6, 33.1e-6);
-        float pad1;
+        float32 pad1;
         glm::vec3 betaA = glm::vec3(0.000425, 0.001881, 0.000085);
-        float pad2;
+        float32 pad2;
         glm::vec3 betaM = glm::vec3(5.61e-6, 2.1e-5, 2.1e-5);
         float pad3;
       } skybox{};
@@ -77,5 +75,4 @@ namespace gestalt {
 
       static_assert(sizeof(LightingParams) <= 88);
     };
-  }  // namespace foundation
 }  // namespace gestalt

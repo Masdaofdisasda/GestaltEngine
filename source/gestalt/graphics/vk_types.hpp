@@ -20,8 +20,9 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
 
-namespace gestalt {
-  namespace foundation {
+#include "common.hpp"
+
+namespace gestalt::foundation {
 
     struct alignas(128) PerFrameData {
       glm::mat4 view{1.f};
@@ -36,32 +37,32 @@ namespace gestalt {
     };
 
     struct EngineStats {
-      float frametime;
-      int triangle_count;
-      int drawcall_count;
-      float scene_update_time;
-      float mesh_draw_time;
+      float32 frametime;
+      int32 triangle_count;
+      int32 drawcall_count;
+      float32 scene_update_time;
+      float32 mesh_draw_time;
     };
 
     struct Bounds {
       glm::vec3 origin;
       glm::vec3 extents;
-      float sphereRadius;
+      float32 sphereRadius;
     };
 
     struct AABB {
-      glm::vec3 min{glm::vec3(std::numeric_limits<float>::max())};
-      glm::vec3 max{glm::vec3(std::numeric_limits<float>::lowest())};
+      glm::vec3 min{glm::vec3(std::numeric_limits<float32>::max())};
+      glm::vec3 max{glm::vec3(std::numeric_limits<float32>::lowest())};
 
       mutable bool is_dirty = true;
     };
 
     struct RenderObject {
-      uint32_t index_count;
-      uint32_t first_index;
-      uint32_t vertex_offset;
+      uint32 index_count;
+      uint32 first_index;
+      uint32 vertex_offset;
 
-      uint32_t material;
+      uint32 material;
       glm::mat4 transform;
     };
 
@@ -70,8 +71,7 @@ namespace gestalt {
       std::vector<RenderObject> transparent_surfaces;
     };
 
-  }  // namespace foundation
-}  // namespace gestalt
+}  // namespace gestalt foundation
 
 #define VK_CHECK(x)                                                     \
     do {                                                                \

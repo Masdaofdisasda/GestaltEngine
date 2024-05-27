@@ -8,8 +8,7 @@ namespace gestalt::graphics {
   struct RenderConfig;
 }
 
-namespace gestalt {
-  namespace application {
+namespace gestalt::application {
     enum class action {
       none,
       add_directional_light,
@@ -19,22 +18,22 @@ namespace gestalt {
     struct GuiCapabilities {
       std::function<void()> exit;
       std::function<void(std::string)> load_gltf;
-      std::function<foundation::EngineStats&()> get_stats;
+      std::function<EngineStats&()> get_stats;
       std::function<ComponentFactory&()> get_component_factory;
       std::function<graphics::RenderConfig&()> get_render_config;
-      std::function<std::shared_ptr<foundation::TextureHandle>()> get_debug_image;
+      std::function<std::shared_ptr<TextureHandle>()> get_debug_image;
     };
 
     class Gui {
       graphics::Gpu gpu_ = {};
       Window window_;
-      std::shared_ptr<foundation::Repository> repository_;
+      std::shared_ptr<Repository> repository_;
       GuiCapabilities actions_;
 
-      uint32_t guizmo_operation_ = 0;
+      uint32 guizmo_operation_ = 0;
 
       action current_action_ = action::none;
-      foundation::entity selected_entity_ = foundation::invalid_entity;
+      entity selected_entity_ = invalid_entity;
 
       bool show_scene_hierarchy_ = true;
       bool show_light_adapt_settings_ = false;
@@ -50,10 +49,10 @@ namespace gestalt {
       void stats();
       void lights();
       void scene_graph();
-      void display_scene_hierarchy(foundation::entity entity);
-      void show_transform_component(foundation::NodeComponent& node, foundation::TransformComponent& transform);
-      void show_mesh_component(foundation::MeshComponent& mesh_component);
-      void show_light_component(foundation::LightComponent& light, foundation::TransformComponent& transform);
+      void display_scene_hierarchy(entity entity);
+      void show_transform_component(NodeComponent& node, TransformComponent& transform);
+      void show_mesh_component(MeshComponent& mesh_component);
+      void show_light_component(LightComponent& light, TransformComponent& transform);
       void show_node_component();
       void show_scene_hierarchy_window();
       void light_adaptation_settings();
@@ -71,16 +70,15 @@ namespace gestalt {
       void set_debug_texture(VkImageView image_view, VkSampler sampler);
 
       void init(graphics::Gpu& gpu, Window& window,
-                VkFormat swapchainFormat, const std::shared_ptr<foundation::Repository>& repository, GuiCapabilities
+                VkFormat swapchainFormat, const std::shared_ptr<Repository>& repository, GuiCapabilities
                 & actions);
 
       void cleanup();
 
-      void draw(VkCommandBuffer cmd, const std::shared_ptr<foundation::TextureHandle>& swapchain);
+      void draw(VkCommandBuffer cmd, const std::shared_ptr<TextureHandle>& swapchain);
 
       void update(const SDL_Event& e);
 
       void new_frame();
     };
-  }  // namespace application
 }  // namespace gestalt

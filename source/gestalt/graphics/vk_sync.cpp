@@ -2,8 +2,7 @@
 
 #include "vk_initializers.hpp"
 
-namespace gestalt {
-  namespace graphics {
+namespace gestalt::graphics {
     void vk_sync::init(const Gpu& gpu, std::vector<FrameData>& frames) {
       gpu_ = gpu;
       deletion_service_.init(gpu_.device, gpu_.allocator);
@@ -32,5 +31,4 @@ namespace gestalt {
 
       deletion_service_.push(imgui_fence);
     }
-  }  // namespace graphics
 }  // namespace gestalt

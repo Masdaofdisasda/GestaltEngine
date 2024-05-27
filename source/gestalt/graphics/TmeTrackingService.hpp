@@ -2,8 +2,7 @@
 #include <SDL_stdinc.h>
 #include <SDL_timer.h>
 
-namespace gestalt {
-  namespace application {
+namespace gestalt::application {
     class TimeTrackingService {
     public:
       TimeTrackingService() { reset_timer(); }
@@ -24,7 +23,6 @@ namespace gestalt {
 
     private:
       Uint64 time_stamp_;    // Stores the last timestamp
-      float delta_seconds_;  // Stores the time elapsed since the last frame
+      float32 delta_seconds_;  // Stores the time elapsed since the last frame
     };
-  }  // namespace application
 }  // namespace gestalt

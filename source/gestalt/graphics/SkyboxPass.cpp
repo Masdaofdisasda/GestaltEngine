@@ -4,10 +4,8 @@
 #include "vk_initializers.hpp"
 #include "vk_pipelines.hpp"
 
-namespace gestalt {
-  namespace graphics {
+namespace gestalt::graphics {
 
-    using namespace foundation;
     void SkyboxPass::prepare() {
       fmt::print("Preparing {}\n", get_name());
 
@@ -119,5 +117,4 @@ namespace gestalt {
     void InfiniteGridPass::destroy() {
 
     }
-  }  // namespace graphics
 }  // namespace gestalt

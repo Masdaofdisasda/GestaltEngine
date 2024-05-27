@@ -2,12 +2,13 @@
 
 #include <SDL.h>
 
-namespace gestalt {
-  namespace application {
+#include "common.hpp"
+
+namespace gestalt::application {
 
     struct Movement {
-      float mouse_position_x{0.f};
-      float mouse_position_y{0.f};
+      float32 mouse_position_x{0.f};
+      float32 mouse_position_y{0.f};
       bool left_mouse_button{false};
       bool right_mouse_button{false};
       bool forward{false};
@@ -28,9 +29,8 @@ namespace gestalt {
       void handle_keyboard(const SDL_Event& e);
 
     public:
-      void handle_event(const SDL_Event& e, uint32_t window_size_x, uint32_t window_size_y);
+      void handle_event(const SDL_Event& e, uint32 window_size_x, uint32 window_size_y);
 
       [[nodiscard]] const Movement& get_movement() const { return movement_; }
     };
-  }  // namespace application
 }  // namespace gestalt

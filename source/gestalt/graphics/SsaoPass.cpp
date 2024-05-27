@@ -4,8 +4,7 @@
 #include "vk_initializers.hpp"
 #include "vk_pipelines.hpp"
 
-namespace gestalt {
-  namespace graphics {
+namespace gestalt::graphics {
       /*
     using namespace foundation;
 
@@ -288,5 +287,4 @@ namespace gestalt {
       vkDestroyPipelineLayout(gpu_.device, pipeline_layout_, nullptr);
       vkDestroyPipeline(gpu_.device, pipeline_, nullptr);
     }*/
-  }  // namespace graphics
 }  // namespace gestalt

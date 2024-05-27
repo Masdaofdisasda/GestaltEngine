@@ -4,8 +4,7 @@
 #include "vk_types.hpp"
 #include "vk_descriptors.hpp"
 
-namespace gestalt {
-  namespace graphics {/*
+namespace gestalt::graphics {/*
     class SsaoFilterPass final : public RenderPass {
       std::string vertex_shader_source_ = "../shaders/fullscreen.vert.spv";
       std::string fragment_shader_source_ = "../shaders/ssao_filter.frag.spv";
@@ -145,5 +144,5 @@ namespace gestalt {
       ShaderPassDependencyInfo& get_dependencies() override { return deps_; }
       std::string get_name() const override { return name_; }
     };*/
-  }  // namespace graphics
+
 }  // namespace gestalt

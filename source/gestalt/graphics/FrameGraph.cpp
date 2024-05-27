@@ -15,12 +15,11 @@
 #include "vk_initializers.hpp"
 #include "vk_pipelines.hpp"
 
-namespace gestalt {
-  namespace graphics {
-    void FrameGraph::init(const Gpu& gpu, const application::Window& window,
+namespace gestalt::graphics {
+    void FrameGraph::init(const Gpu& gpu, const Window& window,
                           const std::shared_ptr<ResourceManager>& resource_manager,
                           const std::shared_ptr<Repository>& repository,
-                          const std::shared_ptr<application::Gui>& imgui_gui) {
+                          const std::shared_ptr<Gui>& imgui_gui) {
       gpu_ = gpu;
       window_ = window;
       resource_manager_ = resource_manager;
@@ -163,7 +162,7 @@ namespace gestalt {
         if (debug_texture_ != nullptr) return;
 
         const auto copyImg = resource_registry_->attachments_.bright_pass;
-        debug_texture_ = std::make_shared<foundation::TextureHandle>(copyImg.image->getType());
+        debug_texture_ = std::make_shared<TextureHandle>(copyImg.image->getType());
         debug_texture_->imageExtent = copyImg.image->imageExtent;
         resource_manager_->create_frame_buffer(debug_texture_);
 
@@ -541,13 +540,13 @@ namespace gestalt {
       swapchain = vkbSwapchain.swapchain;
 
       for (const auto& _swapchainImage : vkbSwapchain.get_images().value()) {
-        foundation::TextureHandle handle{};
+        TextureHandle handle{};
         handle.image = _swapchainImage;
         handle.setFormat(swapchain_image_format);
         handle.setLayout(VK_IMAGE_LAYOUT_UNDEFINED);
         handle.imageExtent = {swapchain_extent.width, swapchain_extent.height, 1};
 
-        swapchain_images.push_back(std::make_shared<foundation::TextureHandle>(handle));
+        swapchain_images.push_back(std::make_shared<TextureHandle>(handle));
       }
 
       const auto views = vkbSwapchain.get_image_views().value();
@@ -557,7 +556,7 @@ namespace gestalt {
       }
     }
 
-    void VkSwapchain::resize_swapchain(application::Window& window) {
+    void VkSwapchain::resize_swapchain(Window& window) {
       vkDeviceWaitIdle(gpu_.device);
 
       destroy_swapchain();
@@ -636,5 +635,4 @@ namespace gestalt {
     std::vector<std::shared_ptr<RenderPass>> FrameGraphWIP::get_sorted_passes() const {
       return sorted_passes_;
     }
-  }  // namespace graphics
 }  // namespace gestalt

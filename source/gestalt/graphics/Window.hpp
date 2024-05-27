@@ -4,8 +4,7 @@
 #include <SDL_vulkan.h>
 #include "vk_types.hpp"
 
-namespace gestalt {
-  namespace application {
+namespace gestalt::application {
 
     class Window {
     public:
@@ -17,5 +16,4 @@ namespace gestalt {
       void update_window_size();
       void cleanup() const;
     };
-  }  // namespace application
 }  // namespace gestalt

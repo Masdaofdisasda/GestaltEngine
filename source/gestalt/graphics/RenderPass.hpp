@@ -3,8 +3,7 @@
 #include "FrameGraph.hpp"
 #include "vk_types.hpp"
 
-namespace gestalt {
-  namespace graphics {
+namespace gestalt::graphics {
     class DirectionalDepthPass final : public RenderPass {
     public:
       void prepare() override;
@@ -107,5 +106,4 @@ namespace gestalt {
       void execute(VkCommandBuffer cmd) override;
       std::string get_name() const override { return "Tonemap Pass"; }
     };
-  }  // namespace graphics
 }  // namespace gestalt

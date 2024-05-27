@@ -7,8 +7,7 @@
 
 #include "SceneManger.hpp"
 
-namespace gestalt {
-  namespace application {
+namespace gestalt::application {
 
     struct Vertex {
       glm::vec3 position;
@@ -16,8 +15,6 @@ namespace gestalt {
       glm::vec4 tangent;
       glm::vec2 uv;
     };
-
-    using namespace gestalt::foundation;
 
     void AssetLoader::init(const std::shared_ptr<graphics::ResourceManager>& resource_manager,
                            const std::shared_ptr<ComponentFactory>& component_factory,
@@ -525,16 +522,16 @@ namespace gestalt {
 
       MeshSurface surface{
           .meshlets = std::move(meshlets),
-          .vertex_count = static_cast<uint32_t>(vertex_count),
-          .index_count = static_cast<uint32_t>(index_count),
-          .first_index = static_cast<uint32_t>(repository_->indices.size()),
-          .vertex_offset = static_cast<uint32_t>(repository_->vertex_positions.size()),
+          .vertex_count = static_cast<uint32>(vertex_count),
+          .index_count = static_cast<uint32>(index_count),
+          .first_index = static_cast<uint32>(repository_->indices.size()),
+          .vertex_offset = static_cast<uint32>(repository_->vertex_positions.size()),
           .local_bounds = local_aabb,
       };
 
       repository_->vertex_positions.add(vertex_positions);
       repository_->vertex_data.add(vertex_data);
-      const uint32_t highest_index = *std::ranges::max_element(indices);
+      const uint32 highest_index = *std::ranges::max_element(indices);
       assert(highest_index <= repository_->vertex_positions.size());
       repository_->indices.add(indices);
 
@@ -674,5 +671,4 @@ namespace gestalt {
         create_mesh(surfaces, std::string(mesh.name));
       }
     }
-  }  // namespace application
 }  // namespace gestalt

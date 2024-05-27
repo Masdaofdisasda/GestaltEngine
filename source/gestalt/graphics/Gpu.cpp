@@ -2,10 +2,7 @@
 
 #include <VkBootstrap.h>
 
-namespace gestalt {
-  namespace graphics {
-
-    using namespace application;
+namespace gestalt::graphics {
 
     void Gpu::init(
         bool use_validation_layers, Window& window,
@@ -137,5 +134,4 @@ namespace gestalt {
       vkDestroyInstance(instance, nullptr);
     }
 
-  }  // namespace graphics
 }  // namespace gestalt

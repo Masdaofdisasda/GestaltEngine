@@ -14,10 +14,8 @@
 #include "vk_initializers.hpp"
 #include "RenderConfig.hpp"
 
-namespace gestalt {
-  namespace application {
+namespace gestalt::application {
 
-    using namespace gestalt::foundation;
     using namespace gestalt::graphics;
 
     void Gui::set_debug_texture(VkImageView image_view, VkSampler sampler) {
@@ -134,8 +132,8 @@ namespace gestalt {
       proj[1][1] *= -1;  // Flip the Y-axis for opengl like system
 
       // Convert glm matrices to arrays for ImGuizmo
-      float* view = glm::value_ptr(viewCam);
-      float* projection = glm::value_ptr(proj);
+      float* view = value_ptr(viewCam);
+      float* projection = value_ptr(proj);
       float model[16];
 
       // Setup for using Gizmo without a separate window
@@ -156,14 +154,14 @@ namespace gestalt {
       if (transform_component.has_value()) {
         auto& transform = transform_component.value().get();
 
-        glm::mat4 localTransform = glm::translate(glm::mat4(1.0f), transform.position)
-                                   * glm::toMat4(transform.rotation)
-                                   * glm::scale(glm::mat4(1.0f), glm::vec3(transform.scale));
+        glm::mat4 localTransform = translate(glm::mat4(1.0f), transform.position)
+                                   * toMat4(transform.rotation)
+                                   * scale(glm::mat4(1.0f), glm::vec3(transform.scale));
         glm::mat4 parentWorldTransform
-            = glm::translate(glm::mat4(1.0f), transform.parent_position)
-              * glm::toMat4(transform.parent_rotation)
-              * glm::scale(glm::mat4(1.0f), glm::vec3(transform.parent_scale));
-        glm::mat4 inverseParentWorldTransform = glm::inverse(parentWorldTransform);
+            = translate(glm::mat4(1.0f), transform.parent_position)
+              * toMat4(transform.parent_rotation)
+              * scale(glm::mat4(1.0f), glm::vec3(transform.parent_scale));
+        glm::mat4 inverseParentWorldTransform = inverse(parentWorldTransform);
         glm::mat4 worldTransform = parentWorldTransform * localTransform;
 
         glm::vec3 t = glm::vec3(worldTransform[3]);
@@ -332,7 +330,7 @@ namespace gestalt {
           static glm::vec3 min_bounds = root.bounds.min;
           static glm::vec3 max_bounds = root.bounds.max;
           static glm::vec2 intensity_range = glm::vec2(1.f);
-          static int light_count = 10;
+          static int32 light_count = 10;
 
           ImGui::InputFloat3("Min Bounds", &min_bounds.x);
           ImGui::InputFloat3("Max Bounds", &max_bounds.x);
@@ -372,7 +370,7 @@ namespace gestalt {
       if (current_action_ == action::add_directional_light) {
         if (ImGui::Begin("Add Directional Light", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
           static glm::vec3 color = glm::vec3(1.0f);  // Default to white
-          static float intensity = 1.0f;
+          static float32 intensity = 1.0f;
           static glm::vec3 direction = glm::vec3(0.0f, -1.0f, 0.0f);  // Default pointing downwards
 
           ImGui::ColorEdit3("Color", &color.x);
@@ -758,14 +756,14 @@ namespace gestalt {
       ImGui::Separator();
       ImGui::Text("World Transform:");
 
-      glm::mat4 localTransform = glm::translate(glm::mat4(1.0f), transform.position)
-                                 * glm::toMat4(transform.rotation)
-                                 * glm::scale(glm::mat4(1.0f), glm::vec3(transform.scale));
+      glm::mat4 localTransform = translate(glm::mat4(1.0f), transform.position)
+                                 * toMat4(transform.rotation)
+                                 * scale(glm::mat4(1.0f), glm::vec3(transform.scale));
       glm::mat4 parentWorldTransform
-          = glm::translate(glm::mat4(1.0f), transform.parent_position)
-            * glm::toMat4(transform.parent_rotation)
-            * glm::scale(glm::mat4(1.0f), glm::vec3(transform.parent_scale));
-      glm::mat4 inverseParentWorldTransform = glm::inverse(parentWorldTransform);
+          = translate(glm::mat4(1.0f), transform.parent_position)
+            * toMat4(transform.parent_rotation)
+            * scale(glm::mat4(1.0f), glm::vec3(transform.parent_scale));
+      glm::mat4 inverseParentWorldTransform = inverse(parentWorldTransform);
       glm::mat4 worldTransform = parentWorldTransform * localTransform;
 
       // World position control (taking parent transform into account)
@@ -796,7 +794,7 @@ namespace gestalt {
       }
 
       // World scale control (taking parent transform into account)
-      float world_scale = glm::length(glm::vec3(worldTransform[0]));
+      float world_scale = length(glm::vec3(worldTransform[0]));
       if (ImGui::DragFloat("World Scale", &world_scale, 0.005f)) {
         transform.scale = world_scale / transform.parent_scale;
         transform.is_dirty = true;
@@ -938,7 +936,7 @@ namespace gestalt {
       }
       if (light.type == LightType::kDirectional) {
         glm::vec3 euler_angles
-            = degrees(glm::eulerAngles(transform.rotation));  // Convert quaternion to Euler angles
+            = degrees(eulerAngles(transform.rotation));  // Convert quaternion to Euler angles
 
         float azimuth = euler_angles.y;     // Azimuth angle (yaw)
         float elevation = -euler_angles.x;  // Elevation angle (pitch)
@@ -1008,5 +1006,4 @@ namespace gestalt {
       }
       ImGui::EndChild();
     }
-  }  // namespace application
 }  // namespace gestalt
