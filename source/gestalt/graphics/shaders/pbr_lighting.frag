@@ -54,6 +54,25 @@ vec3 ReconstructWorldPos(float depth, vec2 uv, mat4 invViewProj) {
     return worldSpacePosition.xyz / worldSpacePosition.w;
 }
 
+// https://johnwhite3d.blogspot.com/2017/10/signed-octahedron-normal-encoding.html
+vec3 SignedOctDecode(vec3 n) {
+
+    // Perform the reverse octahedral transformation
+    vec3 OutN;
+    OutN.x = (n.x - n.y);
+    OutN.y = (n.x + n.y) - 1.0;
+
+    // Retrieve the sign of the z component
+    OutN.z = n.z * 2.0 - 1.0;
+
+    // Reconstruct the z component
+    OutN.z = OutN.z * (1.0 - abs(OutN.x) - abs(OutN.y));
+
+    OutN = normalize(OutN);
+
+    return OutN;
+}
+
 const mat4 biasMat = mat4( 
 	0.5, 0.0, 0.0, 0.0,
 	0.0, 0.5, 0.0, 0.0,
@@ -70,7 +89,7 @@ void main() {
 
 	vec4 Kd = vec4(albedoMetal.rgb, 1.0);
 
-	vec3 n = normalize(normalRough.rgb * 2.0 - 1.0); //TODO
+	vec3 n = SignedOctDecode(normalRough.rgb);
 
 	vec4 Ke = vec4(emissiveOcclusion.rgb, 1.0);
 	

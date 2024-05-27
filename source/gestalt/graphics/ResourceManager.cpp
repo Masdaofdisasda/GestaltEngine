@@ -613,67 +613,52 @@ namespace gestalt {
                             VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT, false);
     }
 
-    void ResourceManager::create_color_frame_buffer(const std::shared_ptr<TextureHandle>& color_image) const {
-      assert(color_image->getType() == TextureType::kColor);
-      // hardcoding the draw format to 32 bit float
-      color_image->setFormat(VK_FORMAT_R16G16B16A16_SFLOAT);
-      const VkExtent3D extent = { color_image->imageExtent.width, color_image->imageExtent.height, 1 };
-      color_image->imageExtent = extent;
+    void ResourceManager::create_frame_buffer(const std::shared_ptr<TextureHandle>& image, VkFormat format) const {
+      assert(image->getType() == TextureType::kColor || image->getType() == TextureType::kDepth);
 
-      VkImageUsageFlags drawImageUsages{};
-      drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-      drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-      drawImageUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
-      drawImageUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-      drawImageUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
+      VkImageUsageFlags usageFlags = 0;
+      VkImageAspectFlags aspectFlags;
 
-      VkImageCreateInfo rimg_info
-          = vkinit::image_create_info(color_image->getFormat(), drawImageUsages, extent);
+      if (image->getType() == TextureType::kColor) {
+        if (format == VK_FORMAT_UNDEFINED) {
+          format = VK_FORMAT_R16G16B16A16_SFLOAT;
+        }
+        usageFlags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        usageFlags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        usageFlags |= VK_IMAGE_USAGE_STORAGE_BIT;
+        usageFlags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        usageFlags |= VK_IMAGE_USAGE_SAMPLED_BIT;
+        aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
+      } else if (image->getType() == TextureType::kDepth) {
+        if (format == VK_FORMAT_UNDEFINED) {
+          format = VK_FORMAT_D32_SFLOAT;
+        }
+        usageFlags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+        usageFlags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        usageFlags |= VK_IMAGE_USAGE_SAMPLED_BIT;
+        aspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
+      }
 
-      // for the draw image, we want to allocate it from gpu local memory
-      VmaAllocationCreateInfo rimg_allocinfo = {};
-      rimg_allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-      rimg_allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+      image->setFormat(format);
+      const VkExtent3D extent = {image->imageExtent.width, image->imageExtent.height, 1};
+      image->imageExtent = extent;
 
-      // allocate and create the image
-      VK_CHECK(vmaCreateImage(gpu_.allocator, &rimg_info, &rimg_allocinfo, &color_image->image,
-                     &color_image->allocation, nullptr));
+      VkImageCreateInfo img_info = vkinit::image_create_info(format, usageFlags, extent);
 
-      // build a image-view for the draw image to use for rendering
-      VkImageViewCreateInfo rview_info = vkinit::imageview_create_info(
-          color_image->getFormat(), color_image->image, VK_IMAGE_ASPECT_COLOR_BIT);
+      // Allocate and create the image
+      VmaAllocationCreateInfo img_allocinfo = {};
+      img_allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+      img_allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-      VK_CHECK(vkCreateImageView(gpu_.device, &rview_info, nullptr, &color_image->imageView));
+      VK_CHECK(vmaCreateImage(gpu_.allocator, &img_info, &img_allocinfo, &image->image,
+                              &image->allocation, nullptr));
+
+      // Build an image view for the image to use for rendering
+      VkImageViewCreateInfo view_info
+          = vkinit::imageview_create_info(format, image->image, aspectFlags);
+      VK_CHECK(vkCreateImageView(gpu_.device, &view_info, nullptr, &image->imageView));
     }
 
-    void ResourceManager::create_depth_frame_buffer(std::shared_ptr<TextureHandle>& depth_image) const {
-      assert(depth_image->getType() == TextureType::kDepth);
-
-      depth_image->setFormat(VK_FORMAT_D32_SFLOAT);
-      const VkExtent3D extent
-          = {depth_image->imageExtent.width, depth_image->imageExtent.height, 1};
-      depth_image->imageExtent = extent;
-      VkImageUsageFlags depthImageUsages{};
-      depthImageUsages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-      depthImageUsages |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-      depthImageUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
-
-      VmaAllocationCreateInfo rimg_allocinfo = {};
-      rimg_allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-      rimg_allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-      VkImageCreateInfo dimg_info
-          = vkinit::image_create_info(depth_image->getFormat(), depthImageUsages, extent);
-
-      // allocate and create the image
-      vmaCreateImage(gpu_.allocator, &dimg_info, &rimg_allocinfo, &depth_image->image,
-                     &depth_image->allocation, nullptr);
-
-      // build a image-view for the draw image to use for rendering
-      VkImageViewCreateInfo dview_info = vkinit::imageview_create_info(
-          depth_image->getFormat(), depth_image->image, VK_IMAGE_ASPECT_DEPTH_BIT);
-
-      VK_CHECK(vkCreateImageView(gpu_.device, &dview_info, nullptr, &depth_image->imageView));
-    }
 
     void ResourceManager::destroy_image(const TextureHandle& img) {
       vkDestroyImageView(gpu_.device, img.imageView, nullptr);

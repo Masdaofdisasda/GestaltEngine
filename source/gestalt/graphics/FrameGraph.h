@@ -37,10 +37,11 @@ namespace gestalt {
 
     struct ImageAttachment {
       std::shared_ptr<TextureHandle> image;
-      float scale = 1.0f;
-      VkExtent3D extent = {0, 0, 1};
+      float scale{1.0f};
+      VkExtent3D extent{0, 0, 1};
+      VkFormat format{VK_FORMAT_UNDEFINED};
       VkClearValue initial_value{};
-      uint32_t version = 0;
+      uint32_t version{0};
     };
 
     enum class ImageUsageType {
@@ -108,30 +109,41 @@ namespace gestalt {
         ImageAttachment gbuffer3{.image = std::make_shared<TextureHandle>(TextureType::kColor)};
 
         ImageAttachment bright_pass{.image = std::make_shared<TextureHandle>(TextureType::kColor),
-                                    .extent = {512, 512}};
+                                    .extent = {512, 512},
+                                    .format = VK_FORMAT_R16G16B16_SFLOAT};
         ImageAttachment blur_y{.image = std::make_shared<TextureHandle>(TextureType::kColor),
-                               .extent = {512, 512}};
+                               .extent = {512, 512},
+                               .format = VK_FORMAT_R16G16B16_SFLOAT};
 
         ImageAttachment lum_64{.image = std::make_shared<TextureHandle>(TextureType::kColor),
-                               .extent = {64, 64}};
+                               .extent = {64, 64},
+                               .format = VK_FORMAT_R16_SFLOAT};
         ImageAttachment lum_32{.image = std::make_shared<TextureHandle>(TextureType::kColor),
-                               .extent = {32, 32}};
+                               .extent = {32, 32},
+                               .format = VK_FORMAT_R16_SFLOAT};
         ImageAttachment lum_16{.image = std::make_shared<TextureHandle>(TextureType::kColor),
-                               .extent = {16, 16}};
+                               .extent = {16, 16},
+                               .format = VK_FORMAT_R16_SFLOAT};
         ImageAttachment lum_8{.image = std::make_shared<TextureHandle>(TextureType::kColor),
-                              .extent = {8, 8}};
+                              .extent = {8, 8},
+                              .format = VK_FORMAT_R16_SFLOAT};
         ImageAttachment lum_4{.image = std::make_shared<TextureHandle>(TextureType::kColor),
-                              .extent = {4, 4}};
+                              .extent = {4, 4},
+                              .format = VK_FORMAT_R16_SFLOAT};
         ImageAttachment lum_2{.image = std::make_shared<TextureHandle>(TextureType::kColor),
-                              .extent = {2, 2}};
+                              .extent = {2, 2},
+                              .format = VK_FORMAT_R16_SFLOAT};
         ImageAttachment lum_1{.image = std::make_shared<TextureHandle>(TextureType::kColor),
-                              .extent = {1, 1}};
+                              .extent = {1, 1},
+                              .format = VK_FORMAT_R16_SFLOAT};
 
         ImageAttachment lum_A{.image = std::make_shared<TextureHandle>(TextureType::kColor),
                               .extent = {1, 1},
+                              .format = VK_FORMAT_R16_SFLOAT,
                               .initial_value = {{1.f, 1.f, 1.f, 1.f}}};
         ImageAttachment lum_B{.image = std::make_shared<TextureHandle>(TextureType::kColor),
                               .extent = {1, 1},
+                              .format = VK_FORMAT_R16_SFLOAT,
                               .initial_value = {{1.f, 1.f, 1.f, 1.f}}};
       } attachments_;
 

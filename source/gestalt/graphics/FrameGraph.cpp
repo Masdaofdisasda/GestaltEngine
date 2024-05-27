@@ -89,9 +89,8 @@ namespace gestalt {
           image_attachment.image->imageExtent = image_attachment.extent;
         }
 
+        resource_manager_->create_frame_buffer(image_attachment.image);
         if (image_attachment.image->getType() == TextureType::kColor) {
-          resource_manager_->create_color_frame_buffer(image_attachment.image);
-
           vkutil::TransitionImage(image_attachment.image)
               .to(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
               .withSource(VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0)
@@ -110,8 +109,6 @@ namespace gestalt {
 
 
         } else if (image_attachment.image->getType() == TextureType::kDepth) {
-          resource_manager_->create_depth_frame_buffer(image_attachment.image);
-
           vkutil::TransitionImage(image_attachment.image)
               .to(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
               .withSource(VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0)
@@ -168,7 +165,7 @@ namespace gestalt {
         const auto copyImg = resource_registry_->attachments_.bright_pass;
         debug_texture_ = std::make_shared<foundation::TextureHandle>(copyImg.image->getType());
         debug_texture_->imageExtent = copyImg.image->imageExtent;
-        resource_manager_->create_color_frame_buffer(debug_texture_);
+        resource_manager_->create_frame_buffer(debug_texture_);
 
         vkutil::TransitionImage(copyImg.image)
             .to(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)

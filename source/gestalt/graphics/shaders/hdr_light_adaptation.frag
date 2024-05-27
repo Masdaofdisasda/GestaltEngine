@@ -2,7 +2,7 @@
 #version 460
 
 layout(location = 0) in  vec2 texCoord;
-layout(location = 0) out vec4 outColor;
+layout(location = 0) out float outColor;
 
 layout( push_constant ) uniform constants
 {
@@ -32,5 +32,5 @@ void main()
    
    newAdaptation = clamp(newAdaptation, params.min_luminance, params.max_luminance);
 
-   outColor = vec4(vec3(newAdaptation), 1.0);
+   outColor = newAdaptation;
 }

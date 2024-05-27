@@ -19,9 +19,26 @@ layout(location = 0) out vec4 gBuffer1; // Albedo (RGB) + Metalness (A)
 layout(location = 1) out vec4 gBuffer2; // Normal (RG) + Roughness (A)
 layout(location = 2) out vec4 gBuffer3; // Emissive (RGB) + Occlusion (A)
 
+#define FLT_MAX 3.402823466e+38
 
 vec3 sRGBToLinear(vec3 color) {
     return mix(color / 12.92, pow((color + vec3(0.055)) / vec3(1.055), vec3(2.4)), step(vec3(0.04045), color));
+}
+
+// https://johnwhite3d.blogspot.com/2017/10/signed-octahedron-normal-encoding.html
+vec3 SignedOctEncode(vec3 n) {
+	n = normalize(n);
+
+    // Perform the octahedral transformation
+    vec3 OutN;
+    OutN.y = n.y * 0.5 + 0.5;
+    OutN.x = n.x * 0.5 + OutN.y;
+    OutN.y = n.x * -0.5 + OutN.y;
+
+    // Store the sign of the z component
+    OutN.z = clamp(n.z * FLT_MAX, 0.0, 1.0);
+
+    return OutN;
 }
 
 void main() {
@@ -83,7 +100,7 @@ void main() {
 	}
 	
 	gBuffer1 = vec4(Kd.rgb, MeR.b); // Albedo + Metalness
-    gBuffer2 = vec4(normalize(n) * 0.5 + 0.5, MeR.g); // Normal + Roughness
+    gBuffer2 = vec4(SignedOctEncode(n), MeR.g); // Normal + Roughness
     gBuffer3 = vec4(Ke.rgb, Kao); // Emissive + Occlusion
 
 }
