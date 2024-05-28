@@ -123,15 +123,13 @@ namespace gestalt::graphics {
     }
   }
 
-  void Gpu::cleanup() {
+  void Gpu::cleanup() const {
     vmaDestroyAllocator(allocator);
     vkDestroyDevice(device, nullptr);
     vkDestroySurfaceKHR(instance, surface, nullptr);
     vkb::destroy_debug_utils_messenger(instance, debug_messenger);
     vkDestroyInstance(instance, nullptr);
   }
-
-  Gpu::~Gpu() { cleanup(); }
 
   VkInstance Gpu::getInstance() const { return instance; }
 

@@ -33,10 +33,9 @@ namespace gestalt::graphics {
       void init(
           bool use_validation_layers, Window& window,
           std::function<void(std::function<void(VkCommandBuffer)>)> immediate_submit_function);
-      void cleanup();
+      void cleanup() const;
 
       Gpu() = default;
-      ~Gpu() override;
       [[nodiscard]] VkInstance getInstance() const override;
       [[nodiscard]] VkDevice getDevice() const override;
       [[nodiscard]] VmaAllocator getAllocator() const override;

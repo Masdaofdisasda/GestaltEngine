@@ -24,7 +24,10 @@ namespace gestalt::graphics {
     return *this;
   }
 
-  void DescriptorLayoutBuilder::clear() { bindings.clear(); }
+  void DescriptorLayoutBuilder::clear() {
+    bindings.clear();
+    binding_flags.clear();
+  }
 
   VkDescriptorSetLayout DescriptorLayoutBuilder::build(VkDevice device, bool is_push_descriptor) {
     VkDescriptorSetLayoutCreateInfo info
