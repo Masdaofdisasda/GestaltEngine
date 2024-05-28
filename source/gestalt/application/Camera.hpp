@@ -20,7 +20,7 @@ namespace gestalt::application {
 
       [[nodiscard]] virtual glm::quat get_orientation() const = 0;
 
-      virtual void update(double delta_seconds, const Movement& movement) = 0;
+      virtual void update(float64 delta_seconds, const Movement& movement) = 0;
     };
 
     class Camera final {
@@ -38,7 +38,7 @@ namespace gestalt::application {
       void set_positioner(CameraPositionerInterface* new_positioner) {
         positioner_ = new_positioner;
       }
-      void update(double delta_seconds, const Movement& movement) const {
+      void update(float64 delta_seconds, const Movement& movement) const {
         positioner_->update(delta_seconds, movement);
       }
 
@@ -54,7 +54,7 @@ namespace gestalt::application {
         set_up_vector(up);
       }
 
-      void update(double delta_seconds, const Movement& movement) override;
+      void update(float64 delta_seconds, const Movement& movement) override;
 
       [[nodiscard]] glm::mat4 get_view_matrix() const override {
         const glm::mat4 t = translate(glm::mat4(1.0f), -camera_position_);

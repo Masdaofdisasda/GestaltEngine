@@ -31,12 +31,13 @@ namespace gestalt::graphics {
       AllocatedBuffer newBuffer;
 
       // allocate the buffer
-      VK_CHECK(vmaCreateBuffer(gpu_.allocator, &bufferInfo, &vmaallocInfo, &newBuffer.buffer,
+      VK_CHECK(vmaCreateBuffer(gpu_->getAllocator(), &bufferInfo, &vmaallocInfo, &newBuffer.buffer,
                                &newBuffer.allocation, &newBuffer.info));
       return newBuffer;
     }
 
-    void ResourceManager::init(const Gpu& gpu, const std::shared_ptr<Repository>& repository) {
+    void ResourceManager::init(const std::shared_ptr<IGpu>& gpu,
+                               const std::shared_ptr<Repository>& repository) {
       gpu_ = gpu;
       repository_ = repository;
       resource_loader_.init(gpu);
@@ -46,7 +47,7 @@ namespace gestalt::graphics {
              {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10},
              {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kLimits.max_materials}};
 
-      descriptorPool.init(gpu_.device, 1, sizes);
+      descriptorPool->init(gpu_->getDevice(), 1, sizes);
 
     }
 
@@ -56,10 +57,14 @@ namespace gestalt::graphics {
         destroy_image(image);
       }
       for (const auto& sampler : repository_->samplers.data()) {
-        vkDestroySampler(gpu_.device, sampler, nullptr);
+        vkDestroySampler(gpu_->getDevice(), sampler, nullptr);
       }
-      descriptorPool.destroy_pools(gpu_.device);
+      descriptorPool->destroy_pools(gpu_->getDevice());
     }
+
+    void ResourceManager::flush_loader() { resource_loader_.flush(); }
+
+    std::shared_ptr<IDescriptorAllocatorGrowable>& ResourceManager::get_descriptor_pool() { return descriptorPool; }
 
     void ResourceManager::upload_mesh() {
       const std::span indices = repository_->indices.data();
@@ -93,7 +98,7 @@ namespace gestalt::graphics {
 
       void* data;
       VmaAllocation allocation = staging.allocation;
-      VK_CHECK(vmaMapMemory(gpu_.allocator, allocation, &data));
+      VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation, &data));
 
       // copy vertex buffer
       memcpy(data, vertex_positions.data(), vertex_position_buffer_size);
@@ -103,7 +108,7 @@ namespace gestalt::graphics {
       memcpy((char*)data + vertex_position_buffer_size + vertex_data_buffer_size, indices.data(),
              index_buffer_size);
 
-        gpu_.immediate_submit([&](VkCommandBuffer cmd) {
+        gpu_->getImmediateSubmit()([&](VkCommandBuffer cmd) {
           VkBufferCopy vertex_positions_copy;
           vertex_positions_copy.dstOffset = 0;
           vertex_positions_copy.srcOffset = 0;
@@ -127,7 +132,7 @@ namespace gestalt::graphics {
 
           vkCmdCopyBuffer(cmd, staging.buffer, mesh_buffers.index_buffer.buffer, 1, &index_copy);
         });
-      vmaUnmapMemory(gpu_.allocator, allocation);
+      vmaUnmapMemory(gpu_->getAllocator(), allocation);
       destroy_buffer(staging);
 
       writer.clear();
@@ -135,16 +140,16 @@ namespace gestalt::graphics {
                           vertex_position_buffer_size, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
       writer.write_buffer(1, mesh_buffers.vertex_data_buffer.buffer, vertex_data_buffer_size, 0,
                           VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-      writer.update_set(gpu_.device, mesh_buffers.descriptor_set);
+      writer.update_set(gpu_->getDevice(), mesh_buffers.descriptor_set);
     }
 
     void ResourceManager::destroy_buffer(const AllocatedBuffer& buffer) {
-      vmaDestroyBuffer(gpu_.allocator, buffer.buffer, buffer.allocation);
+      vmaDestroyBuffer(gpu_->getAllocator(), buffer.buffer, buffer.allocation);
     }
 
     VkSampler ResourceManager::create_sampler(const VkSamplerCreateInfo& sampler_create_info) const {
       VkSampler new_sampler;
-      vkCreateSampler(gpu_.device, &sampler_create_info, nullptr, &new_sampler);
+      vkCreateSampler(gpu_->getDevice(), &sampler_create_info, nullptr, &new_sampler);
       return new_sampler;
     }
 
@@ -174,7 +179,7 @@ namespace gestalt::graphics {
       allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
       // allocate and create the image
-      VK_CHECK(vmaCreateImage(gpu_.allocator, &img_info, &allocinfo, &newImage.image,
+      VK_CHECK(vmaCreateImage(gpu_->getAllocator(), &img_info, &allocinfo, &newImage.image,
                               &newImage.allocation, nullptr));
 
       // if the format is a depth format, we will need to have it use the correct
@@ -192,7 +197,7 @@ namespace gestalt::graphics {
         view_info.subresourceRange.levelCount = img_info.mipLevels;
         view_info.subresourceRange.layerCount = 6;  // Layer count for cubemap
 
-        VK_CHECK(vkCreateImageView(gpu_.device, &view_info, nullptr, &newImage.imageView));
+        VK_CHECK(vkCreateImageView(gpu_->getDevice(), &view_info, nullptr, &newImage.imageView));
 
         return newImage;
       }
@@ -202,7 +207,7 @@ namespace gestalt::graphics {
           = vkinit::imageview_create_info(format, newImage.image, aspectFlag);
       view_info.subresourceRange.levelCount = img_info.mipLevels;
 
-      VK_CHECK(vkCreateImageView(gpu_.device, &view_info, nullptr, &newImage.imageView));
+      VK_CHECK(vkCreateImageView(gpu_->getDevice(), &view_info, nullptr, &newImage.imageView));
 
       return newImage;
     }
@@ -267,14 +272,14 @@ namespace gestalt::graphics {
       }
     }
 
-    void PoorMansResourceLoader::init(const Gpu& gpu) {
+    void PoorMansResourceLoader::init(const std::shared_ptr<IGpu>& gpu) {
 	  gpu_ = gpu;
       VkCommandPoolCreateInfo poolInfo = {};
       poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
       poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-      poolInfo.queueFamilyIndex = gpu_.graphics_queue_family;
+      poolInfo.queueFamilyIndex = gpu_->getGraphicsQueueFamily();
 
-      VK_CHECK(vkCreateCommandPool(gpu_.device, &poolInfo, nullptr, &transferCommandPool));
+      VK_CHECK(vkCreateCommandPool(gpu_->getDevice(), &poolInfo, nullptr, &transferCommandPool));
 
       VkCommandBufferAllocateInfo allocInfo = {};
       allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -282,11 +287,11 @@ namespace gestalt::graphics {
       allocInfo.commandPool = transferCommandPool;
       allocInfo.commandBufferCount = 1;
 
-      VK_CHECK(vkAllocateCommandBuffers(gpu_.device, &allocInfo, &cmd));
+      VK_CHECK(vkAllocateCommandBuffers(gpu_->getDevice(), &allocInfo, &cmd));
 
       VkFenceCreateInfo fenceInfo = {};
       fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-      VK_CHECK(vkCreateFence(gpu_.device, &fenceInfo, nullptr, &flushFence));
+      VK_CHECK(vkCreateFence(gpu_->getDevice(), &fenceInfo, nullptr, &flushFence));
     }
 
     void PoorMansResourceLoader::addImageTask(TextureHandle image, void* imageData,
@@ -309,9 +314,9 @@ namespace gestalt::graphics {
       add_stagging_buffer(task.imageSize, task.stagingBuffer);
 
       void* data;
-      VK_CHECK(vmaMapMemory(gpu_.allocator, task.stagingBuffer.allocation, &data));
+      VK_CHECK(vmaMapMemory(gpu_->getAllocator(), task.stagingBuffer.allocation, &data));
       memcpy(data, task.dataCopy, task.imageSize);
-      vmaUnmapMemory(gpu_.allocator, task.stagingBuffer.allocation);
+      vmaUnmapMemory(gpu_->getAllocator(), task.stagingBuffer.allocation);
 
       vkutil::TransitionImage(task.image)
           .to(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
@@ -351,9 +356,9 @@ namespace gestalt::graphics {
 
       // Copy each face data into the buffer
       void* data;
-      VK_CHECK(vmaMapMemory(gpu_.allocator, task.stagingBuffer.allocation, &data));
+      VK_CHECK(vmaMapMemory(gpu_->getAllocator(), task.stagingBuffer.allocation, &data));
       memcpy(data, task.dataCopy, task.totalCubemapSizeBytes);
-      vmaUnmapMemory(gpu_.allocator, task.stagingBuffer.allocation);
+      vmaUnmapMemory(gpu_->getAllocator(), task.stagingBuffer.allocation);
 
       vkutil::TransitionImage(task.image)
           .to(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
@@ -427,7 +432,7 @@ namespace gestalt::graphics {
       vmaallocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
       // allocate the buffer
-      VK_CHECK(vmaCreateBuffer(gpu_.allocator, &bufferInfo, &vmaallocInfo, &staging_buffer.buffer,
+      VK_CHECK(vmaCreateBuffer(gpu_->getAllocator(), &bufferInfo, &vmaallocInfo, &staging_buffer.buffer,
                                &staging_buffer.allocation, &staging_buffer.info));
     }
 
@@ -467,15 +472,15 @@ namespace gestalt::graphics {
       submitInfo.commandBufferCount = 1;
       submitInfo.pCommandBuffers = &cmd;
 
-      VK_CHECK(vkQueueSubmit(gpu_.graphics_queue, 1, &submitInfo, flushFence));
-      VK_CHECK(vkWaitForFences(gpu_.device, 1, &flushFence, VK_TRUE, UINT64_MAX));
-      VK_CHECK(vkResetFences(gpu_.device, 1, &flushFence));
+      VK_CHECK(vkQueueSubmit(gpu_->getGraphicsQueue(), 1, &submitInfo, flushFence));
+      VK_CHECK(vkWaitForFences(gpu_->getDevice(), 1, &flushFence, VK_TRUE, UINT64_MAX));
+      VK_CHECK(vkResetFences(gpu_->getDevice(), 1, &flushFence));
       VK_CHECK(vkResetCommandBuffer(cmd, 0));
 
       while (!tasksDone.empty()) {
         ImageTask& task = tasksDone.front();
         auto& stagingBuffer = task.stagingBuffer;
-        vmaDestroyBuffer(gpu_.allocator, stagingBuffer.buffer, stagingBuffer.allocation);
+        vmaDestroyBuffer(gpu_->getAllocator(), stagingBuffer.buffer, stagingBuffer.allocation);
 
         delete[] task.dataCopy;
         tasksDone.pop();
@@ -483,7 +488,7 @@ namespace gestalt::graphics {
       while (!cubemapTasksDone.empty()) {
         CubemapTask& task = cubemapTasksDone.front();
         auto& stagingBuffer = task.stagingBuffer;
-        vmaDestroyBuffer(gpu_.allocator, stagingBuffer.buffer, stagingBuffer.allocation);
+        vmaDestroyBuffer(gpu_->getAllocator(), stagingBuffer.buffer, stagingBuffer.allocation);
 
         delete[] task.dataCopy;
         cubemapTasksDone.pop();
@@ -491,9 +496,9 @@ namespace gestalt::graphics {
     }
 
     void PoorMansResourceLoader::cleanup() {
-      vkFreeCommandBuffers(gpu_.device, transferCommandPool, 1, &cmd);
-	  vkDestroyCommandPool(gpu_.device, transferCommandPool, nullptr);
-	  vkDestroyFence(gpu_.device, flushFence, nullptr);
+      vkFreeCommandBuffers(gpu_->getDevice(), transferCommandPool, 1, &cmd);
+	  vkDestroyCommandPool(gpu_->getDevice(), transferCommandPool, nullptr);
+	  vkDestroyFence(gpu_->getDevice(), flushFence, nullptr);
     }
 
     void ResourceManager::load_and_create_cubemap(const std::string& file_path,
@@ -581,7 +586,7 @@ namespace gestalt::graphics {
       sampl.magFilter = VK_FILTER_LINEAR;
       sampl.minFilter = VK_FILTER_LINEAR;
       sampl.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-      vkCreateSampler(gpu_.device, &sampl, nullptr, &Ibl_buffers.cube_map_sampler);
+      vkCreateSampler(gpu_->getDevice(), &sampl, nullptr, &Ibl_buffers.cube_map_sampler);
 
       Ibl_buffers.bdrf_lut = load_image("../../assets/bdrf_lut.png").value();
 
@@ -595,7 +600,7 @@ namespace gestalt::graphics {
       writer.write_image(
           3, Ibl_buffers.bdrf_lut.imageView, repository_->default_material_.linearSampler,
           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-      writer.update_set(gpu_.device, Ibl_buffers.descriptor_set);
+      writer.update_set(gpu_->getDevice(), Ibl_buffers.descriptor_set);
     }
 
     TextureHandle ResourceManager::create_cubemap_from_HDR(std::vector<float>& image_data, int h,
@@ -647,18 +652,18 @@ namespace gestalt::graphics {
       img_allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
       img_allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-      VK_CHECK(vmaCreateImage(gpu_.allocator, &img_info, &img_allocinfo, &image->image,
+      VK_CHECK(vmaCreateImage(gpu_->getAllocator(), &img_info, &img_allocinfo, &image->image,
                               &image->allocation, nullptr));
 
       // Build an image view for the image to use for rendering
       VkImageViewCreateInfo view_info
           = vkinit::imageview_create_info(format, image->image, aspectFlags);
-      VK_CHECK(vkCreateImageView(gpu_.device, &view_info, nullptr, &image->imageView));
+      VK_CHECK(vkCreateImageView(gpu_->getDevice(), &view_info, nullptr, &image->imageView));
     }
 
 
     void ResourceManager::destroy_image(const TextureHandle& img) {
-      vkDestroyImageView(gpu_.device, img.imageView, nullptr);
-      vmaDestroyImage(gpu_.allocator, img.image, img.allocation);
+      vkDestroyImageView(gpu_->getDevice(), img.imageView, nullptr);
+      vmaDestroyImage(gpu_->getAllocator(), img.image, img.allocation);
     }
 }  // namespace gestalt

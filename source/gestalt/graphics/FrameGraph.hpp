@@ -7,6 +7,7 @@
 #include "Gui.hpp"
 #include "RenderConfig.hpp"
 #include "Repository.hpp"
+#include "ResourceManager.hpp"
 #include "vk_pipelines.hpp"
 #include "vk_sync.hpp"
 
@@ -90,7 +91,7 @@ namespace gestalt::graphics {
 
     class ResourceRegistry {
     public:
-      void init(const Gpu& gpu);
+      void init(const std::shared_ptr<IGpu>& gpu);
 
       VkShaderModule get_shader(const ShaderProgram& shader_program);
       void clear_shader_cache();
@@ -139,24 +140,25 @@ namespace gestalt::graphics {
         ImageAttachment lum_A{.image = std::make_shared<TextureHandle>(TextureType::kColor),
                               .extent = {1, 1},
                               .format = VK_FORMAT_R16_SFLOAT,
-                              .initial_value = {{1.f, 1.f, 1.f, 1.f}}};
+                              .initial_value = {{100.f, 100.f, 100.f, 1.f}}};
         ImageAttachment lum_B{.image = std::make_shared<TextureHandle>(TextureType::kColor),
                               .extent = {1, 1},
                               .format = VK_FORMAT_R16_SFLOAT,
-                              .initial_value = {{1.f, 1.f, 1.f, 1.f}}};
+                              .initial_value = {{100.f, 100.f, 100.f, 1.f}}};
       } attachments_;
 
       std::vector<ImageAttachment> attachment_list_;
 
     private:
-      Gpu gpu_ = {};
+      std::shared_ptr<IGpu> gpu_;
       std::unordered_map<std::string, VkShaderModule> shader_cache_{};
     };
 
     class RenderPass {
     public:
       RenderPass() = default;
-      void init(const Gpu& gpu, const std::shared_ptr<ResourceManager>& resource_manager,
+      void init(const std::shared_ptr<IGpu>& gpu,
+                const std::shared_ptr<ResourceManager>& resource_manager,
                 const std::shared_ptr<ResourceRegistry>& registry,
                 const std::shared_ptr<Repository>& repository) {
         gpu_ = gpu;
@@ -203,14 +205,14 @@ namespace gestalt::graphics {
       VkPipelineLayout pipeline_layout_ = nullptr;
       std::vector<VkDescriptorSetLayout> descriptor_layouts_;
 
-      Gpu gpu_ = {};
+      std::shared_ptr<IGpu> gpu_;
       std::shared_ptr<ResourceManager> resource_manager_;
       std::shared_ptr<ResourceRegistry> registry_;
       std::shared_ptr<Repository> repository_;
     };
 
     class VkSwapchain {
-      Gpu gpu_;
+      std::shared_ptr<IGpu> gpu_;
 
     public:
       VkSwapchainKHR swapchain;
@@ -220,7 +222,7 @@ namespace gestalt::graphics {
 
       std::vector<std::shared_ptr<TextureHandle>> swapchain_images;
 
-      void init(const Gpu& gpu, const VkExtent3D& extent);
+      void init(const std::shared_ptr<IGpu>& gpu, const VkExtent3D& extent);
       void create_swapchain(uint32_t width, uint32_t height);
       void resize_swapchain(Window& window);
       void destroy_swapchain() const;
@@ -254,7 +256,7 @@ namespace gestalt::graphics {
     constexpr unsigned char kFrameOverlap = 2;
 
     class FrameGraph {
-      Gpu gpu_ = {};
+      std::shared_ptr<IGpu> gpu_;
       Window window_;
       std::shared_ptr<ResourceManager> resource_manager_;
       std::shared_ptr<Repository> repository_;
@@ -282,7 +284,7 @@ namespace gestalt::graphics {
       void execute(const std::shared_ptr<RenderPass>& render_pass, VkCommandBuffer cmd);
 
     public:
-      void init(const Gpu& gpu, const Window& window,
+      void init(const std::shared_ptr<IGpu>& gpu, const Window& window,
                 const std::shared_ptr<ResourceManager>& resource_manager,
                 const std::shared_ptr<Repository>& repository,
                 const std::shared_ptr<Gui>& imgui_gui);

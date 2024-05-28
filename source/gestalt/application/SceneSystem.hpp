@@ -1,19 +1,27 @@
 ﻿#pragma once
 
+#include <unordered_map>
+
 #include "Components.hpp"
 #include "Camera.hpp"
-#include "ResourceManager.hpp"
-#include "Gpu.hpp"
+#include "GpuTypes.hpp"
+#include "Repository.hpp"
+
+#include "fastgltf/types.hpp"
 
 namespace gestalt::application {
     struct Movement;
 
     class SceneSystem {
     public:
-      void init(const graphics::Gpu& gpu, const std::shared_ptr<graphics::ResourceManager>& resource_manager,
+      void init(const std::shared_ptr<IGpu>& gpu,
+                const std::shared_ptr<IResourceManager>& resource_manager,
+                const std::unique_ptr<IDescriptorUtilFactory>& descriptor_util_factory,
                 const std::shared_ptr<Repository>& repository) {
         gpu_ = gpu;
         resource_manager_ = resource_manager;
+        descriptor_layout_builder_ = descriptor_util_factory->create_descriptor_layout_builder();
+        writer_ = descriptor_util_factory->create_descriptor_writer();
         repository_ = repository;
 
         prepare();
@@ -26,13 +34,14 @@ namespace gestalt::application {
     protected:
       virtual void prepare() = 0;
 
-      graphics::Gpu gpu_ = {};
-      std::shared_ptr<graphics::ResourceManager> resource_manager_;
+      std::shared_ptr<IGpu> gpu_;
+      std::shared_ptr<IResourceManager> resource_manager_;
+      std::unique_ptr<IDescriptorLayoutBuilder> descriptor_layout_builder_;
+      std::unique_ptr<IDescriptorWriter> writer_;
       std::shared_ptr<Repository> repository_;
     };
 
     class MaterialSystem final : public SceneSystem {
-      graphics::descriptor_writer writer_;
     public:
       void create_defaults();
       void prepare() override;
@@ -42,8 +51,6 @@ namespace gestalt::application {
     };
 
     class LightSystem final : public SceneSystem {
-      graphics::descriptor_writer writer_;
-
 
       glm::mat4 calculate_sun_view_proj(const glm::vec3 direction) const;
       void update_directional_lights(std::unordered_map<entity, LightComponent>& lights);
@@ -56,7 +63,6 @@ namespace gestalt::application {
     };
 
     class CameraSystem final : public SceneSystem {
-      graphics::descriptor_writer writer_;
       std::unique_ptr<Camera> active_camera_;
       std::unique_ptr<FreeFlyCamera> free_fly_camera_; // move to components
       float32 aspect_{1.f};

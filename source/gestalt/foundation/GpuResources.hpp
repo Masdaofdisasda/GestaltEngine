@@ -2,7 +2,19 @@
 
 #include "vk_types.hpp"
 
+#include <vma/vk_mem_alloc.h>
+
+#include <array>
+
 namespace gestalt::foundation {
+    
+    inline struct GpuFrame {
+    void next_frame() { frame_number++; }
+    [[nodiscard]] uint8 get_current_frame() const { return frame_number % 2; }
+
+  private:
+    uint64 frame_number{0};
+  } gpu_frame;
 
     struct alignas(4) GpuVertexPosition {
       glm::vec3 position{0.f};

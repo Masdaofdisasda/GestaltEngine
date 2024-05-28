@@ -35,7 +35,7 @@ namespace gestalt::graphics {
                       .set_multisampling_none()
                       .disable_blending()
                       .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-                      .build_pipeline(gpu_.device);
+                      .build_pipeline(gpu_->getDevice());
     }
 
     void DirectionalDepthPass::destroy() {  }

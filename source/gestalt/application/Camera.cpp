@@ -1,4 +1,4 @@
-#include "camera.hpp"
+#include "Camera.hpp"
 
 #include <fmt/core.h>
 
@@ -8,7 +8,7 @@
 #include "InputSystem.hpp"
 
 namespace gestalt::application {
-    void FreeFlyCamera::update(double delta_seconds, const Movement& movement) {
+  void FreeFlyCamera::update(float64 delta_seconds, const Movement& movement) {
       auto mouse_pos = glm::vec2(movement.mouse_position_x, movement.mouse_position_y);
       if (movement.right_mouse_button) {
         const glm::vec2 delta = mouse_pos - mouse_pos_;
@@ -63,7 +63,7 @@ namespace gestalt::application {
         if (length(move_speed_) > maxSpeed) move_speed_ = normalize(move_speed_) * maxSpeed;
       }
 
-      camera_position_ += move_speed_ * static_cast<float>(delta_seconds);
+      camera_position_ += move_speed_ * static_cast<float32>(delta_seconds);
     }
 
     void FreeFlyCamera::set_position(const glm::vec3& pos) { camera_position_ = pos; }

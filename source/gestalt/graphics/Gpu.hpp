@@ -2,24 +2,30 @@
 #pragma once
 
 #include "vk_types.hpp"
+#include "GpuTypes.hpp"
 #include "Window.hpp"
+
+#include <vma/vk_mem_alloc.h>
+
+#include <functional>
+
 
 namespace gestalt::graphics {
 
-    class Gpu {
+    class Gpu final : public IGpu {
 
-    public:
       VkInstance instance;
       VkDevice device;
       VmaAllocator allocator;
 
-      VkDebugUtilsMessengerEXT debug_messenger;
-      VkPhysicalDevice chosen_gpu;
-      VkPhysicalDeviceProperties device_properties;
       VkQueue graphics_queue;
       uint32_t graphics_queue_family;
       VkSurfaceKHR surface;
+      VkDebugUtilsMessengerEXT debug_messenger;
+      VkPhysicalDevice chosen_gpu;
+      VkPhysicalDeviceProperties device_properties;
 
+    public:
 
       std::function<void(std::function<void(VkCommandBuffer)>)> immediate_submit;
       PFN_vkCmdDrawMeshTasksIndirectCountEXT vkCmdDrawMeshTasksIndirectCountEXT;
@@ -28,14 +34,20 @@ namespace gestalt::graphics {
           bool use_validation_layers, Window& window,
           std::function<void(std::function<void(VkCommandBuffer)>)> immediate_submit_function);
       void cleanup();
-    };
-    
-    inline struct GpuFrame {
-      void next_frame() { frame_number++; }
-      [[nodiscard]] uint8 get_current_frame() const { return frame_number % 2; }
 
-    private:
-      uint64 frame_number{0};
-    } gpu_frame;
+      Gpu() = default;
+      ~Gpu() override;
+      [[nodiscard]] VkInstance getInstance() const override;
+      [[nodiscard]] VkDevice getDevice() const override;
+      [[nodiscard]] VmaAllocator getAllocator() const override;
+      [[nodiscard]] VkQueue getGraphicsQueue() const override;
+      [[nodiscard]] uint32_t getGraphicsQueueFamily() const override;
+      [[nodiscard]] VkSurfaceKHR getSurface() const override;
+      [[nodiscard]] VkDebugUtilsMessengerEXT getDebugMessenger() const override;
+      [[nodiscard]] VkPhysicalDevice getPhysicalDevice() const override;
+      [[nodiscard]] VkPhysicalDeviceProperties getPhysicalDeviceProperties() const override;
+      [[nodiscard]] std::function<void(std::function<void(VkCommandBuffer)>)> getImmediateSubmit() const override;
+
+    };
 
 }  // namespace gestalt

@@ -23,8 +23,8 @@ namespace gestalt::application {
       }
     }
 
-    void InputSystem::handle_mouse_motion(const SDL_Event& e, uint32_t window_size_x,
-                                          uint32_t window_size_y) {
+    void InputSystem::handle_mouse_motion(const SDL_Event& e, uint32 window_size_x,
+                                          uint32 window_size_y) {
       movement_.mouse_position_x = static_cast<float>(e.motion.x) / window_size_x;
       movement_.mouse_position_y = static_cast<float>(e.motion.y) / window_size_y;
     }

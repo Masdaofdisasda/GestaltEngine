@@ -39,7 +39,7 @@ namespace gestalt::graphics {
                       .set_multisampling_none()
                       .disable_blending(3)
                       .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-                      .build_pipeline(gpu_.device);
+                      .build_pipeline(gpu_->getDevice());
     }
 
     void DeferredPass::destroy() { }
@@ -99,18 +99,18 @@ namespace gestalt::graphics {
       descriptor_layouts_.push_back(mesh_buffers.descriptor_layout);
 
       VkShaderModule fragShader;
-      vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &fragShader);
+      vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_->getDevice(), &fragShader);
 
       VkShaderModule meshShader;
-      vkutil::load_shader_module(mesh_shader_source_.c_str(), gpu_.device, &meshShader);
+      vkutil::load_shader_module(mesh_shader_source_.c_str(), gpu_->getDevice(), &meshShader);
       VkShaderModule taskShader;
-      vkutil::load_shader_module(task_shader_source_.c_str(), gpu_.device, &taskShader);
+      vkutil::load_shader_module(task_shader_source_.c_str(), gpu_->getDevice(), &taskShader);
 
       VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
       mesh_layout_info.setLayoutCount = descriptor_layouts_.size();
       mesh_layout_info.pSetLayouts = descriptor_layouts_.data();
 
-      VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
+      VK_CHECK(vkCreatePipelineLayout(gpu_->getDevice(), &mesh_layout_info, nullptr, &pipeline_layout_));
 
       const auto gbuffer_1 = registry_->get_resource<TextureHandle>("gbuffer_1");
       const auto gbuffer_2 = registry_->get_resource<TextureHandle>("gbuffer_2");
@@ -129,14 +129,14 @@ namespace gestalt::graphics {
                           {gbuffer_1->getFormat(), gbuffer_2->getFormat(), gbuffer_3->getFormat()})
                       .set_depth_format(depth_image->getFormat())
                       .set_pipeline_layout(pipeline_layout_)
-                      .build_pipeline(gpu_.device);
+                      .build_pipeline(gpu_->getDevice());
 
-      vkDestroyShaderModule(gpu_.device, taskShader, nullptr);
-      vkDestroyShaderModule(gpu_.device, meshShader, nullptr);
-      vkDestroyShaderModule(gpu_.device, fragShader, nullptr);
+      vkDestroyShaderModule(gpu_->getDevice(), taskShader, nullptr);
+      vkDestroyShaderModule(gpu_->getDevice(), meshShader, nullptr);
+      vkDestroyShaderModule(gpu_->getDevice(), fragShader, nullptr);
     }
 
-    void MeshletPass::cleanup() { vkDestroyPipeline(gpu_.device, pipeline_, nullptr); }
+    void MeshletPass::cleanup() { vkDestroyPipeline(gpu_->getDevice(), pipeline_, nullptr); }
 
     void MeshletPass::execute(VkCommandBuffer cmd) {
       const auto gbuffer_1 = registry_->get_resource<TextureHandle>("gbuffer_1");
@@ -223,13 +223,13 @@ namespace gestalt::graphics {
                                            .add_binding(10,
                                                         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                         VK_SHADER_STAGE_FRAGMENT_BIT)
-                                           .build(gpu_.device));
+                                           .build(gpu_->getDevice()));
 
       VkShaderModule meshFragShader;
-      vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &meshFragShader);
+      vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_->getDevice(), &meshFragShader);
 
       VkShaderModule meshVertexShader;
-      vkutil::load_shader_module(vertex_shader_source_.c_str(), gpu_.device, &meshVertexShader);
+      vkutil::load_shader_module(vertex_shader_source_.c_str(), gpu_->getDevice(), &meshVertexShader);
 
       VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
       mesh_layout_info.setLayoutCount = descriptor_layouts_.size();
@@ -237,7 +237,7 @@ namespace gestalt::graphics {
       mesh_layout_info.pPushConstantRanges = &push_constant_range_;
       mesh_layout_info.pushConstantRangeCount = 1;
 
-      VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
+      VK_CHECK(vkCreatePipelineLayout(gpu_->getDevice(), &mesh_layout_info, nullptr, &pipeline_layout_));
 
       const auto color_image = registry_->get_resource<TextureHandle>("scene_opaque_color");
       const auto depth_image = registry_->get_resource<TextureHandle>("scene_opaque_depth");
@@ -253,15 +253,15 @@ namespace gestalt::graphics {
                       .set_color_attachment_format(color_image->getFormat())
                       .set_depth_format(depth_image->getFormat())
                       .set_pipeline_layout(pipeline_layout_)
-                      .build_pipeline(gpu_.device);
+                      .build_pipeline(gpu_->getDevice());
 
-      vkDestroyShaderModule(gpu_.device, meshFragShader, nullptr);
-      vkDestroyShaderModule(gpu_.device, meshVertexShader, nullptr);
+      vkDestroyShaderModule(gpu_->getDevice(), meshFragShader, nullptr);
+      vkDestroyShaderModule(gpu_->getDevice(), meshVertexShader, nullptr);
     }
 
     void TransparentPass::execute(VkCommandBuffer cmd) {
       descriptor_set_
-          = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(4));
+          = resource_manager_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(4));
 
       const auto color_image = registry_->get_resource<TextureHandle>("scene_opaque_color");
       const auto depth_image = registry_->get_resource<TextureHandle>("scene_opaque_depth");
@@ -314,7 +314,7 @@ namespace gestalt::graphics {
       writer.write_image(10, shadow_map->imageView, repository_->default_material_.nearestSampler,
                          VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL,
                          VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-      writer.update_set(gpu_.device, descriptor_set_);
+      writer.update_set(gpu_->getDevice(), descriptor_set_);
 
       gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                                      &descriptor_write);
@@ -333,7 +333,7 @@ namespace gestalt::graphics {
       vkCmdEndRendering(cmd);
     }
 
-    void TransparentPass::cleanup() { vkDestroyPipeline(gpu_.device, pipeline_, nullptr); }
+    void TransparentPass::cleanup() { vkDestroyPipeline(gpu_->getDevice(), pipeline_, nullptr); }
 
     void DebugAabbPass::prepare() {
       fmt::print("preparing debug_aabb pass\n");
@@ -342,10 +342,10 @@ namespace gestalt::graphics {
       descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
 
       VkShaderModule meshFragShader;
-      vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_.device, &meshFragShader);
+      vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_->getDevice(), &meshFragShader);
 
       VkShaderModule meshVertexShader;
-      vkutil::load_shader_module(vertex_shader_source_.c_str(), gpu_.device, &meshVertexShader);
+      vkutil::load_shader_module(vertex_shader_source_.c_str(), gpu_->getDevice(), &meshVertexShader);
 
       VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
       mesh_layout_info.setLayoutCount = descriptor_layouts_.size();
@@ -353,7 +353,7 @@ namespace gestalt::graphics {
       mesh_layout_info.pPushConstantRanges = &push_constant_range_;
       mesh_layout_info.pushConstantRangeCount = 1;
 
-      VK_CHECK(vkCreatePipelineLayout(gpu_.device, &mesh_layout_info, nullptr, &pipeline_layout_));
+      VK_CHECK(vkCreatePipelineLayout(gpu_->getDevice(), &mesh_layout_info, nullptr, &pipeline_layout_));
 
       const auto color_image = registry_->get_resource<TextureHandle>("scene_final");
       const auto depth_image = registry_->get_resource<TextureHandle>("grid_depth");
@@ -369,10 +369,10 @@ namespace gestalt::graphics {
                       .set_color_attachment_format(color_image->getFormat())
                       .set_depth_format(depth_image->getFormat())
                       .set_pipeline_layout(pipeline_layout_)
-                      .build_pipeline(gpu_.device);
+                      .build_pipeline(gpu_->getDevice());
 
-      vkDestroyShaderModule(gpu_.device, meshFragShader, nullptr);
-      vkDestroyShaderModule(gpu_.device, meshVertexShader, nullptr);
+      vkDestroyShaderModule(gpu_->getDevice(), meshFragShader, nullptr);
+      vkDestroyShaderModule(gpu_->getDevice(), meshVertexShader, nullptr);
     }
 
     void DebugAabbPass::cleanup() {}

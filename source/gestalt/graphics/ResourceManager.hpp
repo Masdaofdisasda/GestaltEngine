@@ -1,11 +1,9 @@
 #pragma once
 #include <queue>
-#include <fastgltf/types.hpp>
 
-#include "Repository.hpp"
-#include "Gpu.hpp"
 #include "vk_types.hpp"
 #include "vk_descriptors.hpp"
+#include "Repository.hpp"
 
 
 namespace gestalt::graphics {
@@ -29,7 +27,7 @@ namespace gestalt::graphics {
         VkExtent3D imageExtent;
       };
 
-      Gpu gpu_ = {};
+      std::shared_ptr<IGpu> gpu_;
       VkCommandPool transferCommandPool = {};
       VkCommandBuffer cmd = {};
       VkFence flushFence = {};
@@ -38,7 +36,7 @@ namespace gestalt::graphics {
       const size_t max_tasks_per_batch_ = 5;
 
     public:
-      void init(const Gpu& gpu);
+      void init(const std::shared_ptr<IGpu>& gpu);
       void cleanup();
 
       void addImageTask(TextureHandle image, void* imageData, VkDeviceSize imageSize,
@@ -50,8 +48,9 @@ namespace gestalt::graphics {
       void flush();
     };
 
-    class ResourceManager {
-      Gpu gpu_ = {};
+    class ResourceManager final : public IResourceManager {
+
+      std::shared_ptr<IGpu> gpu_;
       std::shared_ptr<Repository> repository_;
 
       void load_and_create_cubemap(const std::string& file_path, TextureHandle& cubemap);
@@ -61,31 +60,35 @@ namespace gestalt::graphics {
 
       PoorMansResourceLoader resource_loader_;
 
-      DescriptorAllocatorGrowable descriptorPool;  // TODO hide this
-      descriptor_writer writer;
+      std::shared_ptr<IDescriptorAllocatorGrowable> descriptorPool = std::make_shared<DescriptorAllocatorGrowable>();
+      DescriptorWriter writer;
 
-      void init(const Gpu& gpu, const std::shared_ptr<Repository>& repository);
+      void init(const std::shared_ptr<IGpu>& gpu, const std::shared_ptr<Repository>& repository) override;
 
-      void cleanup();
+      void cleanup() override;
+
+      void flush_loader() override;
+
+      std::shared_ptr<IDescriptorAllocatorGrowable>& get_descriptor_pool() override;
 
       AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage,
-                                    VmaMemoryUsage memoryUsage);
-      void upload_mesh();
-      void destroy_buffer(const AllocatedBuffer& buffer);
+                                    VmaMemoryUsage memoryUsage) override;
+      void upload_mesh() override;
+      void destroy_buffer(const AllocatedBuffer& buffer) override;
 
-      VkSampler create_sampler(const VkSamplerCreateInfo& sampler_create_info) const;
+      VkSampler create_sampler(const VkSamplerCreateInfo& sampler_create_info) const override;
 
       TextureHandle create_image(void* data, VkExtent3D size, VkFormat format,
-                                 VkImageUsageFlags usage, bool mipmapped = false);
+                                 VkImageUsageFlags usage, bool mipmapped = false) override;
       TextureHandle create_cubemap(void* imageData, VkExtent3D size, VkFormat format,
-                                   VkImageUsageFlags usage, bool mipmapped = false);
-      std::optional<TextureHandle> load_image(const std::string& filepath);
-      void load_and_process_cubemap(const std::string& file_path);
-      TextureHandle create_cubemap_from_HDR(std::vector<float>& image_data, int h, int w);
+                                   VkImageUsageFlags usage, bool mipmapped = false) override;
+      std::optional<TextureHandle> load_image(const std::string& filepath) override;
+      void load_and_process_cubemap(const std::string& file_path) override;
+      TextureHandle create_cubemap_from_HDR(std::vector<float>& image_data, int h, int w) override;
       void create_frame_buffer(const std::shared_ptr<TextureHandle>& image,
-                               VkFormat format = VK_FORMAT_UNDEFINED) const;
+                               VkFormat format = VK_FORMAT_UNDEFINED) const override;
       TextureHandle create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
-                                 bool mipmapped = false, bool cubemap = false);
-      void destroy_image(const TextureHandle& img);
+                                 bool mipmapped = false, bool cubemap = false) override;
+      void destroy_image(const TextureHandle& img) override;
     };
 }  // namespace gestalt

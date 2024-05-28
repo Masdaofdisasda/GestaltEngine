@@ -4,7 +4,7 @@
 
 #include "Gui.hpp"
 #include "vk_types.hpp"
-#include "SceneManger.hpp"
+#include "SceneManager.hpp"
 #include "Window.hpp"
 #include "FrameGraph.hpp"
 #include "InputSystem.hpp"
@@ -12,10 +12,10 @@
 #include "TmeTrackingService.hpp"
 
 namespace gestalt {
-  class GameEngine {
+  class Engine {
   public:
     void init();
-    void cleanup();
+    void cleanup() const;
     void run();
 
   private:
@@ -24,7 +24,7 @@ namespace gestalt {
     bool freeze_rendering_{false};
 
     application::Window window_;
-    graphics::Gpu gpu_ = {};
+    std::shared_ptr<graphics::Gpu> gpu_;
     void immediate_submit(std::function<void(VkCommandBuffer cmd)> function);
 
     std::shared_ptr<graphics::FrameGraph> frame_graph_ = std::make_shared<graphics::FrameGraph>();

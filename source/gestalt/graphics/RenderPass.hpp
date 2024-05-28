@@ -19,7 +19,7 @@ namespace gestalt::graphics {
       std::string get_name() const override { return "Deferred Pass"; }
     };
     class LightingPass final : public RenderPass {
-      descriptor_writer writer_;
+      DescriptorWriter writer_;
       VkDescriptorSet descriptor_set_ = nullptr;
 
     public:
@@ -43,7 +43,7 @@ namespace gestalt::graphics {
       std::string get_name() const override { return "Infinite Grid Pass"; }
     };
     class BrightPass final : public RenderPass {
-      descriptor_writer writer;
+      DescriptorWriter writer;
       VkDescriptorSet descriptor_set_ = nullptr;
 
     public:
@@ -54,7 +54,7 @@ namespace gestalt::graphics {
     };
 
     class BloomBlurPass final : public RenderPass {
-      descriptor_writer writer;
+      DescriptorWriter writer;
       VkDescriptorSet descriptor_set_ = nullptr;
 
     public:
@@ -65,7 +65,7 @@ namespace gestalt::graphics {
     };
 
     class LuminancePass final : public RenderPass {
-      descriptor_writer writer;
+      DescriptorWriter writer;
       VkDescriptorSet descriptor_set_ = nullptr;
 
     public:
@@ -75,7 +75,7 @@ namespace gestalt::graphics {
       std::string get_name() const override { return "Luminance Pass"; }
     };
     class LuminanceDownscalePass final : public RenderPass {
-      descriptor_writer writer;
+      DescriptorWriter writer;
       VkDescriptorSet descriptor_set_ = nullptr;
 
     public:
@@ -86,7 +86,7 @@ namespace gestalt::graphics {
     };
 
     class LightAdaptationPass final : public RenderPass {
-      descriptor_writer writer;
+      DescriptorWriter writer;
       VkDescriptorSet descriptor_set_ = nullptr;
 
     public:
@@ -97,7 +97,7 @@ namespace gestalt::graphics {
     };
 
     class TonemapPass final : public RenderPass {
-      descriptor_writer writer;
+      DescriptorWriter writer;
       VkDescriptorSet descriptor_set_ = nullptr;
 
     public:

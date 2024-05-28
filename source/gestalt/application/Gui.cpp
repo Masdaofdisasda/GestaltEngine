@@ -12,7 +12,6 @@
 #include <glm/gtc/random.hpp>
 
 #include "vk_initializers.hpp"
-#include "RenderConfig.hpp"
 
 namespace gestalt::application {
 
@@ -28,8 +27,10 @@ namespace gestalt::application {
                                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
 
-    void Gui::init(Gpu& gpu, Window& window, VkFormat swapchainFormat,
-                   const std::shared_ptr<Repository>& repository, GuiCapabilities& actions) {
+    void Gui::init(const std::shared_ptr<IGpu>& gpu, Window& window, VkFormat swapchainFormat,
+                   const std::shared_ptr<Repository>& repository,
+                   const std::unique_ptr<IDescriptorUtilFactory>& descriptor_util_factory,
+                   GuiCapabilities& actions) {
       gpu_ = gpu;
       window_ = window;
       repository_ = repository;
@@ -58,12 +59,15 @@ namespace gestalt::application {
       pool_info.pPoolSizes = pool_sizes;
 
       VkDescriptorPool imguiPool;
-      VK_CHECK(vkCreateDescriptorPool(gpu_.device, &pool_info, nullptr, &imguiPool));
+      VK_CHECK(vkCreateDescriptorPool(gpu_->getDevice(), &pool_info, nullptr, &imguiPool));
 
-      descriptor_set_layout_ = DescriptorLayoutBuilder()
-                                   .add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+      const auto descriptor_layout_builder = descriptor_util_factory->create_descriptor_layout_builder();
+      descriptor_layout_builder->clear();
+      descriptor_set_layout_ = descriptor_layout_builder
+                                   ->
+                                   add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                 VK_SHADER_STAGE_FRAGMENT_BIT)
-                                   .build(gpu_.device);
+                                   .build(gpu_->getDevice());
 
       // 2: initialize imgui library
 
@@ -81,10 +85,10 @@ namespace gestalt::application {
 
       // this initializes imgui for Vulkan
       ImGui_ImplVulkan_InitInfo init_info = {};
-      init_info.Instance = gpu_.instance;
-      init_info.PhysicalDevice = gpu_.chosen_gpu;
-      init_info.Device = gpu_.device;
-      init_info.Queue = gpu_.graphics_queue;
+      init_info.Instance = gpu_->getInstance();
+      init_info.PhysicalDevice = gpu_->getPhysicalDevice();
+      init_info.Device = gpu_->getDevice();
+      init_info.Queue = gpu_->getGraphicsQueue();
       init_info.DescriptorPool = imguiPool;
       init_info.MinImageCount = 3;
       init_info.ImageCount = 3;
@@ -96,7 +100,7 @@ namespace gestalt::application {
       ImGui_ImplVulkan_Init(&init_info);
 
       // execute a gpu command to upload imgui font textures
-      gpu_.immediate_submit([&](VkCommandBuffer cmd) { ImGui_ImplVulkan_CreateFontsTexture(); });
+      gpu_->getImmediateSubmit()([&](VkCommandBuffer cmd) { ImGui_ImplVulkan_CreateFontsTexture(); });
 
       // clear font textures from cpu data
       ImGui_ImplVulkan_DestroyFontsTexture();

@@ -6,7 +6,6 @@
 #include "common.hpp"
 
 #include "Components.hpp"
-#include "ResourceManager.hpp"
 #include "SceneSystem.hpp"
 
 namespace gestalt::application {
@@ -15,13 +14,13 @@ namespace gestalt::application {
     class AssetLoader;
 
     class ComponentFactory {
-      std::shared_ptr<graphics::ResourceManager> resource_manager_;
+      std::shared_ptr<IResourceManager> resource_manager_;
       std::shared_ptr<Repository> repository_;
 
       entity next_entity_id_ = 0;
 
     public:
-      void init(const std::shared_ptr<graphics::ResourceManager>& resource_manager,
+      void init(const std::shared_ptr<IResourceManager>& resource_manager,
                 const std::shared_ptr<Repository>& repository);
 
       entity create_entity();
@@ -48,7 +47,7 @@ namespace gestalt::application {
     };
 
     class AssetLoader {
-      std::shared_ptr<graphics::ResourceManager> resource_manager_;
+      std::shared_ptr<IResourceManager> resource_manager_;
       std::shared_ptr<Repository> repository_;
       std::shared_ptr<ComponentFactory> component_factory_;
 
@@ -95,7 +94,7 @@ namespace gestalt::application {
       void import_meshes(fastgltf::Asset& gltf, size_t material_offset);
 
     public:
-      void init(const std::shared_ptr<graphics::ResourceManager>& resource_manager,
+      void init(const std::shared_ptr<IResourceManager>& resource_manager,
                 const std::shared_ptr<ComponentFactory>& component_factory,
                 const std::shared_ptr<Repository>& repository);
       void import_lights(const fastgltf::Asset& gltf);
@@ -106,8 +105,8 @@ namespace gestalt::application {
      * @brief Class responsible for managing scenes, entities, and their components.
      */
     class SceneManager {
-      graphics::Gpu gpu_ = {};
-      std::shared_ptr<graphics::ResourceManager> resource_manager_;
+      std::shared_ptr<IGpu> gpu_;
+      std::shared_ptr<IResourceManager> resource_manager_;
       std::shared_ptr<Repository> repository_;
 
       std::unique_ptr<AssetLoader> asset_loader_ = std::make_unique<AssetLoader>();
@@ -130,7 +129,9 @@ namespace gestalt::application {
       std::string scene_path_ = "";
 
     public:
-      void init(const graphics::Gpu& gpu, const std::shared_ptr<graphics::ResourceManager>& resource_manager,
+      void init(const std::shared_ptr<IGpu>& gpu,
+                const std::shared_ptr<IResourceManager>& resource_manager,
+                const std::unique_ptr<IDescriptorUtilFactory>& descriptor_util_factory,
                 const std::shared_ptr<Repository>& repository);
       void cleanup();
 

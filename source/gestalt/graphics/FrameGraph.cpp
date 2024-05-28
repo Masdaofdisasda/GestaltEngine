@@ -11,12 +11,13 @@
 #include "Repository.hpp"
 #include "SsaoPass.hpp"
 #include <VkBootstrap.h>
+
 #include "vk_images.hpp"
 #include "vk_initializers.hpp"
 #include "vk_pipelines.hpp"
 
 namespace gestalt::graphics {
-    void FrameGraph::init(const Gpu& gpu, const Window& window,
+  void FrameGraph::init(const std::shared_ptr<IGpu>& gpu, const Window& window,
                           const std::shared_ptr<ResourceManager>& resource_manager,
                           const std::shared_ptr<Repository>& repository,
                           const std::shared_ptr<Gui>& imgui_gui) {
@@ -60,7 +61,7 @@ namespace gestalt::graphics {
         };
 
         frames_[i].descriptor_pool = DescriptorAllocatorGrowable{};
-        frames_[i].descriptor_pool.init(gpu_.device, 1000, frame_sizes);
+        frames_[i].descriptor_pool.init(gpu_->getDevice(), 1000, frame_sizes);
       }
 
       create_resources();
@@ -193,12 +194,12 @@ namespace gestalt::graphics {
 
     bool FrameGraph::acquire_next_image() {
       VK_CHECK(
-          vkWaitForFences(gpu_.device, 1, &get_current_frame().render_fence, true, UINT64_MAX));
+          vkWaitForFences(gpu_->getDevice(), 1, &get_current_frame().render_fence, true, UINT64_MAX));
 
-      get_current_frame().descriptor_pool.clear_pools(gpu_.device);
+      get_current_frame().descriptor_pool.clear_pools(gpu_->getDevice());
       resource_manager_->descriptor_pool = &get_current_frame().descriptor_pool;
 
-      VkResult e = vkAcquireNextImageKHR(gpu_.device, swapchain_->swapchain, UINT64_MAX,
+      VkResult e = vkAcquireNextImageKHR(gpu_->getDevice(), swapchain_->swapchain, UINT64_MAX,
                                          get_current_frame().swapchain_semaphore, nullptr,
                                          &swapchain_image_index_);
       if (e == VK_ERROR_OUT_OF_DATE_KHR) {
@@ -206,7 +207,7 @@ namespace gestalt::graphics {
         return true;
       }
 
-      VK_CHECK(vkResetFences(gpu_.device, 1, &get_current_frame().render_fence));
+      VK_CHECK(vkResetFences(gpu_->getDevice(), 1, &get_current_frame().render_fence));
       VK_CHECK(vkResetCommandBuffer(get_current_frame().main_command_buffer, 0));
 
       return false;
@@ -302,7 +303,7 @@ namespace gestalt::graphics {
 
       VkSubmitInfo2 submit = vkinit::submit_info(&cmdinfo, &signalInfo, &waitInfo);
 
-      VK_CHECK(vkQueueSubmit2(gpu_.graphics_queue, 1, &submit, get_current_frame().render_fence));
+      VK_CHECK(vkQueueSubmit2(gpu_->getGraphicsQueue(), 1, &submit, get_current_frame().render_fence));
       VkPresentInfoKHR presentInfo = vkinit::present_info();
       presentInfo.pSwapchains = &swapchain_->swapchain;
       presentInfo.swapchainCount = 1;
@@ -310,7 +311,7 @@ namespace gestalt::graphics {
       presentInfo.waitSemaphoreCount = 1;
       presentInfo.pImageIndices = &swapchain_image_index_;
 
-      VkResult presentResult = vkQueuePresentKHR(gpu_.graphics_queue, &presentInfo);
+      VkResult presentResult = vkQueuePresentKHR(gpu_->getGraphicsQueue(), &presentInfo);
       if (presentResult == VK_ERROR_OUT_OF_DATE_KHR) {
         resize_requested_ = true;
         return;
@@ -337,7 +338,7 @@ namespace gestalt::graphics {
 
     RenderPassDependency RenderPassDependencyBuilder::build() { return dependency_; }
 
-    void ResourceRegistry::init(const Gpu& gpu) {
+    void ResourceRegistry::init(const std::shared_ptr<IGpu>& gpu) {
       gpu_ = gpu;
 
       attachment_list_.push_back(attachments_.scene_color);
@@ -372,7 +373,7 @@ namespace gestalt::graphics {
       }
 
       VkShaderModule shader_module;
-      vkutil::load_shader_module(shader_path.c_str(), gpu_.device, &shader_module);
+      vkutil::load_shader_module(shader_path.c_str(), gpu_->getDevice(), &shader_module);
 
       shader_cache_[shader_path] = shader_module;
 
@@ -381,15 +382,15 @@ namespace gestalt::graphics {
 
     void ResourceRegistry::clear_shader_cache() {
       for (const auto& shader_module : shader_cache_ | std::views::values) {
-        vkDestroyShaderModule(gpu_.device, shader_module, nullptr);
+        vkDestroyShaderModule(gpu_->getDevice(), shader_module, nullptr);
       }
       shader_cache_.clear();
     }
 
     void RenderPass::cleanup() {
       destroy();
-      vkDestroyPipelineLayout(gpu_.device, pipeline_layout_, nullptr);
-      vkDestroyPipeline(gpu_.device, pipeline_, nullptr);
+      vkDestroyPipelineLayout(gpu_->getDevice(), pipeline_layout_, nullptr);
+      vkDestroyPipeline(gpu_->getDevice(), pipeline_, nullptr);
     }
 
     void RenderPass::begin_renderpass(VkCommandBuffer cmd) {
@@ -507,18 +508,18 @@ namespace gestalt::graphics {
         pipeline_layout_create_info.pPushConstantRanges = &dependencies_.push_constant_range;
       }
 
-      VK_CHECK(vkCreatePipelineLayout(gpu_.device, &pipeline_layout_create_info, nullptr,
+      VK_CHECK(vkCreatePipelineLayout(gpu_->getDevice(), &pipeline_layout_create_info, nullptr,
                                       &pipeline_layout_));
     }
 
-    void VkSwapchain::init(const Gpu& gpu, const VkExtent3D& extent) {
+    void VkSwapchain::init(const std::shared_ptr<IGpu>& gpu, const VkExtent3D& extent) {
       gpu_ = gpu;
 
       create_swapchain(extent.width, extent.height);
     }
 
     void VkSwapchain::create_swapchain(const uint32_t width, const uint32_t height) {
-      vkb::SwapchainBuilder swapchainBuilder{gpu_.chosen_gpu, gpu_.device, gpu_.surface};
+      vkb::SwapchainBuilder swapchainBuilder{gpu_->getPhysicalDevice(), gpu_->getDevice(), gpu_->getSurface()};
 
       swapchain_image_format = VK_FORMAT_B8G8R8A8_UNORM;
 
@@ -557,7 +558,7 @@ namespace gestalt::graphics {
     }
 
     void VkSwapchain::resize_swapchain(Window& window) {
-      vkDeviceWaitIdle(gpu_.device);
+      vkDeviceWaitIdle(gpu_->getDevice());
 
       destroy_swapchain();
 
@@ -567,11 +568,11 @@ namespace gestalt::graphics {
     }
 
     void VkSwapchain::destroy_swapchain() const {
-      vkDestroySwapchainKHR(gpu_.device, swapchain, nullptr);
+      vkDestroySwapchainKHR(gpu_->getDevice(), swapchain, nullptr);
 
       // destroy swapchain resources
       for (auto& _swapchainImage : swapchain_images) {
-        vkDestroyImageView(gpu_.device, _swapchainImage->imageView, nullptr);
+        vkDestroyImageView(gpu_->getDevice(), _swapchainImage->imageView, nullptr);
       }
     }
 

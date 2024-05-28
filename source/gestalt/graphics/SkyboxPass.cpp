@@ -33,7 +33,7 @@ namespace gestalt::graphics {
                       .set_multisampling_none()
                       .disable_blending()
                       .enable_depthtest(false, VK_COMPARE_OP_LESS_OR_EQUAL)
-                      .build_pipeline(gpu_.device);
+                      .build_pipeline(gpu_->getDevice());
     }
 
     void SkyboxPass::execute(const VkCommandBuffer cmd) {
@@ -88,7 +88,7 @@ namespace gestalt::graphics {
                       .set_multisampling_none()
                       .disable_blending()
                       .enable_depthtest(false, VK_COMPARE_OP_LESS_OR_EQUAL)
-                      .build_pipeline(gpu_.device);
+                      .build_pipeline(gpu_->getDevice());
     }
 
     void InfiniteGridPass::execute(const VkCommandBuffer cmd) {

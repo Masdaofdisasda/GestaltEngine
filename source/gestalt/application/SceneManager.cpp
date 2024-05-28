@@ -1,5 +1,5 @@
 ﻿
-#include "SceneManger.hpp"
+#include "SceneManager.hpp"
 
 #include "vk_types.hpp"
 
@@ -8,40 +8,43 @@
 
 #include <glm/gtx/matrix_decompose.hpp>
 
+#include "fmt/printf.h"
+
 namespace gestalt::application {
 
-    void SceneManager::init(const graphics::Gpu& gpu,
-                            const std::shared_ptr<graphics::ResourceManager>& resource_manager,
-                            const std::shared_ptr<Repository>& repository) {
-      gpu_ = gpu;
-      resource_manager_ = resource_manager;
-      repository_ = repository;
+    void SceneManager::init(
+      const std::shared_ptr<IGpu>& gpu, const std::shared_ptr<IResourceManager>& resource_manager,
+                          const std::unique_ptr<IDescriptorUtilFactory>& descriptor_util_factory,
+      const std::shared_ptr<Repository>& repository) {
+    gpu_ = gpu;
+    resource_manager_ = resource_manager;
+    repository_ = repository;
 
-      component_factory_->init(resource_manager_, repository_);
-      asset_loader_->init(resource_manager_, component_factory_, repository_);
+    component_factory_->init(resource_manager_, repository_);
+    asset_loader_->init(resource_manager_, component_factory_, repository_);
 
-      // TODO add lights from gltf to resource manager
+    // TODO add lights from gltf to resource manager
 
-      const size_t camera_index = repository_->cameras.add(CameraData{});
-      repository_->camera_components.add(component_factory_->create_entity_node().first,
-                                         CameraComponent{true, camera_index});
+    const size_t camera_index = repository_->cameras.add(CameraData{});
+    repository_->camera_components.add(component_factory_->create_entity_node().first,
+                                       CameraComponent{true, camera_index});
 
-      component_factory_->create_directional_light(
-          glm::vec3(1.f, 0.957f, 0.917f), 5.f, glm::vec3(-0.216, 0.941, -0.257), get_root_entity());
-      component_factory_->create_point_light(glm::vec3(1.0f), 5.0f, glm ::vec3(0.0, 6.0, 0.0),
-                                             get_root_entity());
+    component_factory_->create_directional_light(
+        glm::vec3(1.f, 0.957f, 0.917f), 5.f, glm::vec3(-0.216, 0.941, -0.257), get_root_entity());
+    component_factory_->create_point_light(glm::vec3(1.0f), 5.0f, glm ::vec3(0.0, 6.0, 0.0),
+                                           get_root_entity());
 
-      material_system_ = std::make_unique<MaterialSystem>();
-      material_system_->init(gpu, resource_manager, repository);
-      light_system_ = std::make_unique<LightSystem>();
-      light_system_->init(gpu, resource_manager, repository);
-      camera_system_= std::make_unique<CameraSystem>();
-      camera_system_->init(gpu, resource_manager, repository);
-      transform_system_ = std::make_unique<TransformSystem>();
-      transform_system_->init(gpu, resource_manager, repository);
-      render_system_ = std::make_unique<RenderSystem>();
-      render_system_->init(gpu, resource_manager, repository);
-    }
+    material_system_ = std::make_unique<MaterialSystem>();
+    material_system_->init(gpu, resource_manager, descriptor_util_factory, repository);
+    light_system_ = std::make_unique<LightSystem>();
+    light_system_->init(gpu, resource_manager, descriptor_util_factory, repository);
+    camera_system_ = std::make_unique<CameraSystem>();
+    camera_system_->init(gpu, resource_manager, descriptor_util_factory, repository);
+    transform_system_ = std::make_unique<TransformSystem>();
+    transform_system_->init(gpu, resource_manager, descriptor_util_factory, repository);
+    render_system_ = std::make_unique<RenderSystem>();
+    render_system_->init(gpu, resource_manager, descriptor_util_factory, repository);
+  }
 
     void SceneManager::load_scene(const std::string& path) {
       size_t mesh_offset = repository_->meshes.size();
@@ -280,7 +283,7 @@ namespace gestalt::application {
         load_scene(scene_path_);
         scene_path_.clear();
       }
-      resource_manager_->resource_loader_.flush();
+      resource_manager_->flush_loader();
 
       material_system_->update();
       light_system_->update();
@@ -292,7 +295,7 @@ namespace gestalt::application {
 
     void SceneManager::request_scene(const std::string& path) { scene_path_ = path; }
 
-    void ComponentFactory::init(const std::shared_ptr<graphics::ResourceManager>& resource_manager,
+    void ComponentFactory::init(const std::shared_ptr<IResourceManager>& resource_manager,
                                          const std::shared_ptr<Repository>& repository) {
       resource_manager_ = resource_manager;
       repository_ = repository;

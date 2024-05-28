@@ -1,12 +1,11 @@
 ﻿#pragma once
 
-#include "vk_types.hpp"
-#include "Gpu.hpp"
-#include "SceneManger.hpp"
+#include <functional>
 
-namespace gestalt::graphics {
-  struct RenderConfig;
-}
+#include "RenderConfig.hpp"
+#include "vk_types.hpp"
+#include "SceneManager.hpp"
+#include "Window.hpp"
 
 namespace gestalt::application {
     enum class action {
@@ -20,12 +19,12 @@ namespace gestalt::application {
       std::function<void(std::string)> load_gltf;
       std::function<EngineStats&()> get_stats;
       std::function<ComponentFactory&()> get_component_factory;
-      std::function<graphics::RenderConfig&()> get_render_config;
+      std::function<RenderConfig&()> get_render_config;
       std::function<std::shared_ptr<TextureHandle>()> get_debug_image;
     };
 
     class Gui {
-      graphics::Gpu gpu_ = {};
+      std::shared_ptr<IGpu> gpu_;
       Window window_;
       std::shared_ptr<Repository> repository_;
       GuiCapabilities actions_;
@@ -69,8 +68,10 @@ namespace gestalt::application {
 
       void set_debug_texture(VkImageView image_view, VkSampler sampler);
 
-      void init(graphics::Gpu& gpu, Window& window,
-                VkFormat swapchainFormat, const std::shared_ptr<Repository>& repository, GuiCapabilities
+      void init(const std::shared_ptr<IGpu>& gpu, Window& window, VkFormat swapchainFormat,
+                const std::shared_ptr<Repository>& repository,
+                const std::unique_ptr<IDescriptorUtilFactory>& descriptor_util_factory,
+                    GuiCapabilities
                 & actions);
 
       void cleanup();

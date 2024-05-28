@@ -7,13 +7,12 @@
 namespace gestalt::graphics {
 
     class vk_sync {
-    Gpu gpu_;
-    DeletionService deletion_service_;
+    std::shared_ptr<IGpu> gpu_;
 
   public:
     VkFence imgui_fence;
 
-    void init(const Gpu& gpu, std::vector<FrameData>& frames);
-    void cleanup() { deletion_service_.flush(); }
+    void init(const std::shared_ptr<IGpu>& gpu, std::vector<FrameData>& frames);
+    void cleanup() { }
   };
 }  // namespace gestalt

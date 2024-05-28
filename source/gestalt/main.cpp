@@ -1,8 +1,8 @@
-#include "graphics/GameEngine.hpp"
+#include "graphics/Engine.hpp"
 
 int main(int argc, char* argv[]) {
 
-  gestalt::GameEngine engine;
+  gestalt::Engine engine;
 
   engine.init();
 

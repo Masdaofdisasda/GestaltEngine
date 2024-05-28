@@ -1,8 +1,9 @@
 #pragma once
 
+#include "common.hpp"
+
 #include <SDL.h>
 
-#include "common.hpp"
 
 namespace gestalt::application {
 
@@ -24,7 +25,7 @@ namespace gestalt::application {
     class InputSystem {
       Movement movement_{};
 
-      void handle_mouse_motion(const SDL_Event& e, uint32_t window_size_x, uint32_t window_size_y);
+      void handle_mouse_motion(const SDL_Event& e, uint32 window_size_x, uint32 window_size_y);
       void handle_mouse_button(const SDL_Event& e);
       void handle_keyboard(const SDL_Event& e);
 

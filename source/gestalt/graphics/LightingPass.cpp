@@ -27,7 +27,7 @@ namespace gestalt:: graphics {
                            VK_SHADER_STAGE_FRAGMENT_BIT)
               .add_binding(14, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                            VK_SHADER_STAGE_FRAGMENT_BIT)
-              .build(gpu_.device));
+              .build(gpu_->getDevice()));
       descriptor_layouts_.push_back(light_data.descriptor_layout);
 
       dependencies_
@@ -54,14 +54,14 @@ namespace gestalt:: graphics {
                       .set_multisampling_none()
                       .disable_blending()
                       .disable_depthtest()
-                      .build_pipeline(gpu_.device);
+                      .build_pipeline(gpu_->getDevice());
     }
 
     void LightingPass::destroy() {  }
 
     void LightingPass::execute(VkCommandBuffer cmd) {
       descriptor_set_
-          = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(2));
+          = resource_manager_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(2));
 
       begin_renderpass(cmd);
 
@@ -91,7 +91,7 @@ namespace gestalt:: graphics {
                           VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
       writer_.write_image(14, shadow_map->imageView, repository_->default_material_.nearestSampler,
                           shadow_map->getLayout(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-      writer_.update_set(gpu_.device, descriptor_set_);
+      writer_.update_set(gpu_->getDevice(), descriptor_set_);
 
       VkDescriptorSet descriptorSets[]
           = {per_frame_buffers.descriptor_sets[frame], ibl_buffers.descriptor_set,

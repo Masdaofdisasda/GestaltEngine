@@ -5,7 +5,7 @@
 
 #include <meshoptimizer.h>
 
-#include "SceneManger.hpp"
+#include "SceneManager.hpp"
 
 namespace gestalt::application {
 
@@ -16,7 +16,7 @@ namespace gestalt::application {
       glm::vec2 uv;
     };
 
-    void AssetLoader::init(const std::shared_ptr<graphics::ResourceManager>& resource_manager,
+    void AssetLoader::init(const std::shared_ptr<IResourceManager>& resource_manager,
                            const std::shared_ptr<ComponentFactory>& component_factory,
                            const std::shared_ptr<Repository>& repository) {
       resource_manager_ = resource_manager;

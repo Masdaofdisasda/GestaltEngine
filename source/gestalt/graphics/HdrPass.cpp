@@ -13,7 +13,7 @@ namespace gestalt::graphics {
                                            .add_binding(10,
                                                         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                         VK_SHADER_STAGE_FRAGMENT_BIT)
-                                           .build(gpu_.device));
+                                           .build(gpu_->getDevice()));
 
       dependencies_
           = RenderPassDependencyBuilder()
@@ -34,12 +34,12 @@ namespace gestalt::graphics {
                       .set_multisampling_none()
                       .disable_blending()
                       .disable_depthtest()
-                      .build_pipeline(gpu_.device);
+                      .build_pipeline(gpu_->getDevice());
     }
 
     void BrightPass::execute(VkCommandBuffer cmd) {
       descriptor_set_
-          = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(0));
+          = resource_manager_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(0));
 
       const auto scene_ssao = registry_->attachments_.scene_color.image;
 
@@ -48,7 +48,7 @@ namespace gestalt::graphics {
       writer.clear();
       writer.write_image(10, scene_ssao->imageView, repository_->default_material_.nearestSampler,
                          scene_ssao->getLayout(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-      writer.update_set(gpu_.device, descriptor_set_);
+      writer.update_set(gpu_->getDevice(), descriptor_set_);
 
       vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                               &descriptor_set_, 0, nullptr);
@@ -72,7 +72,7 @@ namespace gestalt::graphics {
                                            .add_binding(10,
                                                         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                         VK_SHADER_STAGE_FRAGMENT_BIT)
-                                           .build(gpu_.device));
+                                           .build(gpu_->getDevice()));
 
       dependencies_
           = RenderPassDependencyBuilder()
@@ -92,7 +92,7 @@ namespace gestalt::graphics {
                       .set_multisampling_none()
                       .disable_blending()
                       .disable_depthtest()
-                      .build_pipeline(gpu_.device);
+                      .build_pipeline(gpu_->getDevice());
     }
 
     void BloomBlurPass::execute(VkCommandBuffer cmd) {
@@ -106,7 +106,7 @@ namespace gestalt::graphics {
       scissor_.extent = image_x->getExtent2D();
 
       for (int i = 0; i < registry_->config_.bloom_quality * 2; i++) {
-          descriptor_set_ = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(0));
+          descriptor_set_ = resource_manager_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(0));
 
         bool isHorizontal = (i % 2 == 0);
         auto& srcImage = isHorizontal ? image_x : image_y;
@@ -124,7 +124,7 @@ namespace gestalt::graphics {
         writer.clear();
         writer.write_image(10, srcImage->imageView, repository_->default_material_.nearestSampler,
                            srcImage->getLayout(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-        writer.update_set(gpu_.device, descriptor_set_);
+        writer.update_set(gpu_->getDevice(), descriptor_set_);
 
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                                 &descriptor_set_, 0, nullptr);
@@ -149,7 +149,7 @@ namespace gestalt::graphics {
                                            .add_binding(10,
                                                         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                         VK_SHADER_STAGE_FRAGMENT_BIT)
-                                           .build(gpu_.device));
+                                           .build(gpu_->getDevice()));
 
       dependencies_
           = RenderPassDependencyBuilder()
@@ -168,12 +168,12 @@ namespace gestalt::graphics {
                       .set_multisampling_none()
                       .disable_blending()
                       .disable_depthtest()
-                      .build_pipeline(gpu_.device);
+                      .build_pipeline(gpu_->getDevice());
     }
 
     void LuminancePass::execute(VkCommandBuffer cmd) {
       descriptor_set_
-          = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(0));
+          = resource_manager_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(0));
 
       const auto scene_color = registry_->attachments_.scene_color.image;
 
@@ -183,7 +183,7 @@ namespace gestalt::graphics {
       writer.write_image(10, scene_color->imageView, repository_->default_material_.nearestSampler,
                          scene_color->getLayout(),
                          VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-      writer.update_set(gpu_.device, descriptor_set_);
+      writer.update_set(gpu_->getDevice(), descriptor_set_);
 
       vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                               &descriptor_set_, 0, nullptr);
@@ -204,7 +204,7 @@ namespace gestalt::graphics {
                                            .add_binding(10,
                                                         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                         VK_SHADER_STAGE_FRAGMENT_BIT)
-                                           .build(gpu_.device));
+                                           .build(gpu_->getDevice()));
       dependencies_
           = RenderPassDependencyBuilder()
                 .add_shader(ShaderStage::kVertex, "fullscreen.vert.spv")
@@ -227,14 +227,14 @@ namespace gestalt::graphics {
                       .set_multisampling_none()
                       .disable_blending()
                       .disable_depthtest()
-                      .build_pipeline(gpu_.device);
+                      .build_pipeline(gpu_->getDevice());
     }
 
     void LuminanceDownscalePass::execute(VkCommandBuffer cmd) {
       
       for (size_t i = 0; i < dependencies_.image_attachments.size() - 1; ++i) {
         descriptor_set_
-            = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(0));
+            = resource_manager_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(0));
 
         const auto src = dependencies_.image_attachments.at(i).attachment.image;
         const auto dst = dependencies_.image_attachments.at(i + 1).attachment.image;
@@ -251,7 +251,7 @@ namespace gestalt::graphics {
         writer.clear();
         writer.write_image(10, src->imageView, repository_->default_material_.nearestSampler,
             src->getLayout(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-        writer.update_set(gpu_.device, descriptor_set_);
+        writer.update_set(gpu_->getDevice(), descriptor_set_);
 
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                                 &descriptor_set_, 0, nullptr);
@@ -277,7 +277,7 @@ namespace gestalt::graphics {
                            VK_SHADER_STAGE_FRAGMENT_BIT)
               .add_binding(11, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                            VK_SHADER_STAGE_FRAGMENT_BIT)
-              .build(gpu_.device));
+              .build(gpu_->getDevice()));
 
       dependencies_
           = RenderPassDependencyBuilder()
@@ -299,14 +299,14 @@ namespace gestalt::graphics {
                       .set_multisampling_none()
                       .disable_blending()
                       .disable_depthtest()
-                      .build_pipeline(gpu_.device);
+                      .build_pipeline(gpu_->getDevice());
     }
 
     void LightAdaptationPass::destroy() {}
 
     void LightAdaptationPass::execute(VkCommandBuffer cmd) {
       descriptor_set_
-          = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(0));
+          = resource_manager_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(0));
 
       const auto frame = gpu_frame.get_current_frame();
 
@@ -331,7 +331,7 @@ namespace gestalt::graphics {
                          current_lum->getLayout(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
       writer.write_image(11, avg_lum->imageView, repository_->default_material_.nearestSampler,
                          avg_lum->getLayout(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-      writer.update_set(gpu_.device, descriptor_set_);
+      writer.update_set(gpu_->getDevice(), descriptor_set_);
 
       vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                               &descriptor_set_, 0, nullptr);
@@ -362,7 +362,7 @@ namespace gestalt::graphics {
                            VK_SHADER_STAGE_FRAGMENT_BIT)
               .add_binding(13, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                            VK_SHADER_STAGE_FRAGMENT_BIT)
-              .build(gpu_.device));
+              .build(gpu_->getDevice()));
 
       dependencies_
           = RenderPassDependencyBuilder()
@@ -386,12 +386,12 @@ namespace gestalt::graphics {
                       .set_multisampling_none()
                       .disable_blending()
                       .disable_depthtest()
-                      .build_pipeline(gpu_.device);
+                      .build_pipeline(gpu_->getDevice());
     }
 
     void TonemapPass::execute(VkCommandBuffer cmd) {
       descriptor_set_
-          = resource_manager_->descriptor_pool->allocate(gpu_.device, descriptor_layouts_.at(0));
+          = resource_manager_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(0));
 
       const auto frame = gpu_frame.get_current_frame();
       const auto scene_linear = registry_->attachments_.scene_color.image;
@@ -411,7 +411,7 @@ namespace gestalt::graphics {
       writer.write_image(12, lum_image->imageView, repository_->default_material_.linearSampler,
                          lum_image->getLayout(),
                          VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-      writer.update_set(gpu_.device, descriptor_set_);
+      writer.update_set(gpu_->getDevice(), descriptor_set_);
 
       vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
                               &descriptor_set_, 0, nullptr);

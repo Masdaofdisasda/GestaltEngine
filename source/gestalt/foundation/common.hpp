@@ -37,6 +37,6 @@ namespace gestalt {
     }
   }  // namespace graphics
 
-  class GameEngine;
+  class Engine;
 
 }  // namespace gestalt

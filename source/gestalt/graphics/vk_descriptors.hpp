@@ -1,39 +1,40 @@
 ﻿#pragma once
 
+#include <deque>
+
 #include "vk_types.hpp"
 
-#include "DeletionService.hpp"
 #include "Gpu.hpp"
 
 namespace gestalt::graphics {
     
-  struct DescriptorLayoutBuilder {
+  struct DescriptorLayoutBuilder final : IDescriptorLayoutBuilder{
     std::vector<VkDescriptorSetLayoutBinding> bindings;
     std::vector<VkDescriptorBindingFlags> binding_flags;
 
     DescriptorLayoutBuilder& add_binding(uint32_t binding, VkDescriptorType type,
                                          VkShaderStageFlags shader_stages, bool bindless = false,
-                                         uint32_t descriptor_count = 1);
-    void clear();
-    VkDescriptorSetLayout build(VkDevice device, bool is_push_descriptor = false);
+                                         uint32_t descriptor_count = 1) override;
+    void clear() override;
+    VkDescriptorSetLayout build(VkDevice device, bool is_push_descriptor = false) override;
   };
 
-  struct descriptor_writer {
+  struct DescriptorWriter final : IDescriptorWriter {
     std::deque<VkDescriptorImageInfo> imageInfos;
     std::deque<VkDescriptorBufferInfo> bufferInfos;
     std::vector<VkWriteDescriptorSet> writes;
 
     void write_image(int binding, VkImageView image, VkSampler sampler, VkImageLayout layout,
-                     VkDescriptorType type);
+                     VkDescriptorType type) override;
     void write_buffer(int binding, VkBuffer buffer, size_t size, size_t offset,
-                      VkDescriptorType type);
+                      VkDescriptorType type) override;
     void write_buffer_array(int binding, const std::vector<VkDescriptorBufferInfo>& bufferInfos,
-                            VkDescriptorType type, uint32_t arrayElementStart);
+                            VkDescriptorType type, uint32_t arrayElementStart) override;
     void write_image_array(int binding, const std::vector<VkDescriptorImageInfo>& imageInfos,
-                           uint32_t arrayElementStart = 0);
+                           uint32_t arrayElementStart = 0) override;
 
-    void clear();
-    void update_set(VkDevice device, VkDescriptorSet set);
+    void clear() override;
+    void update_set(VkDevice device, VkDescriptorSet set) override;
   };
 
   struct DescriptorAllocator {
@@ -51,18 +52,14 @@ namespace gestalt::graphics {
     VkDescriptorSet allocate(VkDevice device, VkDescriptorSetLayout layout);
   };
 
-  struct DescriptorAllocatorGrowable {
-    struct PoolSizeRatio {
-      VkDescriptorType type;
-      float ratio;
-    };
+  struct DescriptorAllocatorGrowable final : IDescriptorAllocatorGrowable {
 
-    void init(VkDevice device, uint32_t initialSets, std::span<PoolSizeRatio> poolRatios);
-    void clear_pools(VkDevice device);
-    void destroy_pools(VkDevice device);
+    void init(VkDevice device, uint32_t initial_sets, std::span<PoolSizeRatio> poolRatios) override;
+    void clear_pools(VkDevice device) override;
+    void destroy_pools(VkDevice device) override;
 
     VkDescriptorSet allocate(VkDevice device, VkDescriptorSetLayout layout,
-                             const std::vector<uint32_t>& variableDescriptorCounts = {});
+                             const std::vector<uint32_t>& variableDescriptorCounts = {}) override;
 
   private:
     VkDescriptorPool get_pool(VkDevice device);
@@ -72,7 +69,13 @@ namespace gestalt::graphics {
     std::vector<PoolSizeRatio> ratios;
     std::vector<VkDescriptorPool> fullPools;
     std::vector<VkDescriptorPool> readyPools;
-    uint32 setsPerPool;
+    uint32 setsPerPool{0};
+  };
+
+  struct DescriptorUtilFactory final : public IDescriptorUtilFactory {
+    std::unique_ptr<IDescriptorLayoutBuilder> create_descriptor_layout_builder() override;
+    std::unique_ptr<IDescriptorWriter> create_descriptor_writer() override;
+    std::unique_ptr<IDescriptorAllocatorGrowable> create_descriptor_allocator_growable() override;
   };
 
   struct FrameData {

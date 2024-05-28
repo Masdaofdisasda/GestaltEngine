@@ -8,18 +8,19 @@ namespace gestalt::application {
 
       LightBuffers light_data{};
 
+      descriptor_layout_builder_->clear();
       light_data.descriptor_layout
-          = graphics::DescriptorLayoutBuilder()
-            .add_binding(15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
+          = descriptor_layout_builder_->add_binding(15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                                  VK_SHADER_STAGE_FRAGMENT_BIT,
                          false, kLimits.max_directional_lights)
             .add_binding(16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
                          false, kLimits.max_point_lights)
             .add_binding(17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT,
                          false, kLimits.max_directional_lights + kLimits.max_point_lights)
-            .build(gpu_.device);
-      
+            .build(gpu_->getDevice());
+
       light_data.descriptor_set
-          = resource_manager_->descriptorPool.allocate(gpu_.device, light_data.descriptor_layout);
+          = resource_manager_->get_descriptor_pool()->allocate(gpu_->getDevice(), light_data.descriptor_layout);
 
       constexpr size_t max_directional_lights = kLimits.max_directional_lights;
       constexpr size_t max_point_lights = kLimits.max_point_lights;
@@ -35,7 +36,7 @@ namespace gestalt::application {
           sizeof(glm::mat4) * max_lights, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
           VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-      writer_.clear();
+      writer_->clear();
       std::vector<VkDescriptorBufferInfo> dirBufferInfos;
       for (int i = 0; i < max_directional_lights; ++i) {
         VkDescriptorBufferInfo bufferInfo = {};
@@ -44,7 +45,7 @@ namespace gestalt::application {
         bufferInfo.range = 32;
         dirBufferInfos.push_back(bufferInfo);
       }
-      writer_.write_buffer_array(15, dirBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
+      writer_->write_buffer_array(15, dirBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
 
       std::vector<VkDescriptorBufferInfo> pointBufferInfos;
       for (int i = 0; i < max_point_lights; ++i) {
@@ -54,7 +55,7 @@ namespace gestalt::application {
         bufferInfo.range = 32;
         pointBufferInfos.push_back(bufferInfo);
       }
-      writer_.write_buffer_array(16, pointBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
+      writer_->write_buffer_array(16, pointBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
 
       std::vector<VkDescriptorBufferInfo> lightViewProjBufferInfos;
       for (int i = 0; i < max_lights; ++i) {
@@ -64,14 +65,14 @@ namespace gestalt::application {
         bufferInfo.range = 64;
         lightViewProjBufferInfos.push_back(bufferInfo);
       }
-      writer_.write_buffer_array(17, lightViewProjBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
-      writer_.update_set(gpu_.device, light_data.descriptor_set);
+      writer_->write_buffer_array(17, lightViewProjBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
+      writer_->update_set(gpu_->getDevice(), light_data.descriptor_set);
 
       repository_->register_buffer(light_data);
     }
 
     void MaterialSystem::write_material(PbrMaterial& material, const uint32_t material_id) {
-      writer_.clear();
+      writer_->clear();
 
       std::vector<VkDescriptorImageInfo> imageInfos = {
           {material.textures.albedo_sampler, material.textures.albedo_image.imageView,
@@ -86,9 +87,9 @@ namespace gestalt::application {
            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
 
       const uint32_t texture_start = imageInfos.size() * material_id;
-      writer_.write_image_array(4, imageInfos, texture_start);
+      writer_->write_image_array(4, imageInfos, texture_start);
 
-      writer_.update_set(gpu_.device, repository_->material_data.resource_set);
+      writer_->update_set(gpu_->getDevice(), repository_->material_data.resource_set);
 
       if (material.constants.albedo_tex_index != kUnusedTexture) {
         material.constants.albedo_tex_index = texture_start;
@@ -107,10 +108,10 @@ namespace gestalt::application {
       }
 
       PbrMaterial::PbrConstants* mappedData;
-      vmaMapMemory(gpu_.allocator, repository_->material_data.constants_buffer.allocation,
+      vmaMapMemory(gpu_->getAllocator(), repository_->material_data.constants_buffer.allocation,
                    (void**)&mappedData);
       memcpy(mappedData + material_id, &material.constants, sizeof(PbrMaterial::PbrConstants));
-      vmaUnmapMemory(gpu_.allocator, repository_->material_data.constants_buffer.allocation);
+      vmaUnmapMemory(gpu_->getAllocator(), repository_->material_data.constants_buffer.allocation);
     }
 
     void MaterialSystem::create_defaults() {
@@ -165,12 +166,12 @@ namespace gestalt::application {
       sampler.magFilter = VK_FILTER_NEAREST;
       sampler.minFilter = VK_FILTER_NEAREST;
 
-      vkCreateSampler(gpu_.device, &sampler, nullptr, &default_material.nearestSampler);
+      vkCreateSampler(gpu_->getDevice(), &sampler, nullptr, &default_material.nearestSampler);
       repository_->samplers.add(default_material.nearestSampler);
 
       sampler.magFilter = VK_FILTER_LINEAR;
       sampler.minFilter = VK_FILTER_LINEAR;
-      vkCreateSampler(gpu_.device, &sampler, nullptr, &default_material.linearSampler);
+      vkCreateSampler(gpu_->getDevice(), &sampler, nullptr, &default_material.linearSampler);
       repository_->samplers.add(default_material.linearSampler);
 
       PbrMaterial pbr_material{};
@@ -199,12 +200,12 @@ namespace gestalt::application {
       std::vector<PbrMaterial::PbrConstants> material_constants(kLimits.max_materials);
 
       PbrMaterial::PbrConstants* mappedData;
-      VK_CHECK(vmaMapMemory(gpu_.allocator, repository_->material_data.constants_buffer.allocation,
+      VK_CHECK(vmaMapMemory(gpu_->getAllocator(), repository_->material_data.constants_buffer.allocation,
                             (void**)&mappedData));
       memcpy(mappedData, material_constants.data(),
              sizeof(PbrMaterial::PbrConstants) * kLimits.max_materials);
 
-      vmaUnmapMemory(gpu_.allocator, repository_->material_data.constants_buffer.allocation);
+      vmaUnmapMemory(gpu_->getAllocator(), repository_->material_data.constants_buffer.allocation);
 
       std::vector<VkDescriptorBufferInfo> bufferInfos;
       for (int i = 0; i < material_constants.size(); ++i) {
@@ -215,11 +216,11 @@ namespace gestalt::application {
         bufferInfos.push_back(bufferInfo);
       }
 
-      writer_.clear();
-      writer_.write_buffer_array(5, bufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
-      writer_.update_set(gpu_.device, repository_->material_data.constants_set);
+      writer_->clear();
+      writer_->write_buffer_array(5, bufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
+      writer_->update_set(gpu_->getDevice(), repository_->material_data.constants_set);
 
-      writer_.clear();
+      writer_->clear();
       std::vector<VkDescriptorImageInfo> imageInfos{kLimits.max_textures};
       for (int i = 0; i < kLimits.max_textures; ++i) {
         VkDescriptorImageInfo image_info;
@@ -228,8 +229,8 @@ namespace gestalt::application {
         image_info.sampler = repository_->default_material_.linearSampler;
         imageInfos[i] = image_info;
       }
-      writer_.write_image_array(4, imageInfos, 0);
-      writer_.update_set(gpu_.device, repository_->material_data.resource_set);
+      writer_->write_image_array(4, imageInfos, 0);
+      writer_->update_set(gpu_->getDevice(), repository_->material_data.resource_set);
     }
 
     void MaterialSystem::prepare() {
@@ -238,35 +239,39 @@ namespace gestalt::application {
 
       material_data.constants_buffer
           = resource_manager_->create_buffer(sizeof(PbrMaterial::PbrConstants) * kLimits.max_materials,
-                          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+      descriptor_layout_builder_->clear();
       material_data.resource_layout
-          = graphics::DescriptorLayoutBuilder()
-            .add_binding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+          = descriptor_layout_builder_->
+      add_binding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                          VK_SHADER_STAGE_FRAGMENT_BIT, true)
-            .build(gpu_.device);
-      material_data.constants_layout = graphics::DescriptorLayoutBuilder()
-                                           .add_binding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                .build(gpu_->getDevice());
+      descriptor_layout_builder_->clear();
+      material_data.constants_layout = descriptor_layout_builder_
+                                           ->add_binding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                                         VK_SHADER_STAGE_FRAGMENT_BIT, true)
-                                           .build(gpu_.device);
-      material_data.resource_set = resource_manager_->descriptorPool.allocate(
-          gpu_.device, material_data.resource_layout, {kLimits.max_textures});
-      material_data.constants_set = resource_manager_->descriptorPool.allocate(
-          gpu_.device, material_data.constants_layout, {kLimits.max_materials});
+                                           .build(gpu_->getDevice());
+      material_data.resource_set = resource_manager_->get_descriptor_pool()->allocate(
+          gpu_->getDevice(), material_data.resource_layout, {kLimits.max_textures});
+      material_data.constants_set = resource_manager_->get_descriptor_pool()->allocate(
+          gpu_->getDevice(), material_data.constants_layout, {kLimits.max_materials});
 
       create_defaults();
 
       IblBuffers ibl_data{};
 
-      ibl_data.descriptor_layout = graphics::DescriptorLayoutBuilder()
-                           .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+      descriptor_layout_builder_->clear();
+      ibl_data.descriptor_layout
+          = descriptor_layout_builder_->add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                         VK_SHADER_STAGE_FRAGMENT_BIT)
                            .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                         VK_SHADER_STAGE_FRAGMENT_BIT)
                            .add_binding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                         VK_SHADER_STAGE_FRAGMENT_BIT)
-                           .build(gpu_.device);
+                                       .build(gpu_->getDevice());
 
-      ibl_data.descriptor_set = resource_manager_->descriptorPool.allocate(gpu_.device, ibl_data.descriptor_layout);
+      ibl_data.descriptor_set = resource_manager_->get_descriptor_pool()->allocate(
+          gpu_->getDevice(), ibl_data.descriptor_layout);
       repository_->register_buffer(ibl_data);
       
       resource_manager_->load_and_process_cubemap(R"(..\..\assets\san_giuseppe_bridge_4k.hdr)");
@@ -284,7 +289,7 @@ namespace gestalt::application {
 
     void MaterialSystem::cleanup() {
       const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
-      vkDestroyDescriptorSetLayout(gpu_.device, ibl_buffers.descriptor_layout, nullptr);
+      vkDestroyDescriptorSetLayout(gpu_->getDevice(), ibl_buffers.descriptor_layout, nullptr);
     }
 
     glm::mat4 LightSystem::calculate_sun_view_proj(const glm::vec3 direction) const {
@@ -350,10 +355,10 @@ namespace gestalt::application {
       }
 
       void* mapped_data;
-      VK_CHECK(vmaMapMemory(gpu_.allocator, light_data.dir_light_buffer.allocation, &mapped_data));
+      VK_CHECK(vmaMapMemory(gpu_->getAllocator(), light_data.dir_light_buffer.allocation, &mapped_data));
       memcpy(mapped_data, repository_->directional_lights.data().data(),
              sizeof(GpuDirectionalLight) * repository_->directional_lights.size());
-      vmaUnmapMemory(gpu_.allocator, light_data.dir_light_buffer.allocation);
+      vmaUnmapMemory(gpu_->getAllocator(), light_data.dir_light_buffer.allocation);
     }
 
     void LightSystem::update_point_lights(std::unordered_map<entity, LightComponent>& lights) {
@@ -379,10 +384,10 @@ namespace gestalt::application {
 
       void* mapped_data;
       VK_CHECK(
-          vmaMapMemory(gpu_.allocator, light_data.point_light_buffer.allocation, &mapped_data));
+          vmaMapMemory(gpu_->getAllocator(), light_data.point_light_buffer.allocation, &mapped_data));
       memcpy(mapped_data, repository_->point_lights.data().data(),
              sizeof(GpuPointLight) * repository_->point_lights.size());
-      vmaUnmapMemory(gpu_.allocator, light_data.point_light_buffer.allocation);
+      vmaUnmapMemory(gpu_->getAllocator(), light_data.point_light_buffer.allocation);
     }
 
     void LightSystem::update() {
@@ -397,9 +402,9 @@ namespace gestalt::application {
       const auto& matrices = repository_->light_view_projections.data();
       void* mapped_data;
       VK_CHECK(
-          vmaMapMemory(gpu_.allocator, light_data.view_proj_matrices.allocation, &mapped_data));
+          vmaMapMemory(gpu_->getAllocator(), light_data.view_proj_matrices.allocation, &mapped_data));
       memcpy(mapped_data, matrices.data(), sizeof(glm::mat4) * matrices.size());
-      vmaUnmapMemory(gpu_.allocator, light_data.view_proj_matrices.allocation);
+      vmaUnmapMemory(gpu_->getAllocator(), light_data.view_proj_matrices.allocation);
     }
 
     void LightSystem::cleanup() {
@@ -418,22 +423,23 @@ namespace gestalt::application {
 
       PerFrameDataBuffers per_frame_data_buffers{};
 
+      descriptor_layout_builder_->clear();
       per_frame_data_buffers.descriptor_layout
-          = graphics::DescriptorLayoutBuilder()  // TODO move dependecy to graphics
-                .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+          = descriptor_layout_builder_->add_binding(
+                0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                              VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
-                .build(gpu_.device);
+                .build(gpu_->getDevice());
 
       for (int i = 0; i < 2; ++i) {
         per_frame_data_buffers.uniform_buffers[i] = resource_manager_->create_buffer(
             sizeof(PerFrameData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-        per_frame_data_buffers.descriptor_sets[i] = resource_manager_->descriptorPool.allocate(
-            gpu_.device, per_frame_data_buffers.descriptor_layout);
+        per_frame_data_buffers.descriptor_sets[i] = resource_manager_->get_descriptor_pool()->allocate(
+            gpu_->getDevice(), per_frame_data_buffers.descriptor_layout);
 
-        writer_.clear();
-        writer_.write_buffer(0, per_frame_data_buffers.uniform_buffers[i].buffer,
+        writer_->clear();
+        writer_->write_buffer(0, per_frame_data_buffers.uniform_buffers[i].buffer,
                              sizeof(PerFrameData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-        writer_.update_set(gpu_.device, per_frame_data_buffers.descriptor_sets[i]);
+        writer_->update_set(gpu_->getDevice(), per_frame_data_buffers.descriptor_sets[i]);
       }
 
       repository_->register_buffer(per_frame_data_buffers);
@@ -468,10 +474,10 @@ namespace gestalt::application {
 
       void* mapped_data;
       const VmaAllocation allocation = buffers.uniform_buffers[frame].allocation;
-      VK_CHECK(vmaMapMemory(gpu_.allocator, allocation, &mapped_data));
+      VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation, &mapped_data));
       const auto scene_uniform_data = static_cast<PerFrameData*>(mapped_data);
       *scene_uniform_data = buffers.data;
-      vmaUnmapMemory(gpu_.allocator, buffers.uniform_buffers[frame].allocation);
+      vmaUnmapMemory(gpu_->getAllocator(), buffers.uniform_buffers[frame].allocation);
     }
 
     void CameraSystem::cleanup() {
@@ -660,15 +666,17 @@ namespace gestalt::application {
       const size_t initial_vertex_data_buffer_size = 184521 * sizeof(GpuVertexData);
       const size_t initial_index_buffer_size = 786801 * sizeof(uint32_t);
 
-      MeshBuffers mesh_buffers{};
+      MeshBuffers mesh_buffers;
 
+      descriptor_layout_builder_->clear();
       mesh_buffers.descriptor_layout
-          = graphics::DescriptorLayoutBuilder()
-            .add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
+          = descriptor_layout_builder_->add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                                  VK_SHADER_STAGE_VERTEX_BIT)
             .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
-            .build(gpu_.device);
+                .build(gpu_->getDevice());
 
-      mesh_buffers.descriptor_set = resource_manager_->descriptorPool.allocate(gpu_.device, mesh_buffers.descriptor_layout);
+      mesh_buffers.descriptor_set = resource_manager_->get_descriptor_pool()->allocate(
+          gpu_->getDevice(), mesh_buffers.descriptor_layout);
 
       // Create initially empty vertex buffer
       mesh_buffers.vertex_position_buffer = resource_manager_->create_buffer(
