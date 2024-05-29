@@ -131,6 +131,8 @@ namespace gestalt::graphics {
     vkDestroyInstance(instance, nullptr);
   }
 
+  Gpu::~Gpu() = default;
+
   VkInstance Gpu::getInstance() const { return instance; }
 
   VkDevice Gpu::getDevice() const { return device; }

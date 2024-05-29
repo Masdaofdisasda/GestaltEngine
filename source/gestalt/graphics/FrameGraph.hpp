@@ -140,11 +140,11 @@ namespace gestalt::graphics {
         ImageAttachment lum_A{.image = std::make_shared<TextureHandle>(TextureType::kColor),
                               .extent = {1, 1},
                               .format = VK_FORMAT_R16_SFLOAT,
-                              .initial_value = {{100.f, 100.f, 100.f, 1.f}}};
+                              .initial_value = {{1e7f, 0.f, 0.f, 1.f}}};
         ImageAttachment lum_B{.image = std::make_shared<TextureHandle>(TextureType::kColor),
                               .extent = {1, 1},
                               .format = VK_FORMAT_R16_SFLOAT,
-                              .initial_value = {{100.f, 100.f, 100.f, 1.f}}};
+                              .initial_value = {{1e7f, 0.f, 0.f, 1.f}}};
       } attachments_;
 
       std::vector<ImageAttachment> attachment_list_;

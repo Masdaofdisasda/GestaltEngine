@@ -36,6 +36,7 @@ namespace gestalt::graphics {
       void cleanup() const;
 
       Gpu() = default;
+      ~Gpu() override;
       [[nodiscard]] VkInstance getInstance() const override;
       [[nodiscard]] VkDevice getDevice() const override;
       [[nodiscard]] VmaAllocator getAllocator() const override;

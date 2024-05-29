@@ -467,12 +467,16 @@ namespace gestalt::graphics {
 
       VK_CHECK(vkEndCommandBuffer(cmd));
 
-      VkSubmitInfo submitInfo = {};
-      submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-      submitInfo.commandBufferCount = 1;
-      submitInfo.pCommandBuffers = &cmd;
+      VkCommandBufferSubmitInfo commandBufferSubmitInfo = {};
+      commandBufferSubmitInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+      commandBufferSubmitInfo.commandBuffer = cmd;
 
-      VK_CHECK(vkQueueSubmit(gpu_->getGraphicsQueue(), 1, &submitInfo, flushFence));
+      VkSubmitInfo2 submitInfo2 = {};
+      submitInfo2.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+      submitInfo2.commandBufferInfoCount = 1;
+      submitInfo2.pCommandBufferInfos = &commandBufferSubmitInfo;
+
+      VK_CHECK(vkQueueSubmit2(gpu_->getGraphicsQueue(), 1, &submitInfo2, flushFence));
       VK_CHECK(vkWaitForFences(gpu_->getDevice(), 1, &flushFence, VK_TRUE, UINT64_MAX));
       VK_CHECK(vkResetFences(gpu_->getDevice(), 1, &flushFence));
       VK_CHECK(vkResetCommandBuffer(cmd, 0));

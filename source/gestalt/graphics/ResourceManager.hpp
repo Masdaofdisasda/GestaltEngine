@@ -33,7 +33,7 @@ namespace gestalt::graphics {
       VkFence flushFence = {};
       std::queue<ImageTask> tasks_;
       std::queue<CubemapTask> cubemap_tasks_;
-      const size_t max_tasks_per_batch_ = 5;
+      size_t max_tasks_per_batch_ = 5;
 
     public:
       void init(const std::shared_ptr<IGpu>& gpu);

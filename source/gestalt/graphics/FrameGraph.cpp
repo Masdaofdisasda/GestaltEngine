@@ -74,6 +74,8 @@ namespace gestalt::graphics {
     }
 
     void FrameGraph::create_resources() {
+      resource_manager_->flush_loader();
+
       VkCommandBuffer cmd = get_current_frame().main_command_buffer;
       VkCommandBufferBeginInfo cmdBeginInfo
           = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -132,6 +134,26 @@ namespace gestalt::graphics {
       }
 
       VK_CHECK(vkEndCommandBuffer(cmd));
+
+      VkCommandBufferSubmitInfo commandBufferSubmitInfo = {};
+      commandBufferSubmitInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+      commandBufferSubmitInfo.commandBuffer = cmd;
+
+      VkSubmitInfo2 submitInfo2 = {};
+      submitInfo2.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+      submitInfo2.commandBufferInfoCount = 1;
+      submitInfo2.pCommandBufferInfos = &commandBufferSubmitInfo;
+
+      VkQueue graphicsQueue = gpu_->getGraphicsQueue();
+      VkFence createResourcesFence;
+      VkFenceCreateInfo fenceInfo = {};
+      fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+      VK_CHECK(vkCreateFence(gpu_->getDevice(), &fenceInfo, nullptr, &createResourcesFence));
+
+      VK_CHECK(vkQueueSubmit2(graphicsQueue, 1, &submitInfo2, createResourcesFence));
+      VK_CHECK(vkWaitForFences(gpu_->getDevice(), 1, &createResourcesFence, VK_TRUE, UINT64_MAX));
+
+      vkDestroyFence(gpu_->getDevice(), createResourcesFence, nullptr);
     }
 
     void FrameGraph::execute(const std::shared_ptr<RenderPass>& render_pass, VkCommandBuffer cmd) {
