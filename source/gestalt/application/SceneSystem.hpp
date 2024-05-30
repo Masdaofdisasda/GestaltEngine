@@ -52,7 +52,7 @@ namespace gestalt::application {
 
     class LightSystem final : public SceneSystem {
 
-      glm::mat4 calculate_sun_view_proj(const glm::vec3 direction) const;
+      glm::mat4 calculate_sun_view_proj(glm::vec3 direction) const;
       void update_directional_lights(std::unordered_map<entity, LightComponent>& lights);
       void update_point_lights(std::unordered_map<entity, LightComponent>& lights);
 
@@ -69,7 +69,7 @@ namespace gestalt::application {
 
     public:
       void prepare() override;
-      void update_cameras(const float delta_time, const Movement& movement, float aspect);
+      void update_cameras(float delta_time, const Movement& movement, float aspect);
       void update() override;
       void cleanup() override;
     };
@@ -90,23 +90,12 @@ namespace gestalt::application {
 
     class RenderSystem final : public SceneSystem {
       size_t meshes_ = 0;
-      void traverse_scene(const entity entity, const glm::mat4& parent_transform);
-
-    public:
-      void prepare() override;
-      void update() override;
-      void cleanup() override {}
-    };
-
-    class HierarchySystem final : public SceneSystem {
-      void build_scene_graph(const std::vector<fastgltf::Node>& nodes, const size_t& mesh_offset);
-      void create_entities(std::vector<fastgltf::Node> nodes, const size_t& mesh_offset);
-      void build_hierarchy(std::vector<fastgltf::Node> nodes, const size_t& node_offset);
-      void link_orphans_to_root();
+      void traverse_scene(entity entity, const glm::mat4& parent_transform);
 
     public:
       void prepare() override;
       void update() override;
       void cleanup() override;
     };
+
 }  // namespace gestalt

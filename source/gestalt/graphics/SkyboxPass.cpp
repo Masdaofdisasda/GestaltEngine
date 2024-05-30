@@ -39,7 +39,7 @@ namespace gestalt::graphics {
     void SkyboxPass::execute(const VkCommandBuffer cmd) {
       begin_renderpass(cmd);
 
-      const auto frame = gpu_frame.get_current_frame();
+      const auto frame = current_frame_index;
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
       auto& light_data = repository_->get_buffer<LightBuffers>();
 
@@ -94,7 +94,7 @@ namespace gestalt::graphics {
     void InfiniteGridPass::execute(const VkCommandBuffer cmd) {
       begin_renderpass(cmd);
 
-      const auto frame = gpu_frame.get_current_frame();
+      const auto frame = current_frame_index;
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);

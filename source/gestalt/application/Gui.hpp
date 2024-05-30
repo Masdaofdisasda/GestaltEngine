@@ -28,6 +28,7 @@ namespace gestalt::application {
       Window window_;
       std::shared_ptr<Repository> repository_;
       GuiCapabilities actions_;
+      VkDescriptorPool imguiPool_;
 
       uint32 guizmo_operation_ = 0;
 

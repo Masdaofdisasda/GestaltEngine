@@ -38,8 +38,8 @@ namespace gestalt::graphics {
     }
 
     void BrightPass::execute(VkCommandBuffer cmd) {
-      descriptor_set_
-          = resource_manager_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(0));
+      descriptor_set_ = registry_->descriptor_pool->allocate(gpu_->getDevice(),
+                                                                      descriptor_layouts_.at(0));
 
       const auto scene_ssao = registry_->attachments_.scene_color.image;
 
@@ -60,7 +60,10 @@ namespace gestalt::graphics {
       vkCmdEndRendering(cmd);
     }
 
-    void BrightPass::destroy() {}
+    void BrightPass::destroy() {
+      vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layouts_.at(0), nullptr);
+    }
+
     struct BlurDirection {
       int direction;
     };
@@ -106,7 +109,8 @@ namespace gestalt::graphics {
       scissor_.extent = image_x->getExtent2D();
 
       for (int i = 0; i < registry_->config_.bloom_quality * 2; i++) {
-          descriptor_set_ = resource_manager_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(0));
+        descriptor_set_
+            = registry_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(0));
 
         bool isHorizontal = (i % 2 == 0);
         auto& srcImage = isHorizontal ? image_x : image_y;
@@ -140,7 +144,9 @@ namespace gestalt::graphics {
       }
     }
 
-    void BloomBlurPass::destroy() {}
+    void BloomBlurPass::destroy() {
+      vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layouts_.at(0), nullptr);
+    }
 
     void LuminancePass::prepare() {
       fmt::print("Preparing {}\n", get_name());
@@ -173,7 +179,7 @@ namespace gestalt::graphics {
 
     void LuminancePass::execute(VkCommandBuffer cmd) {
       descriptor_set_
-          = resource_manager_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(0));
+          = registry_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(0));
 
       const auto scene_color = registry_->attachments_.scene_color.image;
 
@@ -195,7 +201,9 @@ namespace gestalt::graphics {
       vkCmdEndRendering(cmd);
     }
 
-    void LuminancePass::destroy() {}
+    void LuminancePass::destroy() {
+      vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layouts_.at(0), nullptr);
+    }
 
     void LuminanceDownscalePass::prepare() {
       fmt::print("Preparing {}\n", get_name());
@@ -234,7 +242,7 @@ namespace gestalt::graphics {
       
       for (size_t i = 0; i < dependencies_.image_attachments.size() - 1; ++i) {
         descriptor_set_
-            = resource_manager_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(0));
+            = registry_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(0));
 
         const auto src = dependencies_.image_attachments.at(i).attachment.image;
         const auto dst = dependencies_.image_attachments.at(i + 1).attachment.image;
@@ -267,7 +275,9 @@ namespace gestalt::graphics {
       }
     }
 
-    void LuminanceDownscalePass::destroy() {}
+    void LuminanceDownscalePass::destroy() {
+      vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layouts_.at(0), nullptr);
+    }
     void LightAdaptationPass::prepare() {
       fmt::print("Preparing {}\n", get_name());
 
@@ -302,13 +312,15 @@ namespace gestalt::graphics {
                       .build_pipeline(gpu_->getDevice());
     }
 
-    void LightAdaptationPass::destroy() {}
+    void LightAdaptationPass::destroy() {
+      vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layouts_.at(0), nullptr);
+    }
 
     void LightAdaptationPass::execute(VkCommandBuffer cmd) {
       descriptor_set_
-          = resource_manager_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(0));
+          = registry_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(0));
 
-      const auto frame = gpu_frame.get_current_frame();
+      const auto frame = current_frame_index;
 
       const auto current_lum = registry_->attachments_.lum_1.image;
       const auto avg_lum
@@ -391,9 +403,9 @@ namespace gestalt::graphics {
 
     void TonemapPass::execute(VkCommandBuffer cmd) {
       descriptor_set_
-          = resource_manager_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(0));
+          = registry_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(0));
 
-      const auto frame = gpu_frame.get_current_frame();
+      const auto frame = current_frame_index;
       const auto scene_linear = registry_->attachments_.scene_color.image;
       const auto scene_bloom = registry_->attachments_.bright_pass.image;
       const auto lum_image = frame == 0 ? registry_->attachments_.lum_B.image
@@ -424,5 +436,7 @@ namespace gestalt::graphics {
       vkCmdEndRendering(cmd);
     }
 
-    void TonemapPass::destroy() {}
+    void TonemapPass::destroy() {
+      vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layouts_.at(0), nullptr);
+    }
 }  // namespace gestalt

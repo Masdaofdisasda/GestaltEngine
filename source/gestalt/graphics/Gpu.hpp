@@ -25,14 +25,15 @@ namespace gestalt::graphics {
       VkPhysicalDevice chosen_gpu;
       VkPhysicalDeviceProperties device_properties;
 
-    public:
+      VkFence immediate_submit_fence_ = VK_NULL_HANDLE;
+      VkCommandPool immediate_submit_command_pool_ = VK_NULL_HANDLE;
+      VkCommandBuffer immediate_submit_command_buffer_ = VK_NULL_HANDLE;
 
-      std::function<void(std::function<void(VkCommandBuffer)>)> immediate_submit;
+    public:
       PFN_vkCmdDrawMeshTasksIndirectCountEXT vkCmdDrawMeshTasksIndirectCountEXT;
 
       void init(
-          bool use_validation_layers, Window& window,
-          std::function<void(std::function<void(VkCommandBuffer)>)> immediate_submit_function);
+          bool use_validation_layers, Window& window);
       void cleanup() const;
 
       Gpu() = default;
@@ -46,7 +47,8 @@ namespace gestalt::graphics {
       [[nodiscard]] VkDebugUtilsMessengerEXT getDebugMessenger() const override;
       [[nodiscard]] VkPhysicalDevice getPhysicalDevice() const override;
       [[nodiscard]] VkPhysicalDeviceProperties getPhysicalDeviceProperties() const override;
-      [[nodiscard]] std::function<void(std::function<void(VkCommandBuffer)>)> getImmediateSubmit() const override;
+      void immediateSubmit(std::function<void(VkCommandBuffer cmd)> function) const override;
+    
 
     };
 

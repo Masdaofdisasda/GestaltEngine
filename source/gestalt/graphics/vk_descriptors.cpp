@@ -1,5 +1,8 @@
 ﻿#include "vk_descriptors.hpp"
 
+#include "vk_initializers.hpp"
+#include "RenderConfig.hpp"
+
 namespace gestalt::graphics {
   DescriptorLayoutBuilder& DescriptorLayoutBuilder::add_binding(uint32_t binding,
                                                                 VkDescriptorType type,
@@ -224,6 +227,63 @@ namespace gestalt::graphics {
   DescriptorUtilFactory::create_descriptor_allocator_growable() {
     return std::make_unique<DescriptorAllocatorGrowable>();
   }
+
+  void FrameData::init(VkDevice device, uint32 graphics_queue_family_index) {
+    VkCommandPoolCreateInfo commandPoolInfo = vkinit::command_pool_create_info(
+        graphics_queue_family_index, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    VkCommandBufferAllocateInfo cmdAllocInfo
+        = vkinit::command_buffer_allocate_info(VK_NULL_HANDLE, 1);
+    VkFenceCreateInfo fenceCreateInfo = vkinit::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
+    VkSemaphoreCreateInfo semaphoreCreateInfo = vkinit::semaphore_create_info();
+
+    std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> frame_sizes = {
+        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3},
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3},
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3},
+        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4},
+    };
+
+    for (auto& frame : frames_) {
+      // Initialize Command Pool and Command Buffer
+      VK_CHECK(vkCreateCommandPool(device, &commandPoolInfo, nullptr, &frame.command_pool));
+      cmdAllocInfo.commandPool = frame.command_pool;
+      VK_CHECK(vkAllocateCommandBuffers(device, &cmdAllocInfo, &frame.main_command_buffer));
+
+      // Initialize Fences and Semaphores
+      VK_CHECK(vkCreateFence(device, &fenceCreateInfo, nullptr, &frame.render_fence));
+      VK_CHECK(
+          vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &frame.swapchain_semaphore));
+      VK_CHECK(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &frame.render_semaphore));
+
+      // Initialize Descriptor Pool
+      frame.descriptor_pool.init(device, 1000, frame_sizes);
+    }
+  }
+
+  void FrameData::cleanup(const VkDevice device) {
+	for (auto& frame : frames_) {
+	  vkDestroyCommandPool(device, frame.command_pool, nullptr);
+	  vkDestroyFence(device, frame.render_fence, nullptr);
+	  vkDestroySemaphore(device, frame.swapchain_semaphore, nullptr);
+	  vkDestroySemaphore(device, frame.render_semaphore, nullptr);
+	  frame.descriptor_pool.destroy_pools(device);
+	}
+  }
+
+  void FrameData::advance_frame() {
+    frame_number++;
+
+    current_frame_index = get_current_frame_index(); //TODO : this is a bit weird
+  }
+
+  uint8 FrameData::get_current_frame_index() const {
+    return frame_number % kFramesInFlight;
+  }
+
+  FrameData::FrameResources& FrameData::get_current_frame() {
+    return frames_[get_current_frame_index()];
+  }
+
 
   VkDescriptorSet DescriptorAllocatorGrowable::allocate(
       VkDevice device, VkDescriptorSetLayout layout,

@@ -7,14 +7,6 @@
 #include <array>
 
 namespace gestalt::foundation {
-    
-    inline struct GpuFrame {
-    void next_frame() { frame_number++; }
-    [[nodiscard]] uint8 get_current_frame() const { return frame_number % 2; }
-
-  private:
-    uint64 frame_number{0};
-  } gpu_frame;
 
     struct alignas(4) GpuVertexPosition {
       glm::vec3 position{0.f};
@@ -93,7 +85,7 @@ namespace gestalt::foundation {
       VkDescriptorSetLayout descriptor_layout;
     };
 
-    struct LightBuffers {
+    struct LightBuffers { //TODO double buffering
       AllocatedBuffer dir_light_buffer;
       AllocatedBuffer point_light_buffer;
       AllocatedBuffer view_proj_matrices;

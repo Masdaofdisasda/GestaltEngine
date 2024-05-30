@@ -56,8 +56,6 @@ namespace gestalt::graphics {
       void load_and_create_cubemap(const std::string& file_path, TextureHandle& cubemap);
 
     public:
-      DescriptorAllocatorGrowable* descriptor_pool;
-
       PoorMansResourceLoader resource_loader_;
 
       std::shared_ptr<IDescriptorAllocatorGrowable> descriptorPool = std::make_shared<DescriptorAllocatorGrowable>();

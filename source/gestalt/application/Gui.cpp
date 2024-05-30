@@ -15,8 +15,6 @@
 
 namespace gestalt::application {
 
-    using namespace gestalt::graphics;
-
     void Gui::set_debug_texture(VkImageView image_view, VkSampler sampler) {
 
       if (descriptor_set_ != nullptr) {
@@ -55,11 +53,10 @@ namespace gestalt::application {
       pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
       pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
       pool_info.maxSets = 1000;
-      pool_info.poolSizeCount = (uint32_t)std::size(pool_sizes);
+      pool_info.poolSizeCount = static_cast<uint32>(std::size(pool_sizes));
       pool_info.pPoolSizes = pool_sizes;
 
-      VkDescriptorPool imguiPool;
-      VK_CHECK(vkCreateDescriptorPool(gpu_->getDevice(), &pool_info, nullptr, &imguiPool));
+      VK_CHECK(vkCreateDescriptorPool(gpu_->getDevice(), &pool_info, nullptr, &imguiPool_));
 
       const auto descriptor_layout_builder = descriptor_util_factory->create_descriptor_layout_builder();
       descriptor_layout_builder->clear();
@@ -89,7 +86,7 @@ namespace gestalt::application {
       init_info.PhysicalDevice = gpu_->getPhysicalDevice();
       init_info.Device = gpu_->getDevice();
       init_info.Queue = gpu_->getGraphicsQueue();
-      init_info.DescriptorPool = imguiPool;
+      init_info.DescriptorPool = imguiPool_;
       init_info.MinImageCount = 3;
       init_info.ImageCount = 3;
       init_info.UseDynamicRendering = true;
@@ -99,19 +96,28 @@ namespace gestalt::application {
 
       ImGui_ImplVulkan_Init(&init_info);
 
-      // execute a gpu command to upload imgui font textures
-      gpu_->getImmediateSubmit()([&](VkCommandBuffer cmd) { ImGui_ImplVulkan_CreateFontsTexture(); });
-
-      // clear font textures from cpu data
-      ImGui_ImplVulkan_DestroyFontsTexture();
+      gpu_->immediateSubmit( // wait until the font texture is uploaded
+          [&](VkCommandBuffer cmd) {
+            ImGui_ImplVulkan_CreateFontsTexture();
+          });
     }
 
     void Gui::cleanup() {
-      // add the destroy the imgui created structures
-      // NOTE: i think ImGui_ImplVulkan_Shutdown() destroy the imguiPool
-      // deletion_service_.push(imguiPool);
-      // deletion_service_.push_function([this]() { ImGui::DestroyContext(); });
-      // deletion_service_.push_function([this]() { ImGui_ImplVulkan_Shutdown(); });
+      // Destroy ImGui context
+      ImGui_ImplVulkan_Shutdown();
+      ImGui_ImplSDL2_Shutdown();
+      ImGui::DestroyContext();
+
+      if (descriptor_set_layout_ != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_set_layout_, nullptr);
+        descriptor_set_layout_ = VK_NULL_HANDLE;
+      }
+
+      // Destroy ImGui descriptor pool
+      if (imguiPool_ != VK_NULL_HANDLE) {
+        vkDestroyDescriptorPool(gpu_->getDevice(), imguiPool_, nullptr);
+        imguiPool_ = VK_NULL_HANDLE;
+      }
     }
 
     void Gui::draw(VkCommandBuffer cmd, const std::shared_ptr<TextureHandle>& swapchain) {

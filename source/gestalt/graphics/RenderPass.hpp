@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "FrameGraph.hpp"
+#include "RenderPipeline.hpp"
 #include "vk_types.hpp"
 
 namespace gestalt::graphics {

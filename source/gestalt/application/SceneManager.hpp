@@ -38,10 +38,10 @@ namespace gestalt::application {
                                 const glm::vec3& position, entity parent = 0);
 
       void link_entity_to_parent(entity child, entity parent);
-      void update_transform_component(const unsigned entity, const glm::vec3& position,
+      void update_transform_component(unsigned entity, const glm::vec3& position,
                                       const glm::quat& rotation = glm::quat(0.f, 0.f, 0.f, 0.f),
                                       const float& scale = 1.f);
-      void create_transform_component(const unsigned entity, const glm::vec3& position,
+      void create_transform_component(unsigned entity, const glm::vec3& position,
                                       const glm::quat& rotation = glm::quat(0.f, 0.f, 0.f, 0.f),
                                       const float& scale = 1.f) const;
     };
@@ -123,17 +123,17 @@ namespace gestalt::application {
       void create_entities(std::vector<fastgltf::Node> nodes, const size_t& mesh_offset);
       void build_hierarchy(std::vector<fastgltf::Node> nodes, const size_t& node_offset);
       void link_orphans_to_root();
-      const entity root_entity_ = 0;
+      entity root_entity_ = 0;
 
       void load_scene(const std::string& path);
-      std::string scene_path_ = "";
+      std::string scene_path_;
 
     public:
       void init(const std::shared_ptr<IGpu>& gpu,
                 const std::shared_ptr<IResourceManager>& resource_manager,
                 const std::unique_ptr<IDescriptorUtilFactory>& descriptor_util_factory,
                 const std::shared_ptr<Repository>& repository);
-      void cleanup();
+      void cleanup() const;
 
       void update_scene(float delta_time, const Movement& movement, float aspect);
 

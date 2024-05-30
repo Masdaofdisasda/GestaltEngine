@@ -57,15 +57,17 @@ namespace gestalt:: graphics {
                       .build_pipeline(gpu_->getDevice());
     }
 
-    void LightingPass::destroy() {  }
+    void LightingPass::destroy() {
+      vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layouts_.at(2), nullptr);
+    }
 
     void LightingPass::execute(VkCommandBuffer cmd) {
       descriptor_set_
-          = resource_manager_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(2));
+          = registry_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(2));
 
       begin_renderpass(cmd);
 
-      const auto frame = gpu_frame.get_current_frame();
+      const auto frame = current_frame_index;
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
       const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
       auto& light_data = repository_->get_buffer<LightBuffers>();

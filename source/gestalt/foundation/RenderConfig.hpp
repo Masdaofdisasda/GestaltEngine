@@ -8,6 +8,8 @@
 
 namespace gestalt::foundation {
 
+    inline uint8 current_frame_index{0};
+
     struct GpuDrawPushConstants {
       glm::mat4 worldMatrix;
       int material_id;

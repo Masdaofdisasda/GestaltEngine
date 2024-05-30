@@ -9,7 +9,6 @@
 #include "Repository.hpp"
 #include "ResourceManager.hpp"
 #include "vk_pipelines.hpp"
-#include "vk_sync.hpp"
 
 namespace gestalt::graphics {
 
@@ -41,7 +40,7 @@ namespace gestalt::graphics {
       VkExtent3D extent{0, 0, 1};
       VkFormat format{VK_FORMAT_UNDEFINED};
       VkClearValue initial_value{};
-      uint32_t version{0};
+      uint32 version{0};
     };
 
     enum class ImageUsageType {
@@ -60,7 +59,7 @@ namespace gestalt::graphics {
       ImageAttachment attachment;
       ImageUsageType usage;
       ImageClearOperation clear_operation;
-      uint32_t required_version = 0;
+      uint32 required_version = 0;
     };
 
     struct RenderPassDependency {
@@ -80,11 +79,11 @@ namespace gestalt::graphics {
       }
       RenderPassDependencyBuilder& add_image_attachment(const ImageAttachment& attachment,
                                                         const ImageUsageType usage,
-                                                        const uint32_t required_version = 0,
+                                                        const uint32 required_version = 0,
                                                         const ImageClearOperation clear_operation
                                                         = ImageClearOperation::kDontCare);
 
-      RenderPassDependencyBuilder& set_push_constant_range(uint32_t size,
+      RenderPassDependencyBuilder& set_push_constant_range(uint32 size,
                                                            VkShaderStageFlags stage_flags);
       RenderPassDependency build();
     };
@@ -97,6 +96,7 @@ namespace gestalt::graphics {
       void clear_shader_cache();
 
       RenderConfig config_;
+      DescriptorAllocatorGrowable* descriptor_pool;
 
       struct RenderPassAttachments {
         ImageAttachment scene_color{.image = std::make_shared<TextureHandle>(TextureType::kColor)};
@@ -177,7 +177,7 @@ namespace gestalt::graphics {
       virtual ~RenderPass() = default;
 
       virtual void execute(VkCommandBuffer cmd) = 0;
-      virtual std::string get_name() const = 0;
+      [[nodiscard]] virtual std::string get_name() const = 0;
       virtual void cleanup();
 
     protected:
@@ -255,7 +255,7 @@ namespace gestalt::graphics {
 
     constexpr unsigned char kFrameOverlap = 2;
 
-    class FrameGraph {
+    class RenderPipeline {
       std::shared_ptr<IGpu> gpu_;
       Window window_;
       std::shared_ptr<ResourceManager> resource_manager_;
@@ -265,8 +265,6 @@ namespace gestalt::graphics {
       std::shared_ptr<ResourceRegistry> resource_registry_ = std::make_shared<ResourceRegistry>();
 
       std::shared_ptr<VkSwapchain> swapchain_ = std::make_shared<VkSwapchain>();
-      std::unique_ptr<VkCommand> commands_ = std::make_unique<VkCommand>();
-      std::unique_ptr<vk_sync> sync_ = std::make_unique<vk_sync>();
 
       std::vector<std::shared_ptr<RenderPass>> render_passes_;
 
@@ -274,12 +272,14 @@ namespace gestalt::graphics {
 
       bool resize_requested_{false};
       uint32_t swapchain_image_index_{0};
-      std::vector<FrameData> frames_{kFrameOverlap};
+      FrameData frames_{};
       bool acquire_next_image();
       void present(VkCommandBuffer cmd);
-      FrameData& get_current_frame() { return frames_[gpu_frame.get_current_frame()]; }
       Window& get_window() { return window_; }
-      void create_resources();
+
+      auto& frame() { return frames_.get_current_frame(); }
+
+      void create_resources() const;
       VkCommandBuffer start_draw();
       void execute(const std::shared_ptr<RenderPass>& render_pass, VkCommandBuffer cmd);
 
@@ -293,8 +293,6 @@ namespace gestalt::graphics {
       void cleanup();
 
       RenderConfig& get_config() { return resource_registry_->config_; }
-      vk_sync& get_sync() const { return *sync_; }
-      VkCommand& get_commands() const { return *commands_; }
       VkFormat get_swapchain_format() const { return swapchain_->swapchain_image_format; }
       std::shared_ptr<TextureHandle> get_debug_image() const { return debug_texture_; }
     };

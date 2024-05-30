@@ -21,16 +21,14 @@ namespace gestalt::foundation {
     [[nodiscard]] virtual VkInstance getInstance() const = 0;
     [[nodiscard]] virtual VkDevice getDevice() const = 0;
     [[nodiscard]] virtual VmaAllocator getAllocator() const = 0;
-
     [[nodiscard]] virtual VkQueue getGraphicsQueue() const = 0;
     [[nodiscard]] virtual uint32_t getGraphicsQueueFamily() const = 0;
-    [[nodiscard]] virtual std::function<void(std::function<void(VkCommandBuffer)>)> getImmediateSubmit() const
-        = 0;
     [[nodiscard]] virtual VkSurfaceKHR getSurface() const = 0;
-
     [[nodiscard]] virtual VkDebugUtilsMessengerEXT getDebugMessenger() const = 0;
     [[nodiscard]] virtual VkPhysicalDevice getPhysicalDevice() const = 0;
     [[nodiscard]] virtual VkPhysicalDeviceProperties getPhysicalDeviceProperties() const = 0;
+
+    virtual void immediateSubmit(std::function<void(VkCommandBuffer cmd)> function) const = 0;
   };
 
   class IResourceManager {

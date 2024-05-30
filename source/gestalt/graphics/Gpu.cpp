@@ -2,12 +2,12 @@
 
 #include <VkBootstrap.h>
 
+#include "vk_initializers.hpp"
+
 namespace gestalt::graphics {
 
   void Gpu::init(
-      bool use_validation_layers, Window& window,
-      std::function<void(std::function<void(VkCommandBuffer)>)> immediate_submit_function) {
-    immediate_submit = immediate_submit_function;
+      bool use_validation_layers, Window& window) {
 
     // create the vulkan instance
     vkb::InstanceBuilder builder;
@@ -121,10 +121,45 @@ namespace gestalt::graphics {
     if (!vkCmdDrawMeshTasksIndirectCountEXT) {
       throw std::runtime_error("Failed to load vkCmdDrawMeshTasksIndirectCountEXT");
     }
+
+    // create immediate submit resources
+    VkFenceCreateInfo fence_create_info = vkinit::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
+    VK_CHECK(vkCreateFence(getDevice(), &fence_create_info, nullptr, &immediate_submit_fence_));
+
+    VkCommandPoolCreateInfo commandPoolInfo = vkinit::command_pool_create_info(
+        getGraphicsQueueFamily(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    VK_CHECK(vkCreateCommandPool(getDevice(), &commandPoolInfo, nullptr,
+                                 &immediate_submit_command_pool_));
+    VkCommandBufferAllocateInfo cmdAllocInfo
+        = vkinit::command_buffer_allocate_info(immediate_submit_command_pool_, 1);
+    VK_CHECK(vkAllocateCommandBuffers(getDevice(), &cmdAllocInfo, &immediate_submit_command_buffer_));
+  }
+
+  void Gpu::immediateSubmit(const std::function<void(VkCommandBuffer cmd)> function) const {
+    VK_CHECK(vkResetFences(getDevice(), 1, &immediate_submit_fence_));
+    VK_CHECK(vkResetCommandBuffer(immediate_submit_command_buffer_, 0));
+
+    const VkCommandBuffer cmd = immediate_submit_command_buffer_;
+
+    VkCommandBufferBeginInfo cmdBeginInfo
+        = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
+
+    function(cmd);
+
+    VK_CHECK(vkEndCommandBuffer(cmd));
+
+    VkCommandBufferSubmitInfo cmd_info = vkinit::command_buffer_submit_info(cmd);
+    const VkSubmitInfo2 submit = vkinit::submit_info(&cmd_info, nullptr, nullptr);
+
+    VK_CHECK(vkQueueSubmit2(getGraphicsQueue(), 1, &submit, immediate_submit_fence_));
+    VK_CHECK(vkWaitForFences(getDevice(), 1, &immediate_submit_fence_, VK_TRUE, UINT64_MAX));
   }
 
   void Gpu::cleanup() const {
     vmaDestroyAllocator(allocator);
+    vkDestroyCommandPool(device, immediate_submit_command_pool_, nullptr);
+    vkDestroyFence( device, immediate_submit_fence_, nullptr);
     vkDestroyDevice(device, nullptr);
     vkDestroySurfaceKHR(instance, surface, nullptr);
     vkb::destroy_debug_utils_messenger(instance, debug_messenger);
@@ -150,8 +185,4 @@ namespace gestalt::graphics {
   VkPhysicalDevice Gpu::getPhysicalDevice() const { return chosen_gpu; }
 
   VkPhysicalDeviceProperties Gpu::getPhysicalDeviceProperties() const { return device_properties; }
-
-  std::function<void(std::function<void(VkCommandBuffer)>)> Gpu::getImmediateSubmit() const {
-    return immediate_submit;
-  }
 }  // namespace gestalt::graphics

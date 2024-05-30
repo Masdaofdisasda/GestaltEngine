@@ -6,7 +6,7 @@
 #include "vk_types.hpp"
 #include "SceneManager.hpp"
 #include "Window.hpp"
-#include "FrameGraph.hpp"
+#include "RenderPipeline.hpp"
 #include "InputSystem.hpp"
 #include "Gpu.hpp"
 #include "TmeTrackingService.hpp"
@@ -25,17 +25,14 @@ namespace gestalt {
 
     application::Window window_;
     std::shared_ptr<graphics::Gpu> gpu_;
-    void immediate_submit(std::function<void(VkCommandBuffer cmd)> function);
 
-    std::shared_ptr<graphics::FrameGraph> frame_graph_ = std::make_shared<graphics::FrameGraph>();
+    std::shared_ptr<graphics::RenderPipeline> render_pipeline_ = std::make_shared<graphics::RenderPipeline>();
     std::shared_ptr<application::SceneManager> scene_manager_ = std::make_shared<application::SceneManager>();
     std::shared_ptr<foundation::Repository> repository_ = std::make_shared<foundation::Repository>();
 
     application::GuiCapabilities gui_actions_;
     std::shared_ptr<application::Gui> imgui_ = std::make_shared<application::Gui>();
     void register_gui_actions();
-
-    void update_scene() const;
 
     // utility services
     application::TimeTrackingService time_tracking_service_;

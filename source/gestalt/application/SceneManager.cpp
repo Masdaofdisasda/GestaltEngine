@@ -117,7 +117,19 @@ namespace gestalt::application {
       link_orphans_to_root();
     }
 
-    void SceneManager::cleanup() {}
+    void SceneManager::cleanup() const {
+      render_system_->cleanup();
+      transform_system_->cleanup();
+      camera_system_->cleanup();
+      light_system_->cleanup();
+      material_system_->cleanup();
+
+      repository_->transform_components.clear();
+      repository_->camera_components.clear();
+      repository_->light_components.clear();
+      repository_->mesh_components.clear();
+      repository_->scene_graph.clear();
+    }
 
     entity ComponentFactory::create_entity() { return next_entity_id_++; }
 

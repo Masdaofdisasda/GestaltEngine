@@ -52,6 +52,8 @@ namespace gestalt::foundation {
 
     void remove(const entity& ent) { components_.erase(ent); }
 
+    void clear() { components_.clear(); }
+
   private:
     std::unordered_map<entity, ComponentType> components_;
   };
@@ -112,6 +114,13 @@ namespace gestalt::foundation {
       auto holder = dynamic_cast<Holder<T>*>(holders[typeIndex].get());
       assert(holder != nullptr && "Holder cast failed.");
       return holder->data;
+    }
+
+    template <typename T> void deregister_buffer() {
+      const auto typeIndex = std::type_index(typeid(T));
+      const auto it = holders.find(typeIndex);
+      assert(it != holders.end() && "Instance for this type does not exist.");
+      holders.erase(it);
     }
 
     struct default_material {

@@ -7,8 +7,8 @@
 #include "Gpu.hpp"
 
 namespace gestalt::graphics {
-    
-  struct DescriptorLayoutBuilder final : IDescriptorLayoutBuilder{
+
+  struct DescriptorLayoutBuilder final : IDescriptorLayoutBuilder {
     std::vector<VkDescriptorSetLayoutBinding> bindings;
     std::vector<VkDescriptorBindingFlags> binding_flags;
 
@@ -53,7 +53,6 @@ namespace gestalt::graphics {
   };
 
   struct DescriptorAllocatorGrowable final : IDescriptorAllocatorGrowable {
-
     void init(VkDevice device, uint32_t initial_sets, std::span<PoolSizeRatio> poolRatios) override;
     void clear_pools(VkDevice device) override;
     void destroy_pools(VkDevice device) override;
@@ -78,12 +77,29 @@ namespace gestalt::graphics {
     std::unique_ptr<IDescriptorAllocatorGrowable> create_descriptor_allocator_growable() override;
   };
 
-  struct FrameData {
-    VkSemaphore swapchain_semaphore, render_semaphore;
-    VkFence render_fence;
+  class FrameData {
+  public:
+    static constexpr size_t kFramesInFlight = 2;
+    struct FrameResources {
+      VkSemaphore swapchain_semaphore, render_semaphore;
+      VkFence render_fence;
 
-    VkCommandPool command_pool;
-    VkCommandBuffer main_command_buffer;
-    DescriptorAllocatorGrowable descriptor_pool;
+      VkCommandPool command_pool;
+      VkCommandBuffer main_command_buffer;
+      DescriptorAllocatorGrowable descriptor_pool;
+    };
+
+    void init(VkDevice device, uint32 graphics_queue_family_index);
+    void cleanup(VkDevice device);
+    void advance_frame();
+    [[nodiscard]] uint8 get_current_frame_index() const;
+    FrameResources& get_current_frame();
+
+  private:
+    uint64 frame_number{0};
+    // TODO define constants
+    std::array<FrameResources, kFramesInFlight> frames_{};
   };
-}  // namespace gestalt
+
+
+}  // namespace gestalt::graphics

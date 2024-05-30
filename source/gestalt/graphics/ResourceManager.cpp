@@ -16,6 +16,30 @@
 
 namespace gestalt::graphics {
 
+    void ResourceManager::init(const std::shared_ptr<IGpu>& gpu,
+                               const std::shared_ptr<Repository>& repository) {
+      gpu_ = gpu;
+      repository_ = repository;
+      resource_loader_.init(gpu);
+
+      std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes
+          = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kLimits.max_textures},
+             {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10},
+             {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kLimits.max_materials}};
+
+      descriptorPool->init(gpu_->getDevice(), 1, sizes);
+
+    }
+
+    void ResourceManager::cleanup() {
+      descriptorPool->destroy_pools(gpu_->getDevice());
+      resource_loader_.cleanup();
+    }
+
+    void ResourceManager::flush_loader() { resource_loader_.flush(); }
+
+    std::shared_ptr<IDescriptorAllocatorGrowable>& ResourceManager::get_descriptor_pool() { return descriptorPool; }
+
     AllocatedBuffer ResourceManager::create_buffer(size_t allocSize, VkBufferUsageFlags usage,
                                                    VmaMemoryUsage memoryUsage) {
       // allocate buffer
@@ -35,36 +59,6 @@ namespace gestalt::graphics {
                                &newBuffer.allocation, &newBuffer.info));
       return newBuffer;
     }
-
-    void ResourceManager::init(const std::shared_ptr<IGpu>& gpu,
-                               const std::shared_ptr<Repository>& repository) {
-      gpu_ = gpu;
-      repository_ = repository;
-      resource_loader_.init(gpu);
-
-      std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes
-          = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kLimits.max_textures},
-             {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10},
-             {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kLimits.max_materials}};
-
-      descriptorPool->init(gpu_->getDevice(), 1, sizes);
-
-    }
-
-
-    void ResourceManager::cleanup() {
-      for (auto& image : repository_->textures.data()) {
-        destroy_image(image);
-      }
-      for (const auto& sampler : repository_->samplers.data()) {
-        vkDestroySampler(gpu_->getDevice(), sampler, nullptr);
-      }
-      descriptorPool->destroy_pools(gpu_->getDevice());
-    }
-
-    void ResourceManager::flush_loader() { resource_loader_.flush(); }
-
-    std::shared_ptr<IDescriptorAllocatorGrowable>& ResourceManager::get_descriptor_pool() { return descriptorPool; }
 
     void ResourceManager::upload_mesh() {
       const std::span indices = repository_->indices.data();
@@ -108,7 +102,7 @@ namespace gestalt::graphics {
       memcpy((char*)data + vertex_position_buffer_size + vertex_data_buffer_size, indices.data(),
              index_buffer_size);
 
-        gpu_->getImmediateSubmit()([&](VkCommandBuffer cmd) {
+        gpu_->immediateSubmit([&](VkCommandBuffer cmd) {
           VkBufferCopy vertex_positions_copy;
           vertex_positions_copy.dstOffset = 0;
           vertex_positions_copy.srcOffset = 0;
@@ -176,7 +170,7 @@ namespace gestalt::graphics {
       // always allocate images on dedicated GPU memory
       VmaAllocationCreateInfo allocinfo = {};
       allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-      allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+      allocinfo.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
       // allocate and create the image
       VK_CHECK(vmaCreateImage(gpu_->getAllocator(), &img_info, &allocinfo, &newImage.image,
@@ -654,7 +648,7 @@ namespace gestalt::graphics {
       // Allocate and create the image
       VmaAllocationCreateInfo img_allocinfo = {};
       img_allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-      img_allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+      img_allocinfo.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
       VK_CHECK(vmaCreateImage(gpu_->getAllocator(), &img_info, &img_allocinfo, &image->image,
                               &image->allocation, nullptr));

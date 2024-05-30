@@ -42,12 +42,13 @@ namespace gestalt::graphics {
                       .build_pipeline(gpu_->getDevice());
     }
 
-    void DeferredPass::destroy() { }
+    void DeferredPass::destroy() {
+    }
 
     void DeferredPass::execute(VkCommandBuffer cmd) {
       begin_renderpass(cmd);
 
-      const auto frame = gpu_frame.get_current_frame();
+      const auto frame = current_frame_index;
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
       const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
       const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
