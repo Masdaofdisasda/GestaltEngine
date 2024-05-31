@@ -224,7 +224,7 @@ namespace gestalt::graphics {
 
       void init(const std::shared_ptr<IGpu>& gpu, const VkExtent3D& extent);
       void create_swapchain(uint32_t width, uint32_t height);
-      void resize_swapchain(Window& window);
+      void resize_swapchain(const std::shared_ptr<Window>& window);
       void destroy_swapchain() const;
     };
 
@@ -257,7 +257,7 @@ namespace gestalt::graphics {
 
     class RenderPipeline {
       std::shared_ptr<IGpu> gpu_;
-      Window window_;
+      std::shared_ptr<Window> window_;
       std::shared_ptr<ResourceManager> resource_manager_;
       std::shared_ptr<Repository> repository_;
       std::shared_ptr<Gui> imgui_;
@@ -275,7 +275,6 @@ namespace gestalt::graphics {
       FrameData frames_{};
       bool acquire_next_image();
       void present(VkCommandBuffer cmd);
-      Window& get_window() { return window_; }
 
       auto& frame() { return frames_.get_current_frame(); }
 
@@ -284,7 +283,7 @@ namespace gestalt::graphics {
       void execute(const std::shared_ptr<RenderPass>& render_pass, VkCommandBuffer cmd);
 
     public:
-      void init(const std::shared_ptr<IGpu>& gpu, const Window& window,
+      void init(const std::shared_ptr<IGpu>& gpu, const std::shared_ptr<Window>& window,
                 const std::shared_ptr<ResourceManager>& resource_manager,
                 const std::shared_ptr<Repository>& repository,
                 const std::shared_ptr<Gui>& imgui_gui);

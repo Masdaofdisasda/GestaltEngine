@@ -22,6 +22,8 @@ namespace gestalt::foundation {
   constexpr uint32 kDefaultResolutionWidth = 1300;
   constexpr uint32 kDefaultResolutionHeight = 900;
 
+  constexpr bool kUseValidationLayers = false;
+
   struct Config {
     uint32 maxDirectionalLights = kDefaultMaxDirectionalLights;
     uint32 maxPointLights = kDefaultMaxPointLights;
@@ -30,6 +32,8 @@ namespace gestalt::foundation {
 
     uint32 resolutionWidth = kDefaultResolutionWidth;
     uint32 resolutionHeight = kDefaultResolutionHeight;
+
+    bool useValidationLayers = kUseValidationLayers;
   };
 
   class EngineConfiguration {
@@ -84,6 +88,10 @@ namespace gestalt::foundation {
 
   inline uint32 getResolutionHeight() {
     return EngineConfiguration::getInstance().getConfig().resolutionHeight;
+  }
+
+  inline bool useValidationLayers() {
+    return EngineConfiguration::getInstance().getConfig().useValidationLayers;
   }
 
 }  // namespace gestalt::foundation

@@ -25,7 +25,8 @@ namespace gestalt::application {
                                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
 
-    void Gui::init(const std::shared_ptr<IGpu>& gpu, Window& window, VkFormat swapchainFormat,
+    void Gui::init(const std::shared_ptr<IGpu>& gpu, std::shared_ptr<Window>& window,
+                   VkFormat swapchainFormat,
                    const std::shared_ptr<Repository>& repository,
                    const std::unique_ptr<IDescriptorUtilFactory>& descriptor_util_factory,
                    GuiCapabilities& actions) {
@@ -72,7 +73,7 @@ namespace gestalt::application {
       ImGui::CreateContext();
 
       // this initializes imgui for SDL
-      ImGui_ImplSDL2_InitForVulkan(window_.handle);
+      ImGui_ImplSDL2_InitForVulkan(window_->handle);
 
       VkPipelineRenderingCreateInfoKHR pipelineRenderingCreateInfo = {
           .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
@@ -454,9 +455,9 @@ namespace gestalt::application {
       float windowWidth = 300.0f;  // Width of the ImGui window
       uint32_t menuBarHeight = 18;
       float windowHeight
-          = window_.extent.height - menuBarHeight;  // Full height of the application window
+          = window_->extent.height - menuBarHeight;  // Full height of the application window
       ImVec2 windowPos
-          = ImVec2(window_.extent.width - windowWidth, menuBarHeight);  // Position to the right
+          = ImVec2(window_->extent.width - windowWidth, menuBarHeight);  // Position to the right
       ImVec2 windowSize = ImVec2(windowWidth, windowHeight);            // Size of the ImGui window
 
       ImGui::SetNextWindowPos(windowPos);

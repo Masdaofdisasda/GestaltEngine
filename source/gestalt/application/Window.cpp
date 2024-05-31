@@ -1,10 +1,12 @@
 ﻿#include "Window.hpp"
 
+#include "EngineConfig.hpp"
+
 
 namespace gestalt::application {
 
-    void Window::init(const VkExtent2D window_extent) {
-      extent = window_extent;
+    void Window::init() {
+    extent = {foundation::getResolutionWidth(), foundation::getResolutionHeight()};
 
       SDL_Init(SDL_INIT_VIDEO);
 
@@ -12,8 +14,8 @@ namespace gestalt::application {
           = static_cast<SDL_WindowFlags>(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
 
       handle = SDL_CreateWindow("Gestalt Engine", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                                static_cast<int>(window_extent.width),
-                                static_cast<int>(window_extent.height), window_flags);
+                                static_cast<int>(extent.width), static_cast<int>(extent.height),
+                                window_flags);
     }
 
     void Window::create_surface(const VkInstance instance, VkSurfaceKHR* surface) const {

@@ -1,7 +1,5 @@
 ﻿#pragma once
 
-#include <functional>
-
 #include "Gui.hpp"
 #include "vk_types.hpp"
 #include "SceneManager.hpp"
@@ -23,7 +21,7 @@ namespace gestalt {
     bool quit_{false};
     bool freeze_rendering_{false};
 
-    application::Window window_;
+    std::shared_ptr <application::Window> window_ = std::make_shared<application::Window>();
     std::shared_ptr<graphics::Gpu> gpu_ = std::make_shared<graphics::Gpu>();
 
     std::shared_ptr<graphics::RenderPipeline> render_pipeline_ = std::make_shared<graphics::RenderPipeline>();

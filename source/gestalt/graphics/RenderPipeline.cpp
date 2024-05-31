@@ -15,7 +15,7 @@
 #include "vk_initializers.hpp"
 
 namespace gestalt::graphics {
-  void RenderPipeline::init(const std::shared_ptr<IGpu>& gpu, const Window& window,
+  void RenderPipeline::init(const std::shared_ptr<IGpu>& gpu, const std::shared_ptr<Window>& window,
                           const std::shared_ptr<ResourceManager>& resource_manager,
                           const std::shared_ptr<Repository>& repository,
                           const std::shared_ptr<Gui>& imgui_gui) {
@@ -25,7 +25,7 @@ namespace gestalt::graphics {
       repository_ = repository;
       imgui_ = imgui_gui;
 
-      swapchain_->init(gpu_, {window_.extent.width, window_.extent.height, 1});
+      swapchain_->init(gpu_, {window_->extent.width, window_->extent.height, 1});
 
       resource_registry_->init(gpu_);
 
@@ -63,8 +63,8 @@ namespace gestalt::graphics {
         for (auto& image_attachment : resource_registry_->attachment_list_) {
           if (image_attachment.extent.width == 0 && image_attachment.extent.height == 0) {
             image_attachment.image->imageExtent
-                = {static_cast<uint32_t>(window_.extent.width * image_attachment.scale),
-                   static_cast<uint32_t>(window_.extent.height * image_attachment.scale), 1};
+                = {static_cast<uint32_t>(window_->extent.width * image_attachment.scale),
+                   static_cast<uint32_t>(window_->extent.height * image_attachment.scale), 1};
           } else {
             image_attachment.image->imageExtent = image_attachment.extent;
           }
@@ -350,14 +350,14 @@ namespace gestalt::graphics {
       }
     }
 
-    void VkSwapchain::resize_swapchain(Window& window) {
+    void VkSwapchain::resize_swapchain(const std::shared_ptr<Window>& window) {
       vkDeviceWaitIdle(gpu_->getDevice());
 
       destroy_swapchain();
 
-      window.update_window_size();
+      window->update_window_size();
 
-      create_swapchain(window.extent.width, window.extent.height);
+      create_swapchain(window->extent.width, window->extent.height);
     }
 
     void VkSwapchain::destroy_swapchain() const {

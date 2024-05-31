@@ -32,8 +32,7 @@ namespace gestalt::graphics {
     public:
       PFN_vkCmdDrawMeshTasksIndirectCountEXT vkCmdDrawMeshTasksIndirectCountEXT;
 
-      void init(
-          bool use_validation_layers, Window& window);
+      void init(std::shared_ptr<Window>& window);
       void cleanup() const;
 
       Gpu() = default;

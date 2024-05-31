@@ -41,11 +41,11 @@ namespace gestalt::application {
   }
 
   void RenderSystem::prepare() {
-    const size_t initial_vertex_position_buffer_size
+    constexpr size_t initial_vertex_position_buffer_size
         = getMaxVertices()
           * sizeof(GpuVertexPosition);
-    const size_t initial_vertex_data_buffer_size = getMaxVertices() * sizeof(GpuVertexData);
-    const size_t initial_index_buffer_size = getMaxIndices() * sizeof(uint32_t);
+    constexpr size_t initial_vertex_data_buffer_size = getMaxVertices() * sizeof(GpuVertexData);
+    constexpr size_t initial_index_buffer_size = getMaxIndices() * sizeof(uint32_t);
 
     MeshBuffers mesh_buffers;
 
@@ -80,14 +80,96 @@ namespace gestalt::application {
     repository_->register_buffer(mesh_buffers);
   }
 
+  void RenderSystem::upload_mesh() {
+    const std::span indices = repository_->indices.data();
+    const std::span vertex_positions = repository_->vertex_positions.data();
+    const std::span vertex_data = repository_->vertex_data.data();
+
+    const size_t vertex_position_buffer_size = vertex_positions.size() * sizeof(GpuVertexPosition);
+    const size_t vertex_data_buffer_size = vertex_data.size() * sizeof(GpuVertexData);
+    const size_t index_buffer_size = indices.size() * sizeof(uint32_t);
+
+    auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
+
+    if (mesh_buffers.vertex_position_buffer.info.size < vertex_position_buffer_size) {
+      resource_manager_->destroy_buffer(mesh_buffers.vertex_position_buffer);
+      mesh_buffers.vertex_position_buffer = resource_manager_->create_buffer(
+          vertex_position_buffer_size,
+                          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                          VMA_MEMORY_USAGE_GPU_ONLY);
+    }
+
+    if (mesh_buffers.vertex_data_buffer.info.size < vertex_data_buffer_size) {
+      resource_manager_->destroy_buffer(mesh_buffers.vertex_data_buffer);
+      mesh_buffers.vertex_data_buffer = resource_manager_->create_buffer(
+          vertex_data_buffer_size,
+                          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                          VMA_MEMORY_USAGE_GPU_ONLY);
+    }
+
+    if (mesh_buffers.index_buffer.info.size < index_buffer_size) {
+      resource_manager_->destroy_buffer(mesh_buffers.index_buffer);
+      mesh_buffers.index_buffer = resource_manager_->create_buffer(
+          index_buffer_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+          VMA_MEMORY_USAGE_GPU_ONLY);
+    }
+
+    const AllocatedBuffer staging
+        = resource_manager_->create_buffer(vertex_position_buffer_size + vertex_data_buffer_size + index_buffer_size,
+                        VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+
+    void* data;
+    VK_CHECK(vmaMapMemory(gpu_->getAllocator(), staging.allocation, &data));
+
+    // copy vertex buffer
+    memcpy(data, vertex_positions.data(), vertex_position_buffer_size);
+    memcpy(static_cast<char*>(data) + vertex_position_buffer_size, vertex_data.data(),
+           vertex_data_buffer_size);
+    // copy index buffer
+    memcpy(static_cast<char*>(data) + vertex_position_buffer_size + vertex_data_buffer_size,
+           indices.data(), index_buffer_size);
+
+    vmaUnmapMemory(gpu_->getAllocator(), staging.allocation);
+
+    gpu_->immediateSubmit([&](VkCommandBuffer cmd) {
+      VkBufferCopy copy_regions[3] = {};
+
+      copy_regions[0].dstOffset = 0;
+      copy_regions[0].srcOffset = 0;
+      copy_regions[0].size = vertex_position_buffer_size;
+
+      copy_regions[1].dstOffset = 0;
+      copy_regions[1].srcOffset = vertex_position_buffer_size;
+      copy_regions[1].size = vertex_data_buffer_size;
+
+      copy_regions[2].dstOffset = 0;
+      copy_regions[2].srcOffset = vertex_position_buffer_size + vertex_data_buffer_size;
+      copy_regions[2].size = index_buffer_size;
+
+      vkCmdCopyBuffer(cmd, staging.buffer, mesh_buffers.vertex_position_buffer.buffer, 1,
+                      &copy_regions[0]);
+      vkCmdCopyBuffer(cmd, staging.buffer, mesh_buffers.vertex_data_buffer.buffer, 1,
+                      &copy_regions[1]);
+      vkCmdCopyBuffer(cmd, staging.buffer, mesh_buffers.index_buffer.buffer, 1, &copy_regions[2]);
+    });
+    resource_manager_->destroy_buffer(staging);
+
+    writer_->clear();
+    writer_->write_buffer(0, mesh_buffers.vertex_position_buffer.buffer,
+                          vertex_position_buffer_size,
+                        0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    writer_->write_buffer(1, mesh_buffers.vertex_data_buffer.buffer, vertex_data_buffer_size, 0,
+                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    writer_->update_set(gpu_->getDevice(), mesh_buffers.descriptor_set);
+  }
+
   void RenderSystem::update() {
     if (repository_->meshes.size() != meshes_) {
       meshes_ = repository_->meshes.size();
 
       /* TODO use this
-      resource_manager_->update_mesh(resource_manager_->get_database().get_indices(),
-                                     resource_manager_->get_database().get_vertices());*/
-      resource_manager_->upload_mesh();
+      update_mesh(get_indices(), .get_vertices());*/
+      upload_mesh();
     }
 
     constexpr auto root_transform = glm::mat4(1.0f);

@@ -1,6 +1,6 @@
 ﻿#include "Engine.hpp"
 
-#if 1
+#if 0
 #define VMA_DEBUG_INITIALIZE_ALLOCATIONS 1
 #define VMA_DEBUG_LOG_FORMAT(format, ...) do { \
     printf((format), __VA_ARGS__); \
@@ -25,17 +25,18 @@ namespace gestalt {
 
   Engine* engine = nullptr;
 
-  constexpr bool kUseValidationLayers = true;
-
   void Engine::init() {
     assert(engine == nullptr);
     engine = this;
 
-    foundation::EngineConfiguration::getInstance().setConfig({});
+    // todo load from file
+    foundation::Config config{};
+    config.useValidationLayers = true;
+    foundation::EngineConfiguration::getInstance().setConfig(config);
 
-    window_.init({foundation::getResolutionWidth(), foundation::getResolutionHeight()});
+    window_->init();
 
-    gpu_->init(kUseValidationLayers, window_);
+    gpu_->init(window_);
 
     resource_manager_->init(gpu_, repository_);
 
@@ -55,7 +56,7 @@ namespace gestalt {
   void Engine::register_gui_actions() {
     gui_actions_.exit = [this]() { quit_ = true; };
     gui_actions_.load_gltf
-        = [this](std::string path) { scene_manager_->request_scene(std::move(path)); };
+        = [this](const std::string& path) { scene_manager_->request_scene(path); };
     gui_actions_.get_stats = [this]() -> foundation::EngineStats& { return stats_; };
     gui_actions_.get_component_factory = [this]() -> application::ComponentFactory& {
       return scene_manager_->get_component_factory();
@@ -79,7 +80,7 @@ namespace gestalt {
       while (SDL_PollEvent(&e) != 0) {
         if (e.type == SDL_QUIT) quit_ = true;
 
-        input_system_.handle_event(e, window_.extent.width, window_.extent.height);
+        input_system_.handle_event(e, window_->extent.width, window_->extent.height);
 
         if (e.type == SDL_WINDOWEVENT) {
           if (e.window.event == SDL_WINDOWEVENT_MINIMIZED) {
@@ -106,7 +107,7 @@ namespace gestalt {
 
       scene_manager_->update_scene(
           time_tracking_service_.get_delta_time(), input_system_.get_movement(),
-          static_cast<float>(window_.extent.width) / static_cast<float>(window_.extent.height));
+          static_cast<float>(window_->extent.width) / static_cast<float>(window_->extent.height));
 
       render_pipeline_->execute_passes();
 
@@ -130,7 +131,7 @@ namespace gestalt {
       render_pipeline_->cleanup();
       resource_manager_->cleanup();
       gpu_->cleanup();
-      window_.cleanup();
+      window_->cleanup();
     }
   }
 }  // namespace gestalt

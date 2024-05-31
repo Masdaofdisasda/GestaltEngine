@@ -94,6 +94,7 @@ namespace gestalt::application {
 
     public:
       void prepare() override;
+      void upload_mesh();
       void update() override;
       void cleanup() override;
     };

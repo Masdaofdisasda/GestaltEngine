@@ -71,7 +71,6 @@ namespace gestalt::graphics {
 
       AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage,
                                     VmaMemoryUsage memoryUsage) override;
-      void upload_mesh() override;
       void destroy_buffer(const AllocatedBuffer& buffer) override;
 
       VkSampler create_sampler(const VkSamplerCreateInfo& sampler_create_info) const override;

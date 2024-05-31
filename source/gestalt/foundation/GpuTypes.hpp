@@ -47,7 +47,6 @@ namespace gestalt::foundation {
     virtual AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage,
                                           VmaMemoryUsage memoryUsage)
         = 0;
-    virtual void upload_mesh() = 0;
     virtual void destroy_buffer(const AllocatedBuffer& buffer) = 0;
 
     virtual VkSampler create_sampler(const VkSamplerCreateInfo& sampler_create_info) const = 0;

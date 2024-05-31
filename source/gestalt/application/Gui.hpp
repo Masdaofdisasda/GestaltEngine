@@ -25,7 +25,7 @@ namespace gestalt::application {
 
     class Gui {
       std::shared_ptr<IGpu> gpu_;
-      Window window_;
+      std::shared_ptr<Window> window_;
       std::shared_ptr<Repository> repository_;
       GuiCapabilities actions_;
       VkDescriptorPool imguiPool_;
@@ -69,7 +69,8 @@ namespace gestalt::application {
 
       void set_debug_texture(VkImageView image_view, VkSampler sampler);
 
-      void init(const std::shared_ptr<IGpu>& gpu, Window& window, VkFormat swapchainFormat,
+      void init(const std::shared_ptr<IGpu>& gpu, std::shared_ptr<Window>& window,
+                VkFormat swapchainFormat,
                 const std::shared_ptr<Repository>& repository,
                 const std::unique_ptr<IDescriptorUtilFactory>& descriptor_util_factory,
                     GuiCapabilities

@@ -6,15 +6,14 @@
 
 namespace gestalt::graphics {
 
-  void Gpu::init(
-      bool use_validation_layers, Window& window) {
+  void Gpu::init(std::shared_ptr<Window>& window) {
 
     // create the vulkan instance
     vkb::InstanceBuilder builder;
 
     // make the vulkan instance, with basic debug features
     auto inst_ret = builder.set_app_name("Gestalt Application")
-                        .request_validation_layers(use_validation_layers)
+                        .request_validation_layers(useValidationLayers())
                         .enable_extension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME)
                         .use_default_debug_messenger()
                         .require_api_version(1, 3, 0)
@@ -31,7 +30,7 @@ namespace gestalt::graphics {
     debug_messenger = vkb_inst.debug_messenger;
 
     // create the device
-    window.create_surface(instance, &surface);
+    window->create_surface(instance, &surface);
 
     VkPhysicalDeviceFeatures features10{};
     features10.fillModeNonSolid = true;
