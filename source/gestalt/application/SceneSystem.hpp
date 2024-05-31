@@ -41,7 +41,7 @@ namespace gestalt::application {
       std::shared_ptr<Repository> repository_;
     };
 
-    class MaterialSystem final : public SceneSystem {
+    class MaterialSystem final : public SceneSystem, public NonCopyable<MaterialSystem> {
     public:
       void create_defaults();
       void prepare() override;
@@ -50,7 +50,7 @@ namespace gestalt::application {
       void write_material(PbrMaterial& material, uint32_t material_id);
     };
 
-    class LightSystem final : public SceneSystem {
+    class LightSystem final : public SceneSystem, public NonCopyable<LightSystem> {
 
       glm::mat4 calculate_sun_view_proj(glm::vec3 direction) const;
       void update_directional_lights(std::unordered_map<entity, LightComponent>& lights);
@@ -62,7 +62,7 @@ namespace gestalt::application {
       void cleanup() override;
     };
 
-    class CameraSystem final : public SceneSystem {
+    class CameraSystem final : public SceneSystem, public NonCopyable<CameraSystem> {
       std::unique_ptr<Camera> active_camera_;
       std::unique_ptr<FreeFlyCamera> free_fly_camera_; // move to components
       float32 aspect_{1.f};
@@ -74,7 +74,7 @@ namespace gestalt::application {
       void cleanup() override;
     };
 
-    class TransformSystem final : public SceneSystem {
+    class TransformSystem final : public SceneSystem, public NonCopyable<TransformSystem> {
       void mark_children_dirty(entity entity);
       void mark_as_dirty(entity entity);
       void update_aabb(entity entity, const glm::mat4& parent_transform);
@@ -88,7 +88,7 @@ namespace gestalt::application {
       void cleanup() override;
     };
 
-    class RenderSystem final : public SceneSystem {
+    class RenderSystem final : public SceneSystem, public NonCopyable<RenderSystem> {
       size_t meshes_ = 0;
       void traverse_scene(entity entity, const glm::mat4& parent_transform);
 

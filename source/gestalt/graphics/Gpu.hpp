@@ -12,7 +12,7 @@
 
 namespace gestalt::graphics {
 
-    class Gpu final : public IGpu {
+    class Gpu final : public IGpu, public NonCopyable<Gpu> {
 
       VkInstance instance;
       VkDevice device;

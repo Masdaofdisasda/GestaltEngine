@@ -6,7 +6,7 @@
 
 namespace gestalt::application {
 
-    class Window {
+    class Window : public NonCopyable<Window> {
     public:
       SDL_Window* handle{nullptr};
       VkExtent2D extent{1920, 1080};

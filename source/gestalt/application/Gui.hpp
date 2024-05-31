@@ -23,7 +23,7 @@ namespace gestalt::application {
       std::function<std::shared_ptr<TextureHandle>()> get_debug_image;
     };
 
-    class Gui {
+    class Gui: public NonCopyable<Gui> {
       std::shared_ptr<IGpu> gpu_;
       std::shared_ptr<Window> window_;
       std::shared_ptr<Repository> repository_;

@@ -48,7 +48,7 @@ namespace gestalt::graphics {
       void flush();
     };
 
-    class ResourceManager final : public IResourceManager {
+    class ResourceManager final : public IResourceManager, public NonCopyable<ResourceManager> {
 
       std::shared_ptr<IGpu> gpu_;
       std::shared_ptr<Repository> repository_;

@@ -88,7 +88,7 @@ namespace gestalt::foundation {
     std::vector<DataType> data_;
   };
 
-  class Repository {
+  class Repository : public NonCopyable<Repository> {
     std::unordered_map<std::type_index, std::unique_ptr<DataHolder>> holders;
 
   public:

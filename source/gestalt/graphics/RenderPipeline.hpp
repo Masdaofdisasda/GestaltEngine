@@ -88,7 +88,7 @@ namespace gestalt::graphics {
       RenderPassDependency build();
     };
 
-    class ResourceRegistry {
+    class ResourceRegistry : public NonCopyable<ResourceRegistry> {
     public:
       void init(const std::shared_ptr<IGpu>& gpu);
 
@@ -154,7 +154,7 @@ namespace gestalt::graphics {
       std::unordered_map<std::string, VkShaderModule> shader_cache_{};
     };
 
-    class RenderPass {
+    class RenderPass : public NonCopyable<RenderPass>{
     public:
       RenderPass() = default;
       void init(const std::shared_ptr<IGpu>& gpu,
@@ -170,10 +170,6 @@ namespace gestalt::graphics {
       }
       RenderPassDependency& get_dependencies() { return dependencies_; }
 
-      RenderPass(const RenderPass&) = delete;
-      RenderPass& operator=(const RenderPass&) = delete;
-      RenderPass(RenderPass&&) = delete;
-      RenderPass& operator=(RenderPass&&) = delete;
       virtual ~RenderPass() = default;
 
       virtual void execute(VkCommandBuffer cmd) = 0;
@@ -211,7 +207,7 @@ namespace gestalt::graphics {
       std::shared_ptr<Repository> repository_;
     };
 
-    class VkSwapchain {
+    class VkSwapchain : public NonCopyable<VkSwapchain> {
       std::shared_ptr<IGpu> gpu_;
 
     public:
@@ -253,9 +249,7 @@ namespace gestalt::graphics {
       std::vector<std::shared_ptr<RenderPass>> sorted_passes_;
     };
 
-    constexpr unsigned char kFrameOverlap = 2;
-
-    class RenderPipeline {
+    class RenderPipeline : public NonCopyable<RenderPipeline> {
       std::shared_ptr<IGpu> gpu_;
       std::shared_ptr<Window> window_;
       std::shared_ptr<ResourceManager> resource_manager_;

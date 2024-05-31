@@ -13,7 +13,7 @@ namespace gestalt::application {
     struct Vertex;
     class AssetLoader;
 
-    class ComponentFactory {
+    class ComponentFactory : public NonCopyable<ComponentFactory> {
       std::shared_ptr<IResourceManager> resource_manager_;
       std::shared_ptr<Repository> repository_;
 
@@ -46,7 +46,7 @@ namespace gestalt::application {
                                       const float& scale = 1.f) const;
     };
 
-    class AssetLoader {
+    class AssetLoader : public NonCopyable<AssetLoader> {
       std::shared_ptr<IResourceManager> resource_manager_;
       std::shared_ptr<Repository> repository_;
       std::shared_ptr<ComponentFactory> component_factory_;
@@ -104,7 +104,7 @@ namespace gestalt::application {
     /**
      * @brief Class responsible for managing scenes, entities, and their components.
      */
-    class SceneManager {
+    class SceneManager : public NonCopyable<SceneManager> {
       std::shared_ptr<IGpu> gpu_;
       std::shared_ptr<IResourceManager> resource_manager_;
       std::shared_ptr<Repository> repository_;
