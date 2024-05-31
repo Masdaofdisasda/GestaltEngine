@@ -4,6 +4,7 @@
 
 #include <vma/vk_mem_alloc.h>
 
+#include <EngineConfig.hpp>
 #include <array>
 
 namespace gestalt::foundation {
@@ -79,9 +80,9 @@ namespace gestalt::foundation {
 
     struct PerFrameDataBuffers{
       PerFrameData data;
-      std::array<AllocatedBuffer, 2> uniform_buffers;
+      std::array<AllocatedBuffer, getFramesInFlight()> uniform_buffers;
 
-      std::array<VkDescriptorSet, 2> descriptor_sets;
+      std::array<VkDescriptorSet, getFramesInFlight()> descriptor_sets;
       VkDescriptorSetLayout descriptor_layout;
     };
 

@@ -1,4 +1,6 @@
-﻿#include "RenderConfig.hpp"
+﻿#include <EngineConfig.hpp>
+
+#include "RenderConfig.hpp"
 #include "SceneSystem.hpp"
 
 namespace gestalt::application {
@@ -18,7 +20,7 @@ namespace gestalt::application {
                              VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
                 .build(gpu_->getDevice());
 
-      for (int i = 0; i < 2; ++i) {
+      for (int i = 0; i < getFramesInFlight(); ++i) {
         per_frame_data_buffers.uniform_buffers[i] = resource_manager_->create_buffer(
             sizeof(PerFrameData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
         per_frame_data_buffers.descriptor_sets[i] = resource_manager_->get_descriptor_pool()->allocate(

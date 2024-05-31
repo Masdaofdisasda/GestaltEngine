@@ -6,39 +6,36 @@ namespace gestalt::application {
 
     void LightSystem::prepare() {
 
-      LightBuffers light_data{};
+      LightBuffers light_data;
 
       descriptor_layout_builder_->clear();
       light_data.descriptor_layout
           = descriptor_layout_builder_->add_binding(15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                                   VK_SHADER_STAGE_FRAGMENT_BIT,
-                         false, kLimits.max_directional_lights)
+                              false, getMaxDirectionalLights())
             .add_binding(16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
-                         false, kLimits.max_point_lights)
-            .add_binding(17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT,
-                         false, kLimits.max_directional_lights + kLimits.max_point_lights)
+                             false, getMaxPointLights())
+            .add_binding(17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, false,
+                             getMaxLights())
             .build(gpu_->getDevice());
 
       light_data.descriptor_set
           = resource_manager_->get_descriptor_pool()->allocate(gpu_->getDevice(), light_data.descriptor_layout);
 
-      constexpr size_t max_directional_lights = kLimits.max_directional_lights;
-      constexpr size_t max_point_lights = kLimits.max_point_lights;
-      constexpr size_t max_lights = max_directional_lights + max_point_lights;
-
       light_data.dir_light_buffer = resource_manager_->create_buffer(
-          sizeof(GpuDirectionalLight) * max_directional_lights, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+          sizeof(GpuDirectionalLight) * getMaxDirectionalLights(),
+          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
           VMA_MEMORY_USAGE_CPU_TO_GPU);
       light_data.point_light_buffer = resource_manager_->create_buffer(
-          sizeof(GpuPointLight) * max_point_lights, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+          sizeof(GpuPointLight) * getMaxPointLights(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
           VMA_MEMORY_USAGE_CPU_TO_GPU);
       light_data.view_proj_matrices = resource_manager_->create_buffer(
-          sizeof(glm::mat4) * max_lights, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+          sizeof(glm::mat4) * getMaxLights(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
           VMA_MEMORY_USAGE_CPU_TO_GPU);
 
       writer_->clear();
       std::vector<VkDescriptorBufferInfo> dirBufferInfos;
-      for (int i = 0; i < max_directional_lights; ++i) {
+      for (int i = 0; i < getMaxDirectionalLights(); ++i) {
         VkDescriptorBufferInfo bufferInfo = {};
         bufferInfo.buffer = light_data.dir_light_buffer.buffer;
         bufferInfo.offset = 32 * i;
@@ -48,7 +45,7 @@ namespace gestalt::application {
       writer_->write_buffer_array(15, dirBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
 
       std::vector<VkDescriptorBufferInfo> pointBufferInfos;
-      for (int i = 0; i < max_point_lights; ++i) {
+      for (int i = 0; i < getMaxPointLights(); ++i) {
         VkDescriptorBufferInfo bufferInfo = {};
         bufferInfo.buffer = light_data.point_light_buffer.buffer;
         bufferInfo.offset = 32 * i;
@@ -58,7 +55,7 @@ namespace gestalt::application {
       writer_->write_buffer_array(16, pointBufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
 
       std::vector<VkDescriptorBufferInfo> lightViewProjBufferInfos;
-      for (int i = 0; i < max_lights; ++i) {
+      for (int i = 0; i < getMaxLights(); ++i) {
         VkDescriptorBufferInfo bufferInfo = {};
         bufferInfo.buffer = light_data.view_proj_matrices.buffer;
         bufferInfo.offset = 64 * i;

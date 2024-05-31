@@ -1,7 +1,5 @@
 ﻿#include "SceneSystem.hpp"
 
-#include <glm/detail/_noise.hpp>
-
 namespace gestalt::application {
 
   void MaterialSystem::write_material(PbrMaterial& material, const uint32_t material_id) {
@@ -127,14 +125,14 @@ namespace gestalt::application {
       fmt::print("creating material {}, mat_id {}\n", key, material_id);
     }
 
-    std::vector<PbrMaterial::PbrConstants> material_constants(kLimits.max_materials);
+    std::vector<PbrMaterial::PbrConstants> material_constants(getMaxMaterials());
 
     PbrMaterial::PbrConstants* mappedData;
     VK_CHECK(vmaMapMemory(gpu_->getAllocator(),
                           repository_->material_data.constants_buffer.allocation,
                           (void**)&mappedData));
     memcpy(mappedData, material_constants.data(),
-           sizeof(PbrMaterial::PbrConstants) * kLimits.max_materials);
+           sizeof(PbrMaterial::PbrConstants) * getMaxMaterials());
 
     vmaUnmapMemory(gpu_->getAllocator(), repository_->material_data.constants_buffer.allocation);
 
@@ -152,8 +150,8 @@ namespace gestalt::application {
     writer_->update_set(gpu_->getDevice(), repository_->material_data.constants_set);
 
     writer_->clear();
-    std::vector<VkDescriptorImageInfo> imageInfos{kLimits.max_textures};
-    for (int i = 0; i < kLimits.max_textures; ++i) {
+    std::vector<VkDescriptorImageInfo> imageInfos{getMaxTextures()};
+    for (int i = 0; i < getMaxTextures(); ++i) {
       VkDescriptorImageInfo image_info;
       image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
       image_info.imageView = repository_->default_material_.error_checkerboard_image.imageView;
@@ -168,7 +166,7 @@ namespace gestalt::application {
     auto& material_data = repository_->material_data;
 
     material_data.constants_buffer = resource_manager_->create_buffer(
-        sizeof(PbrMaterial::PbrConstants) * kLimits.max_materials,
+        sizeof(PbrMaterial::PbrConstants) * getMaxMaterials(),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
     descriptor_layout_builder_->clear();
     material_data.resource_layout = descriptor_layout_builder_
@@ -181,9 +179,9 @@ namespace gestalt::application {
                                                        VK_SHADER_STAGE_FRAGMENT_BIT, true)
                                          .build(gpu_->getDevice());
     material_data.resource_set = resource_manager_->get_descriptor_pool()->allocate(
-        gpu_->getDevice(), material_data.resource_layout, {kLimits.max_textures});
+        gpu_->getDevice(), material_data.resource_layout, {getMaxTextures()});
     material_data.constants_set = resource_manager_->get_descriptor_pool()->allocate(
-        gpu_->getDevice(), material_data.constants_layout, {kLimits.max_materials});
+        gpu_->getDevice(), material_data.constants_layout, {getMaxMaterials()});
 
     create_defaults();
 

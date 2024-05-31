@@ -23,9 +23,9 @@ namespace gestalt::graphics {
       resource_loader_.init(gpu);
 
       std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes
-          = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kLimits.max_textures},
+          = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, getMaxTextures()},
              {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10},
-             {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kLimits.max_materials}};
+             {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, getMaxMaterials()}};
 
       descriptorPool->init(gpu_->getDevice(), 1, sizes);
 
@@ -86,13 +86,12 @@ namespace gestalt::graphics {
           index_buffer_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
           VMA_MEMORY_USAGE_GPU_ONLY);
 
-      AllocatedBuffer staging
+      const AllocatedBuffer staging
           = create_buffer(vertex_position_buffer_size + vertex_data_buffer_size + index_buffer_size,
                           VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
 
       void* data;
-      VmaAllocation allocation = staging.allocation;
-      VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation, &data));
+      VK_CHECK(vmaMapMemory(gpu_->getAllocator(), staging.allocation, &data));
 
       // copy vertex buffer
       memcpy(data, vertex_positions.data(), vertex_position_buffer_size);
@@ -126,7 +125,7 @@ namespace gestalt::graphics {
 
           vkCmdCopyBuffer(cmd, staging.buffer, mesh_buffers.index_buffer.buffer, 1, &index_copy);
         });
-      vmaUnmapMemory(gpu_->getAllocator(), allocation);
+      vmaUnmapMemory(gpu_->getAllocator(), staging.allocation);
       destroy_buffer(staging);
 
       writer.clear();

@@ -3,6 +3,7 @@
 #include <deque>
 
 #include "vk_types.hpp"
+#include "EngineConfig.hpp"
 
 #include "Gpu.hpp"
 
@@ -79,7 +80,6 @@ namespace gestalt::graphics {
 
   class FrameData {
   public:
-    static constexpr size_t kFramesInFlight = 2;
     struct FrameResources {
       VkSemaphore swapchain_semaphore, render_semaphore;
       VkFence render_fence;
@@ -98,7 +98,7 @@ namespace gestalt::graphics {
   private:
     uint64 frame_number{0};
     // TODO define constants
-    std::array<FrameResources, kFramesInFlight> frames_{};
+    std::array<FrameResources, getFramesInFlight()> frames_{};
   };
 
 

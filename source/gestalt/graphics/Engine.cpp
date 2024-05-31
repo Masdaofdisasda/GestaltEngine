@@ -31,11 +31,11 @@ namespace gestalt {
     assert(engine == nullptr);
     engine = this;
 
-    window_.init({1300, 900});  // todo : get window size from config
+    foundation::EngineConfiguration::getInstance().setConfig({});
 
-    auto gpu = graphics::Gpu{};
-    gpu.init(kUseValidationLayers, window_);
-    gpu_ = std::make_shared<graphics::Gpu>(gpu);  // TODO simplify this
+    window_.init({foundation::getResolutionWidth(), foundation::getResolutionHeight()});
+
+    gpu_->init(kUseValidationLayers, window_);
 
     resource_manager_->init(gpu_, repository_);
 

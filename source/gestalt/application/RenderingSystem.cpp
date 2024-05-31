@@ -42,9 +42,10 @@ namespace gestalt::application {
 
   void RenderSystem::prepare() {
     const size_t initial_vertex_position_buffer_size
-        = 184521 * sizeof(GpuVertexPosition);  // Note these are the min values to load bistro scene
-    const size_t initial_vertex_data_buffer_size = 184521 * sizeof(GpuVertexData);
-    const size_t initial_index_buffer_size = 786801 * sizeof(uint32_t);
+        = getMaxVertices()
+          * sizeof(GpuVertexPosition);
+    const size_t initial_vertex_data_buffer_size = getMaxVertices() * sizeof(GpuVertexData);
+    const size_t initial_index_buffer_size = getMaxIndices() * sizeof(uint32_t);
 
     MeshBuffers mesh_buffers;
 

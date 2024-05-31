@@ -88,16 +88,6 @@ namespace gestalt::foundation {
     std::vector<DataType> data_;
   };
 
-  struct EngineLimits {
-    size_t max_directional_lights
-        = 2;  // actually only 1 is used, but we need 2 to fulfill the 64 bytes alignment
-    size_t max_point_lights = 256;
-    size_t max_spot_lights = 0;  // not implemented yet
-    size_t max_materials = 256;  // each material can have up to 5 textures (PBR)
-    size_t max_textures = max_materials * 5;
-    size_t max_cameras = -1;
-  } constexpr kLimits = {};
-
   class Repository {
     std::unordered_map<std::type_index, std::unique_ptr<DataHolder>> holders;
 
@@ -136,7 +126,7 @@ namespace gestalt::foundation {
       VkSampler nearestSampler;
     } default_material_ = {};
 
-    MaterialData material_data;
+    MaterialData material_data; // todo save as buffer
 
     DrawContext main_draw_context_;  // TODO replace with draw command buffer
 

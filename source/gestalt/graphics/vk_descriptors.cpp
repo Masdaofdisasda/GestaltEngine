@@ -276,8 +276,7 @@ namespace gestalt::graphics {
     current_frame_index = get_current_frame_index(); //TODO : this is a bit weird
   }
 
-  uint8 FrameData::get_current_frame_index() const {
-    return frame_number % kFramesInFlight;
+  uint8 FrameData::get_current_frame_index() const { return frame_number % getFramesInFlight();
   }
 
   FrameData::FrameResources& FrameData::get_current_frame() {
