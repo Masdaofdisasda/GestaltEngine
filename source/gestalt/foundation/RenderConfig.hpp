@@ -8,12 +8,19 @@
 
 namespace gestalt::foundation {
 
+    inline uint8 next_frame_index{1};
     inline uint8 current_frame_index{0};
+    inline uint8 previous_frame_index{0};
 
-    struct GpuDrawPushConstants {
-      glm::mat4 worldMatrix;
-      int material_id;
-    };
+    inline struct MeshletPushConstants {
+      glm::mat4 viewProjection;
+
+      float32 screenWidth, screenHeight, znear, zfar;  // symmetric projection parameters
+      float32 frustum[4];  // data for left/right/top/bottom frustum planes
+
+      float32 pyramidWidth, pyramidHeight;  // depth pyramid size in texels
+      int32 clusterOcclusionEnabled;
+    } meshlet_push_constants;
 
     struct RenderConfig {
       bool always_opaque{true};

@@ -21,6 +21,39 @@ namespace gestalt::foundation {
       float32 padding{0.f};
     };
 
+    struct MeshDraw {
+      // TRS
+      glm::vec3 position;
+      float32 scale;
+      glm::vec4 orientation;
+
+      // Bounding box
+      // Meshlet data
+      glm::vec3 min;
+      uint32 meshlet_offset;
+      glm::vec3 max;
+      uint32 meshlet_count;
+
+      // Vertex data
+      uint32 vertex_count;
+      uint32 index_count;
+      uint32 first_index;
+      uint32 vertex_offset;
+
+      // Material
+      uint32 materialIndex;
+      uint32 pad[3];
+    };
+
+  static_assert(sizeof(MeshDraw) == 96);
+
+    struct MeshTaskCommand {
+      uint32 meshDrawId;
+      uint32 taskOffset;
+      uint32 taskCount;
+      uint32 pad;
+    };
+
     enum class TextureType { kColor, kDepth, kCubeMap };
 
     class TextureHandle {
@@ -96,11 +129,18 @@ namespace gestalt::foundation {
     };
 
     struct MeshBuffers {
-      AllocatedBuffer index_buffer;
-      AllocatedBuffer vertex_position_buffer;
-      AllocatedBuffer vertex_data_buffer;
+      AllocatedBuffer index_buffer; // regular index buffer
+      AllocatedBuffer vertex_position_buffer; // only vertex positions
+      AllocatedBuffer vertex_data_buffer; // normals, tangents, uvs
 
-      VkDescriptorSet descriptor_set = nullptr;
+      AllocatedBuffer meshlet_buffer; // meshlets
+      AllocatedBuffer meshlet_vertices;
+      AllocatedBuffer meshlet_triangles; // meshlet indices
+      std::array<AllocatedBuffer, getFramesInFlight()> meshlet_task_commands_buffer;
+      std::array<AllocatedBuffer, getFramesInFlight()> mesh_draw_buffer;   // TRS, material id
+      std::array<AllocatedBuffer, getFramesInFlight()> draw_count_buffer;  // number of draws
+
+      std::array<VkDescriptorSet, getFramesInFlight()> descriptor_sets;
       VkDescriptorSetLayout descriptor_layout;
     };
 

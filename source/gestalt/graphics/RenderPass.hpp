@@ -18,6 +18,27 @@ namespace gestalt::graphics {
       void execute(VkCommandBuffer cmd) override;
       std::string get_name() const override { return "Deferred Pass"; }
     };
+    class DrawCullPass final : public RenderPass {
+      public:
+      void prepare() override;
+      void destroy() override;
+      void execute(VkCommandBuffer cmd) override;
+      std::string get_name() const override { return "Draw Cull Pass"; }
+    };
+    class TaskSubmitPass final : public RenderPass {
+      public:
+      void prepare() override;
+      void destroy() override;
+      void execute(VkCommandBuffer cmd) override;
+      std::string get_name() const override { return "Task Submit Pass"; }
+    };
+    class MeshletPass final : public RenderPass {
+    public:
+      void prepare() override;
+      void destroy() override;
+      void execute(VkCommandBuffer cmd) override;
+      std::string get_name() const override { return "Meshlet Pass"; }
+    };
     class LightingPass final : public RenderPass {
       DescriptorWriter writer_;
       VkDescriptorSet descriptor_set_ = nullptr;

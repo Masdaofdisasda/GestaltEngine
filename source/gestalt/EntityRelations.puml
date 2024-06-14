@@ -1,0 +1,161 @@
+@startuml
+
+entity "Meshlet" {
+  glm::vec3 center
+  float32 radius
+  int8 cone_axis[3]
+  int8 cone_cutoff
+  uint32 data_offset
+  uint32 mesh_index
+  uint8 vertex_count
+  uint8 triangle_count
+}
+
+entity "MeshSurface" {
+  uint32 meshlet_offset
+  uint32 meshlet_count
+  uint32 vertex_count
+  uint32 index_count
+  uint32 first_index
+  uint32 vertex_offset
+  AABB local_bounds
+  size_t material
+}
+
+entity "Component" {
+  mutable bool is_dirty = true
+}
+
+entity "MeshComponent" {
+  size_t mesh
+}
+
+entity "Mesh" {
+  std::string name
+  std::vector<MeshSurface> surfaces
+  AABB local_bounds
+}
+
+entity "CameraComponent" {
+  size_t camera_data
+}
+
+entity "CameraData" {
+  glm::mat4 view_matrix{1.0f}
+  glm::mat4 projection_matrix{1.0}
+}
+
+entity "LightComponent" {
+  LightType type
+  glm::vec3 color
+  float intensity
+  float inner_cone
+  float outer_cone
+  std::vector<size_t> light_view_projections
+}
+
+entity "PbrMaterial" {
+  bool double_sided
+  bool transparent
+
+  struct PbrConstants {
+    uint16 albedo_tex_index
+    uint16 metal_rough_tex_index
+    uint16 normal_tex_index
+    uint16 emissive_tex_index
+    uint16 occlusion_tex_index
+    uint32 flags
+    glm::vec4 albedo_color
+    glm::vec2 metal_rough_factor
+    float32 occlusionStrength
+    float32 alpha_cutoff
+    glm::vec3 emissiveColor
+    float32 emissiveStrength
+  } constants
+
+  struct PbrTextures {
+    TextureHandle albedo_image
+    VkSampler albedo_sampler
+    TextureHandle metal_rough_image
+    VkSampler metal_rough_sampler
+    TextureHandle normal_image
+    VkSampler normal_sampler
+    TextureHandle emissive_image
+    VkSampler emissive_sampler
+    TextureHandle occlusion_image
+    VkSampler occlusion_sampler
+  } textures
+}
+
+entity "Material" {
+  std::string name
+  PbrMaterial config
+  bool is_dirty
+}
+
+entity "TransformComponent" {
+  glm::vec3 position
+  glm::quat rotation
+  float32 scale
+  size_t matrix
+  glm::vec3 parent_position
+  glm::quat parent_rotation
+  float32 parent_scale
+}
+
+entity "NodeComponent" {
+  std::string name
+  Entity parent
+  std::vector<Entity> children
+  AABB bounds
+  bool visible
+}
+
+entity "GpuVertexPosition" {
+  glm::vec3 position{0.f}
+  float32 padding{0.f}
+}
+
+entity "GpuVertexData" {
+  uint8 normal[4]
+  uint8 tangent[4]
+  uint16 uv[2]
+  float32 padding{0.f}
+}
+
+entity "MeshDraw" {
+  glm::vec3 position
+  float32 scale
+  glm::vec4 orientation
+  uint32 materialIndex
+  glm::vec3 min
+  glm::vec3 max
+  uint32 meshlet_offset
+  uint32 meshlet_count
+  uint32 vertex_count
+  uint32 index_count
+  uint32 first_index
+  uint32 vertex_offset
+}
+
+entity "MeshTaskCommand" {
+  uint32 meshDrawId
+  uint32 taskOffset
+  uint32 taskCount
+  uint32 pad
+}
+
+' Relationships
+Mesh --> MeshSurface
+MeshSurface --> Meshlet
+MeshComponent -|> Component
+CameraComponent -|> Component
+LightComponent -|> Component
+TransformComponent -|> Component
+NodeComponent -|> Component
+Material --> PbrMaterial
+PbrMaterial --> PbrTextures
+PbrMaterial --> PbrConstants
+MeshDraw --> MeshTaskCommand
+
+@enduml

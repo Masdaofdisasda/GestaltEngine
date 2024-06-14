@@ -54,7 +54,7 @@ namespace gestalt:: graphics {
                       .set_multisampling_none()
                       .disable_blending()
                       .disable_depthtest()
-                      .build_pipeline(gpu_->getDevice());
+                      .build_graphics_pipeline(gpu_->getDevice());
     }
 
     void LightingPass::destroy() {

@@ -273,10 +273,20 @@ namespace gestalt::graphics {
   void FrameData::advance_frame() {
     frame_number++;
 
+    next_frame_index = get_next_frame_index();
     current_frame_index = get_current_frame_index(); //TODO : this is a bit weird
+    previous_frame_index = get_previous_frame_index();
   }
 
   uint8 FrameData::get_current_frame_index() const { return frame_number % getFramesInFlight();
+  }
+
+  uint8 FrameData::get_previous_frame_index() const {
+     return (frame_number + getFramesInFlight() - 1) % getFramesInFlight();
+  }
+
+  uint8 FrameData::get_next_frame_index() const {
+     return (frame_number + 1) % getFramesInFlight();
   }
 
   FrameData::FrameResources& FrameData::get_current_frame() {

@@ -11,7 +11,7 @@ namespace gestalt::application {
 
     void TransformSystem::prepare() {}
 
-    void TransformSystem::mark_parent_dirty(entity entity) {
+    void TransformSystem::mark_parent_dirty(Entity entity) {
       if (entity == invalid_entity) {
         return;
       }
@@ -25,7 +25,7 @@ namespace gestalt::application {
       mark_parent_dirty(node.parent);
     }
 
-    void TransformSystem::mark_children_dirty(entity entity) {
+    void TransformSystem::mark_children_dirty(Entity entity) {
       if (entity == invalid_entity) {
         return;
       }
@@ -41,7 +41,7 @@ namespace gestalt::application {
       }
     }
 
-    void TransformSystem::mark_as_dirty(entity entity) {
+    void TransformSystem::mark_as_dirty(Entity entity) {
       const auto& node = repository_->scene_graph.get(entity).value().get();
       node.bounds.is_dirty = true;
       for (const auto& child : node.children) {
@@ -50,7 +50,7 @@ namespace gestalt::application {
       mark_parent_dirty(node.parent);
     }
 
-    void TransformSystem::update_aabb(const entity entity, const glm::mat4& parent_transform) {
+    void TransformSystem::update_aabb(const Entity entity, const glm::mat4& parent_transform) {
       auto& node = repository_->scene_graph.get(entity).value().get();
       if (!node.bounds.is_dirty) {
         return;

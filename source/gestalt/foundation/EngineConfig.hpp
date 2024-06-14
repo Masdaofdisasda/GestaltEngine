@@ -11,8 +11,10 @@ namespace gestalt::foundation {
   constexpr uint32 kDefaultMaxTextures = kDefaultMaxMaterials * kDefaultPbrMaterialTextures;
 
   // should be enough for Bistro scene
-  constexpr uint32 kDefaultMaxVertices = 32768;   // 2^15
-  constexpr uint32 kDefaultMaxIndices = 1048576;  // 2^20
+  constexpr uint32 kDefaultMaxVertices = 8388608;
+  constexpr uint32 kDefaultMaxIndices = 2 * kDefaultMaxVertices;
+  constexpr uint32 kDefaultMaxMeshes = 4096;
+  constexpr uint32 kDefaultMaxMeshlets = 131072;
 
   // Run time configuration
   constexpr uint32 kDefaultMaxDirectionalLights = 2;  // needed for 64 bit alignment
@@ -67,6 +69,10 @@ namespace gestalt::foundation {
   constexpr uint32 getMaxVertices() { return kDefaultMaxVertices; }
 
   constexpr uint32 getMaxIndices() { return kDefaultMaxIndices; }
+
+  constexpr uint32 getMaxMeshes() { return kDefaultMaxMeshes; }
+
+  constexpr uint32 getMaxMeshlets() { return kDefaultMaxMeshlets; }
 
   inline uint32 getMaxDirectionalLights() {
     return EngineConfiguration::getInstance().getConfig().maxDirectionalLights;

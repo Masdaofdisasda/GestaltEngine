@@ -21,9 +21,11 @@ namespace gestalt::graphics {
 
       void clear();
 
-      VkPipeline build_pipeline(VkDevice device);
+      VkPipeline build_graphics_pipeline(VkDevice device);
+      VkPipeline build_compute_pipeline(VkDevice device) const;
 
       PipelineBuilder& set_shaders(VkShaderModule vertexShader, VkShaderModule fragmentShader);
+      PipelineBuilder& set_shaders(VkShaderModule computeShader);
       PipelineBuilder& set_shaders(VkShaderModule taskShader, VkShaderModule meshShader,
                                    VkShaderModule fragmentShader);
       PipelineBuilder& set_input_topology(VkPrimitiveTopology topology);

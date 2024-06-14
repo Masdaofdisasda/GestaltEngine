@@ -29,8 +29,10 @@ namespace gestalt::graphics {
       VkCommandPool immediate_submit_command_pool_ = VK_NULL_HANDLE;
       VkCommandBuffer immediate_submit_command_buffer_ = VK_NULL_HANDLE;
 
-    public:
       PFN_vkCmdDrawMeshTasksIndirectCountEXT vkCmdDrawMeshTasksIndirectCountEXT;
+      PFN_vkCmdDrawMeshTasksIndirectEXT vkCmdDrawMeshTasksIndirectEXT;
+
+    public:
 
       void init(std::shared_ptr<Window>& window);
       void cleanup() const;
@@ -47,8 +49,12 @@ namespace gestalt::graphics {
       [[nodiscard]] VkPhysicalDevice getPhysicalDevice() const override;
       [[nodiscard]] VkPhysicalDeviceProperties getPhysicalDeviceProperties() const override;
       void immediateSubmit(std::function<void(VkCommandBuffer cmd)> function) const override;
-    
-
+      void drawMeshTasksIndirectCount(VkCommandBuffer commandBuffer, VkBuffer buffer,
+                                      VkDeviceSize offset, VkBuffer countBuffer,
+                                      VkDeviceSize countBufferOffset, uint32_t maxDrawCount,
+                                      uint32_t stride) override;
+      void drawMeshTasksIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer,
+                                          VkDeviceSize offset, uint32_t drawCount, uint32_t stride) const override;
     };
 
 }  // namespace gestalt

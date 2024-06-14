@@ -28,7 +28,7 @@ namespace gestalt::foundation {
   public:
     size_t size() const { return components_.size(); }
 
-    std::optional<std::reference_wrapper<ComponentType>> get(const entity& ent) {
+    std::optional<std::reference_wrapper<ComponentType>> get(const Entity& ent) {
       auto it = components_.find(ent);
       if (it != components_.end()) {
         return std::ref(it->second);
@@ -36,26 +36,26 @@ namespace gestalt::foundation {
       return std::nullopt;
     }
 
-    std::unordered_map<entity, ComponentType>& components() { return components_; }
+    std::unordered_map<Entity, ComponentType>& components() { return components_; }
 
-    std::vector<std::pair<entity, std::reference_wrapper<ComponentType>>> asVector() {
-      std::vector<std::pair<entity, std::reference_wrapper<ComponentType>>> result;
+    std::vector<std::pair<Entity, std::reference_wrapper<ComponentType>>> asVector() {
+      std::vector<std::pair<Entity, std::reference_wrapper<ComponentType>>> result;
       for (auto& [ent, comp] : components_) {
         result.emplace_back(ent, std::ref(comp));
       }
       return result;
     }
 
-    void add(const entity& ent, const ComponentType& component) {
+    void add(const Entity& ent, const ComponentType& component) {
       components_.insert({ent, component});
     }
 
-    void remove(const entity& ent) { components_.erase(ent); }
+    void remove(const Entity& ent) { components_.erase(ent); }
 
     void clear() { components_.clear(); }
 
   private:
-    std::unordered_map<entity, ComponentType> components_;
+    std::unordered_map<Entity, ComponentType> components_;
   };
 
   template <typename DataType> class GpuDataContainer {
@@ -128,11 +128,12 @@ namespace gestalt::foundation {
 
     MaterialData material_data; // todo save as buffer
 
-    DrawContext main_draw_context_;  // TODO replace with draw command buffer
-
     GpuDataContainer<GpuVertexPosition> vertex_positions;
     GpuDataContainer<GpuVertexData> vertex_data;
-    GpuDataContainer<uint32_t> indices;
+    GpuDataContainer<uint32> indices;
+    GpuDataContainer<Meshlet> meshlets;
+    GpuDataContainer<uint32> meshlet_vertices;
+    GpuDataContainer<uint8> meshlet_triangles;
     GpuDataContainer<glm::mat4> model_matrices;
     GpuDataContainer<glm::mat4> light_view_projections;
     GpuDataContainer<GpuDirectionalLight> directional_lights;

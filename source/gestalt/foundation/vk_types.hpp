@@ -50,20 +50,6 @@ namespace gestalt::foundation {
       mutable bool is_dirty = true;
     };
 
-    struct RenderObject {
-      uint32 index_count;
-      uint32 first_index;
-      uint32 vertex_offset;
-
-      uint32 material;
-      glm::mat4 transform;
-    };
-
-    struct DrawContext {
-      std::vector<RenderObject> opaque_surfaces;
-      std::vector<RenderObject> transparent_surfaces;
-    };
-
 }  // namespace gestalt foundation
 
 #define VK_CHECK(x)                                                     \

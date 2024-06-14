@@ -265,7 +265,7 @@ namespace gestalt::graphics {
       std::shared_ptr<TextureHandle> debug_texture_;
 
       bool resize_requested_{false};
-      uint32_t swapchain_image_index_{0};
+      uint32 swapchain_image_index_{0};
       FrameData frames_{};
       bool acquire_next_image();
       void present(VkCommandBuffer cmd);

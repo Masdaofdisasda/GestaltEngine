@@ -11,15 +11,9 @@
 #define VMA_VULKAN_VERSION 1003000
 #include <vma/vk_mem_alloc.h>
 
-#include <VkBootstrap.h>
-
 #include <tracy/Tracy.hpp>
 
-#include "vk_types.hpp"
-
 #include <chrono>
-#include <thread>
-#include <utility>
 
 namespace gestalt {
 
@@ -69,7 +63,7 @@ namespace gestalt {
   }
 
   void Engine::run() {
-    // begin clock
+
     const auto start = std::chrono::system_clock::now();  // todo replace with timetracker
 
     time_tracking_service_.update_timer();
@@ -114,10 +108,7 @@ namespace gestalt {
       FrameMark;
     }
 
-    // get clock again, compare with start clock
     const auto end = std::chrono::system_clock::now();
-
-    // convert to microseconds (integer), and then come back to miliseconds
     const auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     stats_.frametime = elapsed.count() / 1000.f;
   }

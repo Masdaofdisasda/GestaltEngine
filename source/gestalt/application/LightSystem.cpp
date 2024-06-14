@@ -96,14 +96,14 @@ namespace gestalt::application {
       return lightProjection * lightView;
     }
 
-    bool has_dirty_light(const std::unordered_map<entity, LightComponent>& lights) {
+    bool has_dirty_light(const std::unordered_map<Entity, LightComponent>& lights) {
       return std::any_of(
           lights.begin(), lights.end(),
-          [](const std::pair<entity, LightComponent>& light) { return light.second.is_dirty; });
+          [](const std::pair<Entity, LightComponent>& light) { return light.second.is_dirty; });
     }
 
     void LightSystem::update_directional_lights(
-        std::unordered_map<entity, LightComponent>& lights) {
+        std::unordered_map<Entity, LightComponent>& lights) {
       auto& light_data = repository_->get_buffer<LightBuffers>();
 
       repository_->directional_lights.clear();
@@ -137,7 +137,7 @@ namespace gestalt::application {
       vmaUnmapMemory(gpu_->getAllocator(), light_data.dir_light_buffer.allocation);
     }
 
-    void LightSystem::update_point_lights(std::unordered_map<entity, LightComponent>& lights) {
+    void LightSystem::update_point_lights(std::unordered_map<Entity, LightComponent>& lights) {
       auto& light_data = repository_->get_buffer<LightBuffers>();
 
       repository_->point_lights.clear();

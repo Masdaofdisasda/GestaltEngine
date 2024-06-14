@@ -40,11 +40,14 @@ namespace gestalt::application {
               active_camera_->update(delta_time, movement);
     }
 
+    glm::vec4 normalizePlane(glm::vec4 p) { return p / length(glm::vec3(p)); }
+
     void CameraSystem::update() {
       glm::mat4 view = active_camera_->get_view_matrix();
 
       // camera projection
       glm::mat4 projection = glm::perspective(glm::radians(70.f), aspect_, 0.1f, 1000.f);
+      glm::mat4 projection_t = transpose(projection);
 
       // invert the Y direction on projection matrix so that we are more similar
       // to opengl and gltf axis
@@ -68,6 +71,22 @@ namespace gestalt::application {
       const auto scene_uniform_data = static_cast<PerFrameData*>(mapped_data);
       *scene_uniform_data = buffers.data;
       vmaUnmapMemory(gpu_->getAllocator(), buffers.uniform_buffers[frame].allocation);
+
+      meshlet_push_constants.viewProjection = buffers.data.viewproj;
+      meshlet_push_constants.screenWidth = static_cast<float32>(getResolutionWidth());
+      meshlet_push_constants.screenHeight = static_cast<float32>(getResolutionHeight());
+      meshlet_push_constants.znear = 0.1f;
+      meshlet_push_constants.zfar = 1000.0f;
+      const glm::vec4 frustumX = normalizePlane(projection_t[3] + projection_t[0]);
+      const glm::vec4 frustumY = normalizePlane(projection_t[3] + projection_t[1]);
+      meshlet_push_constants.frustum[0] = frustumX.x;
+      meshlet_push_constants.frustum[1] = frustumY.y;
+      meshlet_push_constants.frustum[2] = frustumX.y;
+      meshlet_push_constants.frustum[3] = frustumY.y;
+      //TODO
+      meshlet_push_constants.pyramidWidth = 0;
+      meshlet_push_constants.pyramidHeight = 0;
+      meshlet_push_constants.clusterOcclusionEnabled = 0;
     }
 
     void CameraSystem::cleanup() {

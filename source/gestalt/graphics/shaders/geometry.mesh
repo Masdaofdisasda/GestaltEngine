@@ -1,7 +1,7 @@
 #version 460
 
 #extension GL_GOOGLE_include_directive : require
-#extension GL_NV_mesh_shader : require
+#extension GL_EXT_mesh_shader  : require
 #extension GL_ARB_shader_draw_parameters : require
 #extension GL_EXT_shader_16bit_storage : require
 #extension GL_EXT_shader_8bit_storage: require
@@ -9,14 +9,11 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_float16: require
 
 #include "per_frame_structs.glsl"
+#include "meshlet_structs.glsl"
+#include "math.glsl"
 
-layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
-layout(triangles, max_vertices = 64, max_primitives = 124) out;
-
-in taskNV block
-{
-    uint meshletIndices[32];
-};
+layout(local_size_x = MESH_WGSIZE, local_size_y = 1, local_size_z = 1) in;
+layout(triangles, max_vertices = MESH_MAXVTX, max_primitives = MESH_MAXTRI) out;
 
 layout(location = 0) out vec2 outUV[];
 layout(location = 1) out vec4 outNormal_BiTanX[];
@@ -24,192 +21,118 @@ layout(location = 2) out vec4 outTangent_BiTanY[];
 layout(location = 3) out vec4 outPosition_BiTanZ[];
 layout(location = 4) out flat uint outMaterialIndex[];
 
-struct VertexPosition {
-	vec3 position;
-	float pad;
-}; 
+taskPayloadSharedEXT MeshTaskPayload payload;
 
-struct VertexData {
-    uint8_t nx, ny, nz, nw; // normal
-    uint8_t tx, ty, tz, tw; // tangent
-    float16_t tu, tv;       // tex coords
-	float pad;
-};
-
-struct Meshlet
+layout( push_constant ) uniform constants
 {
-    vec3 center;
-    float radius;
-    int8_t cone_axis[3];
-    int8_t cone_cutoff;
+	mat4 viewProjection;
 
-    uint dataOffset;
-    uint mesh_index;
-    uint8_t vertexCount;
-    uint8_t triangleCount;
+	float screenWidth, screenHeight, znear, zfar; // symmetric projection parameters
+	float frustum[4]; // data for left/right/top/bottom frustum planes
+
+	float pyramidWidth, pyramidHeight; // depth pyramid size in texels
+	int clusterOcclusionEnabled;
+} PushConstants;
+
+layout(set = 4, binding = 0) readonly buffer VertexPositionBuffer{ 
+	VertexPosition vertex_positions[];
 };
 
-struct MeshInstanceDraw {
-    mat4        model;
-    mat4        model_inverse;
-
-    uint        mesh_draw_index; //TODO material index?
-    uint        pad000;
-    uint        pad001;
-    uint        pad002;
+layout(set = 4, binding = 1) readonly buffer VertexDataBuffer{ 
+	VertexData vertex_data[];
 };
 
-struct MeshDrawCommand
-{
-    uint        drawId;
-
-    // VkDrawIndexedIndirectCommand
-    uint        indexCount;
-    uint        instanceCount;
-    uint        firstIndex;
-    uint        vertexOffset;
-    uint        firstInstance;
-
-    // VkDrawMeshTasksIndirectCommandNV
-    uint        taskCount;
-    uint        firstTask;
-};
-
-struct MeshDraw { //only used for flags
-
-    // x = diffuse index, y = roughness index, z = normal index, w = occlusion index.
-    // Occlusion and roughness are encoded in the same texture
-    uvec4       textures;
-    vec4        emissive;
-    vec4        base_color_factor;
-    vec4        metallic_roughness_occlusion_factor;
-
-    uint        flags;
-    float       alpha_cutoff;
-    uint        vertexOffset; // == meshes[meshIndex].vertexOffset, helps data locality in mesh shader
-    uint        meshIndex;
-
-    uint        meshlet_offset;
-    uint        meshlet_count;
-    uint        pad000;
-    uint        pad001;
-
-    vec4        diffuse;
-
-    vec3        specular_colour;
-    float       specular_exp;
-
-    vec4        ambient_colour;
-};
-
-uint DrawFlags_AlphaMask    = 1 << 0;
-uint DrawFlags_DoubleSided  = 1 << 1;
-uint DrawFlags_Transparent  = 1 << 2;
-uint DrawFlags_Phong        = 1 << 3;
-uint DrawFlags_HasNormals   = 1 << 4;
-uint DrawFlags_TexCoords    = 1 << 5;
-uint DrawFlags_HasTangents  = 1 << 6;
-uint DrawFlags_HasJoints    = 1 << 7;
-uint DrawFlags_HasWeights   = 1 << 8;
-uint DrawFlags_AlphaDither  = 1 << 9;
-
-layout(set = 4, binding = 0) readonly buffer VertexPositions { 
-    VertexPosition vertex_positions[];
-};
-
-layout(set = 4, binding = 1) readonly buffer VertexDataBuffer { 
-    VertexData vertex_data[];
-};
-
-// TODO
 layout(set = 4, binding = 2) readonly buffer Meshlets
 {
     Meshlet meshlets[];
 };
 
-layout(set = 4, binding = 3) readonly buffer MeshletData
+layout(set = 4, binding = 3) readonly buffer MeshletVertexBuffer
 {
-    uint meshletData[];
+    int meshletVertices[];
 };
 
-layout(set = 4, binding = 4) readonly buffer VisibleMeshInstances
+layout(set = 4, binding = 4) readonly buffer MeshletIndexBuffer
 {
-    MeshDrawCommand draw_commands[];
-}; 
-
-layout ( std430, set = 4, binding = 5 ) readonly buffer MeshDraws {
-
-    MeshDraw    mesh_draws[];
+    uint8_t meshletIndices[];
 };
 
-layout ( std430, set = 4, binding = 6 ) readonly buffer MeshInstanceDraws {
-
-    MeshInstanceDraw mesh_instance_draws[];
+layout(set = 4, binding = 6) readonly buffer Draws
+{
+    MeshDraw draws[];
 };
-
 
 const float i8_inverse = 1.0 / 127.0;
 
-void main() {
 
-    uint ti = gl_LocalInvocationID.x;
-    uint mi = meshletIndices[gl_WorkGroupID.x];
+void main()
+{
+    uint ti = gl_LocalInvocationIndex;
+    uint mi = payload.meshletIndices[gl_WorkGroupID.x]; // Retrieve meshlet index from payload
 
-    MeshDraw mesh_draw = mesh_draws[ meshlets[mi].mesh_index ];
+    MeshDraw meshDraw = draws[payload.drawId];
 
-    uint vertexCount = uint(meshlets[mi].vertexCount);
-    uint triangleCount = uint(meshlets[mi].triangleCount);
-    uint indexCount = triangleCount * 3;
-
-    uint dataOffset = meshlets[mi].dataOffset;
-    uint vertexOffset = dataOffset;
-    uint indexOffset = dataOffset + vertexCount;
-
-    bool has_normals = (mesh_draw.flags & DrawFlags_HasNormals) != 0;
-    bool has_tangents = (mesh_draw.flags & DrawFlags_HasTangents) != 0;
-
-    uint mesh_instance_index = draw_commands[gl_DrawIDARB].drawId;
-    mat4 model = mesh_instance_draws[mesh_instance_index].model;
-    mat4 model_inverse = mesh_instance_draws[mesh_instance_index].model_inverse;
-
-    for (uint i = ti; i < vertexCount; i += 32) {
+    uint vertexCount = uint(meshlets[mi].vertexCount); // Number of vertices in the meshlet
+    uint triangleCount = uint(meshlets[mi].triangleCount); // Number of triangles in the meshlet
     
-        uint vi = meshletData[vertexOffset + i];
+    // Set the number of vertices and triangles for the meshlet
+    SetMeshOutputsEXT(vertexCount, triangleCount);
+
+    uint vertexOffset = meshlets[mi].vertexOffset;
+    uint indexOffset = meshlets[mi].indexOffset;
+    
+    // Process each vertex in the meshlet
+    for (uint i = ti; i < vertexCount; )
+    {
+        uint meshletIndex = meshletIndices[indexOffset + i];
+        uint vi = meshletVertices[meshletIndex + vertexOffset];
 
         VertexPosition v = vertex_positions[vi];
         VertexData data = vertex_data[vi];
 
-        outUV[i].xy = vec2(data.tu, data.tv);
+        outUV[i] = vec2(data.tu, data.tv);
 
-        vec4 position = vec4(v.position, 1.0f);
-        outPosition_BiTanZ[i].xyz = vec3(model * position);
-        gl_MeshVerticesNV[i].gl_Position = sceneData.viewproj * model * position;
+        vec3 position = rotateQuat(v.position * meshDraw.scale, meshDraw.orientation) + meshDraw.position;
+        outPosition_BiTanZ[i].xyz = position;
+        vec4 clip = PushConstants.viewProjection * vec4(position, 1.0);
+        gl_MeshVerticesEXT[i].gl_Position = clip;
 
-        if (has_normals) {
-            vec3 normal = vec3(int(data.nx), int(data.ny), int(data.nz)) * i8_inverse - 1.0;
-            outNormal_BiTanX[i].xyz = normalize(mat3(model_inverse) * normal);
-        }
+        vec3 normal = vec3(int(data.nx), int(data.ny), int(data.nz)) * i8_inverse - 1.0;
+        normal = normalize(rotateQuat(normal, meshDraw.orientation));
+        outNormal_BiTanX[i].xyz = normal;
 
-        if (has_tangents) {
-            vec3 tangent = vec3(int(data.tx), int(data.ty), int(data.tz)) * i8_inverse - 1.0;
-            outTangent_BiTanY[i].xyz = normalize(mat3(model) * tangent);
+        vec3 tangent = vec3(int(data.tx), int(data.ty), int(data.tz)) * i8_inverse - 1.0;
+        tangent = normalize(rotateQuat(tangent, meshDraw.orientation));
+        outTangent_BiTanY[i].xyz = tangent;
 
-            vec3 bitangent = cross(outNormal_BiTanX[i].xyz, tangent) * (int(data.tw) * i8_inverse - 1.0);
-            outNormal_BiTanX[i].w = bitangent.x;
-            outTangent_BiTanY[i].w = bitangent.y;
-            outPosition_BiTanZ[i].w = bitangent.z;
-        }
+        vec3 bitangent = cross(outNormal_BiTanX[i].xyz, tangent) * (int(data.tw) * i8_inverse  - 1.0 );
+        outNormal_BiTanX[i].w = bitangent.x;
+        outTangent_BiTanY[i].w = bitangent.y;
+        outPosition_BiTanZ[i].w = bitangent.z;
 
-        outMaterialIndex[i] = mesh_instance_draws[mesh_instance_index].mesh_draw_index;
+        outMaterialIndex[i] = meshDraw.materialIndex;
+
+
+	#if MESH_MAXVTX <= MESH_WGSIZE
+		break;
+	#else
+		i += MESH_WGSIZE;
+	#endif
     }
-
-    uint indexGroupCount = (indexCount + 3) / 4;
-
-    for (uint i = ti; i < indexGroupCount; i += 32)
+    
+    // Process each triangle in the meshlet
+    for (uint i = ti; i < triangleCount; )
     {
-        writePackedPrimitiveIndices4x8NV(i * 4, meshletData[indexOffset + i]);
-    }
+        uint offset = indexOffset * 4 + i * 3;
+        uint a = uint(meshletIndices[offset]), b = uint(meshletIndices[offset + 1]), c = uint(meshletIndices[offset + 2]);
 
-    if (ti == 0)
-        gl_PrimitiveCountNV = uint(meshlets[mi].triangleCount);
+        gl_PrimitiveTriangleIndicesEXT[i] = uvec3(a, b, c);
+
+        
+	#if MESH_MAXTRI <= MESH_WGSIZE
+		break;
+	#else
+		i += MESH_WGSIZE;
+	#endif
+    }
 }

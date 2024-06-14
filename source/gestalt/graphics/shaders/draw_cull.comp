@@ -1,0 +1,60 @@
+#version 450
+
+#extension GL_EXT_shader_16bit_storage: require
+#extension GL_EXT_shader_8bit_storage: require
+
+#extension GL_GOOGLE_include_directive: require
+
+#include "meshlet_structs.glsl"
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+layout(push_constant) uniform constants
+{
+	int drawCount;
+} PushConstants;
+
+layout(set = 0, binding = 5) buffer TaskCommands
+{
+	MeshTaskCommand taskCommands[];
+};
+
+layout(set = 0, binding = 6) readonly buffer Draws
+{
+    MeshDraw draws[];
+};
+
+layout(set = 0, binding = 7) buffer CommandCount
+{
+	uint commandCount;
+	uint groupCountX;
+	uint groupCountY;
+	uint groupCountZ;
+};
+
+void main()
+{
+    uint di = gl_GlobalInvocationID.x;
+
+    if (di >= PushConstants.drawCount)
+        return;
+
+    MeshDraw draw = draws[di];
+
+    // Calculate the number of task groups needed to process all meshlets in the draw call
+    uint taskGroups = (draw.meshletCount + TASK_WGSIZE - 1) / TASK_WGSIZE;
+    
+    // Atomically add the number of task groups to the command count and retrieve the starting index   
+    uint dci = atomicAdd(commandCount, taskGroups);
+
+    if (dci + taskGroups <= TASK_WGLIMIT)
+    {
+        // Generate task commands for each task group
+        for (uint i = 0; i < taskGroups; ++i)
+        {
+            taskCommands[dci + i].meshDrawId = di; // Associate task command with draw call ID
+            taskCommands[dci + i].taskOffset = draw.meshletOffset + i * TASK_WGSIZE; // Offset into the meshlet array
+            taskCommands[dci + i].taskCount = min(TASK_WGSIZE, draw.meshletCount - i * TASK_WGSIZE); // Number of meshlets to process
+        }
+    }
+}

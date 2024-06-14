@@ -9,8 +9,8 @@
 
 namespace gestalt::foundation {
 
-    using entity = uint32;
-    constexpr entity root_entity = 0;
+    using Entity = uint32;
+    constexpr Entity root_entity = 0;
     constexpr uint32 invalid_entity = std::numeric_limits<uint32>::max();
     constexpr size_t no_component = std::numeric_limits<size_t>::max();
     constexpr size_t default_material = 0;
@@ -22,14 +22,18 @@ namespace gestalt::foundation {
       int8 cone_axis[3];
       int8 cone_cutoff;
 
-      uint32 data_offset;
-      uint32 mesh_index;
+      uint32 vertex_offset; // offset into the global vertex buffer for this meshlet
+      uint32 index_offset; // offset into the global index buffer for this meshlet
+      uint32 mesh_index;  // index into the mesh or MeshDraw that this meshlet belongs to
       uint8 vertex_count;
       uint8 triangle_count;
     };
 
+  static_assert(sizeof(Meshlet) % 16 == 0);
+
     struct MeshSurface {
-      std::vector<Meshlet> meshlets;
+      uint32 meshlet_offset;
+      uint32 meshlet_count;
 
       uint32 vertex_count;
       uint32 index_count;
@@ -136,8 +140,8 @@ namespace gestalt::foundation {
 
     struct NodeComponent :Component {
       std::string name;
-      entity parent = invalid_entity;
-      std::vector<entity> children;
+      Entity parent = invalid_entity;
+      std::vector<Entity> children;
       AABB bounds;
       bool visible = true;
     };

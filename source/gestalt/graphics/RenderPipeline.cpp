@@ -30,8 +30,10 @@ namespace gestalt::graphics {
       resource_registry_->init(gpu_);
 
       render_passes_.push_back(std::make_shared<DirectionalDepthPass>());
-      render_passes_.push_back(std::make_shared<DeferredPass>());
-      // render_passes_.push_back(std::make_unique<meshlet_pass>());
+      //render_passes_.push_back(std::make_shared<DeferredPass>());
+      render_passes_.push_back(std::make_shared<DrawCullPass>());
+      render_passes_.push_back(std::make_shared<TaskSubmitPass>());
+      render_passes_.push_back(std::make_unique<MeshletPass>());
       render_passes_.push_back(std::make_shared<LightingPass>());
       render_passes_.push_back(std::make_shared<SkyboxPass>());
 
@@ -220,9 +222,6 @@ namespace gestalt::graphics {
         ZoneScopedN("Execute Pass");
         execute(renderpass, cmd);
       }
-
-      repository_->main_draw_context_.opaque_surfaces.clear();
-      repository_->main_draw_context_.transparent_surfaces.clear();
 
       const auto color_image = resource_registry_->attachments_.final_color.image;
       const auto swapchain_image = swapchain_->swapchain_images[swapchain_image_index_];

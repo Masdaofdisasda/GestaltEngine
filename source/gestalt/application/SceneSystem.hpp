@@ -47,14 +47,14 @@ namespace gestalt::application {
       void prepare() override;
       void update() override;
       void cleanup() override;
-      void write_material(PbrMaterial& material, uint32_t material_id);
+      void write_material(PbrMaterial& material, uint32 material_id);
     };
 
     class LightSystem final : public SceneSystem, public NonCopyable<LightSystem> {
 
       glm::mat4 calculate_sun_view_proj(glm::vec3 direction) const;
-      void update_directional_lights(std::unordered_map<entity, LightComponent>& lights);
-      void update_point_lights(std::unordered_map<entity, LightComponent>& lights);
+      void update_directional_lights(std::unordered_map<Entity, LightComponent>& lights);
+      void update_point_lights(std::unordered_map<Entity, LightComponent>& lights);
 
     public:
       void prepare() override;
@@ -75,10 +75,10 @@ namespace gestalt::application {
     };
 
     class TransformSystem final : public SceneSystem, public NonCopyable<TransformSystem> {
-      void mark_children_dirty(entity entity);
-      void mark_as_dirty(entity entity);
-      void update_aabb(entity entity, const glm::mat4& parent_transform);
-      void mark_parent_dirty(entity entity);
+      void mark_children_dirty(Entity entity);
+      void mark_as_dirty(Entity entity);
+      void update_aabb(Entity entity, const glm::mat4& parent_transform);
+      void mark_parent_dirty(Entity entity);
 
     public:
       static glm::mat4 get_model_matrix(const TransformComponent& transform);
@@ -88,13 +88,14 @@ namespace gestalt::application {
       void cleanup() override;
     };
 
-    class RenderSystem final : public SceneSystem, public NonCopyable<RenderSystem> {
+    class MeshSystem final : public SceneSystem, public NonCopyable<MeshSystem> {
       size_t meshes_ = 0;
-      void traverse_scene(entity entity, const glm::mat4& parent_transform);
+      std::vector<MeshDraw> mesh_draws_{getMaxMeshes()};
+      void traverse_scene(Entity entity, const glm::mat4& parent_transform);
+      void upload_mesh();
 
     public:
       void prepare() override;
-      void upload_mesh();
       void update() override;
       void cleanup() override;
     };

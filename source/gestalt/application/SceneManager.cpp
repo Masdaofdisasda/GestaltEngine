@@ -42,7 +42,7 @@ namespace gestalt::application {
     camera_system_->init(gpu, resource_manager, descriptor_util_factory, repository);
     transform_system_ = std::make_unique<TransformSystem>();
     transform_system_->init(gpu, resource_manager, descriptor_util_factory, repository);
-    render_system_ = std::make_unique<RenderSystem>();
+    render_system_ = std::make_unique<MeshSystem>();
     render_system_->init(gpu, resource_manager, descriptor_util_factory, repository);
   }
 
@@ -83,11 +83,11 @@ namespace gestalt::application {
                                        const size_t& node_offset) {
       for (int i = 0; i < nodes.size(); i++) {
         fastgltf::Node& node = nodes[i];
-        entity parent_entity = node_offset + i;
+        Entity parent_entity = node_offset + i;
         auto& scene_object = repository_->scene_graph.get(parent_entity).value().get();
 
         for (auto& c : node.children) {
-          entity child_entity = node_offset + c;
+          Entity child_entity = node_offset + c;
           auto& child = repository_->scene_graph.get(child_entity).value().get();
           scene_object.children.push_back(child_entity);
           child.parent = parent_entity;
@@ -131,11 +131,11 @@ namespace gestalt::application {
       repository_->scene_graph.clear();
     }
 
-    entity ComponentFactory::create_entity() { return next_entity_id_++; }
+    Entity ComponentFactory::create_entity() { return next_entity_id_++; }
 
-    std::pair<entity, std::reference_wrapper<NodeComponent>>
+    std::pair<Entity, std::reference_wrapper<NodeComponent>>
     ComponentFactory::create_entity_node(std::string node_name) {
-      const entity new_entity = create_entity();
+      const Entity new_entity = create_entity();
 
       if (node_name.empty()) {
         node_name = "entity_" + std::to_string(new_entity);
@@ -152,7 +152,7 @@ namespace gestalt::application {
       return std::make_pair(new_entity, std::ref(repository_->scene_graph.get(new_entity)->get()));
     }
 
-    void ComponentFactory::create_transform_component(const entity entity,
+    void ComponentFactory::create_transform_component(const Entity entity,
                                                                const glm::vec3& position,
                                                                const glm::quat& rotation,
                                                                const float& scale) const {
@@ -161,7 +161,7 @@ namespace gestalt::application {
       transform.matrix = repository_->model_matrices.add(glm::mat4(1.0));
     }
 
-    void ComponentFactory::update_transform_component(const entity entity,
+    void ComponentFactory::update_transform_component(const Entity entity,
                                                                const glm::vec3& position,
                                                                const glm::quat& rotation,
                                                                const float& scale) {
@@ -182,24 +182,24 @@ namespace gestalt::application {
       return repository_->scene_graph.get(get_root_entity()).value();
     }
 
-    void ComponentFactory::add_mesh_component(const entity entity,
+    void ComponentFactory::add_mesh_component(const Entity entity,
                                                        const size_t mesh_index) {
       assert(entity != invalid_entity);
 
       repository_->mesh_components.add(entity, MeshComponent{{true}, mesh_index});
     }
 
-    void ComponentFactory::add_camera_component(const entity entity,
+    void ComponentFactory::add_camera_component(const Entity entity,
                                                          const CameraComponent& camera) {
       assert(entity != invalid_entity);
 
       repository_->camera_components.add(entity, camera);
     }
 
-    entity ComponentFactory::create_directional_light(const glm::vec3& color,
+    Entity ComponentFactory::create_directional_light(const glm::vec3& color,
                                                                const float intensity,
                                                                const glm::vec3& direction,
-                                                               entity parent) {
+                                                               Entity parent) {
       auto [entity, node] = create_entity_node("directional_light");
       link_entity_to_parent(entity, parent);
 
@@ -220,9 +220,9 @@ namespace gestalt::application {
       return entity;
     }
 
-    entity ComponentFactory::create_spot_light(
+    Entity ComponentFactory::create_spot_light(
         const glm::vec3& color, const float intensity, const glm::vec3& direction,
-        const glm::vec3& position, const float innerCone, const float outerCone, entity parent) {
+        const glm::vec3& position, const float innerCone, const float outerCone, Entity parent) {
       auto [entity, node] = create_entity_node("spot_light");
       link_entity_to_parent(entity, parent);
 
@@ -246,9 +246,9 @@ namespace gestalt::application {
       return entity;
     }
 
-    entity ComponentFactory::create_point_light(const glm::vec3& color,
+    Entity ComponentFactory::create_point_light(const glm::vec3& color,
                                                          const float intensity,
-                                                         const glm::vec3& position, entity parent) {
+                                                         const glm::vec3& position, Entity parent) {
       auto [entity, node] = create_entity_node("point_light");
       link_entity_to_parent(entity, parent);
 
@@ -270,7 +270,7 @@ namespace gestalt::application {
       return entity;
     }
 
-    void ComponentFactory::link_entity_to_parent(const entity child, const entity parent) {
+    void ComponentFactory::link_entity_to_parent(const Entity child, const Entity parent) {
       if (child == parent) {
         return;
       }
@@ -284,7 +284,7 @@ namespace gestalt::application {
       }
     }
 
-    void SceneManager::add_to_root(entity entity, NodeComponent& node) {
+    void SceneManager::add_to_root(Entity entity, NodeComponent& node) {
       assert(entity != invalid_entity);
       get_root_node().children.push_back(entity);
       node.parent = get_root_entity();

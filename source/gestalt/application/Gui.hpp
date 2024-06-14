@@ -33,7 +33,7 @@ namespace gestalt::application {
       uint32 guizmo_operation_ = 0;
 
       action current_action_ = action::none;
-      entity selected_entity_ = invalid_entity;
+      Entity selected_entity_ = invalid_entity;
 
       bool show_scene_hierarchy_ = true;
       bool show_light_adapt_settings_ = false;
@@ -49,7 +49,7 @@ namespace gestalt::application {
       void stats();
       void lights();
       void scene_graph();
-      void display_scene_hierarchy(entity entity);
+      void display_scene_hierarchy(Entity entity);
       void show_transform_component(NodeComponent& node, TransformComponent& transform);
       void show_mesh_component(MeshComponent& mesh_component);
       void show_light_component(LightComponent& light, TransformComponent& transform);

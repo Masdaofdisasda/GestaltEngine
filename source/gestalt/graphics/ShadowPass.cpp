@@ -23,7 +23,7 @@ namespace gestalt::graphics {
                           .add_shader(ShaderStage::kFragment, "shadow_depth.frag.spv")
                           .add_image_attachment(registry_->attachments_.shadow_map,
                                                 ImageUsageType::kWrite, 0, ImageClearOperation::kClear)
-                .set_push_constant_range(sizeof(GpuDrawPushConstants), VK_SHADER_STAGE_VERTEX_BIT)
+                .set_push_constant_range(sizeof(MeshletPushConstants), VK_SHADER_STAGE_VERTEX_BIT)
                           .build();
 
       create_pipeline_layout();
@@ -35,7 +35,7 @@ namespace gestalt::graphics {
                       .set_multisampling_none()
                       .disable_blending()
                       .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-                      .build_pipeline(gpu_->getDevice());
+                      .build_graphics_pipeline(gpu_->getDevice());
     }
 
     void DirectionalDepthPass::destroy() {  }
@@ -54,30 +54,15 @@ namespace gestalt::graphics {
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
-      VkDescriptorSet descriptorSets[] = {per_frame_buffers.descriptor_sets[frame],
-                                          light_data.descriptor_set, mesh_buffers.descriptor_set};
+      VkDescriptorSet descriptorSets[] = {per_frame_buffers.descriptor_sets[frame], light_data.descriptor_set,
+             mesh_buffers.descriptor_sets[frame]};
 
       vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 3,
                               descriptorSets, 0, nullptr);
       vkCmdSetViewport(cmd, 0, 1, &viewport_);
       vkCmdSetScissor(cmd, 0, 1, &scissor_);
 
-      for (auto& r : repository_->main_draw_context_.opaque_surfaces) {
-        GpuDrawPushConstants push_constants;
-        push_constants.worldMatrix = r.transform;
-        push_constants.material_id = r.material;
-        vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0,
-                           sizeof(GpuDrawPushConstants), &push_constants);
-        vkCmdDrawIndexed(cmd, r.index_count, 1, r.first_index, 0, 0);
-      }
-      for (auto& r : repository_->main_draw_context_.transparent_surfaces) {
-        GpuDrawPushConstants push_constants;
-        push_constants.worldMatrix = r.transform;
-        push_constants.material_id = r.material;
-        vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0,
-                           sizeof(GpuDrawPushConstants), &push_constants);
-        vkCmdDrawIndexed(cmd, r.index_count, 1, r.first_index, 0, 0);
-      }
+      // draw all meshes
 
       vkCmdEndRendering(cmd);
     }

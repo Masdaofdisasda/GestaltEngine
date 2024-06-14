@@ -2,7 +2,7 @@
 
 namespace gestalt::application {
 
-  void MaterialSystem::write_material(PbrMaterial& material, const uint32_t material_id) {
+  void MaterialSystem::write_material(PbrMaterial& material, const uint32 material_id) {
     writer_->clear();
 
     std::vector<VkDescriptorImageInfo> imageInfos
@@ -17,7 +17,7 @@ namespace gestalt::application {
            {material.textures.occlusion_sampler, material.textures.occlusion_image.imageView,
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
 
-    const uint32_t texture_start = imageInfos.size() * material_id;
+    const uint32 texture_start = imageInfos.size() * material_id;
     writer_->write_image_array(4, imageInfos, texture_start);
 
     writer_->update_set(gpu_->getDevice(), repository_->material_data.resource_set);

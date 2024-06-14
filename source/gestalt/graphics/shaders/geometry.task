@@ -1,23 +1,100 @@
-#version 460
+#version 450
 
-#extension GL_NV_mesh_shader : require
+#extension GL_GOOGLE_include_directive : require
+#extension GL_EXT_mesh_shader : require
+#extension GL_EXT_shader_16bit_storage: require
+#extension GL_EXT_shader_8bit_storage: require
 
-layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+#include "meshlet_structs.glsl"
+#include "math.glsl"
 
-out taskNV block
+layout(local_size_x = TASK_WGSIZE, local_size_y = 1, local_size_z = 1) in;
+
+taskPayloadSharedEXT MeshTaskPayload payload;
+
+layout( push_constant ) uniform constants
 {
-    uint meshletIndices[32];
+	mat4 viewProjection;
+
+	float screenWidth, screenHeight, znear, zfar; // symmetric projection parameters
+	float frustum[4]; // data for left/right/top/bottom frustum planes
+
+	float pyramidWidth, pyramidHeight; // depth pyramid size in texels
+	int clusterOcclusionEnabled;
+} PushConstants;
+
+layout(set = 4, binding = 2) readonly buffer Meshlets
+{
+	Meshlet meshlets[];
 };
 
-void main() {
+layout(set = 4, binding = 5) readonly buffer TaskCommands
+{
+	MeshTaskCommand taskCommands[];
+};
 
-    uint ti = gl_LocalInvocationID.x;
-    uint mgi = gl_WorkGroupID.x;
+layout(set = 4, binding = 6) readonly buffer Draws
+{
+	MeshDraw draws[];
+};
 
-    uint mi = mgi * 32 + ti;
+shared int sharedCount;
 
-    meshletIndices[ti] = mi;
+void main()
+{
+    MeshTaskCommand command = taskCommands[gl_WorkGroupID.x * 64 + gl_WorkGroupID.y];
+    uint drawId = command.meshDrawId;
+    MeshDraw meshDraw = draws[drawId];
 
-    if (ti == 0)
-        gl_TaskCountNV = 32;
+    uint taskCount = command.taskCount; // Number of meshlets to process
+
+    uint mgi = gl_LocalInvocationID.x;
+    uint mi = mgi + command.taskOffset; // Calculate the meshlet index
+
+    // Initialize sharedCount to 0 and synchronize workgroup
+    sharedCount = 0;
+    barrier();  // Synchronize all threads in the workgroup
+    
+    // Calculate the world-space position and radius of the meshlet
+    vec3 center = rotateQuat(meshlets[mi].center, meshDraw.orientation) * meshDraw.scale + meshDraw.position;
+    float radius = meshlets[mi].radius * meshDraw.scale;
+    vec3 cone_axis = rotateQuat(vec3(int(meshlets[mi].cone_axis[0]) / 127.0, int(meshlets[mi].cone_axis[1]) / 127.0, int(meshlets[mi].cone_axis[2]) / 127.0), meshDraw.orientation);
+    float cone_cutoff = int(meshlets[mi].cone_cutoff) / 127.0;
+    
+    // Perform visibility checks
+    bool valid = mgi < taskCount;
+    bool visible = valid;
+
+    // backface cone culling
+    visible = visible && !coneCull(center, radius, cone_axis, cone_cutoff, vec3(0, 0, 0));
+    
+    // view frustum culling
+    visible = visible && center.z * PushConstants.frustum[1] - abs(center.x) * PushConstants.frustum[0] > -radius;
+    visible = visible && center.z * PushConstants.frustum[3] - abs(center.y) * PushConstants.frustum[2] > -radius;
+    visible = visible && center.z + radius > PushConstants.znear && center.z - radius < PushConstants.zfar;
+    
+    // For debugging purposes, force visibility to true
+    visible = valid;
+
+    if (visible)
+    {
+        uint index = atomicAdd(sharedCount, 1);
+        payload.meshletIndices[index] = mi;
+    }
+
+    payload.drawId = drawId;
+
+    barrier(); // for sharedCount
+
+    bool debug = false;
+
+    if (debug) {
+	    payload.drawId = drawId;
+	    payload.meshletIndices[gl_LocalInvocationID.x] = mi;
+
+	    EmitMeshTasksEXT(taskCount, 1, 1);
+    } else {
+        EmitMeshTasksEXT(sharedCount, 1, 1);
+    }
+
 }

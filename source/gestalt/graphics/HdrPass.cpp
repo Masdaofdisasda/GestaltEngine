@@ -34,7 +34,7 @@ namespace gestalt::graphics {
                       .set_multisampling_none()
                       .disable_blending()
                       .disable_depthtest()
-                      .build_pipeline(gpu_->getDevice());
+                      .build_graphics_pipeline(gpu_->getDevice());
     }
 
     void BrightPass::execute(VkCommandBuffer cmd) {
@@ -95,7 +95,7 @@ namespace gestalt::graphics {
                       .set_multisampling_none()
                       .disable_blending()
                       .disable_depthtest()
-                      .build_pipeline(gpu_->getDevice());
+                      .build_graphics_pipeline(gpu_->getDevice());
     }
 
     void BloomBlurPass::execute(VkCommandBuffer cmd) {
@@ -174,7 +174,7 @@ namespace gestalt::graphics {
                       .set_multisampling_none()
                       .disable_blending()
                       .disable_depthtest()
-                      .build_pipeline(gpu_->getDevice());
+                      .build_graphics_pipeline(gpu_->getDevice());
     }
 
     void LuminancePass::execute(VkCommandBuffer cmd) {
@@ -235,7 +235,7 @@ namespace gestalt::graphics {
                       .set_multisampling_none()
                       .disable_blending()
                       .disable_depthtest()
-                      .build_pipeline(gpu_->getDevice());
+                      .build_graphics_pipeline(gpu_->getDevice());
     }
 
     void LuminanceDownscalePass::execute(VkCommandBuffer cmd) {
@@ -309,7 +309,7 @@ namespace gestalt::graphics {
                       .set_multisampling_none()
                       .disable_blending()
                       .disable_depthtest()
-                      .build_pipeline(gpu_->getDevice());
+                      .build_graphics_pipeline(gpu_->getDevice());
     }
 
     void LightAdaptationPass::destroy() {
@@ -398,7 +398,7 @@ namespace gestalt::graphics {
                       .set_multisampling_none()
                       .disable_blending()
                       .disable_depthtest()
-                      .build_pipeline(gpu_->getDevice());
+                      .build_graphics_pipeline(gpu_->getDevice());
     }
 
     void TonemapPass::execute(VkCommandBuffer cmd) {

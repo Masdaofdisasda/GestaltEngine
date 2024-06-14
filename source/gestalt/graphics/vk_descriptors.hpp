@@ -93,6 +93,8 @@ namespace gestalt::graphics {
     void cleanup(VkDevice device);
     void advance_frame();
     [[nodiscard]] uint8 get_current_frame_index() const;
+    [[nodiscard]] uint8 get_previous_frame_index() const;
+    [[nodiscard]] uint8 get_next_frame_index() const;
     FrameResources& get_current_frame();
 
   private:

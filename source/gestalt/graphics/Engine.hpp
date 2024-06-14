@@ -1,13 +1,12 @@
 ﻿#pragma once
 
-#include "Gui.hpp"
-#include "vk_types.hpp"
-#include "SceneManager.hpp"
-#include "Window.hpp"
-#include "RenderPipeline.hpp"
-#include "InputSystem.hpp"
 #include "Gpu.hpp"
+#include "Gui.hpp"
+#include "InputSystem.hpp"
+#include "RenderPipeline.hpp"
+#include "SceneManager.hpp"
 #include "TmeTrackingService.hpp"
+#include "Window.hpp"
 
 namespace gestalt {
   class Engine {

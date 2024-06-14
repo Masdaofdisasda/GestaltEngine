@@ -4,7 +4,7 @@
 
 namespace gestalt {
   namespace graphics {
-    VkPipeline PipelineBuilder::build_pipeline(VkDevice device) {
+    VkPipeline PipelineBuilder::build_graphics_pipeline(VkDevice device) {
       // make viewport state from our stored viewport and scissor.
       // at the moment we wont support multiple viewports or scissors
       VkPipelineViewportStateCreateInfo viewportState = {};
@@ -73,6 +73,33 @@ namespace gestalt {
       return newPipeline;
     }
 
+    VkPipeline PipelineBuilder::build_compute_pipeline(VkDevice device) const {
+      // Create the compute pipeline create info
+      VkComputePipelineCreateInfo pipelineInfo = {};
+      pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+      pipelineInfo.pNext = nullptr;
+
+      // Set the compute shader stage
+      if (_shaderStages.size() != 1 || _shaderStages[0].stage != VK_SHADER_STAGE_COMPUTE_BIT) {
+        fmt::println("Invalid shader stages for compute pipeline");
+        return VK_NULL_HANDLE;
+      }
+
+      pipelineInfo.stage = _shaderStages[0];
+      pipelineInfo.layout = _pipelineLayout;
+
+      // Create the compute pipeline
+      VkPipeline newPipeline;
+      if (vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &newPipeline)
+          != VK_SUCCESS) {
+        fmt::println("Failed to create compute pipeline");
+        return VK_NULL_HANDLE;  // failed to create compute pipeline
+      }
+
+      return newPipeline;
+    }
+
+
     PipelineBuilder& PipelineBuilder::set_shaders(VkShaderModule vertexShader,
                                                   VkShaderModule fragmentShader) {
       _shaderStages.clear();
@@ -82,6 +109,15 @@ namespace gestalt {
 
       _shaderStages.push_back(
           vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, fragmentShader));
+
+      return *this;
+    }
+
+    PipelineBuilder& PipelineBuilder::set_shaders(VkShaderModule computeShader) {
+      _shaderStages.clear();
+
+      _shaderStages.push_back(
+          vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_COMPUTE_BIT, computeShader));
 
       return *this;
     }

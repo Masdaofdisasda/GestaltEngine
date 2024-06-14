@@ -103,21 +103,49 @@ namespace gestalt::graphics {
     }
 
     PipelineBuilder RenderPass::create_pipeline() {
-      VkShaderModule vertex_shader;
-      VkShaderModule fragment_shader;
-      std::vector<VkFormat> color_formats;
+      VkShaderModule vertex_shader = VK_NULL_HANDLE;
+      VkShaderModule fragment_shader = VK_NULL_HANDLE;
+      VkShaderModule mesh_shader = VK_NULL_HANDLE;
+      VkShaderModule task_shader = VK_NULL_HANDLE;
+      VkShaderModule compute_shader = VK_NULL_HANDLE;
 
-      // add vertex and fragment shaders
       for (auto& shader_dependency : dependencies_.shaders) {
-        if (shader_dependency.stage == ShaderStage::kVertex) {
-          vertex_shader = registry_->get_shader(shader_dependency);
-        } else if (shader_dependency.stage == ShaderStage::kFragment) {
-          fragment_shader = registry_->get_shader(shader_dependency);
+        switch (shader_dependency.stage) {
+          case ShaderStage::kVertex:
+            vertex_shader = registry_->get_shader(shader_dependency);
+            break;
+          case ShaderStage::kFragment:
+            fragment_shader = registry_->get_shader(shader_dependency);
+            break;
+          case ShaderStage::kMesh:
+            mesh_shader = registry_->get_shader(shader_dependency);
+            break;
+          case ShaderStage::kTask:
+            task_shader = registry_->get_shader(shader_dependency);
+            break;
+          case ShaderStage::kCompute:
+                          compute_shader = registry_->get_shader(shader_dependency);
+            break;
+          default:
+            break;
         }
       }
-      auto builder = PipelineBuilder().set_shaders(vertex_shader, fragment_shader);
+
+      auto builder = PipelineBuilder();
+
+      if (vertex_shader != VK_NULL_HANDLE && fragment_shader != VK_NULL_HANDLE) {
+        builder.set_shaders(vertex_shader, fragment_shader);
+      } else if (mesh_shader != VK_NULL_HANDLE && task_shader != VK_NULL_HANDLE
+                 && fragment_shader != VK_NULL_HANDLE) {
+        builder.set_shaders(task_shader, mesh_shader, fragment_shader);
+      } else if (compute_shader != VK_NULL_HANDLE) {
+        builder.set_shaders(compute_shader);
+      } else {
+        throw std::runtime_error("Required shaders are not available for pipeline creation.");
+      }
 
       // add color and depth attachments
+      std::vector<VkFormat> color_formats;
       for (auto& attachment : dependencies_.image_attachments) {
         if (attachment.usage == ImageUsageType::kWrite
             || attachment.usage == ImageUsageType::kDepthStencilRead) {

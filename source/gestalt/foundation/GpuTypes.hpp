@@ -29,6 +29,14 @@ namespace gestalt::foundation {
     [[nodiscard]] virtual VkPhysicalDeviceProperties getPhysicalDeviceProperties() const = 0;
 
     virtual void immediateSubmit(std::function<void(VkCommandBuffer cmd)> function) const = 0;
+    virtual void drawMeshTasksIndirectCount(VkCommandBuffer commandBuffer, VkBuffer buffer,
+                                            VkDeviceSize offset, VkBuffer countBuffer,
+                                            VkDeviceSize countBufferOffset, uint32_t maxDrawCount,
+                                            uint32_t stride)
+        = 0;
+    virtual void drawMeshTasksIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer,
+                                              VkDeviceSize offset, uint32_t drawCount, uint32_t stride) const
+        = 0;
   };
 
   class IResourceManager {

@@ -17,27 +17,27 @@ namespace gestalt::application {
       std::shared_ptr<IResourceManager> resource_manager_;
       std::shared_ptr<Repository> repository_;
 
-      entity next_entity_id_ = 0;
+      Entity next_entity_id_ = 0;
 
     public:
       void init(const std::shared_ptr<IResourceManager>& resource_manager,
                 const std::shared_ptr<Repository>& repository);
 
-      entity create_entity();
-      std::pair<entity, std::reference_wrapper<NodeComponent>> create_entity_node(
+      Entity create_entity();
+      std::pair<Entity, std::reference_wrapper<NodeComponent>> create_entity_node(
           std::string node_name = "");
-      void add_mesh_component(entity entity, size_t mesh_index);
-      void add_camera_component(entity entity, const CameraComponent& camera);
+      void add_mesh_component(Entity entity, size_t mesh_index);
+      void add_camera_component(Entity entity, const CameraComponent& camera);
 
-      entity create_directional_light(const glm::vec3& color, const float intensity,
-                                      const glm::vec3& direction, entity parent = 0);
-      entity create_spot_light(const glm::vec3& color, const float intensity,
+      Entity create_directional_light(const glm::vec3& color, const float intensity,
+                                      const glm::vec3& direction, Entity parent = 0);
+      Entity create_spot_light(const glm::vec3& color, const float intensity,
                                const glm::vec3& direction, const glm::vec3& position,
-                               const float innerCone, const float outerCone, entity parent = 0);
-      entity create_point_light(const glm::vec3& color, const float intensity,
-                                const glm::vec3& position, entity parent = 0);
+                               const float innerCone, const float outerCone, Entity parent = 0);
+      Entity create_point_light(const glm::vec3& color, const float intensity,
+                                const glm::vec3& position, Entity parent = 0);
 
-      void link_entity_to_parent(entity child, entity parent);
+      void link_entity_to_parent(Entity child, Entity parent);
       void update_transform_component(unsigned entity, const glm::vec3& position,
                                       const glm::quat& rotation = glm::quat(0.f, 0.f, 0.f, 0.f),
                                       const float& scale = 1.f);
@@ -85,10 +85,14 @@ namespace gestalt::application {
       static void optimize_mesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices);
       void simplify_mesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices);
       std::vector<Meshlet> generate_meshlets(std::vector<GpuVertexPosition>& vertices,
-                                             std::vector<uint32_t>& indices);
+                                             std::vector<uint32_t>& indices,
+                                             std::vector<uint32>& meshlet_vertices,
+                                             std::vector<uint8>& meshlet_indices);
       MeshSurface create_surface(std::vector<GpuVertexPosition>& vertex_positions,
                                  std::vector<GpuVertexData>& vertex_data,
-                                 std::vector<uint32_t>& indices, std::vector<Meshlet>&& meshlets);
+                                 std::vector<uint32_t>& indices, std::vector<Meshlet>&& meshlets,
+                                 std::vector<uint32>&& meshlet_vertices,
+                                 std::vector<uint8>&& meshlet_indices) const;
       size_t create_mesh(std::vector<MeshSurface> surfaces, const std::string& name) const;
       void add_material_component(MeshSurface& surface, const size_t material) const;
       void import_meshes(fastgltf::Asset& gltf, size_t material_offset);
@@ -123,7 +127,7 @@ namespace gestalt::application {
       void create_entities(std::vector<fastgltf::Node> nodes, const size_t& mesh_offset);
       void build_hierarchy(std::vector<fastgltf::Node> nodes, const size_t& node_offset);
       void link_orphans_to_root();
-      entity root_entity_ = 0;
+      Entity root_entity_ = 0;
 
       void load_scene(const std::string& path);
       std::string scene_path_;
@@ -141,6 +145,6 @@ namespace gestalt::application {
       ComponentFactory& get_component_factory() const { return *component_factory_; }
       NodeComponent& get_root_node();
       uint32 get_root_entity() { return root_entity_; }
-      void add_to_root(entity entity, NodeComponent& node);
+      void add_to_root(Entity entity, NodeComponent& node);
     };
 }  // namespace gestalt::application

@@ -425,8 +425,8 @@ namespace gestalt::application {
 
         // std::vector<std::pair<entity, light_component&>> lights;
 
-        std::vector<std::pair<entity, std::reference_wrapper<LightComponent>>> lights;
-        std::vector<std::pair<entity, std::reference_wrapper<LightComponent>>> temp
+        std::vector<std::pair<Entity, std::reference_wrapper<LightComponent>>> lights;
+        std::vector<std::pair<Entity, std::reference_wrapper<LightComponent>>> temp
             = repository_->light_components.asVector();
         for (auto& [ent, comp] : temp) {
           if (comp.get().type == LightType::kDirectional && currentOption == 0) {
@@ -675,7 +675,7 @@ namespace gestalt::application {
       }
     }
 
-    void Gui::display_scene_hierarchy(const entity entity) {
+    void Gui::display_scene_hierarchy(const Entity entity) {
       const auto& node_optional = repository_->scene_graph.get(entity);
       if (node_optional.has_value()) {
         NodeComponent& node = node_optional.value().get();
@@ -999,7 +999,7 @@ namespace gestalt::application {
 
       // Child window for the scrollable scene hierarchy
       if (ImGui::BeginChild("HierarchyTree", childSize, true)) {
-        constexpr entity root_entity = 0;  // TODO get root entity
+        constexpr Entity root_entity = 0;  // TODO get root entity
         if (selected_entity_ == invalid_entity) {
           selected_entity_ = root_entity;
         }

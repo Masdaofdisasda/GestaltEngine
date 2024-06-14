@@ -33,36 +33,49 @@ namespace gestalt::graphics {
     window->create_surface(instance, &surface);
 
     VkPhysicalDeviceFeatures features10{};
-    features10.fillModeNonSolid = true;
-    features10.shaderInt16 = true;
+    features10.fillModeNonSolid = VK_TRUE;
+    features10.shaderInt16 = VK_TRUE;
 
     VkPhysicalDeviceVulkan11Features features11{};
-    features11.uniformAndStorageBuffer16BitAccess = true;
-    features11.storageBuffer16BitAccess = true;
-    features11.shaderDrawParameters = true;
+    features11.uniformAndStorageBuffer16BitAccess = VK_TRUE;
+    features11.storageBuffer16BitAccess = VK_TRUE;
+    features11.shaderDrawParameters = VK_TRUE;
 
     VkPhysicalDeviceVulkan12Features features12{};
-    features12.bufferDeviceAddress = true;
-    features12.descriptorIndexing = true;
-    features12.uniformAndStorageBuffer8BitAccess = true;
-    features12.shaderFloat16 = true;
-    features12.shaderInt8 = true;
-    features12.shaderSampledImageArrayNonUniformIndexing = true;
-    features12.shaderStorageBufferArrayNonUniformIndexing = true;
-    features12.descriptorBindingVariableDescriptorCount = true;
-    features12.runtimeDescriptorArray = true;
+    features12.bufferDeviceAddress = VK_TRUE;
+    features12.descriptorIndexing = VK_TRUE;
+    features12.uniformAndStorageBuffer8BitAccess = VK_TRUE;
+    features12.storageBuffer8BitAccess = VK_TRUE;
+    features12.shaderFloat16 = VK_TRUE;
+    features12.shaderInt8 = VK_TRUE;
+    features12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+    features12.shaderStorageBufferArrayNonUniformIndexing = VK_TRUE;
+    features12.descriptorBindingVariableDescriptorCount = VK_TRUE;
+    features12.runtimeDescriptorArray = VK_TRUE;
 
     VkPhysicalDeviceVulkan13Features features13{};
-    features13.dynamicRendering = true;
-    features13.synchronization2 = true;
+    features13.dynamicRendering = VK_TRUE;
+    features13.synchronization2 = VK_TRUE;
+    features13.maintenance4 = VK_TRUE;
 
-    VkPhysicalDeviceMeshShaderFeaturesNV mesh_shader_features{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_NV};
-    mesh_shader_features.taskShader = true;
-    mesh_shader_features.meshShader = true;
+    VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT,
+        .taskShader = VK_TRUE,
+        .meshShader = VK_TRUE,
+        .multiviewMeshShader = VK_FALSE,
+        .primitiveFragmentShadingRateMeshShader = VK_TRUE,
+        .meshShaderQueries = VK_FALSE};
+
+    VkPhysicalDeviceFragmentShadingRateFeaturesKHR shading_rate_features{};
+    shading_rate_features.sType
+        = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR;
+    shading_rate_features.primitiveFragmentShadingRate = VK_TRUE;
+
+    // Link the structures together
+    mesh_shader_features.pNext = &shading_rate_features;
 
     std::vector extensions = {VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
-                              VK_NV_MESH_SHADER_EXTENSION_NAME, VK_EXT_MESH_SHADER_EXTENSION_NAME};
+                              VK_EXT_MESH_SHADER_EXTENSION_NAME};
 
     vkb::PhysicalDeviceSelector selector{vkb_inst};
     auto device_ret = selector.set_minimum_version(1, 3)
@@ -121,6 +134,12 @@ namespace gestalt::graphics {
       throw std::runtime_error("Failed to load vkCmdDrawMeshTasksIndirectCountEXT");
     }
 
+    vkCmdDrawMeshTasksIndirectEXT = reinterpret_cast<PFN_vkCmdDrawMeshTasksIndirectEXT>(
+        vkGetDeviceProcAddr(device, "vkCmdDrawMeshTasksIndirectEXT"));
+    if (!vkCmdDrawMeshTasksIndirectEXT) {
+           throw std::runtime_error("Failed to load vkCmdDrawMeshTasksIndirectEXT");
+    }
+
     // create immediate submit resources
     VkFenceCreateInfo fence_create_info = vkinit::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
     VK_CHECK(vkCreateFence(getDevice(), &fence_create_info, nullptr, &immediate_submit_fence_));
@@ -153,6 +172,18 @@ namespace gestalt::graphics {
 
     VK_CHECK(vkQueueSubmit2(getGraphicsQueue(), 1, &submit, immediate_submit_fence_));
     VK_CHECK(vkWaitForFences(getDevice(), 1, &immediate_submit_fence_, VK_TRUE, UINT64_MAX));
+  }
+
+  void Gpu::drawMeshTasksIndirectCount(VkCommandBuffer commandBuffer, VkBuffer buffer,
+      VkDeviceSize offset, VkBuffer countBuffer, VkDeviceSize countBufferOffset,
+      uint32_t maxDrawCount, uint32_t stride) {
+    vkCmdDrawMeshTasksIndirectCountEXT(commandBuffer, buffer, offset, countBuffer,
+                                       countBufferOffset, maxDrawCount, stride);
+  }
+
+  void Gpu::drawMeshTasksIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer,
+      VkDeviceSize offset, uint32_t drawCount, uint32_t stride) const {
+     vkCmdDrawMeshTasksIndirectEXT(commandBuffer, buffer, offset, drawCount, stride);
   }
 
   void Gpu::cleanup() const {
