@@ -444,18 +444,24 @@ namespace gestalt::application {
     std::vector<Meshlet> AssetLoader::generate_meshlets(std::vector<GpuVertexPosition>& vertices,
                                                         std::vector<uint32_t>& indices,
         std::vector<uint32>& meshlet_vertices,
-                                                        std::vector<uint8>& meshlet_indices) {
+                                                        std::vector<uint8>& meshlet_indices,
+                                                        size_t global_surfaces_count) {
       constexpr size_t max_vertices = 64;
       constexpr size_t max_triangles = 64;  // Must be divisible by 4
       constexpr float cone_weight = 0.5f;    // Set between 0 and 1 if using cone culling
+
       const size_t global_meshlet_vertex_offset = repository_->meshlet_vertices.size();
       const size_t global_meshlet_index_offset = repository_->meshlet_triangles.size();
 
+      // Compute the maximum number of meshlets
       size_t max_meshlets = meshopt_buildMeshletsBound(indices.size(), max_vertices, max_triangles);
+
+      // Allocate buffers for meshopt meshlets, vertices, and triangles
       std::vector<meshopt_Meshlet> meshopt_meshlets(max_meshlets);
       std::vector<unsigned int> meshlet_vertices_local(max_meshlets * max_vertices);
       std::vector<unsigned char> meshlet_triangles(max_meshlets * max_triangles * 3);
 
+      // Build the meshlets
       const size_t meshlet_count = meshopt_buildMeshlets(
           meshopt_meshlets.data(), meshlet_vertices_local.data(), meshlet_triangles.data(),
           indices.data(), indices.size(), reinterpret_cast<const float*>(vertices.data()),
@@ -467,7 +473,9 @@ namespace gestalt::application {
       meshlet_triangles.resize(last.triangle_offset + ((last.triangle_count * 3 + 3) & ~3));
       meshopt_meshlets.resize(meshlet_count);
 
+      // Prepare the result meshlets
       std::vector<Meshlet> result_meshlets(meshlet_count);
+
       for (size_t i = 0; i < meshlet_count; ++i) {
         const auto& local_meshlet = meshopt_meshlets[i];
         auto& meshlet = result_meshlets[i];
@@ -477,11 +485,13 @@ namespace gestalt::application {
                                 &meshlet_triangles[meshlet.triangle_offset], meshlet.triangle_count,
                                 meshlet.vertex_count);*/
 
+        // Compute the bounds for the current meshlet
         meshopt_Bounds meshlet_bounds = meshopt_computeMeshletBounds(
             meshlet_vertices_local.data() + local_meshlet.vertex_offset,
             meshlet_triangles.data() + local_meshlet.triangle_offset, local_meshlet.triangle_count,
             reinterpret_cast<float*>(vertices.data()), vertices.size(), sizeof(GpuVertexPosition));
 
+        // Set meshlet data
         meshlet.vertex_offset = local_meshlet.vertex_offset + global_meshlet_vertex_offset;
         meshlet.index_offset = local_meshlet.triangle_offset + global_meshlet_index_offset;
         meshlet.vertex_count = local_meshlet.vertex_count;
@@ -496,7 +506,9 @@ namespace gestalt::application {
         meshlet.cone_axis[2] = meshlet_bounds.cone_axis_s8[2];
 
         meshlet.cone_cutoff = meshlet_bounds.cone_cutoff_s8;
-        meshlet.mesh_index = repository_->meshes.size();  // TODO
+        // a meshlet belongs not to a mesh but to a surface, because we can have multiple surfaces
+        // per mesh in order to use different materials. A MeshDraw dictates how to draw a surface with a given material
+        meshlet.mesh_draw_index = static_cast<uint32>(global_surfaces_count);  
       }
 
       meshlet_indices.reserve(meshlet_triangles.size());
@@ -596,6 +608,7 @@ namespace gestalt::application {
 
     void AssetLoader::import_meshes(fastgltf::Asset& gltf, const size_t material_offset) {
       std::vector<MeshSurface> surfaces;
+      size_t global_surfaces_count = 0;
 
       fmt::print("importing meshes\n");
       for (fastgltf::Mesh& mesh : gltf.meshes) {
@@ -680,8 +693,8 @@ namespace gestalt::application {
 
           std::vector<uint32> meshlet_vertices;
           std::vector<uint8> meshlet_indices;
-          std::vector<Meshlet> meshlets
-              = generate_meshlets(vertex_positions, indices, meshlet_vertices, meshlet_indices);
+          std::vector<Meshlet> meshlets = generate_meshlets(
+              vertex_positions, indices, meshlet_vertices, meshlet_indices, global_surfaces_count);
 
           for (auto& idx : indices) {
             idx += global_index_offset;
@@ -697,6 +710,7 @@ namespace gestalt::application {
             add_material_component(surface, default_material);
           }
           surfaces.push_back(surface);
+          global_surfaces_count++;
         }
         create_mesh(surfaces, std::string(mesh.name));
       }

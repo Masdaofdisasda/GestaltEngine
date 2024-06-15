@@ -24,14 +24,18 @@ namespace gestalt::foundation {
 
       uint32 vertex_offset; // offset into the global vertex buffer for this meshlet
       uint32 index_offset; // offset into the global index buffer for this meshlet
-      uint32 mesh_index;  // index into the mesh or MeshDraw that this meshlet belongs to
+      uint32 mesh_draw_index;  // index into the mesh or MeshDraw that this meshlet belongs to
       uint8 vertex_count;
       uint8 triangle_count;
     };
 
   static_assert(sizeof(Meshlet) % 16 == 0);
 
-    struct MeshSurface {
+  /**
+   * \brief A MeshSurface is a single renderable part of a Mesh. It references the geometry and the material for a single
+   * Mesh. The MeshSurface is rendered as a single draw call, and the geometry is split into Meshlets.
+   */
+  struct MeshSurface {
       uint32 meshlet_offset;
       uint32 meshlet_count;
 
@@ -52,6 +56,11 @@ namespace gestalt::foundation {
       size_t mesh;
     };
 
+    /**
+     * \brief A Mesh holds all the data for a single renderable "object" in the scene. It has one or more MeshSurfaces
+     * that are rendered together. The Mesh function like a node in the scene graph, because moving the mesh moves all
+     * MeshSurfaces together. A MeshSurface references the geometry and the material for a single renderable part of the Mesh.
+     */
     struct Mesh {
       std::string name;
       std::vector<MeshSurface> surfaces;

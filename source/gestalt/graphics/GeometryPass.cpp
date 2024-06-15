@@ -195,15 +195,17 @@ namespace gestalt::graphics {
 
       dependencies_
           = RenderPassDependencyBuilder()
-                .add_shader(ShaderStage::kMesh, "geometry.mesh.spv")
                 .add_shader(ShaderStage::kTask, "geometry.task.spv")
+                .add_shader(ShaderStage::kMesh, "geometry.mesh.spv")
                 .add_shader(ShaderStage::kFragment, "geometry_deferred.frag.spv")
                 .add_image_attachment(registry_->attachments_.gbuffer1, ImageUsageType::kWrite)
                 .add_image_attachment(registry_->attachments_.gbuffer2, ImageUsageType::kWrite)
                 .add_image_attachment(registry_->attachments_.gbuffer3, ImageUsageType::kWrite)
                 .add_image_attachment(registry_->attachments_.scene_depth, ImageUsageType::kWrite,
                                       0, ImageClearOperation::kClear)
-                .set_push_constant_range(sizeof(MeshletPushConstants), VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT)
+                .set_push_constant_range(
+                    sizeof(MeshletPushConstants),
+                    VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT)
                 .build();
 
       create_pipeline_layout();
@@ -214,9 +216,10 @@ namespace gestalt::graphics {
                       .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
                       .set_multisampling_none()
                       .disable_blending(3)
-                      .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
+                      //.enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
+                      .disable_depthtest()
                       .build_graphics_pipeline(gpu_->getDevice());
-      }
+    }
 
     void MeshletPass::destroy() {  }
 

@@ -21,6 +21,10 @@ namespace gestalt::foundation {
       float32 padding{0.f};
     };
 
+    /**
+     * \brief A MeshDraw contains all the data needed to draw a single MeshSurface. It has transformation data for world space
+     * transformation, bounding data for culling, and references to the vertex and index data for the MeshSurface.
+     */
     struct MeshDraw {
       // TRS
       glm::vec3 position;

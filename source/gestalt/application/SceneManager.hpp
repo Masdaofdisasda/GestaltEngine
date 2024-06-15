@@ -87,7 +87,8 @@ namespace gestalt::application {
       std::vector<Meshlet> generate_meshlets(std::vector<GpuVertexPosition>& vertices,
                                              std::vector<uint32_t>& indices,
                                              std::vector<uint32>& meshlet_vertices,
-                                             std::vector<uint8>& meshlet_indices);
+                                             std::vector<uint8>& meshlet_indices,
+                                             size_t global_surfaces_count);
       MeshSurface create_surface(std::vector<GpuVertexPosition>& vertex_positions,
                                  std::vector<GpuVertexData>& vertex_data,
                                  std::vector<uint32_t>& indices, std::vector<Meshlet>&& meshlets,
