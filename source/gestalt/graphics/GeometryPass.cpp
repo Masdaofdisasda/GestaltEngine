@@ -213,11 +213,10 @@ namespace gestalt::graphics {
       pipeline_ = create_pipeline()
                       .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
                       .set_polygon_mode(VK_POLYGON_MODE_FILL)
-                      .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
+                      .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE)
                       .set_multisampling_none()
                       .disable_blending(3)
-                      //.enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-                      .disable_depthtest()
+                      .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
                       .build_graphics_pipeline(gpu_->getDevice());
     }
 
@@ -230,8 +229,6 @@ namespace gestalt::graphics {
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
       const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
       const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
-
-      vkCmdBindIndexBuffer(cmd, mesh_buffers.index_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
       const VkDescriptorSet descriptorSets[]
@@ -248,7 +245,7 @@ namespace gestalt::graphics {
                          sizeof(MeshletPushConstants), &meshlet_push_constants);
 
       // first byte is the task count, so we need offset by one uin32
-      gpu_->drawMeshTasksIndirect(cmd, mesh_buffers.meshlet_task_commands_buffer[frame].buffer,
+      gpu_->drawMeshTasksIndirect(cmd, mesh_buffers.draw_count_buffer[frame].buffer,
                                   sizeof(uint32), 1, 0);
 
       vkCmdEndRendering(cmd);
