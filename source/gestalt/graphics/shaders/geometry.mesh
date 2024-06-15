@@ -84,15 +84,14 @@ void main()
     // Process each vertex in the meshlet
     for (uint i = ti; i < vertexCount; )
     {
-        uint meshletIndex = meshletIndices[indexOffset + i];
-        uint vi = meshletVertices[meshletIndex + vertexOffset];
+        uint vi = meshletVertices[vertexOffset + i] + meshDraw.vertexOffset;
 
         VertexPosition v = vertex_positions[vi];
         VertexData data = vertex_data[vi];
 
         outUV[i] = vec2(data.tu, data.tv);
 
-        vec3 position = rotateQuat(v.position * meshDraw.scale, meshDraw.orientation) + meshDraw.position;
+        vec3 position = rotateQuat(v.position, meshDraw.orientation) * meshDraw.scale + meshDraw.position;
         outPosition_BiTanZ[i].xyz = position;
         vec4 clip = PushConstants.viewProjection * vec4(position, 1.0);
         gl_MeshVerticesEXT[i].gl_Position = clip;
@@ -112,7 +111,6 @@ void main()
 
         outMaterialIndex[i] = meshDraw.materialIndex;
 
-
 	#if MESH_MAXVTX <= MESH_WGSIZE
 		break;
 	#else
@@ -123,7 +121,8 @@ void main()
     // Process each triangle in the meshlet
     for (uint i = ti; i < triangleCount; )
     {
-        uint offset = indexOffset * 4 + i * 3;
+        //uint offset = indexOffset * 4 + i * 3;
+        uint offset = indexOffset + i * 3;
         uint a = uint(meshletIndices[offset]), b = uint(meshletIndices[offset + 1]), c = uint(meshletIndices[offset + 2]);
 
         gl_PrimitiveTriangleIndicesEXT[i] = uvec3(a, b, c);
