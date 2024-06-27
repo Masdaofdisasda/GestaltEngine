@@ -32,3 +32,7 @@ vec3 rotateQuat(vec3 v, vec4 q)
 {
 	return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v);
 }
+
+vec3 transform(vec3 v, vec3 position, float scale, vec4 orientation) {
+	return rotateQuat(v * scale, orientation) + position;
+}

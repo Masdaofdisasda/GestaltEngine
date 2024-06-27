@@ -559,6 +559,7 @@ namespace gestalt::application {
       repository_->meshlets.add(meshlets);
       repository_->meshlet_vertices.add(meshlet_vertices);
       repository_->meshlet_triangles.add(meshlet_indices);
+      const auto mesh_draw = repository_->mesh_draws.add(MeshDraw{});
 
       const MeshSurface surface{
           .meshlet_offset = static_cast<uint32>(meshlet_offset),
@@ -568,6 +569,7 @@ namespace gestalt::application {
           .first_index = static_cast<uint32>(repository_->indices.size()),
           .vertex_offset = static_cast<uint32>(repository_->vertex_positions.size()),
           .local_bounds = local_aabb,
+          .mesh_draw = mesh_draw,    
       };
 
       repository_->vertex_positions.add(vertex_positions);

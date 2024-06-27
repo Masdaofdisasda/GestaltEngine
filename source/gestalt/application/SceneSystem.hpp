@@ -90,7 +90,6 @@ namespace gestalt::application {
 
     class MeshSystem final : public SceneSystem, public NonCopyable<MeshSystem> {
       size_t meshes_ = 0;
-      std::vector<MeshDraw> mesh_draws_{getMaxMeshes()};
       void traverse_scene(Entity entity, const glm::mat4& parent_transform);
       void upload_mesh();
 

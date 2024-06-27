@@ -1,13 +1,23 @@
 ﻿#include "RenderConfig.hpp"
 #include "SceneSystem.hpp"
 
+#include <glm/gtx/matrix_decompose.hpp>
 namespace gestalt::application {
 
-  void MeshSystem::prepare() {
-    constexpr size_t initial_vertex_position_buffer_size
+    constexpr size_t kMaxVertexPositionBufferSize
         = getMaxVertices() * sizeof(GpuVertexPosition);
-    constexpr size_t initial_vertex_data_buffer_size = getMaxVertices() * sizeof(GpuVertexData);
-    constexpr size_t initial_index_buffer_size = getMaxIndices() * sizeof(uint32);
+    constexpr size_t kMaxVertexDataBufferSize = getMaxVertices() * sizeof(GpuVertexData);
+    constexpr size_t kMaxIndexBufferSize = getMaxIndices() * sizeof(uint32);
+
+  constexpr size_t kMaxMeshletBufferSize = getMaxMeshlets() * sizeof(Meshlet);
+  constexpr size_t kMaxMeshletVertexBufferSize = getMaxVertices() * sizeof(uint32);
+  constexpr size_t kMaxMeshletIndexBufferSize = getMaxIndices() * sizeof(uint8);
+
+  constexpr size_t kMaxMeshletTaskCommandsBufferSize = getMaxMeshlets() * sizeof(MeshTaskCommand);
+  constexpr size_t kMaxMeshDrawBufferSize = getMaxMeshes() * sizeof(MeshDraw);
+  constexpr size_t kMaxDrawCountBufferSize = 4 * sizeof(uint32); // commandCount, x, y, z
+
+  void MeshSystem::prepare() {
 
     MeshBuffers mesh_buffers;
 
@@ -31,49 +41,49 @@ namespace gestalt::application {
           gpu_->getDevice(), mesh_buffers.descriptor_layout);
     }
 
-    // Create initially empty vertex buffer
+    // Create vertex buffer
     mesh_buffers.vertex_position_buffer = resource_manager_->create_buffer(
-        initial_vertex_position_buffer_size,
+        kMaxVertexPositionBufferSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
             | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VMA_MEMORY_USAGE_GPU_ONLY);
     mesh_buffers.vertex_data_buffer = resource_manager_->create_buffer(
-        initial_vertex_data_buffer_size,
+        kMaxVertexDataBufferSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
             | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VMA_MEMORY_USAGE_GPU_ONLY);
 
-    // Create initially empty index buffer
+    // Create index buffer
     mesh_buffers.index_buffer = resource_manager_->create_buffer(
-        initial_index_buffer_size,
+        kMaxIndexBufferSize,
         VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VMA_MEMORY_USAGE_GPU_ONLY);
 
     // Create meshlet buffers
     mesh_buffers.meshlet_buffer = resource_manager_->create_buffer(
-        getMaxMeshlets() * sizeof(Meshlet),
+        kMaxMeshletBufferSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VMA_MEMORY_USAGE_GPU_ONLY);
     mesh_buffers.meshlet_vertices = resource_manager_->create_buffer(
-        getMaxVertices() * sizeof(uint32),
+        kMaxMeshletVertexBufferSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VMA_MEMORY_USAGE_GPU_ONLY);
     mesh_buffers.meshlet_triangles = resource_manager_->create_buffer(
-        getMaxIndices() * sizeof(uint8),
+        kMaxMeshletIndexBufferSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VMA_MEMORY_USAGE_GPU_ONLY);
 
     // Create mesh task commands and draw buffers
     for (int i = 0; i < getFramesInFlight(); i++) {
       mesh_buffers.meshlet_task_commands_buffer[i] = resource_manager_->create_buffer(
-          getMaxMeshlets() * sizeof(MeshTaskCommand),
+          kMaxMeshletTaskCommandsBufferSize,
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
           VMA_MEMORY_USAGE_GPU_ONLY);
       mesh_buffers.mesh_draw_buffer[i] = resource_manager_->create_buffer(
-          getMaxMeshes() * sizeof(MeshDraw), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+          kMaxMeshDrawBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
           VMA_MEMORY_USAGE_CPU_TO_GPU);
       mesh_buffers.draw_count_buffer[i] = resource_manager_->create_buffer(
-          4 * sizeof(uint32),
+          kMaxDrawCountBufferSize,
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
               | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
           VMA_MEMORY_USAGE_GPU_ONLY);
@@ -84,24 +94,24 @@ namespace gestalt::application {
     for (int i = 0; i < getFramesInFlight(); i++) {
       writer_->clear();
       writer_->write_buffer(0, mesh_buffers.vertex_position_buffer.buffer,
-                            initial_vertex_position_buffer_size, 0,
+                            kMaxVertexPositionBufferSize, 0,
                             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
       writer_->write_buffer(1, mesh_buffers.vertex_data_buffer.buffer,
-                            initial_vertex_data_buffer_size, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+                            kMaxVertexDataBufferSize, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
       writer_->write_buffer(2, mesh_buffers.meshlet_buffer.buffer,
-                            getMaxMeshlets() * sizeof(Meshlet), 0,
+                            kMaxMeshletBufferSize, 0,
                             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
       writer_->write_buffer(3, mesh_buffers.meshlet_vertices.buffer,
-                            getMaxVertices() * sizeof(uint32), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+                            kMaxMeshletVertexBufferSize, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
       writer_->write_buffer(4, mesh_buffers.meshlet_triangles.buffer,
-                            getMaxMeshlets() * sizeof(uint8), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+                            kMaxMeshletIndexBufferSize, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
       writer_->write_buffer(5, mesh_buffers.meshlet_task_commands_buffer[i].buffer,
-                            getMaxMeshlets() * sizeof(MeshTaskCommand), 0,
+                            kMaxMeshletTaskCommandsBufferSize, 0,
                             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
       writer_->write_buffer(6, mesh_buffers.mesh_draw_buffer[i].buffer,
-                            getMaxMeshes() * sizeof(MeshDraw), 0,
+                            kMaxMeshDrawBufferSize, 0,
                             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-      writer_->write_buffer(7, mesh_buffers.draw_count_buffer[i].buffer, 4 * sizeof(uint32), 0,
+      writer_->write_buffer(7, mesh_buffers.draw_count_buffer[i].buffer, kMaxDrawCountBufferSize, 0,
                                      VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
       writer_->update_set(gpu_->getDevice(), mesh_buffers.descriptor_sets[i]);
     }
@@ -124,32 +134,32 @@ namespace gestalt::application {
 
     const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
 
-    if (mesh_buffers.vertex_position_buffer.info.size < vertex_position_buffer_size) {
+    if (kMaxVertexPositionBufferSize < vertex_position_buffer_size) {
       fmt::println("vertex_position_buffer size needs to be increased by {}",
                    vertex_position_buffer_size - mesh_buffers.vertex_position_buffer.info.size);
     }
 
-    if (mesh_buffers.vertex_data_buffer.info.size < vertex_data_buffer_size) {
+    if (kMaxVertexDataBufferSize < vertex_data_buffer_size) {
       fmt::println("vertex_data_buffer size needs to be increased by {}",
                    vertex_data_buffer_size - mesh_buffers.vertex_data_buffer.info.size);
     }
 
-    if (mesh_buffers.index_buffer.info.size < index_buffer_size) {
+    if (kMaxIndexBufferSize < index_buffer_size) {
       fmt::println("index_buffer size needs to be increased by {}",
                    index_buffer_size - mesh_buffers.index_buffer.info.size);
     }
 
-    if (mesh_buffers.meshlet_buffer.info.size < meshlet_buffer_size) {
+    if (kMaxMeshletBufferSize < meshlet_buffer_size) {
       fmt::println("meshlet_buffer size needs to be increased by {}",
                    meshlet_buffer_size - mesh_buffers.meshlet_buffer.info.size);
     }
 
-    if (mesh_buffers.meshlet_vertices.info.size < meshlet_vertices_size) {
+    if (kMaxMeshletVertexBufferSize < meshlet_vertices_size) {
       fmt::println("meshlet_vertices size needs to be increased by {}",
                    meshlet_buffer_size - mesh_buffers.meshlet_vertices.info.size);
     }
 
-    if (mesh_buffers.meshlet_triangles.info.size < meshlet_triangles_size) {
+    if (kMaxMeshletIndexBufferSize < meshlet_triangles_size) {
       fmt::println("meshlet_triangles size needs to be increased by {}",
                    meshlet_triangles_size - mesh_buffers.meshlet_triangles.info.size);
     }
@@ -231,22 +241,21 @@ namespace gestalt::application {
       upload_mesh();
     }
 
-    mesh_draws_.clear();
-
     constexpr auto root_transform = glm::mat4(1.0f);
 
     traverse_scene(0, root_transform);
 
-    if (mesh_draws_.empty()) {
+    auto mesh_draws = repository_->mesh_draws;
+    if (mesh_draws.size() == 0) {
       return;
     }
 
-    const size_t mesh_draw_buffer_size = mesh_draws_.size() * sizeof(MeshDraw);
+    const size_t mesh_draw_buffer_size = mesh_draws.size() * sizeof(MeshDraw);
 
     const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
     const auto frame = current_frame_index;
 
-    if (mesh_buffers.mesh_draw_buffer[frame].info.size < mesh_draw_buffer_size) {
+    if (kMaxMeshDrawBufferSize < mesh_draw_buffer_size) {
       fmt::println("mesh_draw_buffer size needs to be increased by {}",
                    mesh_draw_buffer_size - mesh_buffers.mesh_draw_buffer[frame].info.size);
     }
@@ -254,8 +263,8 @@ namespace gestalt::application {
       void* mapped_data;
       const VmaAllocation allocation = mesh_buffers.mesh_draw_buffer[frame].allocation;
       VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation, &mapped_data));
-      const auto mesh_draws = static_cast<MeshDraw*>(mapped_data);
-      std::memcpy(mesh_draws, mesh_draws_.data(), mesh_draws_.size() * sizeof(MeshDraw));
+      const auto mesh_draw_data = static_cast<MeshDraw*>(mapped_data);
+      std::memcpy(mesh_draw_data, mesh_draws.data().data(), mesh_draws.size() * sizeof(MeshDraw));
       vmaUnmapMemory(gpu_->getAllocator(), mesh_buffers.mesh_draw_buffer[frame].allocation);
     }
 
@@ -278,10 +287,18 @@ namespace gestalt::application {
       for (const auto surface : mesh.surfaces) {
         const auto& material = repository_->materials.get(surface.material);
 
+        //TODO Replace this
+        glm::vec3 position;
+        glm::quat orientation;
+        glm::vec3 scale;
+        glm::vec3 skew;
+        glm::vec4 perspective;
+        decompose(world_transform, scale, orientation, position, skew, perspective);
+
         MeshDraw draw{
-            .position = glm::vec3(world_transform[3]),
-            .scale = 1.f,
-            .orientation = glm::vec4(world_transform[0]),
+            .position = position,
+            .scale = scale.x,
+            .orientation = orientation,
             .min = glm::vec3(surface.local_bounds.min),
             .meshlet_offset = surface.meshlet_offset,
             .max = glm::vec3(surface.local_bounds.max),
@@ -293,7 +310,7 @@ namespace gestalt::application {
             .materialIndex = static_cast<uint32>(surface.material),
         };
 
-        mesh_draws_.push_back(draw);
+        repository_->mesh_draws.get(surface.mesh_draw) = draw;
 
         if (material.config.transparent) {
           // mesh_task_commands_.push_back(task);

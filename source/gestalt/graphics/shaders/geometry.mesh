@@ -91,7 +91,7 @@ void main()
 
         outUV[i] = vec2(data.tu, data.tv);
 
-        vec3 position = rotateQuat(v.position, meshDraw.orientation) * meshDraw.scale + meshDraw.position;
+        vec3 position = transform(v.position, meshDraw.position, meshDraw.scale, meshDraw.orientation);
         outPosition_BiTanZ[i].xyz = position;
         vec4 clip = PushConstants.viewProjection * vec4(position, 1.0);
         gl_MeshVerticesEXT[i].gl_Position = clip;

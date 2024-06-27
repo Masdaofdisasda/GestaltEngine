@@ -105,9 +105,10 @@ namespace gestalt::graphics {
       vkCmdFillBuffer(cmd, mesh_buffers.draw_count_buffer[current_frame_index].buffer, 0,
                       mesh_buffers.draw_count_buffer[current_frame_index].info.size, 0);
 
-      const int32 maxCommandCount = repository_->meshlets.size(); // each mesh gets a draw command
+      const int32 maxCommandCount
+          = repository_->mesh_draws.size();  // each mesh gets a draw command
       const uint32 groupCount
-          = (static_cast<uint32>(repository_->meshes.size()) + 63) / 64;  // 64 threads per group
+          = (static_cast<uint32>(maxCommandCount) + 63) / 64;  // 64 threads per group
 
       const DrawCullConstants draw_cull_constants{.draw_count = maxCommandCount};
 
@@ -142,7 +143,6 @@ namespace gestalt::graphics {
 	  dependencies_
 		  = RenderPassDependencyBuilder()
                     .add_shader(ShaderStage::kCompute, "task_submit.comp.spv")
-                    .set_push_constant_range(sizeof(DrawCullConstants), VK_SHADER_STAGE_COMPUTE_BIT)
 				.build();
 
 	  create_pipeline_layout();
@@ -156,18 +156,11 @@ namespace gestalt::graphics {
 
     void TaskSubmitPass::execute(VkCommandBuffer cmd) {
 
-      const int32 maxCommandCount = repository_->meshlets.size();  // each mesh gets a draw command
-
-      const DrawCullConstants draw_cull_constants{.draw_count = maxCommandCount};
-
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_);
       VkDescriptorSet descriptorSets[]
           = {repository_->get_buffer<MeshBuffers>().descriptor_sets[current_frame_index]};
       vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_, 0, 1,
                               descriptorSets, 0, nullptr);
-      vkCmdPushConstants(cmd, pipeline_layout_,
-                         VK_SHADER_STAGE_COMPUTE_BIT, 0,
-                         sizeof(DrawCullConstants), &draw_cull_constants);
       vkCmdDispatch(cmd, 1, 1, 1);
 
       // Memory barrier to ensure writes are visible to the second compute shader
@@ -198,9 +191,12 @@ namespace gestalt::graphics {
                 .add_shader(ShaderStage::kTask, "geometry.task.spv")
                 .add_shader(ShaderStage::kMesh, "geometry.mesh.spv")
                 .add_shader(ShaderStage::kFragment, "geometry_deferred.frag.spv")
-                .add_image_attachment(registry_->attachments_.gbuffer1, ImageUsageType::kWrite)
-                .add_image_attachment(registry_->attachments_.gbuffer2, ImageUsageType::kWrite)
-                .add_image_attachment(registry_->attachments_.gbuffer3, ImageUsageType::kWrite)
+                .add_image_attachment(registry_->attachments_.gbuffer1, ImageUsageType::kWrite, 0,
+                                      ImageClearOperation::kClear)
+                .add_image_attachment(registry_->attachments_.gbuffer2, ImageUsageType::kWrite, 0,
+                                      ImageClearOperation::kClear)
+                .add_image_attachment(registry_->attachments_.gbuffer3, ImageUsageType::kWrite, 0,
+                                      ImageClearOperation::kClear)
                 .add_image_attachment(registry_->attachments_.scene_depth, ImageUsageType::kWrite,
                                       0, ImageClearOperation::kClear)
                 .set_push_constant_range(
@@ -213,7 +209,7 @@ namespace gestalt::graphics {
       pipeline_ = create_pipeline()
                       .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
                       .set_polygon_mode(VK_POLYGON_MODE_FILL)
-                      .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE)
+                      .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
                       .set_multisampling_none()
                       .disable_blending(3)
                       .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)

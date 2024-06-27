@@ -142,6 +142,7 @@ namespace gestalt::foundation {
     GpuDataContainer<VkSampler> samplers;
     GpuDataContainer<Material> materials;
     GpuDataContainer<Mesh> meshes;
+    GpuDataContainer<MeshDraw> mesh_draws;
     GpuDataContainer<CameraData> cameras;
 
     ComponentContainer<NodeComponent> scene_graph;

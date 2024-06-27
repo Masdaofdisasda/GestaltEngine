@@ -3,6 +3,7 @@
 #include "vk_types.hpp"
 
 #include <vma/vk_mem_alloc.h>
+#include <glm/gtc/quaternion.hpp>
 
 #include <EngineConfig.hpp>
 #include <array>
@@ -29,7 +30,7 @@ namespace gestalt::foundation {
       // TRS
       glm::vec3 position;
       float32 scale;
-      glm::vec4 orientation;
+      glm::quat orientation;
 
       // Bounding box
       // Meshlet data
@@ -51,11 +52,10 @@ namespace gestalt::foundation {
 
   static_assert(sizeof(MeshDraw) == 96);
 
-    struct MeshTaskCommand {
+    struct alignas(16) MeshTaskCommand {
       uint32 meshDrawId;
       uint32 taskOffset;
       uint32 taskCount;
-      uint32 pad;
     };
 
     enum class TextureType { kColor, kDepth, kCubeMap };

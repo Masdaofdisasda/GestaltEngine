@@ -46,6 +46,7 @@ namespace gestalt::foundation {
       AABB local_bounds;
 
       size_t material = default_material;
+      size_t mesh_draw = no_component;
     };
 
     struct Component {

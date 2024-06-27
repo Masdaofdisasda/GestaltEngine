@@ -74,5 +74,4 @@ struct MeshTaskCommand
 	uint meshDrawId;  // references a MeshDraw needed to draw one mesh
 	uint taskOffset; // index into the global meshlet array
 	uint taskCount; // [0...63], number of meshlets to process, might be less for the last task
-	uint pad;
 };
