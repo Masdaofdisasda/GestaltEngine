@@ -66,6 +66,9 @@ namespace gestalt::application {
       std::unique_ptr<Camera> active_camera_;
       std::unique_ptr<FreeFlyCamera> free_fly_camera_; // move to components
       float32 aspect_{1.f};
+      float32 near_plane_{0.1f};
+      float32 far_plane_{10000.f};
+      float32 fov_{70.f};
 
     public:
       void prepare() override;

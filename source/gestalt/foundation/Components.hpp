@@ -43,7 +43,7 @@ namespace gestalt::foundation {
       uint32 index_count;
       uint32 first_index;
       uint32 vertex_offset;
-      AABB local_bounds;
+      BoundingSphere local_bounds;
 
       size_t material = default_material;
       size_t mesh_draw = no_component;
@@ -65,7 +65,7 @@ namespace gestalt::foundation {
     struct Mesh {
       std::string name;
       std::vector<MeshSurface> surfaces;
-      AABB local_bounds;
+      BoundingSphere local_bounds;
     };
 
     struct CameraComponent : Component {

@@ -63,6 +63,20 @@ namespace gestalt::graphics {
       void execute(VkCommandBuffer cmd) override;
       std::string get_name() const override { return "Infinite Grid Pass"; }
     };
+    class AabbBvhDebugPass final : public RenderPass {
+    public:
+      void prepare() override;
+      void destroy() override;
+      void execute(VkCommandBuffer cmd) override;
+      std::string get_name() const override { return "AABB BVH Debug Pass"; }
+    };
+    class BoundingSphereDebugPass final : public RenderPass {
+    public:
+      void prepare() override;
+      void destroy() override;
+      void execute(VkCommandBuffer cmd) override;
+      std::string get_name() const override { return "Bounding Sphere Debug Pass"; }
+    };
     class BrightPass final : public RenderPass {
       DescriptorWriter writer;
       VkDescriptorSet descriptor_set_ = nullptr;

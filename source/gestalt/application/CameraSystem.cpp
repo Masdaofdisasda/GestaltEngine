@@ -17,7 +17,8 @@ namespace gestalt::application {
       per_frame_data_buffers.descriptor_layout
           = descriptor_layout_builder_->add_binding(
                 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                             VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
+                              VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT
+                                  | VK_SHADER_STAGE_FRAGMENT_BIT)
                 .build(gpu_->getDevice());
 
       for (int i = 0; i < getFramesInFlight(); ++i) {
@@ -42,11 +43,19 @@ namespace gestalt::application {
 
     glm::vec4 normalizePlane(glm::vec4 p) { return p / length(glm::vec3(p)); }
 
+  
+    glm::mat4 perspectiveProjection(float fovY, float aspectWbyH, float zNear) {
+      float f = 1.0f / tanf(fovY / 2.0f);
+      return glm::mat4(f / aspectWbyH, 0.0f, 0.0f, 0.0f, 0.0f, f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+                  0.0f, 0.0f, zNear, 0.0f);
+    }
+
     void CameraSystem::update() {
-      glm::mat4 view = active_camera_->get_view_matrix();
+      const glm::mat4 view = active_camera_->get_view_matrix();
 
       // camera projection
-      glm::mat4 projection = glm::perspective(glm::radians(70.f), aspect_, 0.1f, 1000.f);
+      //glm::mat4 projection = perspectiveProjection(glm::radians(fov_), aspect_, near_plane_);
+      glm::mat4 projection = glm::perspective(glm::radians(fov_), aspect_, near_plane_, far_plane_);
       glm::mat4 projection_t = transpose(projection);
 
       // invert the Y direction on projection matrix so that we are more similar
@@ -62,8 +71,26 @@ namespace gestalt::application {
       auto& buffers = repository_->get_buffer<PerFrameDataBuffers>();
       buffers.data.view = camera.view_matrix; // is the camera object actually needed?
       buffers.data.proj = camera.projection_matrix;
-      buffers.data.viewproj = camera.projection_matrix * camera.view_matrix;
-      buffers.data.inv_viewproj = inverse(camera.projection_matrix * camera.view_matrix);
+      buffers.data.inv_view = inverse(camera.view_matrix);
+      buffers.data.inv_viewProj = inverse(camera.projection_matrix * camera.view_matrix);
+      buffers.data.P00 = projection_t[0][0];
+      buffers.data.P11 = projection_t[1][1];
+
+      if (!buffers.freezeCullCamera) {
+
+        buffers.data.cullView = camera.view_matrix;
+        buffers.data.cullProj = camera.projection_matrix;
+
+        buffers.data.znear = near_plane_;
+        buffers.data.zfar = far_plane_;
+
+        buffers.data.frustum[0] = normalizePlane(projection_t[3] + projection_t[0]);
+        buffers.data.frustum[1] = normalizePlane(projection_t[3] - projection_t[0]);
+        buffers.data.frustum[2] = normalizePlane(projection_t[3] + projection_t[1]);
+        buffers.data.frustum[3] = normalizePlane(projection_t[3] - projection_t[1]);
+        buffers.data.frustum[4] = normalizePlane(projection_t[3] + projection_t[2]);
+        buffers.data.frustum[5] = normalizePlane(projection_t[3] - projection_t[2]);
+      }
 
       void* mapped_data;
       const VmaAllocation allocation = buffers.uniform_buffers[frame].allocation;
@@ -72,17 +99,6 @@ namespace gestalt::application {
       *scene_uniform_data = buffers.data;
       vmaUnmapMemory(gpu_->getAllocator(), buffers.uniform_buffers[frame].allocation);
 
-      meshlet_push_constants.viewProjection = buffers.data.viewproj;
-      meshlet_push_constants.screenWidth = static_cast<float32>(getResolutionWidth());
-      meshlet_push_constants.screenHeight = static_cast<float32>(getResolutionHeight());
-      meshlet_push_constants.znear = 0.1f;
-      meshlet_push_constants.zfar = 1000.0f;
-      const glm::vec4 frustumX = normalizePlane(projection_t[3] + projection_t[0]);
-      const glm::vec4 frustumY = normalizePlane(projection_t[3] + projection_t[1]);
-      meshlet_push_constants.frustum[0] = frustumX.x;
-      meshlet_push_constants.frustum[1] = frustumY.y;
-      meshlet_push_constants.frustum[2] = frustumX.y;
-      meshlet_push_constants.frustum[3] = frustumY.y;
       //TODO
       meshlet_push_constants.pyramidWidth = 0;
       meshlet_push_constants.pyramidHeight = 0;

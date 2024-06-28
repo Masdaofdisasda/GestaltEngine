@@ -13,18 +13,15 @@ namespace gestalt::foundation {
     inline uint8 previous_frame_index{0};
 
     inline struct MeshletPushConstants {
-      glm::mat4 viewProjection;
-
-      float32 screenWidth, screenHeight, znear, zfar;  // symmetric projection parameters
-      float32 frustum[4];  // data for left/right/top/bottom frustum planes
-
+      int cullFlags{0};
       float32 pyramidWidth, pyramidHeight;  // depth pyramid size in texels
       int32 clusterOcclusionEnabled;
     } meshlet_push_constants;
 
     struct RenderConfig {
       bool always_opaque{true};
-      bool debug_aabb{true};
+      bool debug_aabb_bvh{false};
+      bool debug_bounds_mesh{false};
 
       struct SkyboxParams {
         glm::vec3 betaR = glm::vec3(5.22e-6, 9.19e-6, 33.1e-6);

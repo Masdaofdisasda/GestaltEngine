@@ -37,13 +37,13 @@ void main() {
     TexCoords = cubeVertices[gl_VertexIndex].xyz;
 
     // Remove the translation from the view matrix
-    mat4 viewRotationOnly = sceneData.view;
+    mat4 viewRotationOnly = view;
     viewRotationOnly[3][0] = 0.0;
     viewRotationOnly[3][1] = 0.0;
     viewRotationOnly[3][2] = 0.0;
 
     // Transform the vertex positions
-    vec4 pos = sceneData.proj * viewRotationOnly * vec4(cubeVertices[gl_VertexIndex], 1.0);
+    vec4 pos = proj * viewRotationOnly * vec4(cubeVertices[gl_VertexIndex], 1.0);
 
     // Set the depth value to the far plane to ensure the skybox is always rendered behind other objects
     gl_Position = pos.xyww;

@@ -101,7 +101,7 @@ void main() {
 	vec2 uv = UV;
     float depth = texture(depthBuffer, uv).r;
     vec3 worldPos = ReconstructWorldPos(depth, uv, params.invViewProj);
-	vec3 viewPos = -normalize(vec3(sceneData.view[0][2], sceneData.view[1][2], sceneData.view[2][2]));
+	vec3 viewPos = -normalize(vec3(view[0][2], view[1][2], view[2][2]));
 
     // Transform world position to light space
 	mat4 lightViewProj = lightViewProj[dirLight[0].viewProjIndex].viewProj;

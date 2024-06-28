@@ -55,9 +55,9 @@ struct MeshDraw
 	float scale;
 	vec4 orientation;
 
-	vec3 boundMin;
+	vec3 center;
+	float radius;
 	uint meshletOffset;
-	vec3 boundMax;
 	uint meshletCount;
 
 	uint vertexCount;
@@ -66,7 +66,7 @@ struct MeshDraw
 	uint vertexOffset;
 
 	uint materialIndex;
-	uint pad[3];
+	uint pad;
 };
 
 struct MeshTaskCommand

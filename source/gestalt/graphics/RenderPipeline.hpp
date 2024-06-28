@@ -274,6 +274,7 @@ namespace gestalt::graphics {
 
       void create_resources() const;
       VkCommandBuffer start_draw();
+      void bufferUpdatebarrier(VkCommandBuffer cmd, VkBuffer buffer);
       void execute(const std::shared_ptr<RenderPass>& render_pass, VkCommandBuffer cmd);
 
     public:
@@ -285,7 +286,7 @@ namespace gestalt::graphics {
 
       void cleanup();
 
-      RenderConfig& get_config() { return resource_registry_->config_; }
+      RenderConfig& get_config() const { return resource_registry_->config_; }
       VkFormat get_swapchain_format() const { return swapchain_->swapchain_image_format; }
       std::shared_ptr<TextureHandle> get_debug_image() const { return debug_texture_; }
     };

@@ -17,11 +17,15 @@
 
 namespace gestalt::foundation {
 
-    struct alignas(128) PerFrameData {
+    struct alignas(16) PerFrameData {
       glm::mat4 view{1.f};
+      glm::mat4 inv_view{1.f};
       glm::mat4 proj{1.f};
-      glm::mat4 viewproj{1.f};
-      glm::mat4 inv_viewproj{1.f};
+      glm::mat4 inv_viewProj{1.f};
+      glm::mat4 cullView{1.f};
+      glm::mat4 cullProj{1.f};
+      float P00, P11, znear, zfar;  // symmetric projection parameters
+      glm::vec4 frustum[6];
     };
 
     struct MaterialPipeline {
@@ -47,6 +51,12 @@ namespace gestalt::foundation {
       glm::vec3 min{glm::vec3(std::numeric_limits<float32>::max())};
       glm::vec3 max{glm::vec3(std::numeric_limits<float32>::lowest())};
 
+      mutable bool is_dirty = true;
+    };
+
+    struct BoundingSphere {
+      glm::vec3 center;
+      float radius;
       mutable bool is_dirty = true;
     };
 

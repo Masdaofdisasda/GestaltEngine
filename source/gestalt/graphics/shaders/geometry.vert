@@ -51,7 +51,7 @@ void main()
 
 	vec4 position = vec4(v.position, 1.0f);
 	outPosition_BiTanZ.xyz = vec3(PushConstants.model_matrix * position);
-	gl_Position =  sceneData.viewproj * PushConstants.model_matrix * position;
+	gl_Position =  proj * view * PushConstants.model_matrix * position;
 
 	vec3 normal = vec3(int(data.nx), int(data.ny), int(data.nz)) * i8_inverse - 1.0;
 	outNormal_BiTanX.xyz = normalize(mat3(PushConstants.model_matrix) * normal);

@@ -32,14 +32,14 @@ namespace gestalt::foundation {
       float32 scale;
       glm::quat orientation;
 
-      // Bounding box
+      // Bounding sphere
       // Meshlet data
-      glm::vec3 min;
+      glm::vec3 center;
+      float32 radius;
       uint32 meshlet_offset;
-      glm::vec3 max;
       uint32 meshlet_count;
 
-      // Vertex data
+      // Vertex data , maybe unneeded?
       uint32 vertex_count;
       uint32 index_count;
       uint32 first_index;
@@ -47,10 +47,10 @@ namespace gestalt::foundation {
 
       // Material
       uint32 materialIndex;
-      uint32 pad[3];
+      int32 pad;
     };
 
-  static_assert(sizeof(MeshDraw) == 96);
+  static_assert(sizeof(MeshDraw) % 16 == 0);
 
     struct alignas(16) MeshTaskCommand {
       uint32 meshDrawId;
@@ -117,6 +117,7 @@ namespace gestalt::foundation {
 
     struct PerFrameDataBuffers{
       PerFrameData data;
+      bool freezeCullCamera = false;
       std::array<AllocatedBuffer, getFramesInFlight()> uniform_buffers;
 
       std::array<VkDescriptorSet, getFramesInFlight()> descriptor_sets;

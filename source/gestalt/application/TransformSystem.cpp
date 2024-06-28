@@ -75,13 +75,12 @@ namespace gestalt::application {
 
       if (mesh_optional.has_value()) {
         const auto& mesh = repository_->meshes.get(mesh_optional->get().mesh);
-        min.x = std::min(min.x, mesh.local_bounds.min.x);
-        min.y = std::min(min.y, mesh.local_bounds.min.y);
-        min.z = std::min(min.z, mesh.local_bounds.min.z);
+        AABB local_aabb;
+        local_aabb.min = mesh.local_bounds.center - glm::vec3(mesh.local_bounds.radius);
+        local_aabb.max = mesh.local_bounds.center + glm::vec3(mesh.local_bounds.radius);
 
-        max.x = std::max(max.x, mesh.local_bounds.max.x);
-        max.y = std::max(max.y, mesh.local_bounds.max.y);
-        max.z = std::max(max.z, mesh.local_bounds.max.z);
+        min = glm::min(min, local_aabb.min);
+        max = glm::max(max, local_aabb.max);
       } else {
         // nodes without mesh components should still influence the bounds
         min = glm::vec3(-0.0001f);

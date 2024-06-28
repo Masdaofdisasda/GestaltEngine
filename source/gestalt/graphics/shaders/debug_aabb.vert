@@ -38,6 +38,6 @@ void main()
 
 	int idx = indices[gl_VertexIndex];
 
-	gl_Position = sceneData.viewproj * vec4(pos[idx], 1.0);
+	gl_Position = proj * view * vec4(pos[idx], 1.0);
 }
 

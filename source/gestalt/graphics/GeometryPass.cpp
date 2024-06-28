@@ -81,8 +81,10 @@ namespace gestalt::graphics {
     void DrawCullPass::prepare() {
 	  fmt::print("Preparing {}\n", get_name());
 
+        const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
           const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
-          descriptor_layouts_.push_back(mesh_buffers.descriptor_layout);
+        descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
+              descriptor_layouts_.push_back(mesh_buffers.descriptor_layout);
 
 	  dependencies_
 		  = RenderPassDependencyBuilder()
@@ -114,8 +116,9 @@ namespace gestalt::graphics {
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_);
       VkDescriptorSet descriptorSets[]
-          = {repository_->get_buffer<MeshBuffers>().descriptor_sets[current_frame_index]};
-      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_, 0, 1,
+          = {repository_->get_buffer<PerFrameDataBuffers>().descriptor_sets[current_frame_index],
+        repository_->get_buffer<MeshBuffers>().descriptor_sets[current_frame_index]};
+      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_, 0, 2,
                               descriptorSets, 0, nullptr);
       vkCmdPushConstants(cmd, pipeline_layout_,
                          VK_SHADER_STAGE_COMPUTE_BIT, 0,
@@ -372,103 +375,5 @@ namespace gestalt::graphics {
     }
 
     void TransparentPass::cleanup() { vkDestroyPipeline(gpu_->getDevice(), pipeline_, nullptr); }
-
-    void DebugAabbPass::prepare() {
-      fmt::print("preparing debug_aabb pass\n");
-
-      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
-      descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
-
-      VkShaderModule meshFragShader;
-      vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_->getDevice(), &meshFragShader);
-
-      VkShaderModule meshVertexShader;
-      vkutil::load_shader_module(vertex_shader_source_.c_str(), gpu_->getDevice(), &meshVertexShader);
-
-      VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
-      mesh_layout_info.setLayoutCount = descriptor_layouts_.size();
-      mesh_layout_info.pSetLayouts = descriptor_layouts_.data();
-      mesh_layout_info.pPushConstantRanges = &push_constant_range_;
-      mesh_layout_info.pushConstantRangeCount = 1;
-
-      VK_CHECK(vkCreatePipelineLayout(gpu_->getDevice(), &mesh_layout_info, nullptr, &pipeline_layout_));
-
-      const auto color_image = registry_->get_resource<TextureHandle>("scene_final");
-      const auto depth_image = registry_->get_resource<TextureHandle>("grid_depth");
-
-      pipeline_ = PipelineBuilder()
-                      .set_shaders(meshVertexShader, meshFragShader)
-                      .set_input_topology(VK_PRIMITIVE_TOPOLOGY_LINE_LIST)
-                      .set_polygon_mode(VK_POLYGON_MODE_LINE)
-                      .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
-                      .set_multisampling_none()
-                      .disable_blending()
-                      .enable_depthtest(false, VK_COMPARE_OP_LESS_OR_EQUAL)
-                      .set_color_attachment_format(color_image->getFormat())
-                      .set_depth_format(depth_image->getFormat())
-                      .set_pipeline_layout(pipeline_layout_)
-                      .build_graphics_pipeline(gpu_->getDevice());
-
-      vkDestroyShaderModule(gpu_->getDevice(), meshFragShader, nullptr);
-      vkDestroyShaderModule(gpu_->getDevice(), meshVertexShader, nullptr);
-    }
-
-    void DebugAabbPass::cleanup() {}
-
-    void DebugAabbPass::execute(VkCommandBuffer cmd) {
-      const auto color_image = registry_->get_resource<TextureHandle>("scene_final");
-      const auto depth_image = registry_->get_resource<TextureHandle>("grid_depth");
-
-      VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(
-          color_image->imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-      VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
-          depth_image->imageView, nullptr, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-
-      VkRenderingInfo renderInfo
-          = vkinit::rendering_info(color_image->getExtent2D(), &colorAttachment, &depthAttachment);
-
-      const char frameIndex = gpu_.get_current_frame();
-      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
-
-      VkDescriptorBufferInfo buffer_info;
-      buffer_info.buffer = per_frame_buffers.uniform_buffers[frameIndex].buffer;
-      buffer_info.offset = 0;
-      buffer_info.range = sizeof(PerFrameData);
-
-      VkWriteDescriptorSet descriptor_write = {};
-      descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      descriptor_write.dstBinding = 0;
-      descriptor_write.dstArrayElement = 0;
-      descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-      descriptor_write.descriptorCount = 1;
-      descriptor_write.pBufferInfo = &buffer_info;
-
-      vkCmdBeginRendering(cmd, &renderInfo);
-
-      viewport_.width = static_cast<float>(color_image->getExtent2D().width);
-      viewport_.height = static_cast<float>(color_image->getExtent2D().height);
-      scissor_.extent = color_image->getExtent2D();
-      vkCmdSetViewport(cmd, 0, 1, &viewport_);
-      vkCmdSetScissor(cmd, 0, 1, &scissor_);
-
-      vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
-
-      gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
-                                     &descriptor_write);
-      if (registry_->config_.debug_aabb) {
-        for (auto& node : repository_->scene_graph.components() | std::views::values) {
-          if (!node.visible) continue;
-
-          aabb_debug_push_constants push_constant{
-              .min = glm::vec4(node.bounds.min, 1.0),
-              .max = glm::vec4(node.bounds.max, 1.0),
-          };
-          vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0,
-                             sizeof(aabb_debug_push_constants), &push_constant);
-          vkCmdDraw(cmd, 36, 1, 0, 0);
-        }
-      }
-
-      vkCmdEndRendering(cmd);
-    }*/
+    */
 }  // namespace gestalt

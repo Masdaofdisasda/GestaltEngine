@@ -23,12 +23,12 @@ layout (location=0) out vec4 uv;
 
 void main()
 {
-	mat4 MVP = sceneData.viewproj; // * ubo.model;
+	mat4 MVP = proj * view; // * ubo.model;
 
 	int idx = indices[gl_VertexIndex];
 	vec3 position = pos[idx] * gridSize;
 
-	mat4 iview = inverse(sceneData.view);
+	mat4 iview = inverse(view);
 	vec2 cameraPos = vec2(iview[3][0], iview[3][2]);
 
 	position.x += cameraPos.x;

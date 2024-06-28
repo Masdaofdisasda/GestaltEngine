@@ -5,6 +5,7 @@
 #extension GL_EXT_shader_16bit_storage: require
 #extension GL_EXT_shader_8bit_storage: require
 
+#include "per_frame_structs.glsl"
 #include "meshlet_structs.glsl"
 #include "math.glsl"
 
@@ -14,11 +15,7 @@ taskPayloadSharedEXT MeshTaskPayload payload;
 
 layout( push_constant ) uniform constants
 {
-	mat4 viewProjection;
-
-	float screenWidth, screenHeight, znear, zfar; // symmetric projection parameters
-	float frustum[4]; // data for left/right/top/bottom frustum planes
-
+    int cullFlags;
 	float pyramidWidth, pyramidHeight; // depth pyramid size in texels
 	int clusterOcclusionEnabled;
 } PushConstants;
@@ -56,7 +53,8 @@ void main()
     barrier();  // Synchronize all threads in the workgroup
     
     // Calculate the world-space position and radius of the meshlet
-    vec3 center = rotateQuat(meshlets[mi].center, meshDraw.orientation) * meshDraw.scale + meshDraw.position;
+    vec3 center = transform(meshlets[mi].center, meshDraw.position, meshDraw.scale, meshDraw.orientation);
+    vec4 viewCenter = view * vec4(center, 1.0);
     float radius = meshlets[mi].radius * meshDraw.scale;
     vec3 cone_axis = rotateQuat(vec3(int(meshlets[mi].cone_axis[0]) / 127.0, int(meshlets[mi].cone_axis[1]) / 127.0, int(meshlets[mi].cone_axis[2]) / 127.0), meshDraw.orientation);
     float cone_cutoff = int(meshlets[mi].cone_cutoff) / 127.0;
@@ -69,12 +67,13 @@ void main()
     visible = visible && !coneCull(center, radius, cone_axis, cone_cutoff, vec3(0, 0, 0));
     
     // view frustum culling
-    visible = visible && center.z * PushConstants.frustum[1] - abs(center.x) * PushConstants.frustum[0] > -radius;
-    visible = visible && center.z * PushConstants.frustum[3] - abs(center.y) * PushConstants.frustum[2] > -radius;
-    visible = visible && center.z + radius > PushConstants.znear && center.z - radius < PushConstants.zfar;
-    
-    // For debugging purposes, force visibility to true
-    visible = valid;
+    if (PushConstants.cullFlags == 1) {
+        bool frustum_visible = true;
+	        for ( uint i = 0; i < 6; ++i ) {
+	            frustum_visible = frustum_visible && (dot( frustum[i], viewCenter) > -radius);
+	        }
+        visible = visible && frustum_visible;
+	}
 
     if (visible)
     {

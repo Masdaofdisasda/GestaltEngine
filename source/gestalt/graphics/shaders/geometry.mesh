@@ -25,11 +25,7 @@ taskPayloadSharedEXT MeshTaskPayload payload;
 
 layout( push_constant ) uniform constants
 {
-	mat4 viewProjection;
-
-	float screenWidth, screenHeight, znear, zfar; // symmetric projection parameters
-	float frustum[4]; // data for left/right/top/bottom frustum planes
-
+    int cullFlags;
 	float pyramidWidth, pyramidHeight; // depth pyramid size in texels
 	int clusterOcclusionEnabled;
 } PushConstants;
@@ -93,7 +89,7 @@ void main()
 
         vec3 position = transform(v.position, meshDraw.position, meshDraw.scale, meshDraw.orientation);
         outPosition_BiTanZ[i].xyz = position;
-        vec4 clip = PushConstants.viewProjection * vec4(position, 1.0);
+        vec4 clip = proj * view * vec4(position, 1.0);
         gl_MeshVerticesEXT[i].gl_Position = clip;
 
         vec3 normal = vec3(int(data.nx), int(data.ny), int(data.nz)) * i8_inverse - 1.0;

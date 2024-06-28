@@ -43,9 +43,9 @@ namespace gestalt::graphics {
       render_passes_.push_back(std::make_shared<BrightPass>());
       render_passes_.push_back(std::make_shared<BloomBlurPass>());
       render_passes_.push_back(std::make_shared<InfiniteGridPass>());
+      render_passes_.push_back(std::make_shared<AabbBvhDebugPass>());
+      render_passes_.push_back(std::make_shared<BoundingSphereDebugPass>());
       render_passes_.push_back(std::make_shared<TonemapPass>());
-      /*
-       render_passes_.push_back(std::make_unique<DebugAabbPass>());*/
 
       frames_.init(gpu_->getDevice(), gpu_->getGraphicsQueueFamily());
 
@@ -202,8 +202,38 @@ namespace gestalt::graphics {
       return cmd;
     }
 
+    void RenderPipeline::bufferUpdatebarrier(VkCommandBuffer cmd, VkBuffer buffer) {
+      const auto allStages
+          = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_MESH_SHADER_BIT_EXT
+            | VK_PIPELINE_STAGE_TASK_SHADER_BIT_EXT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+            | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT
+            | VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT | VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+
+      VkBufferMemoryBarrier bufferBarrier = {};
+      bufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+      bufferBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_HOST_WRITE_BIT
+                                    | VK_ACCESS_SHADER_WRITE_BIT
+                                    | VK_ACCESS_MEMORY_WRITE_BIT;  
+      bufferBarrier.dstAccessMask = VK_ACCESS_UNIFORM_READ_BIT
+                                    | VK_ACCESS_SHADER_READ_BIT
+                                    | VK_ACCESS_MEMORY_READ_BIT;  
+   
+      bufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      bufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      bufferBarrier.buffer = buffer;
+      bufferBarrier.offset = 0;
+      bufferBarrier.size = VK_WHOLE_SIZE;
+
+      vkCmdPipelineBarrier(cmd,
+                           VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_HOST_BIT
+                               | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                           allStages, 0, 0, nullptr, 1,
+                           &bufferBarrier, 0, nullptr);
+    }
+
     void RenderPipeline::execute_passes() {
 
+      
       FrameGraphWIP frame_graph{render_passes_};
       frame_graph.topologicalSort();
 
@@ -217,6 +247,10 @@ namespace gestalt::graphics {
       }
 
       VkCommandBuffer cmd = start_draw();
+
+      const auto& perFrameDataBuffer
+          = repository_->get_buffer<PerFrameDataBuffers>().uniform_buffers[frames_.get_current_frame_index()].buffer;
+      bufferUpdatebarrier(cmd, perFrameDataBuffer);
 
       for (auto& renderpass: render_passes_) {
         ZoneScopedN("Execute Pass");

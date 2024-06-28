@@ -603,7 +603,14 @@ namespace gestalt::application {
 
         ImGui::Checkbox("Always Opaque", &config.always_opaque);
 
-        ImGui::Checkbox("View AABBs", &config.debug_aabb);
+        ImGui::Checkbox("View AABBs", &config.debug_aabb_bvh);
+
+        ImGui::Checkbox("View Mesh Bounds", &config.debug_bounds_mesh);
+
+        static bool freeze_frustum_cull = false;
+        if( ImGui::Checkbox("Freeze Frustum Culling", &freeze_frustum_cull)) {
+          repository_->get_buffer<PerFrameDataBuffers>().freezeCullCamera = freeze_frustum_cull;
+        }
 
         const char* shadow_mode_options[] = {"On", "Off"};
         int current_shadow_mode = config.lighting.shadow_mode;

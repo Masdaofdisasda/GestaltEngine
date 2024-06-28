@@ -2,10 +2,11 @@
 
 #extension GL_EXT_shader_16bit_storage: require
 #extension GL_EXT_shader_8bit_storage: require
-
 #extension GL_GOOGLE_include_directive: require
 
+#include "per_frame_structs.glsl"
 #include "meshlet_structs.glsl"
+#include "math.glsl"
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
@@ -14,17 +15,17 @@ layout(push_constant) uniform constants
 	int drawCount;
 } PushConstants;
 
-layout(set = 0, binding = 5) buffer TaskCommands
+layout(set = 1, binding = 5) buffer TaskCommands
 {
 	MeshTaskCommand taskCommands[];
 };
 
-layout(set = 0, binding = 6) readonly buffer Draws
+layout(set = 1, binding = 6) readonly buffer Draws
 {
     MeshDraw draws[];
 };
 
-layout(set = 0, binding = 7) buffer CommandCount
+layout(set = 1, binding = 7) buffer CommandCount
 {
 	uint commandCount;
 	uint groupCountX;
@@ -39,22 +40,37 @@ void main()
     if (di >= PushConstants.drawCount)
         return;
 
-    MeshDraw draw = draws[di];
+    MeshDraw meshDraw = draws[di];
 
-    // Calculate the number of task groups needed to process all meshlets in the draw call
-    uint taskGroups = (draw.meshletCount + TASK_WGSIZE - 1) / TASK_WGSIZE;
+	vec3 center = transform(meshDraw.center, meshDraw.position, meshDraw.scale, meshDraw.orientation);
+    vec4 viewCenter = cullView * vec4(center, 1.0);
+	float radius = meshDraw.radius * meshDraw.scale;
+
+	bool visible = true;
+
+	bool frustum_visible = true;
+	    for ( uint i = 0; i < 6; ++i ) {
+	        frustum_visible = frustum_visible && (dot( frustum[i], viewCenter) > -radius);
+	    }
+
+    visible = visible && frustum_visible;
+
+    if (visible) {
+        // Calculate the number of task groups needed to process all meshlets in the draw call
+        uint taskGroups = (meshDraw.meshletCount + TASK_WGSIZE - 1) / TASK_WGSIZE;
     
-    // Atomically add the number of task groups to the command count and retrieve the starting index   
-    uint dci = atomicAdd(commandCount, taskGroups);
+        // Atomically add the number of task groups to the command count and retrieve the starting index   
+        uint dci = atomicAdd(commandCount, taskGroups);
 
-    if (dci + taskGroups <= TASK_WGLIMIT)
-    {
-        // Generate task commands for each task group
-        for (uint i = 0; i < taskGroups; ++i)
+        if (dci + taskGroups <= TASK_WGLIMIT)
         {
-            taskCommands[dci + i].meshDrawId = di; // Associate task command with draw call ID
-            taskCommands[dci + i].taskOffset = draw.meshletOffset + i * TASK_WGSIZE; // Offset into the meshlet array
-            taskCommands[dci + i].taskCount = min(TASK_WGSIZE, draw.meshletCount - i * TASK_WGSIZE); // Number of meshlets to process
+            // Generate task commands for each task group
+            for (uint i = 0; i < taskGroups; ++i)
+            {
+                taskCommands[dci + i].meshDrawId = di; // Associate task command with draw call ID
+                taskCommands[dci + i].taskOffset = meshDraw.meshletOffset + i * TASK_WGSIZE; // Offset into the meshlet array
+                taskCommands[dci + i].taskCount = min(TASK_WGSIZE, meshDraw.meshletCount - i * TASK_WGSIZE); // Number of meshlets to process
+            }
         }
-    }
+	}
 }

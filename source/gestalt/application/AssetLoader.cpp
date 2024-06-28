@@ -536,22 +536,17 @@ namespace gestalt::application {
       const size_t vertex_count = vertex_positions.size();
       const size_t index_count = indices.size();
 
-      // Initialize local AABB with first vertex position
-      AABB local_aabb{vertex_positions[0].position, vertex_positions[0].position};
+      glm::vec3 center(0.0f);
 
-      // Update local AABB for each vertex
-      for (size_t i = 0; i < vertex_count; ++i) {
-        const glm::vec3& position = vertex_positions[i].position;
+      for (const auto& vertex : vertex_positions) {
+        center += vertex.position;
+      }
+      center /= static_cast<float>(vertex_positions.size());
 
-        // Update min position
-        local_aabb.min.x = std::min(local_aabb.min.x, position.x);
-        local_aabb.min.y = std::min(local_aabb.min.y, position.y);
-        local_aabb.min.z = std::min(local_aabb.min.z, position.z);
-
-        // Update max position
-        local_aabb.max.x = std::max(local_aabb.max.x, position.x);
-        local_aabb.max.y = std::max(local_aabb.max.y, position.y);
-        local_aabb.max.z = std::max(local_aabb.max.z, position.z);
+      float radius = 0.0f;
+      for (const auto& vertex : vertex_positions) {
+        float distance = glm::distance(center, vertex.position);
+        radius = std::max(radius, distance);
       }
 
       auto meshlet_count = meshlets.size();
@@ -568,7 +563,7 @@ namespace gestalt::application {
           .index_count = static_cast<uint32>(index_count),
           .first_index = static_cast<uint32>(repository_->indices.size()),
           .vertex_offset = static_cast<uint32>(repository_->vertex_positions.size()),
-          .local_bounds = local_aabb,
+          .local_bounds = BoundingSphere{center, radius},
           .mesh_draw = mesh_draw,    
       };
 
@@ -585,18 +580,21 @@ namespace gestalt::application {
                                     const std::string& name) const {
       size_t mesh_id = repository_->meshes.size();
       const std::string key = name.empty() ? "mesh_" + std::to_string(mesh_id) : name;
-      AABB aabb;
-      for (MeshSurface& surface : surfaces) {
-        auto& [min, max, is_dirty] = surface.local_bounds;
-        aabb.min.x = std::min(aabb.min.x, min.x);
-        aabb.min.y = std::min(aabb.min.y, min.y);
-        aabb.min.z = std::min(aabb.min.z, min.z);
 
-        aabb.max.x = std::max(aabb.max.x, max.x);
-        aabb.max.y = std::max(aabb.max.y, max.y);
-        aabb.max.z = std::max(aabb.max.z, max.z);
+      glm::vec3 combined_center(0.0f);
+      for (const auto& surface : surfaces) {
+        combined_center += surface.local_bounds.center;
       }
-      mesh_id = repository_->meshes.add(Mesh{key, std::move(surfaces), aabb});
+      combined_center /= static_cast<float>(surfaces.size());
+
+      float combined_radius = 0.0f;
+      for (const auto& surface : surfaces) {
+        float distance = glm::distance(combined_center, surface.local_bounds.center)
+                         + surface.local_bounds.radius;
+        combined_radius = std::max(combined_radius, distance);
+      }
+
+      mesh_id = repository_->meshes.add(Mesh{key, std::move(surfaces), BoundingSphere{combined_center, combined_radius}});
       fmt::print("created mesh {}, mesh_id {}\n", key, mesh_id);
       return mesh_id;
     }

@@ -76,7 +76,7 @@ void main() {
     }
 
 	vec3 n = normalize(inNormal);
-	vec3 viewPos = -normalize(vec3(sceneData.view[0][2], sceneData.view[1][2], sceneData.view[2][2]));
+	vec3 viewPos = -normalize(vec3(view[0][2], view[1][2], view[2][2]));
 	if(hasNormalTexture) {
 		vec3 normal_sample = texture(nonuniformEXT(textures[normalIndex]), UV).rgb;
 		n = perturbNormal(n, normalize(viewPos - inPosition), normal_sample, UV);
