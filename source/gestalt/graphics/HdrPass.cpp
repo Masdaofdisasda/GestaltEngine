@@ -19,8 +19,8 @@ namespace gestalt::graphics {
           = RenderPassDependencyBuilder()
                 .add_shader(ShaderStage::kVertex, "fullscreen.vert.spv")
                 .add_shader(ShaderStage::kFragment, "hdr_bright_pass.frag.spv")
-                .add_image_attachment(registry_->attachments_.scene_color, ImageUsageType::kRead)
-                .add_image_attachment(registry_->attachments_.bright_pass, ImageUsageType::kWrite)
+                .add_image_attachment(registry_->resources_.scene_color, ImageUsageType::kRead)
+                .add_image_attachment(registry_->resources_.bright_pass, ImageUsageType::kWrite)
                 .set_push_constant_range(sizeof(RenderConfig::HdrParams),
                                          VK_SHADER_STAGE_FRAGMENT_BIT)
                 .build();
@@ -41,7 +41,7 @@ namespace gestalt::graphics {
       descriptor_set_ = registry_->descriptor_pool->allocate(gpu_->getDevice(),
                                                                       descriptor_layouts_.at(0));
 
-      const auto scene_ssao = registry_->attachments_.scene_color.image;
+      const auto scene_ssao = registry_->resources_.scene_color.image;
 
       begin_renderpass(cmd);
 
@@ -81,8 +81,8 @@ namespace gestalt::graphics {
           = RenderPassDependencyBuilder()
                 .add_shader(ShaderStage::kVertex, "fullscreen.vert.spv")
                 .add_shader(ShaderStage::kFragment, "hdr_bloom.frag.spv")
-                .add_image_attachment(registry_->attachments_.bright_pass, ImageUsageType::kCombined)
-                .add_image_attachment(registry_->attachments_.blur_y, ImageUsageType::kCombined)
+                .add_image_attachment(registry_->resources_.bright_pass, ImageUsageType::kCombined)
+                .add_image_attachment(registry_->resources_.blur_y, ImageUsageType::kCombined)
                 .set_push_constant_range(sizeof(BlurDirection), VK_SHADER_STAGE_FRAGMENT_BIT)
                 .build();
 
@@ -99,8 +99,8 @@ namespace gestalt::graphics {
     }
 
     void BloomBlurPass::execute(VkCommandBuffer cmd) {
-      const auto image_x = registry_->attachments_.bright_pass.image;
-      const auto image_y = registry_->attachments_.blur_y.image;
+      const auto image_x = registry_->resources_.bright_pass.image;
+      const auto image_y = registry_->resources_.blur_y.image;
 
       BlurDirection blur_direction{0};
 
@@ -161,8 +161,8 @@ namespace gestalt::graphics {
           = RenderPassDependencyBuilder()
                 .add_shader(ShaderStage::kVertex, "fullscreen.vert.spv")
                 .add_shader(ShaderStage::kFragment, "to_luminance.frag.spv")
-                .add_image_attachment(registry_->attachments_.scene_color, ImageUsageType::kRead, 2)
-                .add_image_attachment(registry_->attachments_.lum_64, ImageUsageType::kWrite, 0)
+                .add_image_attachment(registry_->resources_.scene_color, ImageUsageType::kRead, 2)
+                .add_image_attachment(registry_->resources_.lum_64, ImageUsageType::kWrite, 0)
                 .build();
 
       create_pipeline_layout();
@@ -181,7 +181,7 @@ namespace gestalt::graphics {
       descriptor_set_
           = registry_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(0));
 
-      const auto scene_color = registry_->attachments_.scene_color.image;
+      const auto scene_color = registry_->resources_.scene_color.image;
 
       begin_renderpass(cmd);
 
@@ -217,13 +217,13 @@ namespace gestalt::graphics {
           = RenderPassDependencyBuilder()
                 .add_shader(ShaderStage::kVertex, "fullscreen.vert.spv")
                 .add_shader(ShaderStage::kFragment, "downscale2x2.frag.spv")
-                .add_image_attachment(registry_->attachments_.lum_64, ImageUsageType::kRead, 1)
-                .add_image_attachment(registry_->attachments_.lum_32, ImageUsageType::kWrite)
-                .add_image_attachment(registry_->attachments_.lum_16, ImageUsageType::kCombined)
-                .add_image_attachment(registry_->attachments_.lum_8, ImageUsageType::kCombined)
-                .add_image_attachment(registry_->attachments_.lum_4, ImageUsageType::kCombined)
-                .add_image_attachment(registry_->attachments_.lum_2, ImageUsageType::kCombined)
-                .add_image_attachment(registry_->attachments_.lum_1, ImageUsageType::kCombined)
+                .add_image_attachment(registry_->resources_.lum_64, ImageUsageType::kRead, 1)
+                .add_image_attachment(registry_->resources_.lum_32, ImageUsageType::kWrite)
+                .add_image_attachment(registry_->resources_.lum_16, ImageUsageType::kCombined)
+                .add_image_attachment(registry_->resources_.lum_8, ImageUsageType::kCombined)
+                .add_image_attachment(registry_->resources_.lum_4, ImageUsageType::kCombined)
+                .add_image_attachment(registry_->resources_.lum_2, ImageUsageType::kCombined)
+                .add_image_attachment(registry_->resources_.lum_1, ImageUsageType::kCombined)
                 .build();
 
       create_pipeline_layout();
@@ -293,9 +293,9 @@ namespace gestalt::graphics {
           = RenderPassDependencyBuilder()
                 .add_shader(ShaderStage::kVertex, "fullscreen.vert.spv")
                 .add_shader(ShaderStage::kFragment, "hdr_light_adaptation.frag.spv")
-                .add_image_attachment(registry_->attachments_.lum_1, ImageUsageType::kRead, 1)
-                .add_image_attachment(registry_->attachments_.lum_A, ImageUsageType::kCombined, 0)
-                .add_image_attachment(registry_->attachments_.lum_B, ImageUsageType::kCombined, 0)
+                .add_image_attachment(registry_->resources_.lum_1, ImageUsageType::kRead, 1)
+                .add_image_attachment(registry_->resources_.lum_A, ImageUsageType::kCombined, 0)
+                .add_image_attachment(registry_->resources_.lum_B, ImageUsageType::kCombined, 0)
                 .set_push_constant_range(sizeof(RenderConfig::LightAdaptationParams),
                                          VK_SHADER_STAGE_FRAGMENT_BIT)
                 .build();
@@ -322,11 +322,11 @@ namespace gestalt::graphics {
 
       const auto frame = current_frame_index;
 
-      const auto current_lum = registry_->attachments_.lum_1.image;
+      const auto current_lum = registry_->resources_.lum_1.image;
       const auto avg_lum
-          = frame == 0 ? registry_->attachments_.lum_A.image : registry_->attachments_.lum_B.image;
+          = frame == 0 ? registry_->resources_.lum_A.image : registry_->resources_.lum_B.image;
       const auto new_lum
-          = frame == 0 ? registry_->attachments_.lum_B.image : registry_->attachments_.lum_A.image;
+          = frame == 0 ? registry_->resources_.lum_B.image : registry_->resources_.lum_A.image;
 
       vkutil::TransitionImage(current_lum).toLayoutRead().andSubmitTo(cmd);
       vkutil::TransitionImage(avg_lum).toLayoutRead().andSubmitTo(cmd);
@@ -380,11 +380,11 @@ namespace gestalt::graphics {
           = RenderPassDependencyBuilder()
                 .add_shader(ShaderStage::kVertex, "fullscreen.vert.spv")
                 .add_shader(ShaderStage::kFragment, "hdr_final.frag.spv")
-                .add_image_attachment(registry_->attachments_.bright_pass, ImageUsageType::kRead, 1)
-                .add_image_attachment(registry_->attachments_.scene_color, ImageUsageType::kRead, 3)
-                .add_image_attachment(registry_->attachments_.lum_A, ImageUsageType::kRead, 1)
-                .add_image_attachment(registry_->attachments_.lum_B, ImageUsageType::kRead, 1)
-                .add_image_attachment(registry_->attachments_.final_color, ImageUsageType::kWrite, 0)
+                .add_image_attachment(registry_->resources_.bright_pass, ImageUsageType::kRead, 1)
+                .add_image_attachment(registry_->resources_.scene_color, ImageUsageType::kRead, 3)
+                .add_image_attachment(registry_->resources_.lum_A, ImageUsageType::kRead, 1)
+                .add_image_attachment(registry_->resources_.lum_B, ImageUsageType::kRead, 1)
+                .add_image_attachment(registry_->resources_.final_color, ImageUsageType::kWrite, 0)
                 .set_push_constant_range(sizeof(RenderConfig::HdrParams),
                                          VK_SHADER_STAGE_FRAGMENT_BIT)
                 .build();
@@ -406,10 +406,10 @@ namespace gestalt::graphics {
           = registry_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(0));
 
       const auto frame = current_frame_index;
-      const auto scene_linear = registry_->attachments_.scene_color.image;
-      const auto scene_bloom = registry_->attachments_.bright_pass.image;
-      const auto lum_image = frame == 0 ? registry_->attachments_.lum_B.image
-                                            : registry_->attachments_.lum_A.image;
+      const auto scene_linear = registry_->resources_.scene_color.image;
+      const auto scene_bloom = registry_->resources_.bright_pass.image;
+      const auto lum_image = frame == 0 ? registry_->resources_.lum_B.image
+                                            : registry_->resources_.lum_A.image;
 
       begin_renderpass(cmd);
 

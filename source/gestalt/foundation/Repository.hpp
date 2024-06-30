@@ -126,8 +126,6 @@ namespace gestalt::foundation {
       VkSampler nearestSampler;
     } default_material_ = {};
 
-    MaterialData material_data; // todo save as buffer
-
     GpuDataContainer<GpuVertexPosition> vertex_positions;
     GpuDataContainer<GpuVertexData> vertex_data;
     GpuDataContainer<uint32> indices;

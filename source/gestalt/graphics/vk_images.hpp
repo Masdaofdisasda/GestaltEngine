@@ -8,6 +8,17 @@
 
 namespace gestalt::graphics::vkutil {
 
+  class TransitionBuffer {
+  public:
+    explicit TransitionBuffer(const AllocatedBuffer& buffer);
+    TransitionBuffer& waitForRead();
+    TransitionBuffer& waitForWrite();
+    void andSubmitTo(const VkCommandBuffer cmd);
+  private:
+    AllocatedBuffer buffer_;
+    VkBufferMemoryBarrier2 bufferBarrier = {};
+  };
+
       class TransitionImage {
       public:
         explicit TransitionImage(const std::shared_ptr<TextureHandle>& image);

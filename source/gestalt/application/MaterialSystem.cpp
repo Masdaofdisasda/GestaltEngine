@@ -3,6 +3,9 @@
 namespace gestalt::application {
 
   void MaterialSystem::write_material(PbrMaterial& material, const uint32 material_id) {
+
+    MaterialBuffers& material_data = repository_->get_buffer<MaterialBuffers>();
+
     writer_->clear();
 
     std::vector<VkDescriptorImageInfo> imageInfos
@@ -20,7 +23,7 @@ namespace gestalt::application {
     const uint32 texture_start = imageInfos.size() * material_id;
     writer_->write_image_array(4, imageInfos, texture_start);
 
-    writer_->update_set(gpu_->getDevice(), repository_->material_data.resource_set);
+    writer_->update_set(gpu_->getDevice(), material_data.resource_set);
 
     if (material.constants.albedo_tex_index != kUnusedTexture) {
       material.constants.albedo_tex_index = texture_start;
@@ -39,10 +42,10 @@ namespace gestalt::application {
     }
 
     PbrMaterial::PbrConstants* mappedData;
-    vmaMapMemory(gpu_->getAllocator(), repository_->material_data.constants_buffer.allocation,
+    vmaMapMemory(gpu_->getAllocator(), material_data.constants_buffer.allocation,
                  (void**)&mappedData);
     memcpy(mappedData + material_id, &material.constants, sizeof(PbrMaterial::PbrConstants));
-    vmaUnmapMemory(gpu_->getAllocator(), repository_->material_data.constants_buffer.allocation);
+    vmaUnmapMemory(gpu_->getAllocator(), material_data.constants_buffer.allocation);
   }
 
   void MaterialSystem::create_defaults() {
@@ -127,19 +130,20 @@ namespace gestalt::application {
 
     std::vector<PbrMaterial::PbrConstants> material_constants(getMaxMaterials());
 
+    MaterialBuffers& material_data = repository_->get_buffer<MaterialBuffers>();
+
     PbrMaterial::PbrConstants* mappedData;
-    VK_CHECK(vmaMapMemory(gpu_->getAllocator(),
-                          repository_->material_data.constants_buffer.allocation,
+    VK_CHECK(vmaMapMemory(gpu_->getAllocator(), material_data.constants_buffer.allocation,
                           (void**)&mappedData));
     memcpy(mappedData, material_constants.data(),
            sizeof(PbrMaterial::PbrConstants) * getMaxMaterials());
 
-    vmaUnmapMemory(gpu_->getAllocator(), repository_->material_data.constants_buffer.allocation);
+    vmaUnmapMemory(gpu_->getAllocator(), material_data.constants_buffer.allocation);
 
     std::vector<VkDescriptorBufferInfo> bufferInfos;
     for (int i = 0; i < material_constants.size(); ++i) {
       VkDescriptorBufferInfo bufferInfo = {};
-      bufferInfo.buffer = repository_->material_data.constants_buffer.buffer;
+      bufferInfo.buffer = material_data.constants_buffer.buffer;
       bufferInfo.offset = sizeof(PbrMaterial::PbrConstants) * i;
       bufferInfo.range = sizeof(PbrMaterial::PbrConstants);
       bufferInfos.push_back(bufferInfo);
@@ -147,7 +151,7 @@ namespace gestalt::application {
 
     writer_->clear();
     writer_->write_buffer_array(5, bufferInfos, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0);
-    writer_->update_set(gpu_->getDevice(), repository_->material_data.constants_set);
+    writer_->update_set(gpu_->getDevice(), material_data.constants_set);
 
     writer_->clear();
     std::vector<VkDescriptorImageInfo> imageInfos{getMaxTextures()};
@@ -159,11 +163,12 @@ namespace gestalt::application {
       imageInfos[i] = image_info;
     }
     writer_->write_image_array(4, imageInfos, 0);
-    writer_->update_set(gpu_->getDevice(), repository_->material_data.resource_set);
+    writer_->update_set(gpu_->getDevice(), material_data.resource_set);
   }
 
   void MaterialSystem::prepare() {
-    auto& material_data = repository_->material_data;
+
+    MaterialBuffers material_data{};
 
     material_data.constants_buffer = resource_manager_->create_buffer(
         sizeof(PbrMaterial::PbrConstants) * getMaxMaterials(),
@@ -182,6 +187,7 @@ namespace gestalt::application {
         gpu_->getDevice(), material_data.resource_layout, {getMaxTextures()});
     material_data.constants_set = resource_manager_->get_descriptor_pool()->allocate(
         gpu_->getDevice(), material_data.constants_layout, {getMaxMaterials()});
+    repository_->register_buffer(material_data);
 
     create_defaults();
 
@@ -232,7 +238,7 @@ namespace gestalt::application {
 
     repository_->materials.clear();
 
-    const auto& materials = repository_->material_data;
+    const auto& materials = repository_->get_buffer<MaterialBuffers>();
     resource_manager_->destroy_buffer(materials.constants_buffer);
     if (materials.resource_layout != VK_NULL_HANDLE) {
       vkDestroyDescriptorSetLayout(gpu_->getDevice(), materials.resource_layout, nullptr);

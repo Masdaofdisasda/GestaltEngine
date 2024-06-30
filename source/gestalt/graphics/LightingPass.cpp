@@ -34,12 +34,12 @@ namespace gestalt:: graphics {
           = RenderPassDependencyBuilder()
                 .add_shader(ShaderStage::kVertex, "fullscreen.vert.spv")
                 .add_shader(ShaderStage::kFragment, "pbr_lighting.frag.spv")
-                .add_image_attachment(registry_->attachments_.gbuffer1, ImageUsageType::kRead, 1)
-                .add_image_attachment(registry_->attachments_.gbuffer2, ImageUsageType::kRead, 1)
-                .add_image_attachment(registry_->attachments_.gbuffer3, ImageUsageType::kRead, 1)
-                .add_image_attachment(registry_->attachments_.shadow_map, ImageUsageType::kRead, 1)
-                .add_image_attachment(registry_->attachments_.scene_color, ImageUsageType::kWrite, 0)
-                .add_image_attachment(registry_->attachments_.scene_depth, ImageUsageType::kRead,
+                .add_image_attachment(registry_->resources_.gbuffer1, ImageUsageType::kRead, 1)
+                .add_image_attachment(registry_->resources_.gbuffer2, ImageUsageType::kRead, 1)
+                .add_image_attachment(registry_->resources_.gbuffer3, ImageUsageType::kRead, 1)
+                .add_image_attachment(registry_->resources_.shadow_map, ImageUsageType::kRead, 1)
+                .add_image_attachment(registry_->resources_.scene_color, ImageUsageType::kWrite, 0)
+                .add_image_attachment(registry_->resources_.scene_depth, ImageUsageType::kRead,
                                       1)
                 .set_push_constant_range(sizeof(RenderConfig::LightingParams),
                                          VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -75,11 +75,11 @@ namespace gestalt:: graphics {
 
       vkCmdBindIndexBuffer(cmd, mesh_buffers.index_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-      const auto gbuffer_1 = registry_->attachments_.gbuffer1.image;
-      const auto gbuffer_2 = registry_->attachments_.gbuffer2.image;
-      const auto gbuffer_3 = registry_->attachments_.gbuffer3.image;
-      const auto gbuffer_depth = registry_->attachments_.scene_depth.image;
-      const auto shadow_map = registry_->attachments_.shadow_map.image;
+      const auto gbuffer_1 = registry_->resources_.gbuffer1.image;
+      const auto gbuffer_2 = registry_->resources_.gbuffer2.image;
+      const auto gbuffer_3 = registry_->resources_.gbuffer3.image;
+      const auto gbuffer_depth = registry_->resources_.scene_depth.image;
+      const auto shadow_map = registry_->resources_.shadow_map.image;
 
       writer_.clear();
       writer_.write_image(10, gbuffer_1->imageView, repository_->default_material_.nearestSampler,

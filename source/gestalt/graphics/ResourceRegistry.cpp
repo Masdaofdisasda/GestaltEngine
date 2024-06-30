@@ -11,28 +11,28 @@ namespace gestalt::graphics {
     void ResourceRegistry::init(const std::shared_ptr<IGpu>& gpu) {
       gpu_ = gpu;
 
-      attachment_list_.push_back(attachments_.scene_color);
-      attachment_list_.push_back(attachments_.final_color);
-      attachment_list_.push_back(attachments_.scene_depth);
-      attachment_list_.push_back(attachments_.shadow_map);
+      attachment_list_.push_back(resources_.scene_color);
+      attachment_list_.push_back(resources_.final_color);
+      attachment_list_.push_back(resources_.scene_depth);
+      attachment_list_.push_back(resources_.shadow_map);
 
-      attachment_list_.push_back(attachments_.gbuffer1);
-      attachment_list_.push_back(attachments_.gbuffer2);
-      attachment_list_.push_back(attachments_.gbuffer3);
+      attachment_list_.push_back(resources_.gbuffer1);
+      attachment_list_.push_back(resources_.gbuffer2);
+      attachment_list_.push_back(resources_.gbuffer3);
 
-      attachment_list_.push_back(attachments_.bright_pass);
-      attachment_list_.push_back(attachments_.blur_y);
+      attachment_list_.push_back(resources_.bright_pass);
+      attachment_list_.push_back(resources_.blur_y);
 
-      attachment_list_.push_back(attachments_.lum_64);
-      attachment_list_.push_back(attachments_.lum_32);
-      attachment_list_.push_back(attachments_.lum_16);
-      attachment_list_.push_back(attachments_.lum_8);
-      attachment_list_.push_back(attachments_.lum_4);
-      attachment_list_.push_back(attachments_.lum_2);
-      attachment_list_.push_back(attachments_.lum_1);
+      attachment_list_.push_back(resources_.lum_64);
+      attachment_list_.push_back(resources_.lum_32);
+      attachment_list_.push_back(resources_.lum_16);
+      attachment_list_.push_back(resources_.lum_8);
+      attachment_list_.push_back(resources_.lum_4);
+      attachment_list_.push_back(resources_.lum_2);
+      attachment_list_.push_back(resources_.lum_1);
 
-      attachment_list_.push_back(attachments_.lum_A);
-      attachment_list_.push_back(attachments_.lum_B);
+      attachment_list_.push_back(resources_.lum_A);
+      attachment_list_.push_back(resources_.lum_B);
     }
 
     VkShaderModule ResourceRegistry::get_shader(const ShaderProgram& shader_program) {

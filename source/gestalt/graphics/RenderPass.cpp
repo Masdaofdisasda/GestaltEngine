@@ -22,8 +22,15 @@ namespace gestalt::graphics {
       return *this;
     }
 
+    RenderPassDependencyBuilder& RenderPassDependencyBuilder::add_buffer_dependency(
+        const std::shared_ptr<AllocatedBuffer>& buffer, const BufferUsageType usage,
+        const uint32 required_version) {
+      dependency_. buffer_dependencies.push_back({buffer, usage, required_version});
+      return *this;
+    }
+
     RenderPassDependencyBuilder& RenderPassDependencyBuilder::set_push_constant_range(uint32_t size,
-        VkShaderStageFlags stage_flags) {
+                                                                                      VkShaderStageFlags stage_flags) {
       dependency_.push_constant_range = {
           .stageFlags = stage_flags,
           .offset = 0,

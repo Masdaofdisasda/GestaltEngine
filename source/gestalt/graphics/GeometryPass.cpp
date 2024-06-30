@@ -12,20 +12,21 @@ namespace gestalt::graphics {
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
       const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
       const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
+      const auto& material_buffers = repository_->get_buffer<MaterialBuffers>();
       descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
       descriptor_layouts_.push_back(ibl_buffers.descriptor_layout);
-      descriptor_layouts_.push_back(repository_->material_data.resource_layout);
-      descriptor_layouts_.push_back(repository_->material_data.constants_layout);
+      descriptor_layouts_.push_back(material_buffers.resource_layout);
+      descriptor_layouts_.push_back(material_buffers.constants_layout);
       descriptor_layouts_.push_back(mesh_buffers.descriptor_layout);
 
       dependencies_
           = RenderPassDependencyBuilder()
                 .add_shader(ShaderStage::kVertex, "geometry.vert.spv")
                 .add_shader(ShaderStage::kFragment, "geometry_deferred.frag.spv")
-                .add_image_attachment(registry_->attachments_.gbuffer1, ImageUsageType::kWrite)
-                .add_image_attachment(registry_->attachments_.gbuffer2, ImageUsageType::kWrite)
-                .add_image_attachment(registry_->attachments_.gbuffer3, ImageUsageType::kWrite)
-                .add_image_attachment(registry_->attachments_.scene_depth, ImageUsageType::kWrite, 0,
+                .add_image_attachment(registry_->resources_.gbuffer1, ImageUsageType::kWrite)
+                .add_image_attachment(registry_->resources_.gbuffer2, ImageUsageType::kWrite)
+                .add_image_attachment(registry_->resources_.gbuffer3, ImageUsageType::kWrite)
+                .add_image_attachment(registry_->resources_.scene_depth, ImageUsageType::kWrite, 0,
                                       ImageClearOperation::kClear)
                 .set_push_constant_range(sizeof(MeshletPushConstants), VK_SHADER_STAGE_VERTEX_BIT)
                 .build();
@@ -52,13 +53,14 @@ namespace gestalt::graphics {
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
       const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
       const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
+      const auto& material_buffers = repository_->get_buffer<MaterialBuffers>();
 
       vkCmdBindIndexBuffer(cmd, mesh_buffers.index_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
       VkDescriptorSet descriptorSets[]
           = {per_frame_buffers.descriptor_sets[frame], ibl_buffers.descriptor_set,
-             repository_->material_data.resource_set, repository_->material_data.constants_set,
+             material_buffers.resource_set, material_buffers.constants_set,
              mesh_buffers.descriptor_sets[frame]};
       vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 5,
                               descriptorSets, 0, nullptr);
@@ -183,10 +185,11 @@ namespace gestalt::graphics {
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
       const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
       const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
+      const auto& material_buffers = repository_->get_buffer<MaterialBuffers>();
       descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
       descriptor_layouts_.push_back(ibl_buffers.descriptor_layout);
-      descriptor_layouts_.push_back(repository_->material_data.resource_layout);
-      descriptor_layouts_.push_back(repository_->material_data.constants_layout);
+      descriptor_layouts_.push_back(material_buffers.resource_layout);
+      descriptor_layouts_.push_back(material_buffers.constants_layout);
       descriptor_layouts_.push_back(mesh_buffers.descriptor_layout);
 
       dependencies_
@@ -194,13 +197,13 @@ namespace gestalt::graphics {
                 .add_shader(ShaderStage::kTask, "geometry.task.spv")
                 .add_shader(ShaderStage::kMesh, "geometry.mesh.spv")
                 .add_shader(ShaderStage::kFragment, "geometry_deferred.frag.spv")
-                .add_image_attachment(registry_->attachments_.gbuffer1, ImageUsageType::kWrite, 0,
+                .add_image_attachment(registry_->resources_.gbuffer1, ImageUsageType::kWrite, 0,
                                       ImageClearOperation::kClear)
-                .add_image_attachment(registry_->attachments_.gbuffer2, ImageUsageType::kWrite, 0,
+                .add_image_attachment(registry_->resources_.gbuffer2, ImageUsageType::kWrite, 0,
                                       ImageClearOperation::kClear)
-                .add_image_attachment(registry_->attachments_.gbuffer3, ImageUsageType::kWrite, 0,
+                .add_image_attachment(registry_->resources_.gbuffer3, ImageUsageType::kWrite, 0,
                                       ImageClearOperation::kClear)
-                .add_image_attachment(registry_->attachments_.scene_depth, ImageUsageType::kWrite,
+                .add_image_attachment(registry_->resources_.scene_depth, ImageUsageType::kWrite,
                                       0, ImageClearOperation::kClear)
                 .set_push_constant_range(
                     sizeof(MeshletPushConstants),
@@ -228,11 +231,12 @@ namespace gestalt::graphics {
       const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
       const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
       const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
+      const auto& material_buffers = repository_->get_buffer<MaterialBuffers>();
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
       const VkDescriptorSet descriptorSets[]
           = {per_frame_buffers.descriptor_sets[frame], ibl_buffers.descriptor_set,
-             repository_->material_data.resource_set, repository_->material_data.constants_set,
+             material_buffers.resource_set, material_buffers.constants_set,
              mesh_buffers.descriptor_sets[frame]};
       vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 5,
                               descriptorSets, 0, nullptr);

@@ -88,6 +88,10 @@ namespace gestalt::foundation {
       VkBuffer buffer;
       VmaAllocation allocation;
       VmaAllocationInfo info;
+
+      VkAccessFlags2 currentAccess = 0;        // Current access flags
+      VkPipelineStageFlags2 currentStage = 0;  // Current pipeline stage
+      VkBufferUsageFlags usage;               // Buffer usage flags
     };
 
     struct alignas(32) GpuDirectionalLight {
@@ -104,7 +108,7 @@ namespace gestalt::foundation {
       bool enabled;
     };
 
-      struct MaterialData {
+      struct MaterialBuffers {
       VkDescriptorSet resource_set;
       VkDescriptorSetLayout resource_layout;
 

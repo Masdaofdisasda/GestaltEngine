@@ -62,9 +62,25 @@ namespace gestalt::graphics {
       uint32 required_version = 0;
     };
 
+  struct BufferResource {
+      std::shared_ptr<AllocatedBuffer> buffer;
+  };
+
+  enum class BufferUsageType {
+    kRead,
+    kWrite,
+  };
+
+  struct BufferDependency {
+    BufferResource resource;
+    BufferUsageType usage;
+    uint32 required_version = 0;
+    };
+
     struct RenderPassDependency {
       std::vector<ShaderProgram> shaders;
       std::vector<ImageDependency> image_attachments;
+      std::vector<BufferDependency> buffer_dependencies;
       VkPushConstantRange push_constant_range;
     };
 
@@ -83,6 +99,10 @@ namespace gestalt::graphics {
                                                         const ImageClearOperation clear_operation
                                                         = ImageClearOperation::kDontCare);
 
+      RenderPassDependencyBuilder& add_buffer_dependency(const std::shared_ptr<AllocatedBuffer>& buffer,
+                                                         const BufferUsageType usage,
+                                                         const uint32 required_version = 0);
+
       RenderPassDependencyBuilder& set_push_constant_range(uint32 size,
                                                            VkShaderStageFlags stage_flags);
       RenderPassDependency build();
@@ -98,7 +118,7 @@ namespace gestalt::graphics {
       RenderConfig config_;
       DescriptorAllocatorGrowable* descriptor_pool;
 
-      struct RenderPassAttachments {
+      struct RenderPassResources {
         ImageAttachment scene_color{.image = std::make_shared<TextureHandle>(TextureType::kColor)};
         ImageAttachment final_color{.image = std::make_shared<TextureHandle>(TextureType::kColor)};
         ImageAttachment scene_depth{.image = std::make_shared<TextureHandle>(TextureType::kDepth)};
@@ -145,7 +165,7 @@ namespace gestalt::graphics {
                               .extent = {1, 1},
                               .format = VK_FORMAT_R16_SFLOAT,
                               .initial_value = {{1e7f, 0.f, 0.f, 1.f}}};
-      } attachments_;
+      } resources_;
 
       std::vector<ImageAttachment> attachment_list_;
 
@@ -274,7 +294,6 @@ namespace gestalt::graphics {
 
       void create_resources() const;
       VkCommandBuffer start_draw();
-      void bufferUpdatebarrier(VkCommandBuffer cmd, VkBuffer buffer);
       void execute(const std::shared_ptr<RenderPass>& render_pass, VkCommandBuffer cmd);
 
     public:

@@ -53,6 +53,7 @@ namespace gestalt::graphics {
       vmaallocInfo.usage = memoryUsage;
       vmaallocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
       AllocatedBuffer newBuffer;
+      newBuffer.usage = usage;
 
       // allocate the buffer
       VK_CHECK(vmaCreateBuffer(gpu_->getAllocator(), &bufferInfo, &vmaallocInfo, &newBuffer.buffer,

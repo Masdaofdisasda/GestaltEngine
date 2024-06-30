@@ -13,8 +13,8 @@ namespace gestalt::graphics {
           = RenderPassDependencyBuilder()
                 .add_shader(ShaderStage::kVertex, "skybox.vert.spv")
                 .add_shader(ShaderStage::kFragment, "skybox.frag.spv")
-                .add_image_attachment(registry_->attachments_.scene_color, ImageUsageType::kWrite, 1)
-                .add_image_attachment(registry_->attachments_.scene_depth, ImageUsageType::kWrite, 1)
+                .add_image_attachment(registry_->resources_.scene_color, ImageUsageType::kWrite, 1)
+                .add_image_attachment(registry_->resources_.scene_depth, ImageUsageType::kWrite, 1)
                 .set_push_constant_range(sizeof(RenderConfig::SkyboxParams),
                                          VK_SHADER_STAGE_FRAGMENT_BIT)
                 .build();
@@ -70,8 +70,8 @@ namespace gestalt::graphics {
           = RenderPassDependencyBuilder()
                 .add_shader(ShaderStage::kVertex, "infinite_grid.vert.spv")
                 .add_shader(ShaderStage::kFragment, "infinite_grid.frag.spv")
-                .add_image_attachment(registry_->attachments_.scene_color, ImageUsageType::kWrite, 1)
-                .add_image_attachment(registry_->attachments_.scene_depth, ImageUsageType::kWrite, 1)
+                .add_image_attachment(registry_->resources_.scene_color, ImageUsageType::kWrite, 1)
+                .add_image_attachment(registry_->resources_.scene_depth, ImageUsageType::kWrite, 1)
       .set_push_constant_range( sizeof(RenderConfig::GridParams),
                                VK_SHADER_STAGE_FRAGMENT_BIT)
                 .build();
@@ -130,9 +130,9 @@ namespace gestalt::graphics {
           = RenderPassDependencyBuilder()
                 .add_shader(ShaderStage::kVertex, "debug_aabb.vert.spv")
                 .add_shader(ShaderStage::kFragment, "debug_aabb.frag.spv")
-                .add_image_attachment(registry_->attachments_.scene_color, ImageUsageType::kWrite,
+                .add_image_attachment(registry_->resources_.scene_color, ImageUsageType::kWrite,
                                       1)
-                .add_image_attachment(registry_->attachments_.scene_depth,
+                .add_image_attachment(registry_->resources_.scene_depth,
                                       ImageUsageType::kDepthStencilRead, 1)
                 .set_push_constant_range(sizeof(AabbBvhPushConstants), VK_SHADER_STAGE_VERTEX_BIT)
                 .build();
@@ -202,9 +202,9 @@ namespace gestalt::graphics {
           = RenderPassDependencyBuilder()
                 .add_shader(ShaderStage::kVertex, "debug_bound_sphere.vert.spv")
                 .add_shader(ShaderStage::kFragment, "debug_bound_sphere.frag.spv")
-                .add_image_attachment(registry_->attachments_.scene_color, ImageUsageType::kWrite,
+                .add_image_attachment(registry_->resources_.scene_color, ImageUsageType::kWrite,
                                       1)
-                .add_image_attachment(registry_->attachments_.scene_depth, ImageUsageType::kDepthStencilRead,
+                .add_image_attachment(registry_->resources_.scene_depth, ImageUsageType::kDepthStencilRead,
                                       1)
                           .set_push_constant_range(sizeof(BoundingSpherePushConstants),
                                          VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
