@@ -15,10 +15,10 @@
 #include "vk_initializers.hpp"
 
 namespace gestalt::graphics {
-  void RenderPipeline::init(const std::shared_ptr<IGpu>& gpu, const std::shared_ptr<Window>& window,
-                            const std::shared_ptr<ResourceManager>& resource_manager,
-                            const std::shared_ptr<Repository>& repository,
-                            const std::shared_ptr<Gui>& imgui_gui) {
+  void RenderPipeline::init(IGpu* gpu, Window* window,
+                            ResourceManager* resource_manager,
+                            Repository* repository,
+                            Gui* imgui_gui) {
     gpu_ = gpu;
     window_ = window;
     resource_manager_ = resource_manager;
@@ -27,7 +27,7 @@ namespace gestalt::graphics {
 
     swapchain_->init(gpu_, {window_->extent.width, window_->extent.height, 1});
 
-    resource_registry_->init(gpu_);
+    resource_registry_->init(gpu_, repository_);
 
     render_passes_.push_back(std::make_shared<DirectionalDepthPass>());
     // render_passes_.push_back(std::make_shared<DeferredPass>());
@@ -52,7 +52,7 @@ namespace gestalt::graphics {
     create_resources();
 
     for (const auto& pass : render_passes_) {
-      pass->init(gpu_, resource_manager_, resource_registry_, repository_);
+      pass->init(gpu_, resource_manager_, resource_registry_.get(), repository_);
     }
 
     resource_registry_->clear_shader_cache();
@@ -136,6 +136,19 @@ namespace gestalt::graphics {
       }
     }
 
+    for (auto& dependency : renderDependencies.buffer_dependencies) {
+      switch (dependency.usage) {
+        case BufferUsageType::kRead:
+          for (auto& resource : dependency.resource.buffer->get_buffers(current_frame_index))
+            vkutil::TransitionBuffer(resource).waitForRead().andSubmitTo(cmd);
+          break;
+        case BufferUsageType::kWrite:
+          for (auto& resource : dependency.resource.buffer->get_buffers(current_frame_index))
+            vkutil::TransitionBuffer(resource).waitForWrite().andSubmitTo(cmd);
+          break;
+      }
+    }
+
     // fmt::print("Executing {}\n", render_passes_[id]->get_name());
     render_pass->execute(cmd);
 
@@ -175,9 +188,6 @@ namespace gestalt::graphics {
   bool RenderPipeline::acquire_next_image() {
     VK_CHECK(vkWaitForFences(gpu_->getDevice(), 1, &frame().render_fence, true, UINT64_MAX));
 
-    frames_.get_current_frame().descriptor_pool.clear_pools(gpu_->getDevice());
-    resource_registry_->descriptor_pool = &frame().descriptor_pool;
-
     VkResult e
         = vkAcquireNextImageKHR(gpu_->getDevice(), swapchain_->swapchain, UINT64_MAX,
                                 frame().swapchain_semaphore, nullptr, &swapchain_image_index_);
@@ -216,33 +226,6 @@ namespace gestalt::graphics {
     }
 
     VkCommandBuffer cmd = start_draw();
-
-    const auto& perFrameDataBuffer = repository_->get_buffer<PerFrameDataBuffers>()
-                                         .uniform_buffers[frames_.get_current_frame_index()];
-    vkutil::TransitionBuffer(perFrameDataBuffer).waitForWrite().andSubmitTo(cmd);
-
-    const auto& meshBuffers = repository_->get_buffer<MeshBuffers>();
-    vkutil::TransitionBuffer(meshBuffers.index_buffer).waitForWrite().andSubmitTo(cmd);
-    vkutil::TransitionBuffer(meshBuffers.vertex_position_buffer).waitForWrite().andSubmitTo(cmd);
-    vkutil::TransitionBuffer(meshBuffers.vertex_data_buffer).waitForWrite().andSubmitTo(cmd);
-    vkutil::TransitionBuffer(meshBuffers.meshlet_buffer).waitForWrite().andSubmitTo(cmd);
-    vkutil::TransitionBuffer(meshBuffers.meshlet_vertices).waitForWrite().andSubmitTo(cmd);
-    vkutil::TransitionBuffer(meshBuffers.meshlet_triangles).waitForWrite().andSubmitTo(cmd);
-    vkutil::TransitionBuffer(meshBuffers.mesh_draw_buffer[frames_.get_current_frame_index()])
-        .waitForWrite()
-        .andSubmitTo(cmd);
-
-    const auto& lightBuffers = repository_->get_buffer<LightBuffers>();
-    vkutil::TransitionBuffer(lightBuffers.dir_light_buffer).waitForWrite().andSubmitTo(cmd);
-    vkutil::TransitionBuffer(lightBuffers.point_light_buffer)
-        .waitForWrite()
-        .andSubmitTo(cmd);
-    vkutil::TransitionBuffer(lightBuffers.view_proj_matrices)
-        .waitForWrite()
-        .andSubmitTo(cmd);
-
-    const auto& materialData = repository_->get_buffer<MaterialBuffers>();
-    vkutil::TransitionBuffer(materialData.constants_buffer);
 
     for (auto& renderpass : render_passes_) {
       ZoneScopedN("Execute Pass");
@@ -284,7 +267,7 @@ namespace gestalt::graphics {
         .andSubmitTo(cmd);
     swapchain_image->setFormat(VK_FORMAT_UNDEFINED);
 
-    
+    /*
     vkutil::TransitionBuffer(perFrameDataBuffer).waitForRead().andSubmitTo(cmd);
     vkutil::TransitionBuffer(meshBuffers.index_buffer).waitForRead().andSubmitTo(cmd);
     vkutil::TransitionBuffer(meshBuffers.vertex_position_buffer).waitForRead().andSubmitTo(cmd);
@@ -298,7 +281,7 @@ namespace gestalt::graphics {
     vkutil::TransitionBuffer(lightBuffers.dir_light_buffer).waitForRead().andSubmitTo(cmd);
     vkutil::TransitionBuffer(lightBuffers.point_light_buffer).waitForRead().andSubmitTo(cmd);
     vkutil::TransitionBuffer(lightBuffers.view_proj_matrices).waitForRead().andSubmitTo(cmd);
-    vkutil::TransitionBuffer(materialData.constants_buffer);
+    vkutil::TransitionBuffer(materialData.constants_buffer);*/
 
     present(cmd);
   }
@@ -346,7 +329,7 @@ namespace gestalt::graphics {
     frames_.advance_frame();
   }
 
-  void VkSwapchain::init(const std::shared_ptr<IGpu>& gpu, const VkExtent3D& extent) {
+  void VkSwapchain::init(IGpu* gpu, const VkExtent3D& extent) {
     gpu_ = gpu;
 
     create_swapchain(extent.width, extent.height);
@@ -392,7 +375,7 @@ namespace gestalt::graphics {
     }
   }
 
-  void VkSwapchain::resize_swapchain(const std::shared_ptr<Window>& window) {
+  void VkSwapchain::resize_swapchain(Window* window) {
     vkDeviceWaitIdle(gpu_->getDevice());
 
     destroy_swapchain();

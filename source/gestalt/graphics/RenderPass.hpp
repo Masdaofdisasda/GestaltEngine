@@ -11,13 +11,6 @@ namespace gestalt::graphics {
       void execute(VkCommandBuffer cmd) override;
       std::string get_name() const override { return "Direction Depth Pass"; }
     };
-    class DeferredPass final : public RenderPass {
-    public:
-      void prepare() override;
-      void destroy() override;
-      void execute(VkCommandBuffer cmd) override;
-      std::string get_name() const override { return "Deferred Pass"; }
-    };
     class DrawCullPass final : public RenderPass {
       public:
       void prepare() override;
@@ -41,7 +34,7 @@ namespace gestalt::graphics {
     };
     class LightingPass final : public RenderPass {
       DescriptorWriter writer_;
-      VkDescriptorSet descriptor_set_ = nullptr;
+      std::array<VkDescriptorSet, getFramesInFlight()> descriptor_sets;
 
     public:
       void prepare() override;
@@ -79,7 +72,7 @@ namespace gestalt::graphics {
     };
     class BrightPass final : public RenderPass {
       DescriptorWriter writer;
-      VkDescriptorSet descriptor_set_ = nullptr;
+      std::array<VkDescriptorSet, getFramesInFlight()> descriptor_sets;
 
     public:
       void prepare() override;
@@ -88,9 +81,13 @@ namespace gestalt::graphics {
       std::string get_name() const override { return "Bright Pass"; }
     };
 
+  constexpr uint8 kMaxBloomIterations = 6;
+
     class BloomBlurPass final : public RenderPass {
       DescriptorWriter writer;
-      VkDescriptorSet descriptor_set_ = nullptr;
+      std::array<std::array<VkDescriptorSet, kMaxBloomIterations>, getFramesInFlight()>
+          descriptor_sets;
+
 
     public:
       void prepare() override;
@@ -101,7 +98,7 @@ namespace gestalt::graphics {
 
     class LuminancePass final : public RenderPass {
       DescriptorWriter writer;
-      VkDescriptorSet descriptor_set_ = nullptr;
+      std::array<VkDescriptorSet, getFramesInFlight()> descriptor_sets;
 
     public:
       void prepare() override;
@@ -111,7 +108,8 @@ namespace gestalt::graphics {
     };
     class LuminanceDownscalePass final : public RenderPass {
       DescriptorWriter writer;
-      VkDescriptorSet descriptor_set_ = nullptr;
+      std::array<std::array<VkDescriptorSet, 10>, getFramesInFlight()>
+          descriptor_sets;
 
     public:
       void prepare() override;
@@ -122,7 +120,7 @@ namespace gestalt::graphics {
 
     class LightAdaptationPass final : public RenderPass {
       DescriptorWriter writer;
-      VkDescriptorSet descriptor_set_ = nullptr;
+      std::array<VkDescriptorSet,getFramesInFlight()> descriptor_sets;
 
     public:
       void prepare() override;
@@ -133,7 +131,7 @@ namespace gestalt::graphics {
 
     class TonemapPass final : public RenderPass {
       DescriptorWriter writer;
-      VkDescriptorSet descriptor_set_ = nullptr;
+      std::array<VkDescriptorSet, getFramesInFlight()> descriptor_sets;
 
     public:
       void prepare() override;

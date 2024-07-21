@@ -43,19 +43,21 @@ namespace gestalt::foundation {
   public:
     virtual ~IResourceManager() = default;
 
-    virtual void init(const std::shared_ptr<IGpu>& gpu,
-                      const std::shared_ptr<Repository>& repository)
+    virtual void init(IGpu* gpu, Repository* repository)
         = 0;
     virtual void cleanup() = 0;
 
     virtual void flush_loader() = 0;
 
-    virtual std::shared_ptr<IDescriptorAllocatorGrowable>& get_descriptor_pool() = 0;
+    virtual VkDescriptorSet allocateDescriptor(VkDescriptorSetLayout layout,
+                                               const std::vector<uint32_t>& variableDescriptorCounts
+                                               = {})
+        = 0;
 
-    virtual AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage,
+    virtual std::shared_ptr<AllocatedBuffer> create_buffer(size_t allocSize, VkBufferUsageFlags usage,
                                           VmaMemoryUsage memoryUsage)
         = 0;
-    virtual void destroy_buffer(const AllocatedBuffer& buffer) = 0;
+    virtual void destroy_buffer(const std::shared_ptr<AllocatedBuffer> buffer) = 0;
 
     virtual VkSampler create_sampler(const VkSamplerCreateInfo& sampler_create_info) const = 0;
 
@@ -124,20 +126,11 @@ namespace gestalt::foundation {
                                     VkDescriptorType type, uint32_t arrayElementStart)
         = 0;
     virtual void write_image_array(int binding,
-                                   const std::vector<VkDescriptorImageInfo>& imageInfos,
+                                   const std::array<VkDescriptorImageInfo, 5>& imageInfos,
                                    uint32_t arrayElementStart = 0)
         = 0;
 
     virtual void clear() = 0;
     virtual void update_set(VkDevice device, VkDescriptorSet set) = 0;
-  };
-
-  class IDescriptorUtilFactory {
-  public:
-    virtual ~IDescriptorUtilFactory() = default;
-    virtual std::unique_ptr<IDescriptorLayoutBuilder> create_descriptor_layout_builder() = 0;
-    virtual std::unique_ptr<IDescriptorWriter> create_descriptor_writer() = 0;
-    virtual std::unique_ptr<IDescriptorAllocatorGrowable> create_descriptor_allocator_growable()
-        = 0;
   };
 }  // namespace gestalt::foundation

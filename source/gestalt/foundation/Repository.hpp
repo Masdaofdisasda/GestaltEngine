@@ -10,20 +10,6 @@
 
 namespace gestalt::foundation {
 
-  class DataHolder {
-  public:
-    virtual ~DataHolder() = default;
-  };
-
-  template <typename T> class Holder : public DataHolder {
-  public:
-    T data;
-
-    // Constructor to initialize data if needed
-    Holder(const T& initialData) : data(initialData) {}
-    virtual ~Holder() = default;
-  };
-
   template <typename ComponentType> class ComponentContainer {
   public:
     size_t size() const { return components_.size(); }
@@ -89,29 +75,8 @@ namespace gestalt::foundation {
   };
 
   class Repository : public NonCopyable<Repository> {
-    std::unordered_map<std::type_index, std::unique_ptr<DataHolder>> holders;
 
   public:
-    template <typename T> void register_buffer(const T& data) {
-      const auto typeIndex = std::type_index(typeid(T));
-      assert(holders.find(typeIndex) == holders.end() && "Instance for this type already exists.");
-      holders[typeIndex] = std::make_unique<Holder<T>>(data);
-    }
-
-    template <typename T> T& get_buffer() {
-      const auto typeIndex = std::type_index(typeid(T));
-      assert(holders.find(typeIndex) != holders.end() && "Instance for this type does not exist.");
-      auto holder = dynamic_cast<Holder<T>*>(holders[typeIndex].get());
-      assert(holder != nullptr && "Holder cast failed.");
-      return holder->data;
-    }
-
-    template <typename T> void deregister_buffer() {
-      const auto typeIndex = std::type_index(typeid(T));
-      const auto it = holders.find(typeIndex);
-      assert(it != holders.end() && "Instance for this type does not exist.");
-      holders.erase(it);
-    }
 
     struct default_material {
       TextureHandle color_image;
@@ -125,6 +90,12 @@ namespace gestalt::foundation {
       VkSampler linearSampler;
       VkSampler nearestSampler;
     } default_material_ = {};
+
+    std::unique_ptr<MaterialBuffers> material_buffers = std::make_unique<MaterialBuffers>();
+    std::unique_ptr<IblBuffers> ibl_buffers = std::make_unique<IblBuffers>();
+    std::unique_ptr<MeshBuffers> mesh_buffers = std::make_unique<MeshBuffers>();
+    std::unique_ptr<LightBuffers> light_buffers = std::make_unique<LightBuffers>();
+    std::unique_ptr<PerFrameDataBuffers> per_frame_data_buffers = std::make_unique<PerFrameDataBuffers>();
 
     GpuDataContainer<GpuVertexPosition> vertex_positions;
     GpuDataContainer<GpuVertexData> vertex_data;

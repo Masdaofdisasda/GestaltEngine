@@ -15,6 +15,8 @@
 
 namespace gestalt::application {
 
+  constexpr int kMaxPoolElements = 128;
+
     void Gui::set_debug_texture(VkImageView image_view, VkSampler sampler) {
 
       if (descriptor_set_ != nullptr) {
@@ -25,43 +27,41 @@ namespace gestalt::application {
                                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
 
-    void Gui::init(const std::shared_ptr<IGpu>& gpu, std::shared_ptr<Window>& window,
+    void Gui::init(IGpu* gpu, Window* window,
                    VkFormat swapchainFormat,
-                   const std::shared_ptr<Repository>& repository,
-                   const std::unique_ptr<IDescriptorUtilFactory>& descriptor_util_factory,
-                   GuiCapabilities& actions) {
+                   Repository* repository,
+                   IDescriptorLayoutBuilder* builder,
+                   const GuiCapabilities& actions) {
       gpu_ = gpu;
       window_ = window;
       repository_ = repository;
       actions_ = actions;
 
       // 1: create descriptor pool for IMGUI
-      //  the size of the pool is very oversize, but it's copied from imgui demo
-      //  itself.
-      VkDescriptorPoolSize pool_sizes[] = {{VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
-                                           {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
-                                           {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000},
-                                           {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000},
-                                           {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000},
-                                           {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000},
-                                           {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000},
-                                           {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000},
-                                           {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000},
-                                           {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
-                                           {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000}};
+      VkDescriptorPoolSize pool_sizes[] = {{VK_DESCRIPTOR_TYPE_SAMPLER, kMaxPoolElements},
+             {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kMaxPoolElements},
+             {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kMaxPoolElements},
+             {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kMaxPoolElements},
+             {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, kMaxPoolElements},
+             {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, kMaxPoolElements},
+             {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kMaxPoolElements},
+             {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kMaxPoolElements},
+             {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, kMaxPoolElements},
+             {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, kMaxPoolElements},
+             {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, kMaxPoolElements}};
 
       VkDescriptorPoolCreateInfo pool_info = {};
       pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
       pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-      pool_info.maxSets = 1000;
+      pool_info.maxSets = 100;
       pool_info.poolSizeCount = static_cast<uint32>(std::size(pool_sizes));
       pool_info.pPoolSizes = pool_sizes;
 
       VK_CHECK(vkCreateDescriptorPool(gpu_->getDevice(), &pool_info, nullptr, &imguiPool_));
 
-      const auto descriptor_layout_builder = descriptor_util_factory->create_descriptor_layout_builder();
-      descriptor_layout_builder->clear();
-      descriptor_set_layout_ = descriptor_layout_builder
+
+      builder->clear();
+      descriptor_set_layout_ = builder
                                    ->
                                    add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                 VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -609,7 +609,7 @@ namespace gestalt::application {
 
         static bool freeze_frustum_cull = false;
         if( ImGui::Checkbox("Freeze Frustum Culling", &freeze_frustum_cull)) {
-          repository_->get_buffer<PerFrameDataBuffers>().freezeCullCamera = freeze_frustum_cull;
+          repository_->per_frame_data_buffers->freezeCullCamera = freeze_frustum_cull;
         }
 
         const char* shadow_mode_options[] = {"On", "Off"};

@@ -27,7 +27,7 @@ namespace gestalt::graphics {
         VkExtent3D imageExtent;
       };
 
-      std::shared_ptr<IGpu> gpu_;
+      IGpu* gpu_ = nullptr;
       VkCommandPool transferCommandPool = {};
       VkCommandBuffer cmd = {};
       VkFence flushFence = {};
@@ -36,7 +36,7 @@ namespace gestalt::graphics {
       size_t max_tasks_per_batch_ = 5;
 
     public:
-      void init(const std::shared_ptr<IGpu>& gpu);
+      void init(IGpu* gpu);
       void cleanup();
 
       void addImageTask(TextureHandle image, void* imageData, VkDeviceSize imageSize,
@@ -50,28 +50,30 @@ namespace gestalt::graphics {
 
     class ResourceManager final : public IResourceManager, public NonCopyable<ResourceManager> {
 
-      std::shared_ptr<IGpu> gpu_;
-      std::shared_ptr<Repository> repository_;
+      IGpu* gpu_;
+      Repository* repository_;
+      std::unique_ptr<IDescriptorAllocatorGrowable> descriptorPool = std::make_unique<DescriptorAllocatorGrowable>();
 
       void load_and_create_cubemap(const std::string& file_path, TextureHandle& cubemap);
 
     public:
       PoorMansResourceLoader resource_loader_;
 
-      std::shared_ptr<IDescriptorAllocatorGrowable> descriptorPool = std::make_shared<DescriptorAllocatorGrowable>();
       DescriptorWriter writer;
 
-      void init(const std::shared_ptr<IGpu>& gpu, const std::shared_ptr<Repository>& repository) override;
+      void init(IGpu* gpu, Repository* repository) override;
 
       void cleanup() override;
 
       void flush_loader() override;
 
-      std::shared_ptr<IDescriptorAllocatorGrowable>& get_descriptor_pool() override;
+      VkDescriptorSet allocateDescriptor(VkDescriptorSetLayout layout,
+                                         const std::vector<uint32_t>& variableDescriptorCounts
+                                         = {}) override;
 
-      AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage,
+      std::shared_ptr<AllocatedBuffer> create_buffer(size_t allocSize, VkBufferUsageFlags usage,
                                     VmaMemoryUsage memoryUsage) override;
-      void destroy_buffer(const AllocatedBuffer& buffer) override;
+      void destroy_buffer(const std::shared_ptr<AllocatedBuffer> buffer) override;
 
       VkSampler create_sampler(const VkSamplerCreateInfo& sampler_create_info) const override;
 

@@ -10,12 +10,12 @@ namespace gestalt::graphics::vkutil {
 
   class TransitionBuffer {
   public:
-    explicit TransitionBuffer(const AllocatedBuffer& buffer);
+    explicit TransitionBuffer(const std::shared_ptr<AllocatedBuffer>& buffer);
     TransitionBuffer& waitForRead();
     TransitionBuffer& waitForWrite();
     void andSubmitTo(const VkCommandBuffer cmd);
   private:
-    AllocatedBuffer buffer_;
+    std::shared_ptr<AllocatedBuffer> buffer_;
     VkBufferMemoryBarrier2 bufferBarrier = {};
   };
 

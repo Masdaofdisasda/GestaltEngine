@@ -6,76 +6,6 @@
 
 namespace gestalt::graphics {
 
-    void DeferredPass::prepare() {
-      fmt::print("Preparing {}\n", get_name());
-
-      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
-      const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
-      const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
-      const auto& material_buffers = repository_->get_buffer<MaterialBuffers>();
-      descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
-      descriptor_layouts_.push_back(ibl_buffers.descriptor_layout);
-      descriptor_layouts_.push_back(material_buffers.resource_layout);
-      descriptor_layouts_.push_back(material_buffers.constants_layout);
-      descriptor_layouts_.push_back(mesh_buffers.descriptor_layout);
-
-      dependencies_
-          = RenderPassDependencyBuilder()
-                .add_shader(ShaderStage::kVertex, "geometry.vert.spv")
-                .add_shader(ShaderStage::kFragment, "geometry_deferred.frag.spv")
-                .add_image_attachment(registry_->resources_.gbuffer1, ImageUsageType::kWrite)
-                .add_image_attachment(registry_->resources_.gbuffer2, ImageUsageType::kWrite)
-                .add_image_attachment(registry_->resources_.gbuffer3, ImageUsageType::kWrite)
-                .add_image_attachment(registry_->resources_.scene_depth, ImageUsageType::kWrite, 0,
-                                      ImageClearOperation::kClear)
-                .set_push_constant_range(sizeof(MeshletPushConstants), VK_SHADER_STAGE_VERTEX_BIT)
-                .build();
-
-      create_pipeline_layout();
-
-      pipeline_ = create_pipeline()
-                      .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
-                      .set_polygon_mode(VK_POLYGON_MODE_FILL)
-                      .set_cull_mode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE)
-                      .set_multisampling_none()
-                      .disable_blending(3)
-                      .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-                      .build_graphics_pipeline(gpu_->getDevice());
-    }
-
-    void DeferredPass::destroy() {
-    }
-
-    void DeferredPass::execute(VkCommandBuffer cmd) {
-      begin_renderpass(cmd);
-
-      const auto frame = current_frame_index;
-      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
-      const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
-      const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
-      const auto& material_buffers = repository_->get_buffer<MaterialBuffers>();
-
-      vkCmdBindIndexBuffer(cmd, mesh_buffers.index_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-
-      vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
-      VkDescriptorSet descriptorSets[]
-          = {per_frame_buffers.descriptor_sets[frame], ibl_buffers.descriptor_set,
-             material_buffers.resource_set, material_buffers.constants_set,
-             mesh_buffers.descriptor_sets[frame]};
-      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 5,
-                              descriptorSets, 0, nullptr);
-      vkCmdSetViewport(cmd, 0, 1, &viewport_);
-      vkCmdSetScissor(cmd, 0, 1, &scissor_);
-
-      // todo
-      MeshletPushConstants push_constants;
-      vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0,
-                         sizeof(MeshletPushConstants), &push_constants);
-      vkCmdDrawIndexed(cmd, 3, 1, 0, 0, 0);
-
-      vkCmdEndRendering(cmd);
-    }
-
   struct DrawCullConstants {
       int32 draw_count;
     };
@@ -83,14 +13,33 @@ namespace gestalt::graphics {
     void DrawCullPass::prepare() {
 	  fmt::print("Preparing {}\n", get_name());
 
-        const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
-          const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
-        descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
-              descriptor_layouts_.push_back(mesh_buffers.descriptor_layout);
+          descriptor_layouts_.push_back(
+              DescriptorLayoutBuilder()
+                  .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT
+                                   | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT
+                                   | VK_SHADER_STAGE_FRAGMENT_BIT)
+                  .build(gpu_->getDevice()));
+
+          constexpr auto mesh_stages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT
+                                       | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT;
+          descriptor_layouts_.push_back(
+              DescriptorLayoutBuilder()
+                  .add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+                  .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+                  .add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+                  .add_binding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+                  .add_binding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+                  .add_binding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+                  .add_binding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+                  .add_binding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+                  .build(gpu_->getDevice()));
 
 	  dependencies_
 		  = RenderPassDependencyBuilder()
                     .add_shader(ShaderStage::kCompute, "draw_cull.comp.spv")
+                    .add_buffer_dependency(registry_->resources_.perFrameDataBuffer, BufferUsageType::kRead)
+                    .add_buffer_dependency(registry_->resources_.meshBuffer, BufferUsageType::kWrite)
                     .set_push_constant_range(sizeof(DrawCullConstants), VK_SHADER_STAGE_COMPUTE_BIT)
 				.build();
 
@@ -104,10 +53,10 @@ namespace gestalt::graphics {
     }
 
     void DrawCullPass::execute(VkCommandBuffer cmd) {
-      const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
+      const auto& mesh_buffers = repository_->mesh_buffers;
 
-      vkCmdFillBuffer(cmd, mesh_buffers.draw_count_buffer[current_frame_index].buffer, 0,
-                      mesh_buffers.draw_count_buffer[current_frame_index].info.size, 0);
+      vkCmdFillBuffer(cmd, mesh_buffers->draw_count_buffer[current_frame_index]->buffer, 0,
+                      mesh_buffers->draw_count_buffer[current_frame_index]->info.size, 0);
 
       const int32 maxCommandCount
           = repository_->mesh_draws.size();  // each mesh gets a draw command
@@ -116,12 +65,8 @@ namespace gestalt::graphics {
 
       const DrawCullConstants draw_cull_constants{.draw_count = maxCommandCount};
 
-      vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_);
-      VkDescriptorSet descriptorSets[]
-          = {repository_->get_buffer<PerFrameDataBuffers>().descriptor_sets[current_frame_index],
-        repository_->get_buffer<MeshBuffers>().descriptor_sets[current_frame_index]};
-      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_, 0, 2,
-                              descriptorSets, 0, nullptr);
+      begin_compute_pass(cmd);
+
       vkCmdPushConstants(cmd, pipeline_layout_,
                          VK_SHADER_STAGE_COMPUTE_BIT, 0,
                          sizeof(DrawCullConstants), &draw_cull_constants);
@@ -142,12 +87,26 @@ namespace gestalt::graphics {
     void TaskSubmitPass::prepare() {
 	  fmt::print("Preparing {}\n", get_name());
 
-          const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
-          descriptor_layouts_.push_back(mesh_buffers.descriptor_layout);
+          
+      constexpr auto mesh_stages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT
+                                       | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT;
+          descriptor_layouts_.push_back(
+              DescriptorLayoutBuilder()
+                  .add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+                  .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+                  .add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+                  .add_binding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+                  .add_binding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+                  .add_binding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+                  .add_binding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+                  .add_binding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+                  .build(gpu_->getDevice()));
 
 	  dependencies_
 		  = RenderPassDependencyBuilder()
-                    .add_shader(ShaderStage::kCompute, "task_submit.comp.spv")
+                              .add_shader(ShaderStage::kCompute, "task_submit.comp.spv")
+                              .add_buffer_dependency(registry_->resources_.meshBuffer,
+                                                     BufferUsageType::kWrite)
 				.build();
 
 	  create_pipeline_layout();
@@ -161,11 +120,7 @@ namespace gestalt::graphics {
 
     void TaskSubmitPass::execute(VkCommandBuffer cmd) {
 
-      vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_);
-      VkDescriptorSet descriptorSets[]
-          = {repository_->get_buffer<MeshBuffers>().descriptor_sets[current_frame_index]};
-      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_, 0, 1,
-                              descriptorSets, 0, nullptr);
+        begin_compute_pass(cmd);
       vkCmdDispatch(cmd, 1, 1, 1);
 
       // Memory barrier to ensure writes are visible to the second compute shader
@@ -182,15 +137,42 @@ namespace gestalt::graphics {
     void MeshletPass::prepare() {
       fmt::print("Preparing {}\n", get_name());
 
-      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
-      const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
-      const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
-      const auto& material_buffers = repository_->get_buffer<MaterialBuffers>();
-      descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
-      descriptor_layouts_.push_back(ibl_buffers.descriptor_layout);
-      descriptor_layouts_.push_back(material_buffers.resource_layout);
-      descriptor_layouts_.push_back(material_buffers.constants_layout);
-      descriptor_layouts_.push_back(mesh_buffers.descriptor_layout);
+      descriptor_layouts_.push_back(
+          DescriptorLayoutBuilder()
+              .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT
+                               | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT
+                               | VK_SHADER_STAGE_FRAGMENT_BIT)
+              .build(gpu_->getDevice()));
+      descriptor_layouts_.push_back(DescriptorLayoutBuilder()
+                                        .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                                     VK_SHADER_STAGE_FRAGMENT_BIT)
+                                        .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                                     VK_SHADER_STAGE_FRAGMENT_BIT)
+                                        .add_binding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                                     VK_SHADER_STAGE_FRAGMENT_BIT)
+                                        .build(gpu_->getDevice()));
+      descriptor_layouts_.push_back(DescriptorLayoutBuilder()
+                                        .add_binding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                                     VK_SHADER_STAGE_FRAGMENT_BIT, true)
+                                        .build(gpu_->getDevice()));
+      descriptor_layouts_.push_back(
+          DescriptorLayoutBuilder()
+              .add_binding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, true)
+              .build(gpu_->getDevice()));
+      constexpr auto mesh_stages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT
+                                   | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT;
+      descriptor_layouts_.push_back(
+          DescriptorLayoutBuilder()
+              .add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+              .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+              .add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+              .add_binding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+              .add_binding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+              .add_binding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+              .add_binding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+              .add_binding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+              .build(gpu_->getDevice()));
 
       dependencies_
           = RenderPassDependencyBuilder()
@@ -203,8 +185,13 @@ namespace gestalt::graphics {
                                       ImageClearOperation::kClear)
                 .add_image_attachment(registry_->resources_.gbuffer3, ImageUsageType::kWrite, 0,
                                       ImageClearOperation::kClear)
-                .add_image_attachment(registry_->resources_.scene_depth, ImageUsageType::kWrite,
-                                      0, ImageClearOperation::kClear)
+                .add_image_attachment(registry_->resources_.scene_depth, ImageUsageType::kWrite, 0,
+                                      ImageClearOperation::kClear)
+                .add_buffer_dependency(registry_->resources_.perFrameDataBuffer,
+                                       BufferUsageType::kRead)
+                .add_buffer_dependency(registry_->resources_.IblBuffer, BufferUsageType::kRead)
+                .add_buffer_dependency(registry_->resources_.materialBuffer, BufferUsageType::kRead)
+                .add_buffer_dependency(registry_->resources_.meshBuffer, BufferUsageType::kRead)
                 .set_push_constant_range(
                     sizeof(MeshletPushConstants),
                     VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT)
@@ -228,18 +215,9 @@ namespace gestalt::graphics {
       begin_renderpass(cmd);
 
       const auto frame = current_frame_index;
-      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
-      const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
-      const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
-      const auto& material_buffers = repository_->get_buffer<MaterialBuffers>();
+      const auto& mesh_buffers = repository_->mesh_buffers;
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
-      const VkDescriptorSet descriptorSets[]
-          = {per_frame_buffers.descriptor_sets[frame], ibl_buffers.descriptor_set,
-             material_buffers.resource_set, material_buffers.constants_set,
-             mesh_buffers.descriptor_sets[frame]};
-      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 5,
-                              descriptorSets, 0, nullptr);
       vkCmdSetViewport(cmd, 0, 1, &viewport_);
       vkCmdSetScissor(cmd, 0, 1, &scissor_);
 
@@ -248,136 +226,9 @@ namespace gestalt::graphics {
                          sizeof(MeshletPushConstants), &meshlet_push_constants);
 
       // first byte is the task count, so we need offset by one uin32
-      gpu_->drawMeshTasksIndirect(cmd, mesh_buffers.draw_count_buffer[frame].buffer,
+      gpu_->drawMeshTasksIndirect(cmd, mesh_buffers->draw_count_buffer[frame]->buffer,
                                   sizeof(uint32), 1, 0);
 
       vkCmdEndRendering(cmd);
     }
-
-    /*
-    void TransparentPass::prepare() {
-      fmt::print("preparing transparent pass\n");
-
-      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
-      const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
-      descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
-      descriptor_layouts_.push_back(ibl_buffers.descriptor_layout);
-      descriptor_layouts_.push_back(repository_->material_data.resource_layout);
-      descriptor_layouts_.push_back(repository_->material_data.constants_layout);
-      descriptor_layouts_.emplace_back(DescriptorLayoutBuilder()
-                                           .add_binding(10,
-                                                        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                                        VK_SHADER_STAGE_FRAGMENT_BIT)
-                                           .build(gpu_->getDevice()));
-
-      VkShaderModule meshFragShader;
-      vkutil::load_shader_module(fragment_shader_source_.c_str(), gpu_->getDevice(), &meshFragShader);
-
-      VkShaderModule meshVertexShader;
-      vkutil::load_shader_module(vertex_shader_source_.c_str(), gpu_->getDevice(), &meshVertexShader);
-
-      VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::pipeline_layout_create_info();
-      mesh_layout_info.setLayoutCount = descriptor_layouts_.size();
-      mesh_layout_info.pSetLayouts = descriptor_layouts_.data();
-      mesh_layout_info.pPushConstantRanges = &push_constant_range_;
-      mesh_layout_info.pushConstantRangeCount = 1;
-
-      VK_CHECK(vkCreatePipelineLayout(gpu_->getDevice(), &mesh_layout_info, nullptr, &pipeline_layout_));
-
-      const auto color_image = registry_->get_resource<TextureHandle>("scene_opaque_color");
-      const auto depth_image = registry_->get_resource<TextureHandle>("scene_opaque_depth");
-
-      pipeline_ = PipelineBuilder()
-                      .set_shaders(meshVertexShader, meshFragShader)
-                      .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
-                      .set_polygon_mode(VK_POLYGON_MODE_FILL)
-                      .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
-                      .set_multisampling_none()
-                      .enable_blending_additive()
-                      .enable_depthtest(false, VK_COMPARE_OP_LESS_OR_EQUAL)
-                      .set_color_attachment_format(color_image->getFormat())
-                      .set_depth_format(depth_image->getFormat())
-                      .set_pipeline_layout(pipeline_layout_)
-                      .build_graphics_pipeline(gpu_->getDevice());
-
-      vkDestroyShaderModule(gpu_->getDevice(), meshFragShader, nullptr);
-      vkDestroyShaderModule(gpu_->getDevice(), meshVertexShader, nullptr);
-    }
-
-    void TransparentPass::execute(VkCommandBuffer cmd) {
-      descriptor_set_
-          = resource_manager_->descriptor_pool->allocate(gpu_->getDevice(), descriptor_layouts_.at(4));
-
-      const auto color_image = registry_->get_resource<TextureHandle>("scene_opaque_color");
-      const auto depth_image = registry_->get_resource<TextureHandle>("scene_opaque_depth");
-
-      const auto shadow_map = registry_->get_resource<TextureHandle>("directional_shadow_map");
-
-      VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(
-          color_image->imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-      VkRenderingAttachmentInfo depthAttachment = vkinit::depth_attachment_info(
-          depth_image->imageView, nullptr, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-
-      VkRenderingInfo renderInfo
-          = vkinit::rendering_info(color_image->getExtent2D(), &colorAttachment, &depthAttachment);
-
-      vkCmdBeginRendering(cmd, &renderInfo);
-
-      const char frameIndex = gpu_.get_current_frame();
-      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
-      const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
-      const auto& ibl_buffers = repository_->get_buffer<IblBuffers>();
-
-      VkDescriptorBufferInfo buffer_info;
-      buffer_info.buffer = per_frame_buffers.uniform_buffers[frameIndex].buffer;
-      buffer_info.offset = 0;
-      buffer_info.range = sizeof(PerFrameData);
-
-      VkWriteDescriptorSet descriptor_write = {};
-      descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      descriptor_write.dstBinding = 0;
-      descriptor_write.dstArrayElement = 0;
-      descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-      descriptor_write.descriptorCount = 1;
-      descriptor_write.pBufferInfo = &buffer_info;
-
-      vkCmdBindIndexBuffer(cmd, mesh_buffers.index_buffer.buffer, 0,
-                           VK_INDEX_TYPE_UINT32);
-
-      VkDescriptorSet descriptorSets[]
-          = {ibl_buffers.descriptor_set, repository_->material_data.resource_set,
-             repository_->material_data.constants_set, descriptor_set_};
-
-      viewport_.width = static_cast<float>(depth_image->getExtent2D().width);
-      viewport_.height = static_cast<float>(depth_image->getExtent2D().height);
-      scissor_.extent = depth_image->getExtent2D();
-      vkCmdSetViewport(cmd, 0, 1, &viewport_);
-      vkCmdSetScissor(cmd, 0, 1, &scissor_);
-
-      vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
-      writer.clear();
-      writer.write_image(10, shadow_map->imageView, repository_->default_material_.nearestSampler,
-                         VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL,
-                         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-      writer.update_set(gpu_->getDevice(), descriptor_set_);
-
-      gpu_.vkCmdPushDescriptorSetKHR(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
-                                     &descriptor_write);
-      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1, 4,
-                              descriptorSets, 0, nullptr);
-
-      for (auto& r : repository_->main_draw_context_.transparent_surfaces) {
-        MeshletPushConstants push_constants;
-        push_constants.worldMatrix = r.transform;
-        push_constants.material_id = r.material;
-        vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0,
-                           sizeof(MeshletPushConstants), &push_constants);
-        vkCmdDrawIndexed(cmd, r.index_count, 1, r.first_index, 0, 0);
-      }
-
-      vkCmdEndRendering(cmd);
-    }
-
-    void TransparentPass::cleanup() { vkDestroyPipeline(gpu_->getDevice(), pipeline_, nullptr); }
-    */
 }  // namespace gestalt

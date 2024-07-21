@@ -20,21 +20,29 @@ namespace gestalt {
     bool quit_{false};
     bool freeze_rendering_{false};
 
-    std::shared_ptr <application::Window> window_ = std::make_shared<application::Window>();
-    std::shared_ptr<graphics::Gpu> gpu_ = std::make_shared<graphics::Gpu>();
+    std::unique_ptr<application::Window> window_ = std::make_unique<application::Window>();
+    std::unique_ptr<graphics::Gpu> gpu_ = std::make_unique<graphics::Gpu>();
 
-    std::shared_ptr<graphics::RenderPipeline> render_pipeline_ = std::make_shared<graphics::RenderPipeline>();
-    std::shared_ptr<application::SceneManager> scene_manager_ = std::make_shared<application::SceneManager>();
-    std::shared_ptr<foundation::Repository> repository_ = std::make_shared<foundation::Repository>();
+    std::unique_ptr<graphics::RenderPipeline> render_pipeline_
+        = std::make_unique<graphics::RenderPipeline>();
+    std::unique_ptr<application::SceneManager> scene_manager_
+        = std::make_unique<application::SceneManager>();
+    std::unique_ptr<foundation::Repository> repository_
+        = std::make_unique<foundation::Repository>();
 
     application::GuiCapabilities gui_actions_;
-    std::shared_ptr<application::Gui> imgui_ = std::make_shared<application::Gui>();
+    std::unique_ptr<application::Gui> imgui_ = std::make_unique<application::Gui>();
     void register_gui_actions();
 
     // utility services
     application::TimeTrackingService time_tracking_service_;
     application::InputSystem input_system_;
-    std::shared_ptr<graphics::ResourceManager> resource_manager_ = std::make_shared<graphics::ResourceManager>();
+    std::unique_ptr<graphics::ResourceManager> resource_manager_
+        = std::make_unique<graphics::ResourceManager>();
+    std::unique_ptr<foundation::IDescriptorLayoutBuilder> descriptor_layout_builder_
+        = std::make_unique<graphics::DescriptorLayoutBuilder>();
+    std::unique_ptr<foundation::IDescriptorWriter> writer_
+        = std::make_unique<graphics::DescriptorWriter>();
 
     foundation::EngineStats stats_ = {};
   };

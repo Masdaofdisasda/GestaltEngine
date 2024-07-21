@@ -30,21 +30,23 @@ namespace gestalt {
 
     window_->init();
 
-    gpu_->init(window_);
+    gpu_->init(window_.get());
 
-    resource_manager_->init(gpu_, repository_);
+    resource_manager_->init(gpu_.get(), repository_.get());
 
-    scene_manager_->init(gpu_, resource_manager_,
-                         std::make_unique<graphics::DescriptorUtilFactory>(), repository_);
+    scene_manager_->init(gpu_.get(), resource_manager_.get(),
+                         descriptor_layout_builder_.get(), writer_.get(), repository_.get());
 
-    render_pipeline_->init(gpu_, window_, resource_manager_, repository_, imgui_);
+    render_pipeline_->init(gpu_.get(), window_.get(), resource_manager_.get(), repository_.get(),
+                           imgui_.get());
 
     register_gui_actions();
-    imgui_->init(gpu_, window_, render_pipeline_->get_swapchain_format(), repository_,
-                 std::make_unique<graphics::DescriptorUtilFactory>(), gui_actions_);
+    imgui_->init(gpu_.get(), window_.get(), render_pipeline_->get_swapchain_format(), repository_.get(),
+                 descriptor_layout_builder_.get(), gui_actions_);
 
     // everything went fine
     is_initialized_ = true;
+    fmt::print("Engine initialized\n");
   }
 
   void Engine::register_gui_actions() {
@@ -63,6 +65,7 @@ namespace gestalt {
   }
 
   void Engine::run() {
+    fmt::print("Render loop starts\n");
 
     const auto start = std::chrono::system_clock::now();  // todo replace with timetracker
 
@@ -114,6 +117,7 @@ namespace gestalt {
   }
 
   void Engine::cleanup() const {
+    fmt::print("Engine shutting down\n");
     if (is_initialized_) {
       vkDeviceWaitIdle(gpu_->getDevice());
 

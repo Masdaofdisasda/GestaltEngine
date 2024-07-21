@@ -12,16 +12,16 @@
 
 namespace gestalt::application {
 
-    void SceneManager::init(
-      const std::shared_ptr<IGpu>& gpu, const std::shared_ptr<IResourceManager>& resource_manager,
-                          const std::unique_ptr<IDescriptorUtilFactory>& descriptor_util_factory,
-      const std::shared_ptr<Repository>& repository) {
+    void SceneManager::init(IGpu* gpu, IResourceManager* resource_manager,
+                          IDescriptorLayoutBuilder* builder, IDescriptorWriter* writer
+        ,
+      Repository* repository) {
     gpu_ = gpu;
     resource_manager_ = resource_manager;
     repository_ = repository;
 
     component_factory_->init(resource_manager_, repository_);
-    asset_loader_->init(resource_manager_, component_factory_, repository_);
+    asset_loader_->init(resource_manager_, component_factory_.get(), repository_);
 
     // TODO add lights from gltf to resource manager
 
@@ -35,15 +35,15 @@ namespace gestalt::application {
                                            get_root_entity());
 
     material_system_ = std::make_unique<MaterialSystem>();
-    material_system_->init(gpu, resource_manager, descriptor_util_factory, repository);
+    material_system_->init(gpu_, resource_manager_, builder, writer, repository_);
     light_system_ = std::make_unique<LightSystem>();
-    light_system_->init(gpu, resource_manager, descriptor_util_factory, repository);
+    light_system_->init(gpu_, resource_manager_, builder, writer, repository_);
     camera_system_ = std::make_unique<CameraSystem>();
-    camera_system_->init(gpu, resource_manager, descriptor_util_factory, repository);
+    camera_system_->init(gpu_, resource_manager_, builder, writer, repository_);
     transform_system_ = std::make_unique<TransformSystem>();
-    transform_system_->init(gpu, resource_manager, descriptor_util_factory, repository);
+    transform_system_->init(gpu_, resource_manager_, builder, writer, repository_);
     render_system_ = std::make_unique<MeshSystem>();
-    render_system_->init(gpu, resource_manager, descriptor_util_factory, repository);
+    render_system_->init(gpu_, resource_manager_, builder, writer, repository_);
   }
 
     void SceneManager::load_scene(const std::string& path) {
@@ -307,8 +307,8 @@ namespace gestalt::application {
 
     void SceneManager::request_scene(const std::string& path) { scene_path_ = path; }
 
-    void ComponentFactory::init(const std::shared_ptr<IResourceManager>& resource_manager,
-                                         const std::shared_ptr<Repository>& repository) {
+    void ComponentFactory::init(IResourceManager* resource_manager,
+                                         Repository* repository) {
       resource_manager_ = resource_manager;
       repository_ = repository;
 

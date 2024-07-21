@@ -24,9 +24,9 @@ namespace gestalt::application {
     };
 
     class Gui: public NonCopyable<Gui> {
-      std::shared_ptr<IGpu> gpu_;
-      std::shared_ptr<Window> window_;
-      std::shared_ptr<Repository> repository_;
+      IGpu* gpu_ = nullptr;
+      Window* window_ = nullptr;
+      Repository* repository_ = nullptr;
       GuiCapabilities actions_;
       VkDescriptorPool imguiPool_;
 
@@ -69,12 +69,8 @@ namespace gestalt::application {
 
       void set_debug_texture(VkImageView image_view, VkSampler sampler);
 
-      void init(const std::shared_ptr<IGpu>& gpu, std::shared_ptr<Window>& window,
-                VkFormat swapchainFormat,
-                const std::shared_ptr<Repository>& repository,
-                const std::unique_ptr<IDescriptorUtilFactory>& descriptor_util_factory,
-                    GuiCapabilities
-                & actions);
+      void init(IGpu* gpu, Window* window, VkFormat swapchainFormat, Repository* repository,
+                IDescriptorLayoutBuilder* builder, const GuiCapabilities& actions);
 
       void cleanup();
 

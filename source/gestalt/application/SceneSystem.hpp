@@ -14,14 +14,15 @@ namespace gestalt::application {
 
     class SceneSystem {
     public:
-      void init(const std::shared_ptr<IGpu>& gpu,
-                const std::shared_ptr<IResourceManager>& resource_manager,
-                const std::unique_ptr<IDescriptorUtilFactory>& descriptor_util_factory,
-                const std::shared_ptr<Repository>& repository) {
+      void init(IGpu* gpu,
+                IResourceManager* resource_manager,
+                IDescriptorLayoutBuilder* builder,
+                IDescriptorWriter* writer,
+                Repository* repository) {
         gpu_ = gpu;
         resource_manager_ = resource_manager;
-        descriptor_layout_builder_ = descriptor_util_factory->create_descriptor_layout_builder();
-        writer_ = descriptor_util_factory->create_descriptor_writer();
+        descriptor_layout_builder_ = builder;
+        writer_ = writer;
         repository_ = repository;
 
         prepare();
@@ -34,14 +35,15 @@ namespace gestalt::application {
     protected:
       virtual void prepare() = 0;
 
-      std::shared_ptr<IGpu> gpu_;
-      std::shared_ptr<IResourceManager> resource_manager_;
-      std::unique_ptr<IDescriptorLayoutBuilder> descriptor_layout_builder_;
-      std::unique_ptr<IDescriptorWriter> writer_;
-      std::shared_ptr<Repository> repository_;
+      IGpu* gpu_ = nullptr;
+      IResourceManager* resource_manager_ = nullptr;
+      IDescriptorLayoutBuilder* descriptor_layout_builder_ = nullptr;
+      IDescriptorWriter* writer_ = nullptr;
+      Repository* repository_ = nullptr;
     };
 
     class MaterialSystem final : public SceneSystem, public NonCopyable<MaterialSystem> {
+      std::array<std::array<VkDescriptorImageInfo, getPbrMaterialTextures()>, getMaxMaterials()> image_infos_ = {};
     public:
       void create_defaults();
       void prepare() override;

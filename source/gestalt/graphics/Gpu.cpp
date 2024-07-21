@@ -6,7 +6,7 @@
 
 namespace gestalt::graphics {
 
-  void Gpu::init(std::shared_ptr<Window>& window) {
+  void Gpu::init(Window* window) {
 
     // create the vulkan instance
     vkb::InstanceBuilder builder;

@@ -34,7 +34,7 @@ namespace gestalt::graphics {
 
     public:
 
-      void init(std::shared_ptr<Window>& window);
+      void init(Window* window);
       void cleanup() const;
 
       Gpu() = default;

@@ -16,18 +16,20 @@
 
 namespace gestalt::graphics {
 
-    void ResourceManager::init(const std::shared_ptr<IGpu>& gpu,
-                               const std::shared_ptr<Repository>& repository) {
+    void ResourceManager::init(IGpu* gpu,
+                               Repository* repository) {
       gpu_ = gpu;
       repository_ = repository;
       resource_loader_.init(gpu);
 
       std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes
-          = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, getMaxTextures()},
-             {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10},
-             {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, getMaxMaterials()}};
+          = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, getMaxTextures() * 2.f},
+             {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 256},
+             {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, getMaxMaterials() * 2.f},
 
-      descriptorPool->init(gpu_->getDevice(), 1, sizes);
+          };
+
+      descriptorPool->init(gpu_->getDevice(), 1024, sizes);
 
     }
 
@@ -38,9 +40,14 @@ namespace gestalt::graphics {
 
     void ResourceManager::flush_loader() { resource_loader_.flush(); }
 
-    std::shared_ptr<IDescriptorAllocatorGrowable>& ResourceManager::get_descriptor_pool() { return descriptorPool; }
+    VkDescriptorSet ResourceManager::allocateDescriptor(VkDescriptorSetLayout layout,
+                                                        const std::vector<uint32_t>&
+                                                        variableDescriptorCounts) {
+      return descriptorPool->allocate(gpu_->getDevice(), layout, variableDescriptorCounts);
+    }
 
-    AllocatedBuffer ResourceManager::create_buffer(size_t allocSize, VkBufferUsageFlags usage,
+    std::shared_ptr<AllocatedBuffer> ResourceManager::create_buffer(size_t allocSize,
+                                                                    VkBufferUsageFlags usage,
                                                    VmaMemoryUsage memoryUsage) {
       // allocate buffer
       VkBufferCreateInfo bufferInfo = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
@@ -54,16 +61,17 @@ namespace gestalt::graphics {
       vmaallocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
       AllocatedBuffer newBuffer;
       newBuffer.usage = usage;
+      newBuffer.memory_usage = memoryUsage;
 
       // allocate the buffer
       VK_CHECK(vmaCreateBuffer(gpu_->getAllocator(), &bufferInfo, &vmaallocInfo, &newBuffer.buffer,
                                &newBuffer.allocation, &newBuffer.info));
-      return newBuffer;
+      return std::make_shared<AllocatedBuffer>(newBuffer);
     }
 
 
-    void ResourceManager::destroy_buffer(const AllocatedBuffer& buffer) {
-      vmaDestroyBuffer(gpu_->getAllocator(), buffer.buffer, buffer.allocation);
+    void ResourceManager::destroy_buffer(const std::shared_ptr<AllocatedBuffer> buffer) {
+      vmaDestroyBuffer(gpu_->getAllocator(), buffer->buffer, buffer->allocation);
     }
 
     VkSampler ResourceManager::create_sampler(const VkSamplerCreateInfo& sampler_create_info) const {
@@ -191,7 +199,7 @@ namespace gestalt::graphics {
       }
     }
 
-    void PoorMansResourceLoader::init(const std::shared_ptr<IGpu>& gpu) {
+    void PoorMansResourceLoader::init(IGpu* gpu) {
 	  gpu_ = gpu;
       VkCommandPoolCreateInfo poolInfo = {};
       poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -453,14 +461,14 @@ namespace gestalt::graphics {
       std::string env_file = base_path + "_environment" + extension;
       std::string irr_file = base_path + "_irradiance" + extension;
 
-      auto& Ibl_buffers = repository_->get_buffer<IblBuffers>();
+      auto& Ibl_buffers = repository_->ibl_buffers;
 
       if (std::filesystem::exists(env_file) && std::filesystem::exists(irr_file)) {
         fmt::print("Loading environment map from file: {}\n", env_file);
-        load_and_create_cubemap(env_file, Ibl_buffers.environment_map);
+        load_and_create_cubemap(env_file, Ibl_buffers->environment_map);
 
         fmt::print("Loading irradiance map from file: {}\n", irr_file);
-        load_and_create_cubemap(irr_file, Ibl_buffers.environment_irradiance_map);
+        load_and_create_cubemap(irr_file, Ibl_buffers->environment_irradiance_map);
       } else {
         fmt::print("Loading HDR image from file: {}\n", file_path);
         int w, h, comp;
@@ -481,7 +489,7 @@ namespace gestalt::graphics {
 
         std::vector<float> img32_env(envDstW * envDstH * 4);
         float24to32(envDstW, envDstH, env_out.data(), img32_env.data());
-        Ibl_buffers.environment_map = create_cubemap_from_HDR(img32_env, envDstH, envDstW);
+        Ibl_buffers->environment_map = create_cubemap_from_HDR(img32_env, envDstH, envDstW);
 
         // Process the HDR image for the irradiance map
         const int irrDstW = 256;
@@ -493,7 +501,7 @@ namespace gestalt::graphics {
 
         std::vector<float> img32_irr(irrDstW * irrDstH * 4);
         float24to32(irrDstW, irrDstH, irr_out.data(), img32_irr.data());
-        Ibl_buffers.environment_irradiance_map
+        Ibl_buffers->environment_irradiance_map
             = create_cubemap_from_HDR(img32_irr, irrDstH, irrDstW);
 
         // Cleanup
@@ -509,21 +517,21 @@ namespace gestalt::graphics {
       sampl.magFilter = VK_FILTER_LINEAR;
       sampl.minFilter = VK_FILTER_LINEAR;
       sampl.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-      vkCreateSampler(gpu_->getDevice(), &sampl, nullptr, &Ibl_buffers.cube_map_sampler);
+      vkCreateSampler(gpu_->getDevice(), &sampl, nullptr, &Ibl_buffers->cube_map_sampler);
 
-      Ibl_buffers.bdrf_lut = load_image("../../assets/bdrf_lut.png").value();
+      Ibl_buffers->bdrf_lut = load_image("../../assets/bdrf_lut.png").value();
 
       writer.clear();
-      writer.write_image(1, Ibl_buffers.environment_map.imageView, Ibl_buffers.cube_map_sampler,
+      writer.write_image(1, Ibl_buffers->environment_map.imageView, Ibl_buffers->cube_map_sampler,
                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                          VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-      writer.write_image(2, Ibl_buffers.environment_irradiance_map.imageView,
-                         Ibl_buffers.cube_map_sampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+      writer.write_image(2, Ibl_buffers->environment_irradiance_map.imageView,
+                         Ibl_buffers->cube_map_sampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                          VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
       writer.write_image(
-          3, Ibl_buffers.bdrf_lut.imageView, repository_->default_material_.linearSampler,
+          3, Ibl_buffers->bdrf_lut.imageView, repository_->default_material_.linearSampler,
           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-      writer.update_set(gpu_->getDevice(), Ibl_buffers.descriptor_set);
+      writer.update_set(gpu_->getDevice(), Ibl_buffers->descriptor_set);
     }
 
     TextureHandle ResourceManager::create_cubemap_from_HDR(std::vector<float>& image_data, int h,

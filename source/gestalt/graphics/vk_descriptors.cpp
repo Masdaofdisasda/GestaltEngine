@@ -78,30 +78,37 @@ namespace gestalt::graphics {
   void DescriptorWriter::write_buffer_array(int binding,
                                             const std::vector<VkDescriptorBufferInfo>& bufferInfos,
                                             VkDescriptorType type, uint32_t arrayElementStart) {
+    for (const auto& bufferInfo : bufferInfos) {
+      this->bufferInfos.push_back(bufferInfo);
+    }
+
     // Prepare a write descriptor set for an array of buffers
     VkWriteDescriptorSet write = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-
     write.dstBinding = binding;
     write.dstSet = VK_NULL_HANDLE;  // Will be set in update_set()
     write.descriptorCount = static_cast<uint32_t>(bufferInfos.size());
     write.descriptorType = type;
-    write.pBufferInfo = bufferInfos.data();  // Point to the array of buffer infos
+    write.pBufferInfo = &this->bufferInfos.back() - (bufferInfos.size() - 1);
     write.dstArrayElement = arrayElementStart;
 
     // Add to the list of writes
     writes.push_back(write);
   }
 
-  void DescriptorWriter::write_image_array(int binding,
-                                           const std::vector<VkDescriptorImageInfo>& imageInfos,
+  void DescriptorWriter::write_image_array(
+      int binding, const std::array<VkDescriptorImageInfo, 5>& image_infos,
                                            uint32_t arrayElementStart) {
+    for (const auto& imageInfo : image_infos) {
+      imageInfos.push_back(imageInfo);
+    }
+
     VkWriteDescriptorSet write = {};
     write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     write.dstBinding = binding;
     write.dstSet = VK_NULL_HANDLE;  // Will be set in update_set()
-    write.descriptorCount = imageInfos.size();
+    write.descriptorCount = image_infos.size();
     write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    write.pImageInfo = imageInfos.data();
+    write.pImageInfo = &imageInfos.back() - (image_infos.size() - 1);
     write.dstArrayElement = arrayElementStart;
 
     writes.push_back(write);
@@ -111,14 +118,18 @@ namespace gestalt::graphics {
     imageInfos.clear();
     writes.clear();
     bufferInfos.clear();
+
+    writes.reserve(getMaxMaterials());
   }
 
   void DescriptorWriter::update_set(VkDevice device, VkDescriptorSet set) {
+    assert(set != VK_NULL_HANDLE && "Descriptor set is VK_NULL_HANDLE");
+
     for (VkWriteDescriptorSet& write : writes) {
       write.dstSet = set;
     }
 
-    vkUpdateDescriptorSets(device, (uint32_t)writes.size(), writes.data(), 0, nullptr);
+    vkUpdateDescriptorSets(device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
   }
 
   void DescriptorWriter::write_image(int binding, VkImageView image, VkSampler sampler,
@@ -140,29 +151,29 @@ namespace gestalt::graphics {
   void DescriptorAllocator::init_pool(VkDevice device, uint32_t maxSets,
                                       std::span<pool_size_ratio> poolRatios) {
     std::vector<VkDescriptorPoolSize> poolSizes;
-    for (pool_size_ratio ratio : poolRatios) {
-      poolSizes.push_back(VkDescriptorPoolSize{.type = ratio.type,
-                                               .descriptorCount = uint32_t(ratio.ratio * maxSets)});
+    for (const auto [type, ratio] : poolRatios) {
+      poolSizes.push_back(VkDescriptorPoolSize{.type = type,
+                                               .descriptorCount = static_cast<uint32_t>(ratio * maxSets)});
     }
 
     VkDescriptorPoolCreateInfo pool_info = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
     pool_info.flags = 0;
     pool_info.maxSets = maxSets;
-    pool_info.poolSizeCount = (uint32_t)poolSizes.size();
+    pool_info.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     pool_info.pPoolSizes = poolSizes.data();
 
-    vkCreateDescriptorPool(device, &pool_info, nullptr, &pool);
+    VK_CHECK(vkCreateDescriptorPool(device, &pool_info, nullptr, &pool));
   }
 
-  void DescriptorAllocator::clear_descriptors(VkDevice device) {
+  void DescriptorAllocator::clear_descriptors(VkDevice device) const {
     vkResetDescriptorPool(device, pool, 0);
   }
 
-  void DescriptorAllocator::destroy_pool(VkDevice device) {
+  void DescriptorAllocator::destroy_pool(VkDevice device) const {
     vkDestroyDescriptorPool(device, pool, nullptr);
   }
 
-  VkDescriptorSet DescriptorAllocator::allocate(VkDevice device, VkDescriptorSetLayout layout) {
+  VkDescriptorSet DescriptorAllocator::allocate(VkDevice device, VkDescriptorSetLayout layout) const {
     VkDescriptorSetAllocateInfo allocInfo
         = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
     allocInfo.pNext = nullptr;
@@ -178,7 +189,7 @@ namespace gestalt::graphics {
 
   VkDescriptorPool DescriptorAllocatorGrowable::get_pool(VkDevice device) {
     VkDescriptorPool newPool;
-    if (readyPools.size() != 0) {
+    if (!readyPools.empty()) {
       newPool = readyPools.back();
       readyPools.pop_back();
     } else {
@@ -187,6 +198,7 @@ namespace gestalt::graphics {
 
       setsPerPool = setsPerPool * 1.5;
       if (setsPerPool > 4092) {
+        fmt::println("Descriptor pool size exceeded 4092. Resetting to 4092");
         setsPerPool = 4092;
       }
     }
@@ -197,35 +209,21 @@ namespace gestalt::graphics {
   VkDescriptorPool DescriptorAllocatorGrowable::create_pool(VkDevice device, uint32_t setCount,
                                                             std::span<PoolSizeRatio> poolRatios) {
     std::vector<VkDescriptorPoolSize> poolSizes;
-    for (PoolSizeRatio ratio : poolRatios) {
+    for (auto [type, ratio] : poolRatios) {
       poolSizes.push_back(VkDescriptorPoolSize{
-          .type = ratio.type, .descriptorCount = uint32_t(ratio.ratio * setCount)});
+          .type = type, .descriptorCount = static_cast<uint32_t>(ratio * setCount)});
     }
 
     VkDescriptorPoolCreateInfo pool_info = {};
     pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool_info.flags = 0;
     pool_info.maxSets = setCount;
-    pool_info.poolSizeCount = (uint32_t)poolSizes.size();
+    pool_info.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
     pool_info.pPoolSizes = poolSizes.data();
 
     VkDescriptorPool newPool;
-    vkCreateDescriptorPool(device, &pool_info, nullptr, &newPool);
+    VK_CHECK(vkCreateDescriptorPool(device, &pool_info, nullptr, &newPool));
     return newPool;
-  }
-
-  std::unique_ptr<IDescriptorLayoutBuilder>
-  DescriptorUtilFactory::create_descriptor_layout_builder() {
-    return std::make_unique<DescriptorLayoutBuilder>();
-  }
-
-  std::unique_ptr<IDescriptorWriter> DescriptorUtilFactory::create_descriptor_writer() {
-    return std::make_unique<DescriptorWriter>();
-  }
-
-  std::unique_ptr<IDescriptorAllocatorGrowable>
-  DescriptorUtilFactory::create_descriptor_allocator_growable() {
-    return std::make_unique<DescriptorAllocatorGrowable>();
   }
 
   void FrameData::init(VkDevice device, uint32 graphics_queue_family_index) {
@@ -236,12 +234,6 @@ namespace gestalt::graphics {
     VkFenceCreateInfo fenceCreateInfo = vkinit::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
     VkSemaphoreCreateInfo semaphoreCreateInfo = vkinit::semaphore_create_info();
 
-    std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> frame_sizes = {
-        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3},
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3},
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3},
-        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4},
-    };
 
     for (auto& frame : frames_) {
       // Initialize Command Pool and Command Buffer
@@ -256,7 +248,6 @@ namespace gestalt::graphics {
       VK_CHECK(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &frame.render_semaphore));
 
       // Initialize Descriptor Pool
-      frame.descriptor_pool.init(device, 1000, frame_sizes);
     }
   }
 
@@ -266,7 +257,6 @@ namespace gestalt::graphics {
 	  vkDestroyFence(device, frame.render_fence, nullptr);
 	  vkDestroySemaphore(device, frame.swapchain_semaphore, nullptr);
 	  vkDestroySemaphore(device, frame.render_semaphore, nullptr);
-	  frame.descriptor_pool.destroy_pools(device);
 	}
   }
 
@@ -306,7 +296,7 @@ namespace gestalt::graphics {
     variableDescriptorCountInfo.descriptorSetCount = variableDescriptorCounts.size();
     variableDescriptorCountInfo.pDescriptorCounts = variableDescriptorCounts.data();
 
-    VkDescriptorSetAllocateInfo allocInfo = {};
+    VkDescriptorSetAllocateInfo allocInfo;
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocInfo.pNext
         = variableDescriptorCounts.empty()
@@ -327,6 +317,8 @@ namespace gestalt::graphics {
       allocInfo.descriptorPool = poolToUse;
 
       VK_CHECK(vkAllocateDescriptorSets(device, &allocInfo, &ds));
+    } else {
+      VK_CHECK(result);
     }
 
     readyPools.push_back(poolToUse);
@@ -341,7 +333,7 @@ namespace gestalt::graphics {
       ratios.push_back(r);
     }
 
-    VkDescriptorPool newPool = create_pool(device, initial_sets, poolRatios);
+    const VkDescriptorPool newPool = create_pool(device, initial_sets, poolRatios);
 
     setsPerPool = initial_sets * 1.5;  // grow it next allocation
 
@@ -360,11 +352,11 @@ namespace gestalt::graphics {
   }
 
   void DescriptorAllocatorGrowable::destroy_pools(VkDevice device) {
-    for (auto p : readyPools) {
+    for (const auto p : readyPools) {
       vkDestroyDescriptorPool(device, p, nullptr);
     }
     readyPools.clear();
-    for (auto p : fullPools) {
+    for (const auto p : fullPools) {
       vkDestroyDescriptorPool(device, p, nullptr);
     }
     fullPools.clear();

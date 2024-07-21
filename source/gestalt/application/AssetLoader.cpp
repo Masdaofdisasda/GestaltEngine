@@ -16,9 +16,9 @@ namespace gestalt::application {
       glm::vec2 uv;
     };
 
-    void AssetLoader::init(const std::shared_ptr<IResourceManager>& resource_manager,
-                           const std::shared_ptr<ComponentFactory>& component_factory,
-                           const std::shared_ptr<Repository>& repository) {
+    void AssetLoader::init(IResourceManager* resource_manager,
+                           ComponentFactory* component_factory,
+                           Repository* repository) {
       resource_manager_ = resource_manager;
       repository_ = repository;
       component_factory_ = component_factory;

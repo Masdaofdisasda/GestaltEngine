@@ -23,7 +23,7 @@ namespace gestalt::graphics {
     }
 
     RenderPassDependencyBuilder& RenderPassDependencyBuilder::add_buffer_dependency(
-        const std::shared_ptr<AllocatedBuffer>& buffer, const BufferUsageType usage,
+        const BufferResource& buffer, const BufferUsageType usage,
         const uint32 required_version) {
       dependency_. buffer_dependencies.push_back({buffer, usage, required_version});
       return *this;
@@ -43,6 +43,12 @@ namespace gestalt::graphics {
 
     void RenderPass::cleanup() {
       destroy();
+      for (const auto& layout: descriptor_layouts_) {
+
+        if (layout != VK_NULL_HANDLE) {
+          vkDestroyDescriptorSetLayout(gpu_->getDevice(), layout, nullptr);
+        }
+      }
       vkDestroyPipelineLayout(gpu_->getDevice(), pipeline_layout_, nullptr);
       vkDestroyPipeline(gpu_->getDevice(), pipeline_, nullptr);
     }
@@ -106,7 +112,36 @@ namespace gestalt::graphics {
             depthAttachment.sType ? &depthAttachment : nullptr);
       }
 
+      if (!dependencies_.buffer_dependencies.empty()) {
+        std::vector<VkDescriptorSet> descriptor_sets;
+        descriptor_sets.reserve(dependencies_.buffer_dependencies.size());
+        for (auto& buffer : dependencies_.buffer_dependencies) {
+          for (auto sets = buffer.resource.buffer->get_descriptor_set(current_frame_index); auto set : sets) {
+            descriptor_sets.push_back(set);
+          }
+        }
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0,
+                                descriptor_sets.size(), descriptor_sets.data(), 0, nullptr);
+      }
+
       vkCmdBeginRendering(cmd, &renderInfo);
+    }
+
+  void RenderPass::begin_compute_pass(VkCommandBuffer cmd) {
+      if (!dependencies_.buffer_dependencies.empty()) {
+        std::vector<VkDescriptorSet> descriptor_sets;
+        descriptor_sets.reserve(dependencies_.buffer_dependencies.size());
+        for (const auto& buffer : dependencies_.buffer_dependencies) {
+          for (auto sets = buffer.resource.buffer->get_descriptor_set(current_frame_index);
+               auto set : sets) {
+            descriptor_sets.push_back(set);
+          }
+        }
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_, 0,
+                                descriptor_sets.size(), descriptor_sets.data(), 0, nullptr);
+      }
+
+      vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_);
     }
 
     PipelineBuilder RenderPass::create_pipeline() {

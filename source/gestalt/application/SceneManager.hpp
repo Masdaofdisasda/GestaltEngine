@@ -14,14 +14,13 @@ namespace gestalt::application {
     class AssetLoader;
 
     class ComponentFactory : public NonCopyable<ComponentFactory> {
-      std::shared_ptr<IResourceManager> resource_manager_;
-      std::shared_ptr<Repository> repository_;
+      IResourceManager* resource_manager_ = nullptr;
+      Repository* repository_ = nullptr;
 
       Entity next_entity_id_ = 0;
 
     public:
-      void init(const std::shared_ptr<IResourceManager>& resource_manager,
-                const std::shared_ptr<Repository>& repository);
+      void init(IResourceManager* resource_manager, Repository* repository);
 
       Entity create_entity();
       std::pair<Entity, std::reference_wrapper<NodeComponent>> create_entity_node(
@@ -47,9 +46,9 @@ namespace gestalt::application {
     };
 
     class AssetLoader : public NonCopyable<AssetLoader> {
-      std::shared_ptr<IResourceManager> resource_manager_;
-      std::shared_ptr<Repository> repository_;
-      std::shared_ptr<ComponentFactory> component_factory_;
+      IResourceManager* resource_manager_ = nullptr;
+      Repository* repository_ = nullptr;
+      ComponentFactory* component_factory_ = nullptr;
 
       static VkFilter extract_filter(fastgltf::Filter filter);
       VkSamplerMipmapMode extract_mipmap_mode(fastgltf::Filter filter);
@@ -99,9 +98,9 @@ namespace gestalt::application {
       void import_meshes(fastgltf::Asset& gltf, size_t material_offset);
 
     public:
-      void init(const std::shared_ptr<IResourceManager>& resource_manager,
-                const std::shared_ptr<ComponentFactory>& component_factory,
-                const std::shared_ptr<Repository>& repository);
+      void init(IResourceManager* resource_manager,
+                ComponentFactory* component_factory,
+                Repository* repository);
       void import_lights(const fastgltf::Asset& gltf);
       std::vector<fastgltf::Node> load_scene_from_gltf(const std::string& file_path);
     };
@@ -110,13 +109,13 @@ namespace gestalt::application {
      * @brief Class responsible for managing scenes, entities, and their components.
      */
     class SceneManager : public NonCopyable<SceneManager> {
-      std::shared_ptr<IGpu> gpu_;
-      std::shared_ptr<IResourceManager> resource_manager_;
-      std::shared_ptr<Repository> repository_;
+      IGpu* gpu_ = nullptr;
+      IResourceManager* resource_manager_ = nullptr;
+      Repository* repository_ = nullptr;
 
       std::unique_ptr<AssetLoader> asset_loader_ = std::make_unique<AssetLoader>();
-      std::shared_ptr<ComponentFactory> component_factory_
-          = std::make_shared<ComponentFactory>();
+      std::unique_ptr<ComponentFactory> component_factory_
+          = std::make_unique<ComponentFactory>();
 
       std::unique_ptr<MaterialSystem> material_system_;
       std::unique_ptr<SceneSystem> light_system_;
@@ -134,10 +133,11 @@ namespace gestalt::application {
       std::string scene_path_;
 
     public:
-      void init(const std::shared_ptr<IGpu>& gpu,
-                const std::shared_ptr<IResourceManager>& resource_manager,
-                const std::unique_ptr<IDescriptorUtilFactory>& descriptor_util_factory,
-                const std::shared_ptr<Repository>& repository);
+      void init(IGpu* gpu,
+                IResourceManager* resource_manager,
+                IDescriptorLayoutBuilder* builder,
+                IDescriptorWriter* writer,
+                Repository* repository);
       void cleanup() const;
 
       void update_scene(float delta_time, const Movement& movement, float aspect);

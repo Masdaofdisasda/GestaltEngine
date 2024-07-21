@@ -31,7 +31,7 @@ namespace gestalt::graphics {
                       VkDescriptorType type) override;
     void write_buffer_array(int binding, const std::vector<VkDescriptorBufferInfo>& bufferInfos,
                             VkDescriptorType type, uint32_t arrayElementStart) override;
-    void write_image_array(int binding, const std::vector<VkDescriptorImageInfo>& imageInfos,
+    void write_image_array(int binding, const std::array<VkDescriptorImageInfo, 5>& image_infos,
                            uint32_t arrayElementStart = 0) override;
 
     void clear() override;
@@ -47,13 +47,13 @@ namespace gestalt::graphics {
     VkDescriptorPool pool;
 
     void init_pool(VkDevice device, uint32_t maxSets, std::span<pool_size_ratio> poolRatios);
-    void clear_descriptors(VkDevice device);
-    void destroy_pool(VkDevice device);
+    void clear_descriptors(VkDevice device) const;
+    void destroy_pool(VkDevice device) const;
 
-    VkDescriptorSet allocate(VkDevice device, VkDescriptorSetLayout layout);
+    VkDescriptorSet allocate(VkDevice device, VkDescriptorSetLayout layout) const;
   };
 
-  struct DescriptorAllocatorGrowable final : IDescriptorAllocatorGrowable {
+  struct DescriptorAllocatorGrowable final : IDescriptorAllocatorGrowable, NonCopyable<DescriptorAllocatorGrowable> {
     void init(VkDevice device, uint32_t initial_sets, std::span<PoolSizeRatio> poolRatios) override;
     void clear_pools(VkDevice device) override;
     void destroy_pools(VkDevice device) override;
@@ -63,19 +63,13 @@ namespace gestalt::graphics {
 
   private:
     VkDescriptorPool get_pool(VkDevice device);
-    VkDescriptorPool create_pool(VkDevice device, uint32_t setCount,
-                                 std::span<PoolSizeRatio> poolRatios);
+    static VkDescriptorPool create_pool(VkDevice device, uint32_t setCount,
+                                        std::span<PoolSizeRatio> poolRatios);
 
     std::vector<PoolSizeRatio> ratios;
     std::vector<VkDescriptorPool> fullPools;
     std::vector<VkDescriptorPool> readyPools;
     uint32 setsPerPool{0};
-  };
-
-  struct DescriptorUtilFactory final : public IDescriptorUtilFactory {
-    std::unique_ptr<IDescriptorLayoutBuilder> create_descriptor_layout_builder() override;
-    std::unique_ptr<IDescriptorWriter> create_descriptor_writer() override;
-    std::unique_ptr<IDescriptorAllocatorGrowable> create_descriptor_allocator_growable() override;
   };
 
   class FrameData {
@@ -86,7 +80,6 @@ namespace gestalt::graphics {
 
       VkCommandPool command_pool;
       VkCommandBuffer main_command_buffer;
-      DescriptorAllocatorGrowable descriptor_pool;
     };
 
     void init(VkDevice device, uint32 graphics_queue_family_index);

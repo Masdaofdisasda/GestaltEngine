@@ -11,12 +11,36 @@ namespace gestalt::graphics {
     void DirectionalDepthPass::prepare() {
       fmt::print("Preparing {}\n", get_name());
 
-      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
-      const auto& light_data = repository_->get_buffer<LightBuffers>();
-      const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
-      descriptor_layouts_.push_back(per_frame_buffers.descriptor_layout);
-      descriptor_layouts_.push_back(light_data.descriptor_layout);
-      descriptor_layouts_.push_back(mesh_buffers.descriptor_layout);
+      descriptor_layouts_.emplace_back(
+          DescriptorLayoutBuilder()
+              .add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT
+                               | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT
+                               | VK_SHADER_STAGE_FRAGMENT_BIT)
+              .build(gpu_->getDevice()));
+      descriptor_layouts_.emplace_back(
+          DescriptorLayoutBuilder()
+              .add_binding(15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
+                           false, getMaxDirectionalLights())
+              .add_binding(16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
+                           false, getMaxPointLights())
+              .add_binding(17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                           VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, false,
+                           getMaxLights())
+              .build(gpu_->getDevice()));
+      constexpr auto mesh_stages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT
+                                   | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT;
+      descriptor_layouts_.emplace_back(
+          DescriptorLayoutBuilder()
+              .add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+              .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+              .add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+              .add_binding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+              .add_binding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+              .add_binding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+              .add_binding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+              .add_binding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, mesh_stages)
+              .build(gpu_->getDevice()));
 
       dependencies_ = RenderPassDependencyBuilder()
                           .add_shader(ShaderStage::kVertex, "shadow_geometry.vert.spv")
@@ -45,17 +69,14 @@ namespace gestalt::graphics {
       begin_renderpass(cmd);
 
       const auto frame = current_frame_index;
-      const auto& per_frame_buffers = repository_->get_buffer<PerFrameDataBuffers>();
-      const auto& light_data = repository_->get_buffer<LightBuffers>();
-      const auto& mesh_buffers = repository_->get_buffer<MeshBuffers>();
-
-      vkCmdBindIndexBuffer(cmd, mesh_buffers.index_buffer.buffer, 0,
-                           VK_INDEX_TYPE_UINT32);
+      const auto& per_frame_buffers = repository_->per_frame_data_buffers;
+      const auto& light_data = repository_->light_buffers;
+      const auto& mesh_buffers = repository_->mesh_buffers;
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
-      VkDescriptorSet descriptorSets[] = {per_frame_buffers.descriptor_sets[frame], light_data.descriptor_set,
-             mesh_buffers.descriptor_sets[frame]};
+      VkDescriptorSet descriptorSets[] = {per_frame_buffers->descriptor_sets[frame], light_data->descriptor_set,
+             mesh_buffers->descriptor_sets[frame]};
 
       vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 3,
                               descriptorSets, 0, nullptr);

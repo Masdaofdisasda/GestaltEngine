@@ -11,10 +11,10 @@ namespace gestalt::application {
       active_camera_ = std::make_unique<Camera>();
       active_camera_->init(*free_fly_camera_);
 
-      PerFrameDataBuffers per_frame_data_buffers{};
+      const auto& per_frame_data_buffers = repository_->per_frame_data_buffers;
 
       descriptor_layout_builder_->clear();
-      per_frame_data_buffers.descriptor_layout
+      const auto descriptor_layout
           = descriptor_layout_builder_->add_binding(
                 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT
@@ -22,18 +22,19 @@ namespace gestalt::application {
                 .build(gpu_->getDevice());
 
       for (int i = 0; i < getFramesInFlight(); ++i) {
-        per_frame_data_buffers.uniform_buffers[i] = resource_manager_->create_buffer(
+        per_frame_data_buffers->uniform_buffers[i] = resource_manager_->create_buffer(
             sizeof(PerFrameData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-        per_frame_data_buffers.descriptor_sets[i] = resource_manager_->get_descriptor_pool()->allocate(
-            gpu_->getDevice(), per_frame_data_buffers.descriptor_layout);
+        per_frame_data_buffers->descriptor_sets[i]
+            = resource_manager_->allocateDescriptor(descriptor_layout);
 
         writer_->clear();
-        writer_->write_buffer(0, per_frame_data_buffers.uniform_buffers[i].buffer,
+        writer_->write_buffer(0, per_frame_data_buffers->uniform_buffers[i]->buffer,
                              sizeof(PerFrameData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-        writer_->update_set(gpu_->getDevice(), per_frame_data_buffers.descriptor_sets[i]);
+        writer_->update_set(gpu_->getDevice(), per_frame_data_buffers->descriptor_sets[i]);
       }
 
-      repository_->register_buffer(per_frame_data_buffers);
+      vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layout, nullptr);
+
     }
 
     void CameraSystem::update_cameras(const float delta_time, const Movement& movement, float aspect) {
@@ -68,36 +69,36 @@ namespace gestalt::application {
 
       const auto frame = current_frame_index;
 
-      auto& buffers = repository_->get_buffer<PerFrameDataBuffers>();
-      buffers.data.view = camera.view_matrix; // is the camera object actually needed?
-      buffers.data.proj = camera.projection_matrix;
-      buffers.data.inv_view = inverse(camera.view_matrix);
-      buffers.data.inv_viewProj = inverse(camera.projection_matrix * camera.view_matrix);
-      buffers.data.P00 = projection_t[0][0];
-      buffers.data.P11 = projection_t[1][1];
+      auto& buffers = repository_->per_frame_data_buffers;
+      buffers->data.view = camera.view_matrix;  // is the camera object actually needed?
+      buffers->data.proj = camera.projection_matrix;
+      buffers->data.inv_view = inverse(camera.view_matrix);
+      buffers->data.inv_viewProj = inverse(camera.projection_matrix * camera.view_matrix);
+      buffers->data.P00 = projection_t[0][0];
+      buffers->data.P11 = projection_t[1][1];
 
-      if (!buffers.freezeCullCamera) {
+      if (!buffers->freezeCullCamera) {
 
-        buffers.data.cullView = camera.view_matrix;
-        buffers.data.cullProj = camera.projection_matrix;
+        buffers->data.cullView = camera.view_matrix;
+        buffers->data.cullProj = camera.projection_matrix;
 
-        buffers.data.znear = near_plane_;
-        buffers.data.zfar = far_plane_;
+        buffers->data.znear = near_plane_;
+        buffers->data.zfar = far_plane_;
 
-        buffers.data.frustum[0] = normalizePlane(projection_t[3] + projection_t[0]);
-        buffers.data.frustum[1] = normalizePlane(projection_t[3] - projection_t[0]);
-        buffers.data.frustum[2] = normalizePlane(projection_t[3] + projection_t[1]);
-        buffers.data.frustum[3] = normalizePlane(projection_t[3] - projection_t[1]);
-        buffers.data.frustum[4] = normalizePlane(projection_t[3] + projection_t[2]);
-        buffers.data.frustum[5] = normalizePlane(projection_t[3] - projection_t[2]);
+        buffers->data.frustum[0] = normalizePlane(projection_t[3] + projection_t[0]);
+        buffers->data.frustum[1] = normalizePlane(projection_t[3] - projection_t[0]);
+        buffers->data.frustum[2] = normalizePlane(projection_t[3] + projection_t[1]);
+        buffers->data.frustum[3] = normalizePlane(projection_t[3] - projection_t[1]);
+        buffers->data.frustum[4] = normalizePlane(projection_t[3] + projection_t[2]);
+        buffers->data.frustum[5] = normalizePlane(projection_t[3] - projection_t[2]);
       }
 
       void* mapped_data;
-      const VmaAllocation allocation = buffers.uniform_buffers[frame].allocation;
+      const VmaAllocation allocation = buffers->uniform_buffers[frame]->allocation;
       VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation, &mapped_data));
       const auto scene_uniform_data = static_cast<PerFrameData*>(mapped_data);
-      *scene_uniform_data = buffers.data;
-      vmaUnmapMemory(gpu_->getAllocator(), buffers.uniform_buffers[frame].allocation);
+      *scene_uniform_data = buffers->data;
+      vmaUnmapMemory(gpu_->getAllocator(), buffers->uniform_buffers[frame]->allocation);
 
       //TODO
       meshlet_push_constants.pyramidWidth = 0;
@@ -108,17 +109,11 @@ namespace gestalt::application {
     void CameraSystem::cleanup() {
       repository_->cameras.clear();
 
-      const auto& buffers = repository_->get_buffer<PerFrameDataBuffers>();
+      const auto& buffers = repository_->per_frame_data_buffers;
 
       for (int i = 0; i < 2; ++i) {
-        resource_manager_->destroy_buffer(buffers.uniform_buffers[i]);
+        resource_manager_->destroy_buffer(buffers->uniform_buffers[i]);
       }
-
-      if (buffers.descriptor_layout != VK_NULL_HANDLE) {
-        vkDestroyDescriptorSetLayout(gpu_->getDevice(), buffers.descriptor_layout, nullptr);
-      }
-
-      repository_->deregister_buffer<PerFrameDataBuffers>();
     }
 
 }  // namespace gestalt
