@@ -7,6 +7,7 @@
 namespace gestalt::graphics {
 
   void Gpu::init(Window* window) {
+    volkInitialize();
 
     // create the vulkan instance
     vkb::InstanceBuilder builder;
@@ -27,55 +28,66 @@ namespace gestalt::graphics {
 
     // grab the instance
     instance = vkb_inst.instance;
+    volkLoadInstance(instance);
     debug_messenger = vkb_inst.debug_messenger;
 
     // create the device
     window->create_surface(instance, &surface);
 
-    VkPhysicalDeviceFeatures features10{};
-    features10.fillModeNonSolid = VK_TRUE;
-    features10.shaderInt16 = VK_TRUE;
+    VkPhysicalDeviceFeatures features10 = {.fillModeNonSolid = VK_TRUE, .shaderInt16 = VK_TRUE};
 
-    VkPhysicalDeviceVulkan11Features features11{};
-    features11.uniformAndStorageBuffer16BitAccess = VK_TRUE;
-    features11.storageBuffer16BitAccess = VK_TRUE;
-    features11.shaderDrawParameters = VK_TRUE;
+    VkPhysicalDeviceVulkan11Features features11
+        = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+           .storageBuffer16BitAccess = VK_TRUE,
+           .uniformAndStorageBuffer16BitAccess = VK_TRUE,
+           .multiview = VK_TRUE,
+           .shaderDrawParameters = VK_TRUE};
 
-    VkPhysicalDeviceVulkan12Features features12{};
-    features12.bufferDeviceAddress = VK_TRUE;
-    features12.descriptorIndexing = VK_TRUE;
-    features12.uniformAndStorageBuffer8BitAccess = VK_TRUE;
-    features12.storageBuffer8BitAccess = VK_TRUE;
-    features12.shaderFloat16 = VK_TRUE;
-    features12.shaderInt8 = VK_TRUE;
-    features12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
-    features12.shaderStorageBufferArrayNonUniformIndexing = VK_TRUE;
-    features12.descriptorBindingVariableDescriptorCount = VK_TRUE;
-    features12.runtimeDescriptorArray = VK_TRUE;
+    VkPhysicalDeviceVulkan12Features features12
+        = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+           .storageBuffer8BitAccess = VK_TRUE,
+           .uniformAndStorageBuffer8BitAccess = VK_TRUE,
+           .shaderFloat16 = VK_TRUE,
+           .shaderInt8 = VK_TRUE,
+           .descriptorIndexing = VK_TRUE,
+           .shaderSampledImageArrayNonUniformIndexing = VK_TRUE,
+           .shaderStorageBufferArrayNonUniformIndexing = VK_TRUE,
+           .descriptorBindingVariableDescriptorCount = VK_TRUE,
+           .runtimeDescriptorArray = VK_TRUE,
+           .bufferDeviceAddress = VK_TRUE
+        };
 
-    VkPhysicalDeviceVulkan13Features features13{};
-    features13.dynamicRendering = VK_TRUE;
-    features13.synchronization2 = VK_TRUE;
-    features13.maintenance4 = VK_TRUE;
+    VkPhysicalDeviceVulkan13Features features13
+        = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+           .synchronization2 = VK_TRUE,
+           .dynamicRendering = VK_TRUE,
+           .maintenance4 = VK_TRUE};
+
 
     VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT,
         .taskShader = VK_TRUE,
         .meshShader = VK_TRUE,
-        .multiviewMeshShader = VK_FALSE,
+        .multiviewMeshShader = VK_TRUE, // validation bug?
         .primitiveFragmentShadingRateMeshShader = VK_TRUE,
         .meshShaderQueries = VK_FALSE};
 
-    VkPhysicalDeviceFragmentShadingRateFeaturesKHR shading_rate_features{};
-    shading_rate_features.sType
-        = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR;
-    shading_rate_features.primitiveFragmentShadingRate = VK_TRUE;
+    VkPhysicalDeviceFragmentShadingRateFeaturesKHR shading_rate_features{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR,
+        .primitiveFragmentShadingRate = VK_TRUE
+    };
+    shading_rate_features.pNext = &mesh_shader_features;
 
-    // Link the structures together
-    mesh_shader_features.pNext = &shading_rate_features;
+    VkPhysicalDeviceDescriptorBufferFeaturesEXT descriptorBufferFeatures{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_FEATURES_EXT,
+        .descriptorBuffer = VK_TRUE
+    };
+    descriptorBufferFeatures.pNext = &shading_rate_features;
 
     std::vector extensions = {VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
-                              VK_EXT_MESH_SHADER_EXTENSION_NAME};
+                              VK_EXT_MESH_SHADER_EXTENSION_NAME,
+          VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME
+    };
 
     vkb::PhysicalDeviceSelector selector{vkb_inst};
     auto device_ret = selector.set_minimum_version(1, 3)
@@ -83,7 +95,7 @@ namespace gestalt::graphics {
                           .set_required_features_11(features11)
                           .set_required_features_12(features12)
                           .set_required_features_13(features13)
-                          .add_required_extension_features(mesh_shader_features)
+                          .add_required_extension_features(descriptorBufferFeatures)
                           .add_required_extensions(extensions)
                           .set_surface(surface)
                           .select();
@@ -107,8 +119,13 @@ namespace gestalt::graphics {
 
     // Get the VkDevice handle used in the rest of a vulkan application
     device = vkbDevice.device;
+    volkLoadDevice(device);
     chosen_gpu = physicalDevice.physical_device;
     vkGetPhysicalDeviceProperties(chosen_gpu, &device_properties);
+
+    device_properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    device_properties2.pNext = &descriptorBufferProperties;
+    vkGetPhysicalDeviceProperties2(chosen_gpu, &device_properties2);
 
     // get a Graphics queue
     auto graphics_queue_ret = vkbDevice.get_queue(vkb::QueueType::graphics);
@@ -126,18 +143,15 @@ namespace gestalt::graphics {
     allocatorInfo.device = device;
     allocatorInfo.instance = instance;
     allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
-    vmaCreateAllocator(&allocatorInfo, &allocator);
 
-    vkCmdDrawMeshTasksIndirectCountEXT = reinterpret_cast<PFN_vkCmdDrawMeshTasksIndirectCountEXT>(
-        vkGetDeviceProcAddr(device, "vkCmdDrawMeshTasksIndirectCountEXT"));
-    if (!vkCmdDrawMeshTasksIndirectCountEXT) {
-      throw std::runtime_error("Failed to load vkCmdDrawMeshTasksIndirectCountEXT");
-    }
+    // Provide Vulkan function pointers to VMA
+    VmaVulkanFunctions vma_vulkan_func{};
+    vma_vulkan_func.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
+    vma_vulkan_func.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
+    allocatorInfo.pVulkanFunctions = &vma_vulkan_func;
 
-    vkCmdDrawMeshTasksIndirectEXT = reinterpret_cast<PFN_vkCmdDrawMeshTasksIndirectEXT>(
-        vkGetDeviceProcAddr(device, "vkCmdDrawMeshTasksIndirectEXT"));
-    if (!vkCmdDrawMeshTasksIndirectEXT) {
-           throw std::runtime_error("Failed to load vkCmdDrawMeshTasksIndirectEXT");
+    if (vmaCreateAllocator(&allocatorInfo, &allocator) != VK_SUCCESS) {
+      throw std::runtime_error("Failed to create VMA allocator!");
     }
 
     // create immediate submit resources
@@ -174,18 +188,6 @@ namespace gestalt::graphics {
     VK_CHECK(vkWaitForFences(getDevice(), 1, &immediate_submit_fence_, VK_TRUE, UINT64_MAX));
   }
 
-  void Gpu::drawMeshTasksIndirectCount(VkCommandBuffer commandBuffer, VkBuffer buffer,
-      VkDeviceSize offset, VkBuffer countBuffer, VkDeviceSize countBufferOffset,
-      uint32_t maxDrawCount, uint32_t stride) {
-    vkCmdDrawMeshTasksIndirectCountEXT(commandBuffer, buffer, offset, countBuffer,
-                                       countBufferOffset, maxDrawCount, stride);
-  }
-
-  void Gpu::drawMeshTasksIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer,
-      VkDeviceSize offset, uint32_t drawCount, uint32_t stride) const {
-     vkCmdDrawMeshTasksIndirectEXT(commandBuffer, buffer, offset, drawCount, stride);
-  }
-
   void Gpu::cleanup() const {
     vmaDestroyAllocator(allocator);
     vkDestroyCommandPool(device, immediate_submit_command_pool_, nullptr);
@@ -215,4 +217,12 @@ namespace gestalt::graphics {
   VkPhysicalDevice Gpu::getPhysicalDevice() const { return chosen_gpu; }
 
   VkPhysicalDeviceProperties Gpu::getPhysicalDeviceProperties() const { return device_properties; }
+
+  VkPhysicalDeviceProperties2 Gpu::getPhysicalDeviceProperties2() const {
+    return device_properties2;
+  }
+
+  VkPhysicalDeviceDescriptorBufferPropertiesEXT Gpu::getDescriptorBufferProperties() const {
+    return descriptorBufferProperties;
+  }
 }  // namespace gestalt::graphics

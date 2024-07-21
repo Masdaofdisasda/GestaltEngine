@@ -6,7 +6,7 @@
 #include "vk_initializers.hpp"
 
 #include "GpuResources.hpp"
-#include "../../../build/_deps/vma-src/include/vk_mem_alloc.h"
+#include <vma/vk_mem_alloc.h>
 
 namespace gestalt::graphics {
   vkutil::TransitionBuffer::TransitionBuffer(const std::shared_ptr<AllocatedBuffer>& buffer) {

@@ -73,6 +73,9 @@ namespace gestalt::graphics {
 
       std::shared_ptr<AllocatedBuffer> create_buffer(size_t allocSize, VkBufferUsageFlags usage,
                                     VmaMemoryUsage memoryUsage) override;
+      std::shared_ptr<AllocatedBuffer> create_descriptor_buffer(size_t allocSize,
+                                                                VkBufferUsageFlags usage,
+                                                                VmaMemoryUsage memoryUsage);
       void destroy_buffer(const std::shared_ptr<AllocatedBuffer> buffer) override;
 
       VkSampler create_sampler(const VkSamplerCreateInfo& sampler_create_info) const override;

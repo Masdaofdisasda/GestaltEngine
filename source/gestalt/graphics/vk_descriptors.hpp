@@ -17,7 +17,7 @@ namespace gestalt::graphics {
                                          VkShaderStageFlags shader_stages, bool bindless = false,
                                          uint32_t descriptor_count = 1) override;
     void clear() override;
-    VkDescriptorSetLayout build(VkDevice device, bool is_push_descriptor = false) override;
+    VkDescriptorSetLayout build(VkDevice device, VkDescriptorSetLayoutCreateFlags flags = 0) override;
   };
 
   struct DescriptorWriter final : IDescriptorWriter {

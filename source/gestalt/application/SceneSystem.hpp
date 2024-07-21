@@ -43,13 +43,20 @@ namespace gestalt::application {
     };
 
     class MaterialSystem final : public SceneSystem, public NonCopyable<MaterialSystem> {
-      std::array<std::array<VkDescriptorImageInfo, getPbrMaterialTextures()>, getMaxMaterials()> image_infos_ = {};
+      std::array<VkDescriptorImageInfo, getMaxTextures()> image_infos_ = {};
+
+      void create_uniform_buffer();
+      void create_images_buffer();
+      void create_ibl_images();
+      void create_default_material();
+      void fill_uniform_buffer();
+      void fill_images_buffer();
+      void write_material(PbrMaterial& material, uint32 material_id);
+
     public:
-      void create_defaults();
       void prepare() override;
       void update() override;
       void cleanup() override;
-      void write_material(PbrMaterial& material, uint32 material_id);
     };
 
     class LightSystem final : public SceneSystem, public NonCopyable<LightSystem> {

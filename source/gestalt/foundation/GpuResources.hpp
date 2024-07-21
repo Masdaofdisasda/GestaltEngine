@@ -116,11 +116,19 @@ namespace gestalt::foundation {
 
   struct MaterialBuffers : BufferCollection, NonCopyable<MaterialBuffers> {
     std::shared_ptr<AllocatedBuffer> constants_buffer;
-    VkDescriptorSet constants_set;
-    VkDescriptorSet texture_set;
+    //VkDescriptorSet constants_set;
+    //VkDescriptorSet texture_set;
+
+    std::shared_ptr<AllocatedBuffer> uniform_descriptor_buffer;
+    VkDeviceSize uniform_descriptor_set_layout_size;
+    VkDeviceSize uniform_binding_offset;
+
+    std::shared_ptr<AllocatedBuffer> image_descriptor_buffer;
+    VkDeviceSize image_descriptor_set_layout_size;
+    VkDeviceSize image_binding_offset;
 
     std::vector<VkDescriptorSet> get_descriptor_set(const int16 frame_index) const override {
-      return {texture_set, constants_set};
+      return {};
     }
 
     std::vector<std::shared_ptr<AllocatedBuffer>> get_buffers(int16 frame_index) const override {

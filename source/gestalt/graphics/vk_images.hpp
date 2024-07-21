@@ -1,7 +1,7 @@
 
 #pragma once 
 
-#include <vulkan/vulkan.h>
+#include "vk_types.hpp"
 
 #include "GpuResources.hpp"
 

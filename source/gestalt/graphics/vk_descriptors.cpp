@@ -32,17 +32,14 @@ namespace gestalt::graphics {
     binding_flags.clear();
   }
 
-  VkDescriptorSetLayout DescriptorLayoutBuilder::build(VkDevice device, bool is_push_descriptor) {
+  VkDescriptorSetLayout DescriptorLayoutBuilder::build(
+      VkDevice device, VkDescriptorSetLayoutCreateFlags flags) {
     VkDescriptorSetLayoutCreateInfo info
         = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
            .pNext = nullptr,
-           .flags = 0,
+           .flags = flags,
            .bindingCount = static_cast<uint32_t>(bindings.size()),
            .pBindings = bindings.data()};
-
-    if (is_push_descriptor) {
-      info.flags |= VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
-    }
 
     VkDescriptorSetLayoutBindingFlagsCreateInfoEXT bindingFlagsInfo
         = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT,

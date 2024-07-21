@@ -69,6 +69,43 @@ namespace gestalt::graphics {
       return std::make_shared<AllocatedBuffer>(newBuffer);
     }
 
+    // https://github.com/KhronosGroup/Vulkan-Samples/tree/main/samples/extensions/descriptor_buffer_basic
+  inline size_t aligned_size(size_t size, size_t alignment) {
+      return (size + alignment - 1) & ~(alignment - 1);
+    }
+
+    std::shared_ptr<AllocatedBuffer> ResourceManager::create_descriptor_buffer(size_t allocSize,
+                                                                    VkBufferUsageFlags usage,
+                                                   VmaMemoryUsage memoryUsage) {
+
+      // Align allocSize to the descriptor buffer alignment requirement
+      allocSize = aligned_size(
+          allocSize, gpu_->getDescriptorBufferProperties().descriptorBufferOffsetAlignment);
+
+      // Allocate buffer
+      VkBufferCreateInfo bufferInfo = {};
+      bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+      bufferInfo.pNext = nullptr;
+      bufferInfo.size = allocSize;
+      bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+      bufferInfo.usage = usage | VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT
+                         | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
+      VmaAllocationCreateInfo vmaallocInfo = {};
+      vmaallocInfo.usage = memoryUsage;
+      vmaallocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+      AllocatedBuffer newBuffer;
+      newBuffer.usage = usage;
+      newBuffer.memory_usage = memoryUsage;
+
+      // Allocate the buffer
+      VK_CHECK(vmaCreateBuffer(gpu_->getAllocator(), &bufferInfo, &vmaallocInfo, &newBuffer.buffer,
+                               &newBuffer.allocation, &newBuffer.info));
+
+      return std::make_shared<AllocatedBuffer>(newBuffer);
+    }
+
 
     void ResourceManager::destroy_buffer(const std::shared_ptr<AllocatedBuffer> buffer) {
       vmaDestroyBuffer(gpu_->getAllocator(), buffer->buffer, buffer->allocation);

@@ -226,8 +226,8 @@ namespace gestalt::graphics {
                          sizeof(MeshletPushConstants), &meshlet_push_constants);
 
       // first byte is the task count, so we need offset by one uin32
-      gpu_->drawMeshTasksIndirect(cmd, mesh_buffers->draw_count_buffer[frame]->buffer,
-                                  sizeof(uint32), 1, 0);
+      vkCmdDrawMeshTasksIndirectEXT(cmd, mesh_buffers->draw_count_buffer[frame]->buffer,
+                                    sizeof(uint32), 1, 0);
 
       vkCmdEndRendering(cmd);
     }

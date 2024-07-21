@@ -15,6 +15,9 @@ target_include_directories(
   ${FOUNDATION_MODULE}
   PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"
          "${Vulkan_INCLUDE_DIRS}"
+         "${volk_SOURCE_DIR}"
          "${glm_SOURCE_DIR}"
          "${fmt_SOURCE_DIR}/include"
 )
+
+target_link_libraries(${FOUNDATION_MODULE} PUBLIC volk)

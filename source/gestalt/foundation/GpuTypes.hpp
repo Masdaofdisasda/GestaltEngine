@@ -22,21 +22,16 @@ namespace gestalt::foundation {
     [[nodiscard]] virtual VkDevice getDevice() const = 0;
     [[nodiscard]] virtual VmaAllocator getAllocator() const = 0;
     [[nodiscard]] virtual VkQueue getGraphicsQueue() const = 0;
-    [[nodiscard]] virtual uint32_t getGraphicsQueueFamily() const = 0;
+    [[nodiscard]] virtual uint32 getGraphicsQueueFamily() const = 0;
     [[nodiscard]] virtual VkSurfaceKHR getSurface() const = 0;
     [[nodiscard]] virtual VkDebugUtilsMessengerEXT getDebugMessenger() const = 0;
     [[nodiscard]] virtual VkPhysicalDevice getPhysicalDevice() const = 0;
     [[nodiscard]] virtual VkPhysicalDeviceProperties getPhysicalDeviceProperties() const = 0;
+    [[nodiscard]] virtual VkPhysicalDeviceProperties2 getPhysicalDeviceProperties2() const = 0;
+    [[nodiscard]] virtual VkPhysicalDeviceDescriptorBufferPropertiesEXT getDescriptorBufferProperties()
+        const = 0;
 
     virtual void immediateSubmit(std::function<void(VkCommandBuffer cmd)> function) const = 0;
-    virtual void drawMeshTasksIndirectCount(VkCommandBuffer commandBuffer, VkBuffer buffer,
-                                            VkDeviceSize offset, VkBuffer countBuffer,
-                                            VkDeviceSize countBufferOffset, uint32_t maxDrawCount,
-                                            uint32_t stride)
-        = 0;
-    virtual void drawMeshTasksIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer,
-                                              VkDeviceSize offset, uint32_t drawCount, uint32_t stride) const
-        = 0;
   };
 
   class IResourceManager {
@@ -50,11 +45,15 @@ namespace gestalt::foundation {
     virtual void flush_loader() = 0;
 
     virtual VkDescriptorSet allocateDescriptor(VkDescriptorSetLayout layout,
-                                               const std::vector<uint32_t>& variableDescriptorCounts
+                                               const std::vector<uint32>& variableDescriptorCounts
                                                = {})
         = 0;
 
     virtual std::shared_ptr<AllocatedBuffer> create_buffer(size_t allocSize, VkBufferUsageFlags usage,
+                                          VmaMemoryUsage memoryUsage)
+        = 0;
+    virtual std::shared_ptr<AllocatedBuffer> create_descriptor_buffer(size_t allocSize,
+                                                                      VkBufferUsageFlags usage,
                                           VmaMemoryUsage memoryUsage)
         = 0;
     virtual void destroy_buffer(const std::shared_ptr<AllocatedBuffer> buffer) = 0;
@@ -89,7 +88,8 @@ namespace gestalt::foundation {
                                                   uint32_t descriptor_count = 1)
         = 0;
     virtual void clear() = 0;
-    virtual VkDescriptorSetLayout build(VkDevice device, bool is_push_descriptor = false) = 0;
+    virtual VkDescriptorSetLayout build(VkDevice device, VkDescriptorSetLayoutCreateFlags flags = 0)
+        = 0;
   };
 
   class IDescriptorAllocatorGrowable {
