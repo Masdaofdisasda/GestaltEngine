@@ -5,7 +5,7 @@
 
 #include "per_frame_structs.glsl"
 
-layout(set = 1, binding = 17) buffer LightViewProj{
+layout(set = 1, binding = 2) buffer LightViewProj{
 	mat4 viewProj;
 } lightViewProj[256 + 2];
 

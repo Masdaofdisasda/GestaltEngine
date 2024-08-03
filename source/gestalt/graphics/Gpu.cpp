@@ -80,7 +80,7 @@ namespace gestalt::graphics {
 
     VkPhysicalDeviceDescriptorBufferFeaturesEXT descriptorBufferFeatures{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_FEATURES_EXT,
-        .descriptorBuffer = VK_TRUE
+        .descriptorBuffer = VK_TRUE,
     };
     descriptorBufferFeatures.pNext = &shading_rate_features;
 

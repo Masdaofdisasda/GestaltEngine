@@ -50,9 +50,8 @@ namespace gestalt::graphics {
 
     class ResourceManager final : public IResourceManager, public NonCopyable<ResourceManager> {
 
-      IGpu* gpu_;
-      Repository* repository_;
-      std::unique_ptr<IDescriptorAllocatorGrowable> descriptorPool = std::make_unique<DescriptorAllocatorGrowable>();
+      IGpu* gpu_ = nullptr;
+      Repository* repository_ = nullptr;
 
       void load_and_create_cubemap(const std::string& file_path, TextureHandle& cubemap);
 
@@ -67,15 +66,11 @@ namespace gestalt::graphics {
 
       void flush_loader() override;
 
-      VkDescriptorSet allocateDescriptor(VkDescriptorSetLayout layout,
-                                         const std::vector<uint32_t>& variableDescriptorCounts
-                                         = {}) override;
-
       std::shared_ptr<AllocatedBuffer> create_buffer(size_t allocSize, VkBufferUsageFlags usage,
                                     VmaMemoryUsage memoryUsage) override;
-      std::shared_ptr<AllocatedBuffer> create_descriptor_buffer(size_t allocSize,
-                                                                VkBufferUsageFlags usage,
-                                                                VmaMemoryUsage memoryUsage);
+      std::shared_ptr<DescriptorBuffer> create_descriptor_buffer(VkDescriptorSetLayout descriptor_layout,
+                                                                 size_t numBindings,
+                                                                 VkBufferUsageFlags usage = 0) override;
       void destroy_buffer(const std::shared_ptr<AllocatedBuffer> buffer) override;
 
       VkSampler create_sampler(const VkSamplerCreateInfo& sampler_create_info) const override;

@@ -38,6 +38,7 @@ namespace gestalt {
       _renderInfo.pColorAttachmentFormats = _colorAttachmentformats.data();
       // connect the renderInfo to the pNext extension mechanism
       pipelineInfo.pNext = &_renderInfo;
+      pipelineInfo.flags = VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT; 
 
       pipelineInfo.stageCount = static_cast<uint32>(_shaderStages.size());
       pipelineInfo.pStages = _shaderStages.data();
@@ -78,6 +79,7 @@ namespace gestalt {
       VkComputePipelineCreateInfo pipelineInfo = {};
       pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
       pipelineInfo.pNext = nullptr;
+      pipelineInfo.flags = VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT; 
 
       // Set the compute shader stage
       if (_shaderStages.size() != 1 || _shaderStages[0].stage != VK_SHADER_STAGE_COMPUTE_BIT) {

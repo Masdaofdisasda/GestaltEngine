@@ -1,4 +1,5 @@
 ﻿#include "RenderPass.hpp"
+#include "descriptor.hpp"
 
 #include "vk_images.hpp"
 #include "vk_initializers.hpp"
@@ -37,22 +38,23 @@ namespace gestalt::graphics {
   }
 
   void BrightPass::execute(VkCommandBuffer cmd) {
-    if (descriptor_sets.at(0) == nullptr) {
-      for (auto& set : descriptor_sets) {
-        set = resource_manager_->allocateDescriptor( descriptor_layouts_.at(0));
-        writer.clear();
-        writer.write_image(10, registry_->resources_.scene_color.image->imageView,
-                           repository_->default_material_.nearestSampler,
-                           registry_->resources_.scene_color.image->getLayout(),
-                           VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-        writer.update_set(gpu_->getDevice(), set);
+    if (descriptor_buffers_.at(0) == nullptr) {
+      for (auto& set : descriptor_buffers_) {
+        set = resource_manager_->create_descriptor_buffer(descriptor_layouts_.at(0), 1);
+
+        VkDescriptorImageInfo image_info = {repository_->default_material_.nearestSampler,
+                                            registry_->resources_.scene_color.image->imageView,
+                                            registry_->resources_.scene_color.image->getLayout()};
+        set->
+                  write_image(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info)
+                  .update();
       }
     }
 
     begin_renderpass(cmd);
 
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
-                            &descriptor_sets[current_frame_index], 0, nullptr);
+    descriptor_buffers_[current_frame_index]->bind(
+        cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
     vkCmdSetViewport(cmd, 0, 1, &viewport_);
     vkCmdSetScissor(cmd, 0, 1, &scissor_);
@@ -116,13 +118,15 @@ namespace gestalt::graphics {
       vkutil::TransitionImage(srcImage).toLayoutRead().andSubmitTo(cmd);
       vkutil::TransitionImage(dstImage).toLayoutWrite().andSubmitTo(cmd);
 
-      if (descriptor_sets[current_frame_index][i] == nullptr) {
-        descriptor_sets[current_frame_index][i]
-            = resource_manager_->allocateDescriptor(descriptor_layouts_.at(0));
-        writer.clear();
-        writer.write_image(10, srcImage->imageView, repository_->default_material_.nearestSampler,
-                           srcImage->getLayout(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-        writer.update_set(gpu_->getDevice(), descriptor_sets[current_frame_index][i]);
+      if (descriptor_buffers_[current_frame_index][i] == nullptr) {
+        descriptor_buffers_[current_frame_index][i]
+            = resource_manager_->create_descriptor_buffer(descriptor_layouts_.at(0), 1);
+        VkDescriptorImageInfo image_info = {repository_->default_material_.nearestSampler,
+                                            srcImage->imageView, srcImage->getLayout()};
+        descriptor_buffers_[current_frame_index][i]
+            ->
+        write_image(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info)
+                  .update();
       }
 
 
@@ -131,9 +135,8 @@ namespace gestalt::graphics {
       VkRenderingInfo renderInfo
           = vkinit::rendering_info(dstImage->getExtent2D(), &colorAttachment, nullptr);
       vkCmdBeginRendering(cmd, &renderInfo);
-
-      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
-                              &descriptor_sets[current_frame_index][i], 0, nullptr);
+      descriptor_buffers_[current_frame_index][i]->bind(
+          cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
       blur_direction.direction = i % 2;
@@ -181,21 +184,20 @@ namespace gestalt::graphics {
   void LuminancePass::execute(VkCommandBuffer cmd) {
     const auto scene_color = registry_->resources_.scene_color.image;
 
-    if (descriptor_sets.at(0) == nullptr) {
-      for (auto& set : descriptor_sets) {
-        set = resource_manager_->allocateDescriptor( descriptor_layouts_.at(0));
-        writer.clear();
-        writer.write_image(10, scene_color->imageView,
-                           repository_->default_material_.nearestSampler, scene_color->getLayout(),
-                           VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-        writer.update_set(gpu_->getDevice(), set);
+    if (descriptor_buffers_.at(0) == nullptr) {
+      for (auto& set : descriptor_buffers_) {
+        set = resource_manager_->create_descriptor_buffer(descriptor_layouts_.at(0), 1);
+        auto image_info = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,
+                                              scene_color->imageView, scene_color->getLayout()};
+        set->write_image(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info)
+                  .update();
       }
     }
 
     begin_renderpass(cmd);
 
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
-                            &descriptor_sets[current_frame_index], 0, nullptr);
+    descriptor_buffers_.at(current_frame_index)->bind(
+        cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
     vkCmdSetViewport(cmd, 0, 1, &viewport_);
@@ -249,13 +251,16 @@ namespace gestalt::graphics {
       vkutil::TransitionImage(src).toLayoutRead().andSubmitTo(cmd);
       vkutil::TransitionImage(dst).toLayoutWrite().andSubmitTo(cmd);
 
-      if (descriptor_sets[current_frame_index].at(i) == nullptr) {
-        descriptor_sets[current_frame_index].at(i)
-            = resource_manager_->allocateDescriptor( descriptor_layouts_.at(0));
-        writer.clear();
-        writer.write_image(10, src->imageView, repository_->default_material_.nearestSampler,
-                           src->getLayout(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-        writer.update_set(gpu_->getDevice(), descriptor_sets[current_frame_index].at(i));
+      if (descriptor_buffers_[current_frame_index].at(i) == nullptr) {
+        descriptor_buffers_[current_frame_index].at(i)
+            = resource_manager_->create_descriptor_buffer(descriptor_layouts_.at(0), 1);
+         VkDescriptorImageInfo image_info = {repository_->default_material_.nearestSampler,
+                                            src->imageView, src->getLayout()};
+        descriptor_buffers_[current_frame_index]
+            .at(i)
+            ->
+                         write_image(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info)
+                        .update();
       }
 
       VkRenderingAttachmentInfo newColorAttachment
@@ -263,9 +268,8 @@ namespace gestalt::graphics {
       VkRenderingInfo newRenderInfo
           = vkinit::rendering_info(dst->getExtent2D(), &newColorAttachment, nullptr);
       vkCmdBeginRendering(cmd, &newRenderInfo);
-
-      vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
-                              &descriptor_sets[current_frame_index].at(i), 0, nullptr);
+      descriptor_buffers_[current_frame_index].at(i)->bind(
+            cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
       viewport_.width = static_cast<float>(dst->getExtent2D().width);
@@ -331,18 +335,19 @@ namespace gestalt::graphics {
     vkutil::TransitionImage(avg_lum).toLayoutRead().andSubmitTo(cmd);
     vkutil::TransitionImage(new_lum).toLayoutWrite().andSubmitTo(cmd);
 
-    if (descriptor_sets.at(frame) == nullptr) {
-      descriptor_sets.at(frame)
-          = resource_manager_->allocateDescriptor( descriptor_layouts_.at(0));
-        writer.clear();
-        writer.write_image(10, current_lum->imageView,
-                           repository_->default_material_.nearestSampler, current_lum->getLayout(),
-                           VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-        writer.write_image(11, avg_lum->imageView, repository_->default_material_.nearestSampler,
-                           avg_lum->getLayout(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-        writer.update_set(gpu_->getDevice(), descriptor_sets.at(frame) );
-    }
+    if (descriptor_buffers_.at(frame) == nullptr) {
+      descriptor_buffers_.at(frame)
+          = resource_manager_->create_descriptor_buffer(descriptor_layouts_.at(0), 2);
 
+      auto image_info0 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,
+                                               current_lum->imageView, current_lum->getLayout()};
+      auto image_info1 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,
+                                               avg_lum->imageView, avg_lum->getLayout()};
+      descriptor_buffers_.at(frame)
+          ->write_image(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info0)
+          .write_image(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info1)
+          .update();
+    }
 
     VkRenderingAttachmentInfo newColorAttachment
         = vkinit::attachment_info(new_lum->imageView, nullptr, new_lum->getLayout());
@@ -350,8 +355,8 @@ namespace gestalt::graphics {
         = vkinit::rendering_info(new_lum->getExtent2D(), &newColorAttachment, nullptr);
     vkCmdBeginRendering(cmd, &newRenderInfo);
 
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
-                            &descriptor_sets[current_frame_index], 0, nullptr);
+    descriptor_buffers_.at(frame)->bind(
+        cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
     viewport_.width = static_cast<float>(new_lum->getExtent2D().width);
@@ -412,25 +417,27 @@ namespace gestalt::graphics {
     const auto lum_image
         = frame == 0 ? registry_->resources_.lum_B.image : registry_->resources_.lum_A.image;
 
-    if (descriptor_sets.at(0) == nullptr) {
-      for (auto& set : descriptor_sets) {
-        set = resource_manager_->allocateDescriptor( descriptor_layouts_.at(0));
-        writer.clear();
-        writer.write_image(10, scene_linear->imageView,
-                           repository_->default_material_.nearestSampler, scene_linear->getLayout(),
-                           VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-        writer.write_image(11, scene_bloom->imageView, repository_->default_material_.linearSampler,
-                           scene_bloom->getLayout(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-        writer.write_image(12, lum_image->imageView, repository_->default_material_.linearSampler,
-                           lum_image->getLayout(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-        writer.update_set(gpu_->getDevice(), set);
+    if (descriptor_buffers_.at(0) == nullptr) {
+      for (auto& set : descriptor_buffers_) {
+        set = resource_manager_->create_descriptor_buffer(descriptor_layouts_.at(0), 3);
+        auto image_info0 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,
+                                              scene_linear->imageView, scene_linear->getLayout()};
+         auto image_info1 = VkDescriptorImageInfo{repository_->default_material_.linearSampler,
+                                                    scene_bloom->imageView, scene_bloom->getLayout()};
+         auto image_info2 = VkDescriptorImageInfo{repository_->default_material_.linearSampler,
+                                                    lum_image->imageView, lum_image->getLayout()};
+         set->
+                         write_image(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info0)
+                        .write_image(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info1)
+                        .write_image(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info2)
+                        .update();
       }
     }
 
     begin_renderpass(cmd);
 
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
-                            &descriptor_sets[current_frame_index], 0, nullptr);
+    descriptor_buffers_.at(current_frame_index)->bind(
+        cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
     vkCmdSetViewport(cmd, 0, 1, &viewport_);
     vkCmdSetScissor(cmd, 0, 1, &scissor_);

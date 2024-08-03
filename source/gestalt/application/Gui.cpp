@@ -75,6 +75,12 @@ namespace gestalt::application {
       // this initializes imgui for SDL
       ImGui_ImplSDL2_InitForVulkan(window_->handle);
 
+      ImGui_ImplVulkan_LoadFunctions(
+          [](const char* function_name, void* user_data) -> PFN_vkVoidFunction {
+            return vkGetInstanceProcAddr((VkInstance)user_data, function_name);
+          },
+          gpu_->getInstance());
+
       VkPipelineRenderingCreateInfoKHR pipelineRenderingCreateInfo = {
           .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
           .colorAttachmentCount = 1,

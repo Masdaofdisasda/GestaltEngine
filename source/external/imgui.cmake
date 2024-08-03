@@ -17,6 +17,8 @@ target_link_libraries(DearImGui PRIVATE ${VULKAN_LIBRARY} SDL2-static)
 
 target_include_directories(DearImGui PRIVATE "${Vulkan_INCLUDE_DIRS}")
 
+target_compile_definitions(DearImGui PRIVATE IMGUI_IMPL_VULKAN_NO_PROTOTYPES VK_NO_PROTOTYPES)
+
 set_property(TARGET DearImGui PROPERTY FOLDER "External/ImGUI")
 
 # Add ImNodeFlow

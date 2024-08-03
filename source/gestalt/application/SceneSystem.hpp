@@ -17,12 +17,10 @@ namespace gestalt::application {
       void init(IGpu* gpu,
                 IResourceManager* resource_manager,
                 IDescriptorLayoutBuilder* builder,
-                IDescriptorWriter* writer,
                 Repository* repository) {
         gpu_ = gpu;
         resource_manager_ = resource_manager;
         descriptor_layout_builder_ = builder;
-        writer_ = writer;
         repository_ = repository;
 
         prepare();
@@ -38,7 +36,6 @@ namespace gestalt::application {
       IGpu* gpu_ = nullptr;
       IResourceManager* resource_manager_ = nullptr;
       IDescriptorLayoutBuilder* descriptor_layout_builder_ = nullptr;
-      IDescriptorWriter* writer_ = nullptr;
       Repository* repository_ = nullptr;
     };
 
@@ -60,6 +57,9 @@ namespace gestalt::application {
     };
 
     class LightSystem final : public SceneSystem, public NonCopyable<LightSystem> {
+
+      void create_buffers();
+      void fill_buffers();
 
       glm::mat4 calculate_sun_view_proj(glm::vec3 direction) const;
       void update_directional_lights(std::unordered_map<Entity, LightComponent>& lights);
@@ -104,6 +104,9 @@ namespace gestalt::application {
       size_t meshes_ = 0;
       void traverse_scene(Entity entity, const glm::mat4& parent_transform);
       void upload_mesh();
+
+      void create_buffers();
+      void fill_descriptors();
 
     public:
       void prepare() override;

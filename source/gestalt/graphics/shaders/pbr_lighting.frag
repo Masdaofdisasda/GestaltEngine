@@ -12,27 +12,27 @@ layout(location = 0) in vec2 texCoord;
 
 layout (location = 0) out vec4 outFragColor;
 
-layout(set = 2, binding = 10) uniform sampler2D gbuffer1;
-layout(set = 2, binding = 11) uniform sampler2D gbuffer2;
-layout(set = 2, binding = 12) uniform sampler2D gbuffer3;
-layout(set = 2, binding = 13) uniform sampler2D depthBuffer;
-layout(set = 2, binding = 14) uniform sampler2D shadowMap;
+layout(set = 2, binding = 0) uniform sampler2D gbuffer1;
+layout(set = 2, binding = 1) uniform sampler2D gbuffer2;
+layout(set = 2, binding = 2) uniform sampler2D gbuffer3;
+layout(set = 2, binding = 3) uniform sampler2D depthBuffer;
+layout(set = 2, binding = 4) uniform sampler2D shadowMap;
 
-layout(set = 3, binding = 15) buffer DirLight{
+layout(set = 3, binding = 0) buffer DirLight{
 	vec3 color;
 	float intensity;
 	vec3 direction;
 	int viewProjIndex;
 } dirLight[2];
 
-layout(set = 3, binding = 16) buffer PointLight{
+layout(set = 3, binding = 1) buffer PointLight{
 	vec3 color;
 	float intensity;
 	vec3 position;
 	bool enabled;
 } pointLight[256];
 
-layout(set = 3, binding = 17) buffer LightViewProj{
+layout(set = 3, binding = 2) buffer LightViewProj{
 	mat4 viewProj;
 } lightViewProj[256 + 2];
 

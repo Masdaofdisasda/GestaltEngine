@@ -37,7 +37,7 @@ namespace gestalt::graphics {
     VkDescriptorSetLayoutCreateInfo info
         = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
            .pNext = nullptr,
-           .flags = flags,
+           .flags = flags | VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT,
            .bindingCount = static_cast<uint32_t>(bindings.size()),
            .pBindings = bindings.data()};
 

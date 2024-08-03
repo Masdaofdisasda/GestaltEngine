@@ -1,4 +1,5 @@
 ﻿#include "RenderPass.hpp"
+#include "descriptor.hpp"
 
 #include "vk_images.hpp"
 #include "vk_initializers.hpp"
@@ -19,29 +20,29 @@ namespace gestalt::graphics {
             .build(gpu_->getDevice()));
     descriptor_layouts_.emplace_back(
         DescriptorLayoutBuilder()
+            .add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
             .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
             .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
-            .add_binding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
             .build(gpu_->getDevice()));
     descriptor_layouts_.emplace_back(DescriptorLayoutBuilder()
-                                         .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                         .add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                       VK_SHADER_STAGE_FRAGMENT_BIT)
-                                         .add_binding(11, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                         .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                       VK_SHADER_STAGE_FRAGMENT_BIT)
-                                         .add_binding(12, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                         .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                       VK_SHADER_STAGE_FRAGMENT_BIT)
-                                         .add_binding(13, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                         .add_binding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                       VK_SHADER_STAGE_FRAGMENT_BIT)
-                                         .add_binding(14, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                         .add_binding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                       VK_SHADER_STAGE_FRAGMENT_BIT)
                                          .build(gpu_->getDevice()));
     descriptor_layouts_.emplace_back(
         DescriptorLayoutBuilder()
-            .add_binding(15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
+            .add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
                          getMaxDirectionalLights())
-            .add_binding(16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
+            .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
                          getMaxPointLights())
-            .add_binding(17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                          VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, false,
                          getMaxLights())
             .build(gpu_->getDevice()));
@@ -89,31 +90,29 @@ namespace gestalt::graphics {
     const auto gbuffer_depth = registry_->resources_.scene_depth.image;
     const auto shadow_map = registry_->resources_.shadow_map.image;
 
-    if (descriptor_sets.at(frame) == nullptr) {
-      descriptor_sets.at(frame)
-          = resource_manager_->allocateDescriptor(descriptor_layouts_.at(2));
-      writer_.clear();
-      writer_.write_image(10, gbuffer_1->imageView, repository_->default_material_.nearestSampler,
-                          gbuffer_1->getLayout(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-      writer_.write_image(11, gbuffer_2->imageView, repository_->default_material_.nearestSampler,
-                          gbuffer_2->getLayout(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-      writer_.write_image(12, gbuffer_3->imageView, repository_->default_material_.nearestSampler,
-                          gbuffer_3->getLayout(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-      writer_.write_image(13, gbuffer_depth->imageView,
-                          repository_->default_material_.nearestSampler, gbuffer_depth->getLayout(),
-                          VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-      writer_.write_image(14, shadow_map->imageView, repository_->default_material_.nearestSampler,
-                          shadow_map->getLayout(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-      writer_.update_set(gpu_->getDevice(), descriptor_sets.at(frame));
+    if (descriptor_buffers_.at(frame) == nullptr) {
+      descriptor_buffers_.at(frame) = resource_manager_->create_descriptor_buffer(
+          descriptor_layouts_.at(1), 5, 0);
+      auto image_info0 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,gbuffer_1->imageView,gbuffer_1->getLayout()};
+       auto image_info1 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,gbuffer_2->imageView,gbuffer_2->getLayout()};
+       auto image_info2 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,gbuffer_3->imageView,gbuffer_3->getLayout()};
+       auto image_info3 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,gbuffer_depth->imageView,gbuffer_depth->getLayout()};
+       auto image_info4 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,shadow_map->imageView,shadow_map->getLayout()};
+       descriptor_buffers_.at(frame)
+           ->
+                 write_image(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info0)
+                 .write_image(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info1)
+                 .write_image(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info2)
+                 .write_image(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info3)
+                 .write_image(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info4)
+                             .update();
     }
 
-
-    VkDescriptorSet descriptorSets[]
-        = {per_frame_buffers->descriptor_sets[frame], ibl_buffers->descriptor_set,
-           descriptor_sets[current_frame_index],
-           light_data->descriptor_set};
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 4,
-                            descriptorSets, 0, nullptr);
+    per_frame_buffers->descriptor_buffers[frame]->bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                       pipeline_layout_, 0);
+    ibl_buffers->descriptor_buffer->bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1);
+    descriptor_buffers_.at(frame)->bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 2);
+    light_data->descriptor_buffer->bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 3);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
     vkCmdSetViewport(cmd, 0, 1, &viewport_);

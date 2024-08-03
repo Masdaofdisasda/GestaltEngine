@@ -2,6 +2,9 @@
 #include "SceneSystem.hpp"
 
 #include <glm/gtx/matrix_decompose.hpp>
+
+#include "descriptor.hpp"
+
 namespace gestalt::application {
 
     constexpr size_t kMaxVertexPositionBufferSize
@@ -18,102 +21,9 @@ namespace gestalt::application {
   constexpr size_t kMaxDrawCountBufferSize = 4 * sizeof(uint32); // commandCount, x, y, z
 
   void MeshSystem::prepare() {
-    const auto& mesh_buffers = repository_->mesh_buffers;
 
-    descriptor_layout_builder_->clear();
-    constexpr auto geometry_stages
-        = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT;
-    const auto descriptor_layout
-        = descriptor_layout_builder_
-              ->add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
-              .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
-              .add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
-              .add_binding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
-              .add_binding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
-              .add_binding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
-              .add_binding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
-              .add_binding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
-              .build(gpu_->getDevice());
-
-    for (auto& descriptor_set : mesh_buffers->descriptor_sets) {
-      descriptor_set = resource_manager_->allocateDescriptor( descriptor_layout);
-    }
-
-    // Create vertex buffer
-    mesh_buffers->vertex_position_buffer = resource_manager_->create_buffer(
-        kMaxVertexPositionBufferSize,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
-            | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VMA_MEMORY_USAGE_GPU_ONLY);
-    mesh_buffers->vertex_data_buffer = resource_manager_->create_buffer(
-        kMaxVertexDataBufferSize,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
-            | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VMA_MEMORY_USAGE_GPU_ONLY);
-
-    // Create index buffer
-    mesh_buffers->index_buffer = resource_manager_->create_buffer(
-        kMaxIndexBufferSize,
-        VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VMA_MEMORY_USAGE_GPU_ONLY);
-
-    // Create meshlet buffers
-    mesh_buffers->meshlet_buffer = resource_manager_->create_buffer(
-        kMaxMeshletBufferSize,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VMA_MEMORY_USAGE_GPU_ONLY);
-    mesh_buffers->meshlet_vertices = resource_manager_->create_buffer(
-        kMaxMeshletVertexBufferSize,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VMA_MEMORY_USAGE_GPU_ONLY);
-    mesh_buffers->meshlet_triangles = resource_manager_->create_buffer(
-        kMaxMeshletIndexBufferSize,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VMA_MEMORY_USAGE_GPU_ONLY);
-
-    // Create mesh task commands and draw buffers
-    for (int i = 0; i < getFramesInFlight(); i++) {
-      mesh_buffers->meshlet_task_commands_buffer[i] = resource_manager_->create_buffer(
-          kMaxMeshletTaskCommandsBufferSize,
-          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
-          VMA_MEMORY_USAGE_GPU_ONLY);
-      mesh_buffers->mesh_draw_buffer[i] = resource_manager_->create_buffer(
-          kMaxMeshDrawBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-          VMA_MEMORY_USAGE_CPU_TO_GPU);
-      mesh_buffers->draw_count_buffer[i] = resource_manager_->create_buffer(
-          kMaxDrawCountBufferSize,
-          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
-              | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-          VMA_MEMORY_USAGE_GPU_ONLY);
-    }
-
-    for (int i = 0; i < getFramesInFlight(); i++) {
-      writer_->clear();
-      writer_->write_buffer(0, mesh_buffers->vertex_position_buffer->buffer,
-                            kMaxVertexPositionBufferSize, 0,
-                            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-      writer_->write_buffer(1, mesh_buffers->vertex_data_buffer->buffer,
-                            kMaxVertexDataBufferSize, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-      writer_->write_buffer(2, mesh_buffers->meshlet_buffer->buffer,
-                            kMaxMeshletBufferSize, 0,
-                            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-      writer_->write_buffer(3, mesh_buffers->meshlet_vertices->buffer,
-                            kMaxMeshletVertexBufferSize, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-      writer_->write_buffer(4, mesh_buffers->meshlet_triangles->buffer,
-                            kMaxMeshletIndexBufferSize, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-      writer_->write_buffer(5, mesh_buffers->meshlet_task_commands_buffer[i]->buffer,
-                            kMaxMeshletTaskCommandsBufferSize, 0,
-                            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-      writer_->write_buffer(6, mesh_buffers->mesh_draw_buffer[i]->buffer,
-                            kMaxMeshDrawBufferSize, 0,
-                            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-      writer_->write_buffer(7, mesh_buffers->draw_count_buffer[i]->buffer, kMaxDrawCountBufferSize,
-                            0,
-                                     VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-      writer_->update_set(gpu_->getDevice(), mesh_buffers->descriptor_sets[i]);
-    }
-
-    vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layout, nullptr);
+      create_buffers();
+    fill_descriptors();
 
   }
 
@@ -232,6 +142,120 @@ namespace gestalt::application {
                       &copy_regions[5]);
     });
     resource_manager_->destroy_buffer(staging);
+  }
+
+  void MeshSystem::create_buffers() {
+    const auto& mesh_buffers = repository_->mesh_buffers;
+
+    descriptor_layout_builder_->clear();
+    constexpr auto geometry_stages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT
+                                     | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT;
+    const auto descriptor_layout
+        = descriptor_layout_builder_
+              ->add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
+              .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
+              .add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
+              .add_binding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
+              .add_binding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
+              .add_binding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
+              .add_binding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
+              .add_binding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
+              .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
+
+        for (int i = 0; i < getFramesInFlight(); i++) {
+      mesh_buffers->descriptor_buffers[i] = resource_manager_->create_descriptor_buffer(
+          descriptor_layout, 8, 0);
+    }
+
+    vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layout, nullptr);
+
+    // Create vertex buffer
+    mesh_buffers->vertex_position_buffer = resource_manager_->create_buffer(
+        kMaxVertexPositionBufferSize,
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
+            | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        VMA_MEMORY_USAGE_GPU_ONLY);
+    mesh_buffers->vertex_data_buffer = resource_manager_->create_buffer(
+        kMaxVertexDataBufferSize,
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
+            | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        VMA_MEMORY_USAGE_GPU_ONLY);
+
+    // Create index buffer
+    mesh_buffers->index_buffer = resource_manager_->create_buffer(
+        kMaxIndexBufferSize,
+        VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+            | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        VMA_MEMORY_USAGE_GPU_ONLY);
+
+    // Create meshlet buffers
+    mesh_buffers->meshlet_buffer = resource_manager_->create_buffer(
+        kMaxMeshletBufferSize,
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+            | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        VMA_MEMORY_USAGE_GPU_ONLY);
+    mesh_buffers->meshlet_vertices = resource_manager_->create_buffer(
+        kMaxMeshletVertexBufferSize,
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+            | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        VMA_MEMORY_USAGE_GPU_ONLY);
+    mesh_buffers->meshlet_triangles = resource_manager_->create_buffer(
+        kMaxMeshletIndexBufferSize,
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+            | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        VMA_MEMORY_USAGE_GPU_ONLY);
+
+    // Create mesh task commands and draw buffers
+    for (int i = 0; i < getFramesInFlight(); i++) {
+      mesh_buffers->meshlet_task_commands_buffer[i] = resource_manager_->create_buffer(
+          kMaxMeshletTaskCommandsBufferSize,
+          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
+              | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+          VMA_MEMORY_USAGE_GPU_ONLY);
+      mesh_buffers->mesh_draw_buffer[i] = resource_manager_->create_buffer(
+          kMaxMeshDrawBufferSize,
+          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+          VMA_MEMORY_USAGE_CPU_TO_GPU);
+      mesh_buffers->draw_count_buffer[i] = resource_manager_->create_buffer(
+          kMaxDrawCountBufferSize,
+          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
+              | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+          VMA_MEMORY_USAGE_GPU_ONLY);
+    }
+  }
+
+  void MeshSystem::fill_descriptors() {
+    const auto& mesh_buffers = repository_->mesh_buffers;
+
+    for (int i = 0; i < getFramesInFlight(); i++) {
+      mesh_buffers->descriptor_buffers[i]
+          ->write_buffer_array(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                               mesh_buffers->vertex_position_buffer->address,
+                               sizeof(GpuVertexPosition) * getMaxVertices())
+          .update()
+          .write_buffer_array(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                              mesh_buffers->vertex_data_buffer->address, sizeof(GpuVertexData)*getMaxVertices())
+          .update()
+          .write_buffer_array(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                              mesh_buffers->meshlet_buffer->address, sizeof(Meshlet)*getMaxMeshlets())
+          .update()
+          .write_buffer_array(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                              mesh_buffers->meshlet_vertices->address, sizeof(uint32)*getMaxVertices())
+          .update()
+          .write_buffer_array(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                              mesh_buffers->meshlet_triangles->address, sizeof(uint8)*getMaxIndices())
+          .write_buffer_array(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                              mesh_buffers->meshlet_task_commands_buffer[i]->address,
+                              sizeof(MeshTaskCommand)* getMaxMeshlets())
+          .update()
+          .write_buffer_array(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                              mesh_buffers->mesh_draw_buffer[i]->address, sizeof(MeshDraw)*
+                              getMaxMeshes())
+          .update()
+          .write_buffer(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                        mesh_buffers->draw_count_buffer[i]->address, 4 * sizeof(uint32))
+          .update();
+    }
   }
 
   void MeshSystem::update() {

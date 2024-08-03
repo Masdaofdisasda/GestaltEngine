@@ -9,6 +9,10 @@
 #include <array>
 
 namespace gestalt::foundation {
+  class IGpu;
+}
+
+namespace gestalt::foundation {
 
   struct alignas(4) GpuVertexPosition {
     glm::vec3 position{0.f};
@@ -86,11 +90,65 @@ namespace gestalt::foundation {
     VkBuffer buffer;
     VmaAllocation allocation;
     VmaAllocationInfo info;
+    VkDeviceAddress address;
 
     VkAccessFlags2 currentAccess = 0;        // Current access flags
     VkPipelineStageFlags2 currentStage = 0;  // Current pipeline stage
     VkBufferUsageFlags usage;                // Buffer usage flags
     VmaMemoryUsage memory_usage;
+  };
+
+  
+  struct DescriptorUpdate {
+    VkDescriptorType type;
+    size_t descriptorSize;
+    uint32 binding;
+    uint32 descriptorIndex;
+    VkDescriptorAddressInfoEXT addr_info; // note only used because for the pointer in the descriptorInfo struct
+    VkDescriptorImageInfo image_info;
+  };
+
+  struct DescriptorBuffer {
+    VmaAllocator allocator;
+    VkDevice device;
+
+    VkBuffer buffer;
+    VmaAllocation allocation;
+    VmaAllocationInfo info;
+    VkDeviceAddress address;
+    VkDeviceSize size;
+    VkBufferUsageFlags usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT
+                               | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+    std::vector<VkDeviceSize> offsets;
+
+    explicit DescriptorBuffer(VkPhysicalDeviceDescriptorBufferPropertiesEXT buffer_features)
+      : properties_(buffer_features) {}
+
+    DescriptorBuffer& update();
+
+    void bind(VkCommandBuffer cmd, VkPipelineBindPoint bind_point, VkPipelineLayout pipelineLayout,
+              uint32_t set) const;
+
+    DescriptorBuffer& write_image(uint32 binding, VkDescriptorType type,
+                                  const VkDescriptorImageInfo& image_info,
+                                  uint32 descriptor_index = 0);
+    DescriptorBuffer& write_buffer(uint32 binding, VkDescriptorType type,
+                                         VkDeviceAddress resource_address, size_t descriptor_range,
+                                         uint32 descriptor_index = 0);
+
+    DescriptorBuffer& write_buffer_array(uint32 binding, VkDescriptorType type,
+                                               VkDeviceAddress resource_address,
+                                               size_t descriptor_range, uint32 descriptor_count = 1,
+                                               uint32 first_descriptor = 0);
+    DescriptorBuffer& write_image_array(uint32 binding, VkDescriptorType type,
+                                              const std::vector<VkDescriptorImageInfo>& image_infos,
+                                              uint32_t first_descriptor = 0);
+
+  private:
+    std::vector<DescriptorUpdate> update_infos;
+    VkPhysicalDeviceDescriptorBufferPropertiesEXT properties_;
+
+    size_t MapDescriptorSize(VkDescriptorType type) const;
   };
 
   struct alignas(32) GpuDirectionalLight {
@@ -110,29 +168,25 @@ namespace gestalt::foundation {
   // BUFFER TYPES
   struct BufferCollection {
     virtual ~BufferCollection() = default;
-    virtual std::vector<VkDescriptorSet> get_descriptor_set(int16 frame_index) const = 0;
     virtual std::vector<std::shared_ptr<AllocatedBuffer>> get_buffers(int16 frame_index) const = 0;
+    virtual std::vector<std::shared_ptr<DescriptorBuffer>> get_descriptor_buffers(
+        int16 frame_index) const
+        = 0;
   };
 
   struct MaterialBuffers : BufferCollection, NonCopyable<MaterialBuffers> {
-    std::shared_ptr<AllocatedBuffer> constants_buffer;
-    //VkDescriptorSet constants_set;
-    //VkDescriptorSet texture_set;
+    std::shared_ptr<AllocatedBuffer> uniform_buffer;
 
-    std::shared_ptr<AllocatedBuffer> uniform_descriptor_buffer;
-    VkDeviceSize uniform_descriptor_set_layout_size;
-    VkDeviceSize uniform_binding_offset;
-
-    std::shared_ptr<AllocatedBuffer> image_descriptor_buffer;
-    VkDeviceSize image_descriptor_set_layout_size;
-    VkDeviceSize image_binding_offset;
-
-    std::vector<VkDescriptorSet> get_descriptor_set(const int16 frame_index) const override {
-      return {};
-    }
+    std::shared_ptr<DescriptorBuffer> uniform_descriptor_buffer;
+    std::shared_ptr<DescriptorBuffer> image_descriptor_buffer;
 
     std::vector<std::shared_ptr<AllocatedBuffer>> get_buffers(int16 frame_index) const override {
-      return {constants_buffer};
+      return {uniform_buffer};
+    }
+
+    std::vector<std::shared_ptr<DescriptorBuffer>> get_descriptor_buffers(
+        int16 frame_index) const override {
+      return {uniform_descriptor_buffer, image_descriptor_buffer};
     }
   };
 
@@ -141,14 +195,15 @@ namespace gestalt::foundation {
     bool freezeCullCamera = false;
     std::array<std::shared_ptr<AllocatedBuffer>, getFramesInFlight()> uniform_buffers;
 
-    std::array<VkDescriptorSet, getFramesInFlight()> descriptor_sets;
-
-    std::vector<VkDescriptorSet> get_descriptor_set(const int16 frame_index) const override {
-      return {descriptor_sets[frame_index]};
-    }
+    std::array<std::shared_ptr<DescriptorBuffer>, getFramesInFlight()> descriptor_buffers;
 
     std::vector<std::shared_ptr<AllocatedBuffer>> get_buffers(int16 frame_index) const override {
       return {uniform_buffers[frame_index]};
+    }
+
+    std ::vector<std::shared_ptr<DescriptorBuffer>> get_descriptor_buffers(
+        int16 frame_index) const override {
+      return {descriptor_buffers[frame_index]};
     }
   };
 
@@ -157,14 +212,15 @@ namespace gestalt::foundation {
     std::shared_ptr<AllocatedBuffer> point_light_buffer;
     std::shared_ptr<AllocatedBuffer> view_proj_matrices;
 
-    VkDescriptorSet descriptor_set = nullptr;
-
-    std::vector<VkDescriptorSet> get_descriptor_set(const int16 frame_index) const override {
-      return {descriptor_set};
-    }
+    std::shared_ptr<DescriptorBuffer> descriptor_buffer;
 
     std::vector<std::shared_ptr<AllocatedBuffer>> get_buffers(int16 frame_index) const override {
       return {dir_light_buffer, point_light_buffer, view_proj_matrices};
+    }
+
+    std::vector<std::shared_ptr<DescriptorBuffer>> get_descriptor_buffers(
+        int16 frame_index) const override {
+      return {descriptor_buffer};
     }
   };
 
@@ -182,11 +238,7 @@ namespace gestalt::foundation {
     std::array<std::shared_ptr<AllocatedBuffer>, getFramesInFlight()>
         draw_count_buffer;  // number of draws
 
-    std::array<VkDescriptorSet, getFramesInFlight()> descriptor_sets;
-
-    std::vector<VkDescriptorSet> get_descriptor_set(const int16 frame_index) const override {
-      return {descriptor_sets[frame_index]};
-    }
+    std::array<std::shared_ptr<DescriptorBuffer>, getFramesInFlight()> descriptor_buffers;
 
     std::vector<std::shared_ptr<AllocatedBuffer>> get_buffers(int16 frame_index) const override {
       return {index_buffer,
@@ -199,6 +251,11 @@ namespace gestalt::foundation {
               mesh_draw_buffer[frame_index],
               draw_count_buffer[frame_index]};
     }
+
+    std::vector<std::shared_ptr<DescriptorBuffer>> get_descriptor_buffers(
+        int16 frame_index) const override {
+      return {descriptor_buffers[frame_index]};
+    }
   };
 
   struct IblBuffers : BufferCollection {
@@ -208,14 +265,15 @@ namespace gestalt::foundation {
 
     VkSampler cube_map_sampler;
 
-    VkDescriptorSet descriptor_set = nullptr;
-
-    std::vector<VkDescriptorSet> get_descriptor_set(const int16 frame_index) const override {
-      return {descriptor_set};
-    }
+    std::shared_ptr<DescriptorBuffer> descriptor_buffer;
 
     std::vector<std::shared_ptr<AllocatedBuffer>> get_buffers(int16 frame_index) const override {
       return {};
+    }
+
+    std::vector<std::shared_ptr<DescriptorBuffer>> get_descriptor_buffers(
+        int16 frame_index) const override {
+      return {descriptor_buffer};
     }
   };
 

@@ -149,7 +149,7 @@ namespace gestalt::graphics {
       }
     }
 
-    // fmt::print("Executing {}\n", render_passes_[id]->get_name());
+    //fmt::print("Executing {}\n", render_pass->get_name());
     render_pass->execute(cmd);
 
     if (false && render_pass->get_name() == "Bloom Blur Pass") {
@@ -281,7 +281,7 @@ namespace gestalt::graphics {
     vkutil::TransitionBuffer(lightBuffers.dir_light_buffer).waitForRead().andSubmitTo(cmd);
     vkutil::TransitionBuffer(lightBuffers.point_light_buffer).waitForRead().andSubmitTo(cmd);
     vkutil::TransitionBuffer(lightBuffers.view_proj_matrices).waitForRead().andSubmitTo(cmd);
-    vkutil::TransitionBuffer(materialData.constants_buffer);*/
+    vkutil::TransitionBuffer(materialData.uniform_buffer);*/
 
     present(cmd);
   }

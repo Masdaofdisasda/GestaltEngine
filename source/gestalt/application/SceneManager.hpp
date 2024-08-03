@@ -121,7 +121,7 @@ namespace gestalt::application {
       std::unique_ptr<SceneSystem> light_system_;
       std::unique_ptr<CameraSystem> camera_system_;
       std::unique_ptr<SceneSystem> transform_system_;
-      std::unique_ptr<SceneSystem> render_system_;
+      std::unique_ptr<SceneSystem> mesh_system_;
 
       void build_scene_graph(const std::vector<fastgltf::Node>& nodes, const size_t& mesh_offset);
       void create_entities(std::vector<fastgltf::Node> nodes, const size_t& mesh_offset);
@@ -136,7 +136,6 @@ namespace gestalt::application {
       void init(IGpu* gpu,
                 IResourceManager* resource_manager,
                 IDescriptorLayoutBuilder* builder,
-                IDescriptorWriter* writer,
                 Repository* repository);
       void cleanup() const;
 

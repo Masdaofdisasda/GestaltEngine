@@ -12,6 +12,7 @@
 
 #include "Components.hpp"
 #include "CubemapUtils.hpp"
+#include "descriptor.hpp"
 
 
 namespace gestalt::graphics {
@@ -21,52 +22,40 @@ namespace gestalt::graphics {
       gpu_ = gpu;
       repository_ = repository;
       resource_loader_.init(gpu);
-
-      std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes
-          = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, getMaxTextures() * 2.f},
-             {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 256},
-             {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, getMaxMaterials() * 2.f},
-
-          };
-
-      descriptorPool->init(gpu_->getDevice(), 1024, sizes);
-
     }
 
     void ResourceManager::cleanup() {
-      descriptorPool->destroy_pools(gpu_->getDevice());
       resource_loader_.cleanup();
     }
 
     void ResourceManager::flush_loader() { resource_loader_.flush(); }
 
-    VkDescriptorSet ResourceManager::allocateDescriptor(VkDescriptorSetLayout layout,
-                                                        const std::vector<uint32_t>&
-                                                        variableDescriptorCounts) {
-      return descriptorPool->allocate(gpu_->getDevice(), layout, variableDescriptorCounts);
-    }
 
     std::shared_ptr<AllocatedBuffer> ResourceManager::create_buffer(size_t allocSize,
                                                                     VkBufferUsageFlags usage,
                                                    VmaMemoryUsage memoryUsage) {
-      // allocate buffer
-      VkBufferCreateInfo bufferInfo = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-      bufferInfo.pNext = nullptr;
-      bufferInfo.size = allocSize;
+      usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
+      VkBufferCreateInfo bufferInfo = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+      bufferInfo.size = allocSize;
       bufferInfo.usage = usage;
 
       VmaAllocationCreateInfo vmaallocInfo = {};
       vmaallocInfo.usage = memoryUsage;
       vmaallocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-      AllocatedBuffer newBuffer;
-      newBuffer.usage = usage;
-      newBuffer.memory_usage = memoryUsage;
 
-      // allocate the buffer
-      VK_CHECK(vmaCreateBuffer(gpu_->getAllocator(), &bufferInfo, &vmaallocInfo, &newBuffer.buffer,
-                               &newBuffer.allocation, &newBuffer.info));
-      return std::make_shared<AllocatedBuffer>(newBuffer);
+      AllocatedBuffer new_buffer;
+      new_buffer.usage = usage;
+      new_buffer.memory_usage = memoryUsage;
+
+      VK_CHECK(vmaCreateBuffer(gpu_->getAllocator(), &bufferInfo, &vmaallocInfo, &new_buffer.buffer,
+                               &new_buffer.allocation, &new_buffer.info));
+
+      const VkBufferDeviceAddressInfo device_address_info = {.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = new_buffer.buffer};
+      new_buffer.address
+          = vkGetBufferDeviceAddress(gpu_->getDevice(), &device_address_info);
+
+      return std::make_shared<AllocatedBuffer>(new_buffer);
     }
 
     // https://github.com/KhronosGroup/Vulkan-Samples/tree/main/samples/extensions/descriptor_buffer_basic
@@ -74,38 +63,50 @@ namespace gestalt::graphics {
       return (size + alignment - 1) & ~(alignment - 1);
     }
 
-    std::shared_ptr<AllocatedBuffer> ResourceManager::create_descriptor_buffer(size_t allocSize,
-                                                                    VkBufferUsageFlags usage,
-                                                   VmaMemoryUsage memoryUsage) {
+  std::shared_ptr<DescriptorBuffer> ResourceManager::create_descriptor_buffer(
+        VkDescriptorSetLayout descriptor_layout, size_t numBindings, VkBufferUsageFlags usage) {
+      DescriptorBuffer descriptor_buffer{gpu_->getDescriptorBufferProperties()};
+      descriptor_buffer.usage |= usage;
+      descriptor_buffer.device = gpu_->getDevice();
+      descriptor_buffer.allocator = gpu_->getAllocator();
 
-      // Align allocSize to the descriptor buffer alignment requirement
-      allocSize = aligned_size(
-          allocSize, gpu_->getDescriptorBufferProperties().descriptorBufferOffsetAlignment);
+      vkGetDescriptorSetLayoutSizeEXT(gpu_->getDevice(), descriptor_layout,
+                                      &descriptor_buffer.size);
 
-      // Allocate buffer
+      descriptor_buffer.offsets.reserve(numBindings);
+      for (size_t i = 0; i < numBindings; ++i) {
+        VkDeviceSize binding_offset;
+        vkGetDescriptorSetLayoutBindingOffsetEXT(gpu_->getDevice(), descriptor_layout, i,
+                                                 &binding_offset);
+        binding_offset = aligned_size(binding_offset, gpu_->getDescriptorBufferProperties().descriptorBufferOffsetAlignment);
+        descriptor_buffer.offsets.push_back(binding_offset);
+      }
+
+      descriptor_buffer.size
+          = aligned_size(descriptor_buffer.size,
+                         gpu_->getDescriptorBufferProperties().descriptorBufferOffsetAlignment);
+
       VkBufferCreateInfo bufferInfo = {};
       bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
       bufferInfo.pNext = nullptr;
-      bufferInfo.size = allocSize;
+      bufferInfo.size = descriptor_buffer.size;
       bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-      bufferInfo.usage = usage | VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT
-                         | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+      bufferInfo.usage = descriptor_buffer.usage;
 
       VmaAllocationCreateInfo vmaallocInfo = {};
-      vmaallocInfo.usage = memoryUsage;
+      vmaallocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
       vmaallocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+      VK_CHECK(vmaCreateBuffer(gpu_->getAllocator(), &bufferInfo, &vmaallocInfo,
+                               &descriptor_buffer.buffer, &descriptor_buffer.allocation,
+                               &descriptor_buffer.info));
 
-      AllocatedBuffer newBuffer;
-      newBuffer.usage = usage;
-      newBuffer.memory_usage = memoryUsage;
+      VkBufferDeviceAddressInfo deviceAddressInfo
+          = {.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
+      deviceAddressInfo.buffer = descriptor_buffer.buffer;
+      descriptor_buffer.address = vkGetBufferDeviceAddress(gpu_->getDevice(), &deviceAddressInfo);
 
-      // Allocate the buffer
-      VK_CHECK(vmaCreateBuffer(gpu_->getAllocator(), &bufferInfo, &vmaallocInfo, &newBuffer.buffer,
-                               &newBuffer.allocation, &newBuffer.info));
-
-      return std::make_shared<AllocatedBuffer>(newBuffer);
+      return std::make_shared<DescriptorBuffer>(descriptor_buffer);
     }
-
 
     void ResourceManager::destroy_buffer(const std::shared_ptr<AllocatedBuffer> buffer) {
       vmaDestroyBuffer(gpu_->getAllocator(), buffer->buffer, buffer->allocation);
@@ -558,17 +559,22 @@ namespace gestalt::graphics {
 
       Ibl_buffers->bdrf_lut = load_image("../../assets/bdrf_lut.png").value();
 
-      writer.clear();
-      writer.write_image(1, Ibl_buffers->environment_map.imageView, Ibl_buffers->cube_map_sampler,
-                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-      writer.write_image(2, Ibl_buffers->environment_irradiance_map.imageView,
-                         Ibl_buffers->cube_map_sampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-      writer.write_image(
-          3, Ibl_buffers->bdrf_lut.imageView, repository_->default_material_.linearSampler,
-          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-      writer.update_set(gpu_->getDevice(), Ibl_buffers->descriptor_set);
+      resource_loader_.flush();
+      vkDeviceWaitIdle(gpu_->getDevice());
+
+     Ibl_buffers->descriptor_buffer->
+                write_image(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                             {Ibl_buffers->cube_map_sampler, Ibl_buffers->environment_map.imageView,
+                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL})
+                .write_image(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                             {Ibl_buffers->cube_map_sampler,
+                              Ibl_buffers->environment_irradiance_map.imageView,
+                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL})
+                .write_image(
+                    2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                    {repository_->default_material_.linearSampler, Ibl_buffers->bdrf_lut.imageView,
+                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL})
+                .update();
     }
 
     TextureHandle ResourceManager::create_cubemap_from_HDR(std::vector<float>& image_data, int h,

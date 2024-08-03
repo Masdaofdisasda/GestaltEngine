@@ -1,4 +1,5 @@
 ﻿#include "SceneSystem.hpp"
+#include "descriptor.hpp"
 
 namespace gestalt::application {
 
@@ -14,6 +15,10 @@ namespace gestalt::application {
     create_images_buffer();
 
     create_default_material();
+
+    fill_uniform_buffer();
+    fill_images_buffer();
+
     create_ibl_images();
   }
 
@@ -21,61 +26,55 @@ namespace gestalt::application {
     const auto& mat_buffers = repository_->material_buffers;
 
     descriptor_layout_builder_->clear();
-    const auto uniformLayout = descriptor_layout_builder_
-                                   ->add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                                                 VK_SHADER_STAGE_FRAGMENT_BIT, true)
+    const auto uniformLayout
+        = descriptor_layout_builder_
+              ->add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
+                            true)
               .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
 
-    vkGetDescriptorSetLayoutSizeEXT(gpu_->getDevice(), uniformLayout,
-                                    &mat_buffers->uniform_descriptor_set_layout_size);
-
-    vkGetDescriptorSetLayoutBindingOffsetEXT(gpu_->getDevice(), uniformLayout, 0,
-                                             &mat_buffers->uniform_binding_offset);
-    mat_buffers->uniform_descriptor_buffer = resource_manager_->create_descriptor_buffer(
-        mat_buffers->uniform_descriptor_set_layout_size, 0, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    mat_buffers->constants_buffer = resource_manager_->create_buffer(
-        sizeof(PbrMaterial::PbrConstants) * getMaxMaterials(), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-        VMA_MEMORY_USAGE_CPU_TO_GPU);
+    mat_buffers->uniform_descriptor_buffer
+        = resource_manager_->create_descriptor_buffer(uniformLayout, 1);
     vkDestroyDescriptorSetLayout(gpu_->getDevice(), uniformLayout, nullptr);
+
+    mat_buffers->uniform_buffer = resource_manager_->create_buffer(
+        sizeof(PbrMaterial::PbrConstants) * getMaxMaterials(),
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        VMA_MEMORY_USAGE_CPU_TO_GPU);
   }
 
   void MaterialSystem::create_images_buffer() {
     const auto& mat_buffers = repository_->material_buffers;
 
     descriptor_layout_builder_->clear();
-    const auto imageLayout = descriptor_layout_builder_
-                                 ->add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                               VK_SHADER_STAGE_FRAGMENT_BIT, true)
+    const auto imageLayout
+        = descriptor_layout_builder_
+              ->add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                            VK_SHADER_STAGE_FRAGMENT_BIT, true)
               .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
 
-    vkGetDescriptorSetLayoutSizeEXT(gpu_->getDevice(), imageLayout,
-                                    &mat_buffers->image_descriptor_set_layout_size);
-    vkGetDescriptorSetLayoutBindingOffsetEXT(gpu_->getDevice(), imageLayout, 0,
-                                             &mat_buffers->image_binding_offset);
     repository_->material_buffers->image_descriptor_buffer
         = resource_manager_->create_descriptor_buffer(
-            mat_buffers->image_descriptor_set_layout_size,
-            VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+            imageLayout, 1, VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT);
     vkDestroyDescriptorSetLayout(gpu_->getDevice(), imageLayout, nullptr);
   }
 
   void MaterialSystem::create_ibl_images() {
     descriptor_layout_builder_->clear();
-    const auto descriptor_layout = descriptor_layout_builder_
-                                       ->add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                                     VK_SHADER_STAGE_FRAGMENT_BIT)
-                                       .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                                    VK_SHADER_STAGE_FRAGMENT_BIT)
-                                       .add_binding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                                    VK_SHADER_STAGE_FRAGMENT_BIT)
-                                       .build(gpu_->getDevice());
+    const auto descriptor_layout
+        = descriptor_layout_builder_
+              ->add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                            VK_SHADER_STAGE_FRAGMENT_BIT)
+              .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                           VK_SHADER_STAGE_FRAGMENT_BIT)
+              .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                           VK_SHADER_STAGE_FRAGMENT_BIT)
+              .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
 
-    repository_->ibl_buffers->descriptor_set
-        = resource_manager_->allocateDescriptor(descriptor_layout);
+    repository_->ibl_buffers->descriptor_buffer = resource_manager_->create_descriptor_buffer(
+        descriptor_layout, 3, VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT);
+    vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layout, nullptr);
 
     resource_manager_->load_and_process_cubemap(R"(..\..\assets\san_giuseppe_bridge_4k.hdr)");
-
-    vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layout, nullptr);
   }
 
   void MaterialSystem::create_default_material() {
@@ -148,87 +147,49 @@ namespace gestalt::application {
   }
 
   void MaterialSystem::fill_uniform_buffer() {
-    const auto& constant_buffer = repository_->material_buffers->constants_buffer;
+    const auto& constant_buffer = repository_->material_buffers->uniform_buffer;
 
     const std::vector<PbrMaterial::PbrConstants> material_constants(getMaxMaterials());
 
     PbrMaterial::PbrConstants* uniformBufferPointer;
-    VK_CHECK(vmaMapMemory(gpu_->getAllocator(), constant_buffer->allocation, (void**)&uniformBufferPointer));
+    VK_CHECK(vmaMapMemory(gpu_->getAllocator(), constant_buffer->allocation,
+                          (void**)&uniformBufferPointer));
     memcpy(uniformBufferPointer, material_constants.data(),
            sizeof(PbrMaterial::PbrConstants) * getMaxMaterials());
 
     vmaUnmapMemory(gpu_->getAllocator(), constant_buffer->allocation);
 
-    const auto& mat_buffers
-        = repository_->material_buffers;
+    const auto& descriptor_buffer = repository_->material_buffers->uniform_descriptor_buffer;
 
-    char* descriptorBufPtr;
-    VK_CHECK(
-        vmaMapMemory(gpu_->getAllocator(), mat_buffers->uniform_descriptor_buffer->allocation,
-                          (void**)&descriptorBufPtr));
-
-    VkBufferDeviceAddressInfo deviceAdressInfo{
-        .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = constant_buffer->buffer};
-    VkDeviceAddress constant_buffer_address
-        = vkGetBufferDeviceAddress(gpu_->getDevice(), &deviceAdressInfo);
-
-    for (int i = 0; i < getMaxMaterials(); ++i) {
-      VkDescriptorAddressInfoEXT addr_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_ADDRESS_INFO_EXT};
-      addr_info.address = constant_buffer_address + i * sizeof(PbrMaterial::PbrConstants);
-      addr_info.range = sizeof(PbrMaterial::PbrConstants);
-      addr_info.format = VK_FORMAT_UNDEFINED;
-
-      VkDescriptorGetInfoEXT buffer_descriptor_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT};
-      buffer_descriptor_info.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-      buffer_descriptor_info.data.pUniformBuffer = &addr_info;
-
-      vkGetDescriptorEXT(gpu_->getDevice(), &buffer_descriptor_info,
-                         gpu_->getDescriptorBufferProperties().uniformBufferDescriptorSize,
-                         descriptorBufPtr + i * mat_buffers->uniform_descriptor_set_layout_size
-                             + mat_buffers->uniform_binding_offset);
-    }
-
-    vmaUnmapMemory(gpu_->getAllocator(), mat_buffers->uniform_descriptor_buffer->allocation);
+    descriptor_buffer
+        ->write_buffer_array(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, constant_buffer->address,
+                             sizeof(PbrMaterial::PbrConstants), getMaxMaterials())
+        .update();
   }
 
   void MaterialSystem::fill_images_buffer() {
     const auto& mat_buffers = repository_->material_buffers;
     const auto& default_mat = repository_->default_material_;
 
-    char* imageDescriptorBufPtr;
-    VK_CHECK(vmaMapMemory(gpu_->getAllocator(),
-                          repository_->material_buffers->image_descriptor_buffer->allocation,
-                          (void**)&imageDescriptorBufPtr));
+    std::vector<VkDescriptorImageInfo> image_infos;
 
-    for (int i = 0; i < getMaxMaterials(); ++i) {
-      const VkDescriptorImageInfo imageInfos[getPbrMaterialTextures()]
-          = {{default_mat.linearSampler, default_mat.color_image.imageView,
-              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-             {default_mat.linearSampler, default_mat.metallic_roughness_image.imageView,
-              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-             {default_mat.linearSampler, default_mat.normal_image.imageView,
-              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-             {default_mat.linearSampler, default_mat.emissive_image.imageView,
-              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-             {default_mat.nearestSampler, default_mat.occlusion_image.imageView,
-              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
-
-      for (int j = 0; j < getPbrMaterialTextures(); ++j) {
-        VkDescriptorGetInfoEXT image_descriptor_info{VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT};
-        image_descriptor_info.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        image_descriptor_info.data.pCombinedImageSampler = &imageInfos[j];
-
-        vkGetDescriptorEXT(
-            gpu_->getDevice(), &image_descriptor_info,
-            gpu_->getDescriptorBufferProperties().combinedImageSamplerDescriptorSize,
-            imageDescriptorBufPtr
-                + (i * getPbrMaterialTextures() + j) * mat_buffers->image_descriptor_set_layout_size
-                + mat_buffers->image_binding_offset);
-      }
+    for (int i = 0; i < getMaxTextures(); ++i) {
+      image_infos.push_back({default_mat.linearSampler, default_mat.color_image.imageView,
+                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
+      image_infos.push_back({default_mat.linearSampler,
+                             default_mat.metallic_roughness_image.imageView,
+                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
+      image_infos.push_back({default_mat.linearSampler, default_mat.normal_image.imageView,
+                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
+      image_infos.push_back({default_mat.linearSampler, default_mat.emissive_image.imageView,
+                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
+      image_infos.push_back({default_mat.nearestSampler, default_mat.occlusion_image.imageView,
+                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
     }
 
-    vmaUnmapMemory(gpu_->getAllocator(),
-                   repository_->material_buffers->image_descriptor_buffer->allocation);
+    mat_buffers->image_descriptor_buffer
+        ->write_image_array(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_infos, 0)
+        .update();
   }
 
   void MaterialSystem::update() {
@@ -248,7 +209,7 @@ namespace gestalt::application {
     }
 
     if (first_processed) {
-        // TODO batch update textures
+      // TODO batch update textures
     }
   }
 
@@ -266,7 +227,7 @@ namespace gestalt::application {
 
     repository_->materials.clear();
 
-    resource_manager_->destroy_buffer(repository_->material_buffers->constants_buffer);
+    resource_manager_->destroy_buffer(repository_->material_buffers->uniform_buffer);
 
     const auto& samplers = repository_->samplers.data();
     for (auto& sampler : samplers) {
@@ -298,27 +259,7 @@ namespace gestalt::application {
     // Calculate the start offset in the descriptor buffer
     const uint32_t texture_start = getPbrMaterialTextures() * material_id;
 
-    // Map the image descriptor buffer memory
-    char* imageDescriptorBufPtr;
-    VK_CHECK(vmaMapMemory(gpu_->getAllocator(), mat_buffers->image_descriptor_buffer->allocation,
-                          (void**)&imageDescriptorBufPtr));
-
-    // Fill the descriptor buffer with image descriptor information for the given material ID
-    for (int j = 0; j < getPbrMaterialTextures(); ++j) {
-      VkDescriptorGetInfoEXT image_descriptor_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT};
-      image_descriptor_info.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-      image_descriptor_info.data.pCombinedImageSampler = &image_infos[j];
-
-      vkGetDescriptorEXT(gpu_->getDevice(), &image_descriptor_info,
-                         gpu_->getDescriptorBufferProperties().combinedImageSamplerDescriptorSize,
-                         imageDescriptorBufPtr
-                             + (texture_start + j) * mat_buffers->image_descriptor_set_layout_size
-                             + mat_buffers->image_binding_offset);
-    }
-
-    // Unmap the image descriptor buffer memory
-    vmaUnmapMemory(gpu_->getAllocator(), mat_buffers->image_descriptor_buffer->allocation);
-
+    mat_buffers->image_descriptor_buffer->update();
 
     if (material.constants.albedo_tex_index != kUnusedTexture) {
       material.constants.albedo_tex_index = texture_start;
@@ -337,11 +278,10 @@ namespace gestalt::application {
     }
 
     PbrMaterial::PbrConstants* mappedData;
-    vmaMapMemory(gpu_->getAllocator(), repository_->material_buffers->constants_buffer->allocation,
+    vmaMapMemory(gpu_->getAllocator(), repository_->material_buffers->uniform_buffer->allocation,
                  (void**)&mappedData);
     memcpy(mappedData + material_id, &material.constants, sizeof(PbrMaterial::PbrConstants));
-    vmaUnmapMemory(gpu_->getAllocator(),
-                   repository_->material_buffers->constants_buffer->allocation);
+    vmaUnmapMemory(gpu_->getAllocator(), repository_->material_buffers->uniform_buffer->allocation);
   }
 
 }  // namespace gestalt::application

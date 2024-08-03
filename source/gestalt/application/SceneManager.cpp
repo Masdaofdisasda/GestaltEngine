@@ -13,8 +13,7 @@
 namespace gestalt::application {
 
     void SceneManager::init(IGpu* gpu, IResourceManager* resource_manager,
-                          IDescriptorLayoutBuilder* builder, IDescriptorWriter* writer
-        ,
+                          IDescriptorLayoutBuilder* builder,
       Repository* repository) {
     gpu_ = gpu;
     resource_manager_ = resource_manager;
@@ -35,15 +34,15 @@ namespace gestalt::application {
                                            get_root_entity());
 
     material_system_ = std::make_unique<MaterialSystem>();
-    material_system_->init(gpu_, resource_manager_, builder, writer, repository_);
+    material_system_->init(gpu_, resource_manager_, builder, repository_);
     light_system_ = std::make_unique<LightSystem>();
-    light_system_->init(gpu_, resource_manager_, builder, writer, repository_);
+    light_system_->init(gpu_, resource_manager_, builder, repository_);
     camera_system_ = std::make_unique<CameraSystem>();
-    camera_system_->init(gpu_, resource_manager_, builder, writer, repository_);
+    camera_system_->init(gpu_, resource_manager_, builder, repository_);
     transform_system_ = std::make_unique<TransformSystem>();
-    transform_system_->init(gpu_, resource_manager_, builder, writer, repository_);
-    render_system_ = std::make_unique<MeshSystem>();
-    render_system_->init(gpu_, resource_manager_, builder, writer, repository_);
+    transform_system_->init(gpu_, resource_manager_, builder, repository_);
+    mesh_system_ = std::make_unique<MeshSystem>();
+    mesh_system_->init(gpu_, resource_manager_, builder, repository_);
   }
 
     void SceneManager::load_scene(const std::string& path) {
@@ -118,7 +117,7 @@ namespace gestalt::application {
     }
 
     void SceneManager::cleanup() const {
-      render_system_->cleanup();
+      mesh_system_->cleanup();
       transform_system_->cleanup();
       camera_system_->cleanup();
       light_system_->cleanup();
@@ -302,7 +301,7 @@ namespace gestalt::application {
       camera_system_->update_cameras(delta_time, movement, aspect);
       camera_system_->update();
       transform_system_->update();
-      render_system_->update();
+      mesh_system_->update();
     }
 
     void SceneManager::request_scene(const std::string& path) { scene_path_ = path; }

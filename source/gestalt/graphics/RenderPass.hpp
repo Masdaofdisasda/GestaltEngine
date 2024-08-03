@@ -33,8 +33,7 @@ namespace gestalt::graphics {
       std::string get_name() const override { return "Meshlet Pass"; }
     };
     class LightingPass final : public RenderPass {
-      DescriptorWriter writer_;
-      std::array<VkDescriptorSet, getFramesInFlight()> descriptor_sets;
+      std::array<std::shared_ptr<DescriptorBuffer>, getFramesInFlight()> descriptor_buffers_;
 
     public:
       void prepare() override;
@@ -71,8 +70,7 @@ namespace gestalt::graphics {
       std::string get_name() const override { return "Bounding Sphere Debug Pass"; }
     };
     class BrightPass final : public RenderPass {
-      DescriptorWriter writer;
-      std::array<VkDescriptorSet, getFramesInFlight()> descriptor_sets;
+      std::array<std::shared_ptr<DescriptorBuffer>, getFramesInFlight()> descriptor_buffers_;
 
     public:
       void prepare() override;
@@ -84,9 +82,9 @@ namespace gestalt::graphics {
   constexpr uint8 kMaxBloomIterations = 6;
 
     class BloomBlurPass final : public RenderPass {
-      DescriptorWriter writer;
-      std::array<std::array<VkDescriptorSet, kMaxBloomIterations>, getFramesInFlight()>
-          descriptor_sets;
+    std::array<std::array<std::shared_ptr<DescriptorBuffer>, kMaxBloomIterations>,
+               getFramesInFlight()>
+          descriptor_buffers_ = {};
 
 
     public:
@@ -97,8 +95,7 @@ namespace gestalt::graphics {
     };
 
     class LuminancePass final : public RenderPass {
-      DescriptorWriter writer;
-      std::array<VkDescriptorSet, getFramesInFlight()> descriptor_sets;
+      std::array<std::shared_ptr<DescriptorBuffer>, getFramesInFlight()> descriptor_buffers_;
 
     public:
       void prepare() override;
@@ -107,9 +104,8 @@ namespace gestalt::graphics {
       std::string get_name() const override { return "Luminance Pass"; }
     };
     class LuminanceDownscalePass final : public RenderPass {
-      DescriptorWriter writer;
-      std::array<std::array<VkDescriptorSet, 10>, getFramesInFlight()>
-          descriptor_sets;
+      std::array<std::array<std::shared_ptr<DescriptorBuffer>, 10>, getFramesInFlight()>
+          descriptor_buffers_;
 
     public:
       void prepare() override;
@@ -119,8 +115,7 @@ namespace gestalt::graphics {
     };
 
     class LightAdaptationPass final : public RenderPass {
-      DescriptorWriter writer;
-      std::array<VkDescriptorSet,getFramesInFlight()> descriptor_sets;
+      std::array<std::shared_ptr<DescriptorBuffer>, getFramesInFlight()> descriptor_buffers_;
 
     public:
       void prepare() override;
@@ -130,8 +125,7 @@ namespace gestalt::graphics {
     };
 
     class TonemapPass final : public RenderPass {
-      DescriptorWriter writer;
-      std::array<VkDescriptorSet, getFramesInFlight()> descriptor_sets;
+      std::array<std::shared_ptr<DescriptorBuffer>, getFramesInFlight()> descriptor_buffers_;
 
     public:
       void prepare() override;

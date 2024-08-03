@@ -35,7 +35,7 @@ namespace gestalt {
     resource_manager_->init(gpu_.get(), repository_.get());
 
     scene_manager_->init(gpu_.get(), resource_manager_.get(),
-                         descriptor_layout_builder_.get(), writer_.get(), repository_.get());
+                         descriptor_layout_builder_.get(), repository_.get());
 
     render_pipeline_->init(gpu_.get(), window_.get(), resource_manager_.get(), repository_.get(),
                            imgui_.get());

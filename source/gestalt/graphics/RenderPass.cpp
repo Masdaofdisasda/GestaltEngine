@@ -111,17 +111,15 @@ namespace gestalt::graphics {
             extent, colorAttachments.data(), colorAttachments.size(),
             depthAttachment.sType ? &depthAttachment : nullptr);
       }
-
       if (!dependencies_.buffer_dependencies.empty()) {
-        std::vector<VkDescriptorSet> descriptor_sets;
-        descriptor_sets.reserve(dependencies_.buffer_dependencies.size());
-        for (auto& buffer : dependencies_.buffer_dependencies) {
-          for (auto sets = buffer.resource.buffer->get_descriptor_set(current_frame_index); auto set : sets) {
-            descriptor_sets.push_back(set);
+        uint32_t i = 0;
+        for (const auto& buffer_dependency : dependencies_.buffer_dependencies) {
+          const auto& descriptor_buffers
+              = buffer_dependency.resource.buffer->get_descriptor_buffers(current_frame_index);
+          for (const auto& descriptor_buffer : descriptor_buffers) {
+            descriptor_buffer->bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, i++);
           }
         }
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0,
-                                descriptor_sets.size(), descriptor_sets.data(), 0, nullptr);
       }
 
       vkCmdBeginRendering(cmd, &renderInfo);
@@ -129,16 +127,14 @@ namespace gestalt::graphics {
 
   void RenderPass::begin_compute_pass(VkCommandBuffer cmd) {
       if (!dependencies_.buffer_dependencies.empty()) {
-        std::vector<VkDescriptorSet> descriptor_sets;
-        descriptor_sets.reserve(dependencies_.buffer_dependencies.size());
-        for (const auto& buffer : dependencies_.buffer_dependencies) {
-          for (auto sets = buffer.resource.buffer->get_descriptor_set(current_frame_index);
-               auto set : sets) {
-            descriptor_sets.push_back(set);
+        uint32_t i = 0;
+        for (const auto& buffer_dependency : dependencies_.buffer_dependencies) {
+          const auto& descriptor_buffers
+              = buffer_dependency.resource.buffer->get_descriptor_buffers(current_frame_index);
+          for (const auto& descriptor_buffer : descriptor_buffers) {
+            descriptor_buffer->bind(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_, i++);
           }
         }
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_, 0,
-                                descriptor_sets.size(), descriptor_sets.data(), 0, nullptr);
       }
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_);

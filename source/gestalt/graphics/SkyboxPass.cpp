@@ -56,12 +56,10 @@ namespace gestalt::graphics {
     const auto& per_frame_buffers = repository_->per_frame_data_buffers;
     const auto& light_data = repository_->light_buffers;
 
-    VkDescriptorSet descriptorSets[]
-        = {per_frame_buffers->descriptor_sets[frame], light_data->descriptor_set};
-
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 2,
-                            descriptorSets, 0, nullptr);
+    per_frame_buffers->descriptor_buffers[frame]->bind(
+        cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,pipeline_layout_, 0);
+    light_data->descriptor_buffer->bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,pipeline_layout_, 1);
     vkCmdSetViewport(cmd, 0, 1, &viewport_);
     vkCmdSetScissor(cmd, 0, 1, &scissor_);
 
@@ -115,10 +113,8 @@ namespace gestalt::graphics {
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
-    VkDescriptorSet descriptorSets[] = {per_frame_buffers->descriptor_sets[frame]};
-
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
-                            descriptorSets, 0, nullptr);
+    per_frame_buffers->descriptor_buffers[frame]->bind(
+        cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
     vkCmdPushConstants(cmd, pipeline_layout_, VK_SHADER_STAGE_FRAGMENT_BIT, 0,
@@ -182,10 +178,8 @@ namespace gestalt::graphics {
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
-    VkDescriptorSet descriptorSets[] = {per_frame_buffers->descriptor_sets[frame]};
-
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
-                            descriptorSets, 0, nullptr);
+    per_frame_buffers->descriptor_buffers[frame]->bind(
+        cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
     vkCmdSetViewport(cmd, 0, 1, &viewport_);
@@ -255,10 +249,8 @@ namespace gestalt::graphics {
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
-    VkDescriptorSet descriptorSets[] = {per_frame_buffers->descriptor_sets[frame]};
-
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
-                            descriptorSets, 0, nullptr);
+    per_frame_buffers->descriptor_buffers[frame]->bind(
+        cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
     vkCmdSetViewport(cmd, 0, 1, &viewport_);

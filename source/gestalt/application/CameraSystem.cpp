@@ -2,6 +2,7 @@
 
 #include "RenderConfig.hpp"
 #include "SceneSystem.hpp"
+#include "descriptor.hpp"
 
 namespace gestalt::application {
 
@@ -19,18 +20,28 @@ namespace gestalt::application {
                 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT
                                   | VK_SHADER_STAGE_FRAGMENT_BIT)
-                .build(gpu_->getDevice());
+                .build(gpu_->getDevice(),
+                       VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
 
       for (int i = 0; i < getFramesInFlight(); ++i) {
         per_frame_data_buffers->uniform_buffers[i] = resource_manager_->create_buffer(
-            sizeof(PerFrameData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-        per_frame_data_buffers->descriptor_sets[i]
-            = resource_manager_->allocateDescriptor(descriptor_layout);
+            sizeof(PerFrameData),
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+            VMA_MEMORY_USAGE_CPU_TO_GPU);
+        per_frame_data_buffers->descriptor_buffers[i] = resource_manager_->create_descriptor_buffer(
+            descriptor_layout, 1,
+            0);
 
-        writer_->clear();
-        writer_->write_buffer(0, per_frame_data_buffers->uniform_buffers[i]->buffer,
-                             sizeof(PerFrameData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-        writer_->update_set(gpu_->getDevice(), per_frame_data_buffers->descriptor_sets[i]);
+        VkBufferDeviceAddressInfo deviceAdressInfo{
+            .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+            .buffer = per_frame_data_buffers->uniform_buffers[i]->buffer};
+        VkDeviceAddress per_frame_data_buffer_address
+            = vkGetBufferDeviceAddress(gpu_->getDevice(), &deviceAdressInfo);
+
+        per_frame_data_buffers->descriptor_buffers[i]->
+                               write_buffer(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                                             per_frame_data_buffer_address, sizeof(PerFrameData))
+                               .update();
       }
 
       vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layout, nullptr);
