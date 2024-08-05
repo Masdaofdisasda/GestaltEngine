@@ -75,10 +75,15 @@ namespace gestalt::graphics {
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
-    per_frame_buffers->descriptor_buffers[frame]->bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+    bind_descriptor_buffers(cmd, {
+        per_frame_buffers->descriptor_buffers[frame].get(),
+        light_data->descriptor_buffer.get(),
+        mesh_buffers->descriptor_buffers[frame].get(),
+    });
+    per_frame_buffers->descriptor_buffers[frame]->bind_descriptors(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                                        pipeline_layout_, 0);
-    light_data->descriptor_buffer->bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1);
-    mesh_buffers->descriptor_buffers[frame]->bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+    light_data->descriptor_buffer->bind_descriptors(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1);
+    mesh_buffers->descriptor_buffers[frame]->bind_descriptors(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                                   pipeline_layout_, 2);
     vkCmdSetViewport(cmd, 0, 1, &viewport_);
     vkCmdSetScissor(cmd, 0, 1, &scissor_);

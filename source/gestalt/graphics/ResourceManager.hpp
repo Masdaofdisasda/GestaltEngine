@@ -68,8 +68,7 @@ namespace gestalt::graphics {
 
       std::shared_ptr<AllocatedBuffer> create_buffer(size_t allocSize, VkBufferUsageFlags usage,
                                     VmaMemoryUsage memoryUsage) override;
-      std::shared_ptr<DescriptorBuffer> create_descriptor_buffer(VkDescriptorSetLayout descriptor_layout,
-                                                                 size_t numBindings,
+      std::shared_ptr<DescriptorBuffer> create_descriptor_buffer(VkDescriptorSetLayout descriptor_layout, uint32 numBindings,
                                                                  VkBufferUsageFlags usage = 0) override;
       void destroy_buffer(const std::shared_ptr<AllocatedBuffer> buffer) override;
 

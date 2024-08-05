@@ -4,8 +4,8 @@
 layout(location = 0) in  vec2 texCoord;
 layout(location = 0) out vec4 outColor;
 
-layout(binding = 10) uniform sampler2D texColor;
-layout(binding = 11) uniform sampler2D texRotationPattern;
+layout(binding = 0) uniform sampler2D texColor;
+layout(binding = 1) uniform sampler2D texRotationPattern;
 
 layout( push_constant ) uniform constants
 {

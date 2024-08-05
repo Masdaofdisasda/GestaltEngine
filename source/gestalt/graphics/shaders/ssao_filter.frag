@@ -29,8 +29,8 @@ layout( push_constant ) uniform constants
 	float distScale;
 } params;
 
-layout(binding = 10) uniform sampler2D texDepth;
-layout(binding = 11) uniform sampler2D texRotation;
+layout(binding = 0) uniform sampler2D texDepth;
+layout(binding = 1) uniform sampler2D texRotation;
 
 // based on http://steps3d.narod.ru/tutorials/ssao-tutorial.html
 void main()

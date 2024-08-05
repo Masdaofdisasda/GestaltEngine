@@ -13,8 +13,8 @@ layout( push_constant ) uniform constants
     float max_luminance;
 } params;
 
-layout(set = 0, binding = 10) uniform sampler2D currentLuminance;
-layout(set = 0, binding = 11) uniform sampler2D adaptedLuminance;
+layout(set = 0, binding = 0) uniform sampler2D currentLuminance;
+layout(set = 0, binding = 1) uniform sampler2D adaptedLuminance;
 
 float sigmoid(float x) {
     return 1.0 / (1.0 + exp(-x));

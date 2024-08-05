@@ -48,7 +48,7 @@ namespace gestalt::foundation {
                                           VmaMemoryUsage memoryUsage)
         = 0;
     virtual std::shared_ptr<DescriptorBuffer> create_descriptor_buffer(
-        VkDescriptorSetLayout descriptor_layout, size_t numBindings,
+        VkDescriptorSetLayout descriptor_layout, uint32 numBindings,
         VkBufferUsageFlags usage = 0)
     = 0;
     virtual void destroy_buffer(const std::shared_ptr<AllocatedBuffer> buffer) = 0;

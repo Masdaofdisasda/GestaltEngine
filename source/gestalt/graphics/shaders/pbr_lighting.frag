@@ -18,7 +18,11 @@ layout(set = 2, binding = 2) uniform sampler2D gbuffer3;
 layout(set = 2, binding = 3) uniform sampler2D depthBuffer;
 layout(set = 2, binding = 4) uniform sampler2D shadowMap;
 
-layout(set = 3, binding = 0) buffer DirLight{
+layout(set = 3, binding = 0) buffer LightViewProj{
+	mat4 viewProj;
+} lightViewProj[256 + 2];
+
+layout(set = 3, binding = 2) buffer DirLight{
 	vec3 color;
 	float intensity;
 	vec3 direction;
@@ -32,9 +36,6 @@ layout(set = 3, binding = 1) buffer PointLight{
 	bool enabled;
 } pointLight[256];
 
-layout(set = 3, binding = 2) buffer LightViewProj{
-	mat4 viewProj;
-} lightViewProj[256 + 2];
 
 layout( push_constant ) uniform constants
 {	

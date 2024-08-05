@@ -116,13 +116,34 @@ namespace gestalt::graphics {
         for (const auto& buffer_dependency : dependencies_.buffer_dependencies) {
           const auto& descriptor_buffers
               = buffer_dependency.resource.buffer->get_descriptor_buffers(current_frame_index);
+
+          std::vector<DescriptorBuffer*> buffers;
+          buffers.reserve(descriptor_buffers.size());
+          for ( const auto& descriptor_buffer : descriptor_buffers) {
+            buffers.push_back(descriptor_buffer.get());
+          }
+          bind_descriptor_buffers(cmd, buffers);
+
           for (const auto& descriptor_buffer : descriptor_buffers) {
-            descriptor_buffer->bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, i++);
+            descriptor_buffer->bind_descriptors(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, i++);
           }
         }
       }
 
       vkCmdBeginRendering(cmd, &renderInfo);
+    }
+
+  void RenderPass::bind_descriptor_buffers(
+        VkCommandBuffer cmd, const std::vector<DescriptorBuffer*>& descriptor_buffers) {
+      std::vector<VkDescriptorBufferBindingInfoEXT> bufferBindings;
+    bufferBindings.reserve(descriptor_buffers.size());
+
+      for (const auto descriptor_buffer : descriptor_buffers) {
+        bufferBindings.push_back({.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_BUFFER_BINDING_INFO_EXT,
+                                  .address = descriptor_buffer->address,
+                                  .usage = descriptor_buffer->usage});
+      }
+      vkCmdBindDescriptorBuffersEXT(cmd, bufferBindings.size(), bufferBindings.data());
     }
 
   void RenderPass::begin_compute_pass(VkCommandBuffer cmd) {
@@ -132,7 +153,7 @@ namespace gestalt::graphics {
           const auto& descriptor_buffers
               = buffer_dependency.resource.buffer->get_descriptor_buffers(current_frame_index);
           for (const auto& descriptor_buffer : descriptor_buffers) {
-            descriptor_buffer->bind(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_, i++);
+            descriptor_buffer->bind_descriptors(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_, i++);
           }
         }
       }

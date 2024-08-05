@@ -23,7 +23,7 @@ namespace gestalt::foundation {
         assert(false && "Invalid descriptor type");
       }
 
-      const VkDeviceSize offset = descriptorIndex * descriptorSize + offsets[binding];
+      const VkDeviceSize offset = descriptorIndex * descriptorSize + bindings[binding].offset;
       vkGetDescriptorEXT(device, &descriptor_info, descriptorSize,
                          descriptor_buf_ptr + offset);
     }
@@ -34,23 +34,15 @@ namespace gestalt::foundation {
      return *this;
   }
 
-  void DescriptorBuffer::bind(VkCommandBuffer cmd, VkPipelineBindPoint bind_point,
-                              VkPipelineLayout pipelineLayout, uint32_t set) const {
-
-      std::vector<VkDescriptorBufferBindingInfoEXT> bufferBindings;
-      bufferBindings.reserve(offsets.size());
-      for (int i = 0; i < offsets.size(); ++i) {
-        bufferBindings.push_back({.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_BUFFER_BINDING_INFO_EXT,
-                                  .address = address,
-                                  .usage = usage});
-    }
-    vkCmdBindDescriptorBuffersEXT(cmd, bufferBindings.size(), bufferBindings.data());
-
-    for (int i = 0; i < offsets.size(); ++i) {
-      uint32 bufferIndex = i;
-      VkDeviceSize offset = offsets[i];
-      vkCmdSetDescriptorBufferOffsetsEXT(cmd, bind_point, pipelineLayout, set, 1, &bufferIndex,
-                                         &offset);
+  void DescriptorBuffer::bind_descriptors(VkCommandBuffer cmd, VkPipelineBindPoint bind_point,
+                                          VkPipelineLayout pipelineLayout, uint32_t set) const {
+    VkDeviceSize buffer_offset = 0;
+    for (const auto& [descriptorSize, descriptorCount, binding, offset] : bindings) {
+      for (int i = 0; i < descriptorCount; ++i) {
+        buffer_offset = i * descriptorSize;
+        vkCmdSetDescriptorBufferOffsetsEXT(cmd, bind_point, pipelineLayout, set, 1, &set,
+                                           &buffer_offset);
+      }
     }
   }
 
@@ -58,10 +50,8 @@ namespace gestalt::foundation {
   size_t DescriptorBuffer::MapDescriptorSize(const VkDescriptorType type) const {
     switch (type) {
       case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
-      case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
         return properties_.uniformBufferDescriptorSize;
       case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
-      case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
         return properties_.storageBufferDescriptorSize;
       case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
         return properties_.uniformTexelBufferDescriptorSize;
@@ -78,43 +68,22 @@ namespace gestalt::foundation {
       case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
         return properties_.inputAttachmentDescriptorSize;
       default:
-        return 0;
+        assert( false && "Invalid descriptor type");
     }
   }
 
-  DescriptorBuffer& DescriptorBuffer::write_buffer(
-      uint32 binding,
-                                                               VkDescriptorType type,
-                                                               VkDeviceAddress resource_address,
-                                                               size_t descriptor_range,
-                                                               uint32 descriptor_index) {
-    return write_buffer_array(binding, type, resource_address, descriptor_range, 1,
-                              descriptor_index);
-  }
-
-  DescriptorBuffer& DescriptorBuffer::write_buffer_array(uint32 binding, VkDescriptorType type,
+  DescriptorBuffer& DescriptorBuffer::write_buffer(uint32 binding, VkDescriptorType type,
                                                          VkDeviceAddress resource_address,
-                                                         size_t descriptor_range,
-                                                         uint32 descriptor_count,
-                                                         uint32 first_descriptor) {
-    update_infos.reserve(descriptor_count);
+                                                         size_t buffer_size) {
+    VkDescriptorAddressInfoEXT addr_info = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_ADDRESS_INFO_EXT,
+                                            .address = resource_address,
+                                            .range = buffer_size,
+                                            .format = VK_FORMAT_UNDEFINED};
 
-    for (uint32 descriptor_index = first_descriptor;
-         descriptor_index < first_descriptor + descriptor_count; ++descriptor_index) {
-      VkDescriptorAddressInfoEXT addr_info
-          = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_ADDRESS_INFO_EXT,
-             .address = resource_address,
-             .range = descriptor_range,
-             .format = VK_FORMAT_UNDEFINED};
-
-      DescriptorUpdate descriptor_update{.type = type,
-                                         .descriptorSize = MapDescriptorSize(type),
-                                         .binding = binding,
-                                         .descriptorIndex = descriptor_index,
-                                         .addr_info = addr_info};
-
-      update_infos.emplace_back(descriptor_update);
-    }
+    update_infos.emplace_back(DescriptorUpdate{.type = type,
+                                               .descriptorSize = MapDescriptorSize(type),
+                                               .binding = binding,
+                                               .addr_info = addr_info});
     return *this;
   }
 

@@ -28,11 +28,11 @@ namespace gestalt::graphics {
             .build(gpu_->getDevice()));
     descriptor_layouts_.emplace_back(
         DescriptorLayoutBuilder()
-            .add_binding(15, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
+            .add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
                          getMaxDirectionalLights())
-            .add_binding(16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
+            .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
                          getMaxPointLights())
-            .add_binding(17, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                          VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, false,
                          getMaxLights())
             .build(gpu_->getDevice()));
@@ -57,9 +57,13 @@ namespace gestalt::graphics {
     const auto& light_data = repository_->light_buffers;
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
-    per_frame_buffers->descriptor_buffers[frame]->bind(
+
+    bind_descriptor_buffers(
+        cmd, {per_frame_buffers->descriptor_buffers[frame].get(), light_data->descriptor_buffer.get()
+    });
+    per_frame_buffers->descriptor_buffers[frame]->bind_descriptors(
         cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,pipeline_layout_, 0);
-    light_data->descriptor_buffer->bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,pipeline_layout_, 1);
+    light_data->descriptor_buffer->bind_descriptors(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,pipeline_layout_, 1);
     vkCmdSetViewport(cmd, 0, 1, &viewport_);
     vkCmdSetScissor(cmd, 0, 1, &scissor_);
 
@@ -113,7 +117,8 @@ namespace gestalt::graphics {
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
-    per_frame_buffers->descriptor_buffers[frame]->bind(
+    bind_descriptor_buffers(cmd, {per_frame_buffers->descriptor_buffers[frame].get()});
+    per_frame_buffers->descriptor_buffers[frame]->bind_descriptors(
         cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
@@ -178,7 +183,8 @@ namespace gestalt::graphics {
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
-    per_frame_buffers->descriptor_buffers[frame]->bind(
+    bind_descriptor_buffers(cmd, {per_frame_buffers->descriptor_buffers[frame].get()});
+    per_frame_buffers->descriptor_buffers[frame]->bind_descriptors(
         cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
@@ -249,7 +255,8 @@ namespace gestalt::graphics {
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
-    per_frame_buffers->descriptor_buffers[frame]->bind(
+    bind_descriptor_buffers(cmd, {per_frame_buffers->descriptor_buffers[frame].get()});
+    per_frame_buffers->descriptor_buffers[frame]->bind_descriptors(
         cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);

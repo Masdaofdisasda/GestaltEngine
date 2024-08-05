@@ -15,8 +15,8 @@ layout( push_constant ) uniform constants
 	float distScale;
 } params;
 
-layout(binding = 10) uniform sampler2D texScene;
-layout(binding = 11) uniform sampler2D texSSAO;
+layout(binding = 0) uniform sampler2D texScene;
+layout(binding = 1) uniform sampler2D texSSAO;
 
 void main()
 {

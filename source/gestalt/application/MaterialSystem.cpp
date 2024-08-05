@@ -28,8 +28,7 @@ namespace gestalt::application {
     descriptor_layout_builder_->clear();
     const auto uniformLayout
         = descriptor_layout_builder_
-              ->add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
-                            true)
+              ->add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false, getMaxMaterials())
               .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
 
     mat_buffers->uniform_descriptor_buffer
@@ -49,7 +48,7 @@ namespace gestalt::application {
     const auto imageLayout
         = descriptor_layout_builder_
               ->add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                            VK_SHADER_STAGE_FRAGMENT_BIT, true)
+                            VK_SHADER_STAGE_FRAGMENT_BIT, false, getMaxTextures())
               .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
 
     repository_->material_buffers->image_descriptor_buffer
@@ -162,8 +161,8 @@ namespace gestalt::application {
     const auto& descriptor_buffer = repository_->material_buffers->uniform_descriptor_buffer;
 
     descriptor_buffer
-        ->write_buffer_array(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, constant_buffer->address,
-                             sizeof(PbrMaterial::PbrConstants), getMaxMaterials())
+        ->write_buffer(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, constant_buffer->address,
+                             sizeof(PbrMaterial::PbrConstants) * getMaxMaterials())
         .update();
   }
 

@@ -3,7 +3,7 @@
 layout(location = 0) in  vec2 texCoord;
 layout(location = 0) out vec4 outColor;
 
-layout(binding = 10) uniform sampler2D texSSAO;
+layout(binding = 0) uniform sampler2D texSSAO;
 
 const vec4 gaussFilter[11] = vec4[](
 	vec4(-5.0, 0.0, 0.0,  3.0/133.0),

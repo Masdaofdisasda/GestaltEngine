@@ -9,7 +9,7 @@
 namespace gestalt::graphics {
 
   void LightingPass::prepare() {
-    fmt::print("preparing lighting pass\n");
+    fmt::print("Preparing {}\n", get_name());
 
     descriptor_layouts_.emplace_back(
         DescriptorLayoutBuilder()
@@ -35,16 +35,16 @@ namespace gestalt::graphics {
                                                       VK_SHADER_STAGE_FRAGMENT_BIT)
                                          .add_binding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                       VK_SHADER_STAGE_FRAGMENT_BIT)
-                                         .build(gpu_->getDevice()));
+            .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT));
     descriptor_layouts_.emplace_back(
         DescriptorLayoutBuilder()
-            .add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
-                         getMaxDirectionalLights())
-            .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
-                         getMaxPointLights())
-            .add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                          VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, false,
                          getMaxLights())
+            .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
+                         getMaxPointLights())
+            .add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
+                         getMaxDirectionalLights())
             .build(gpu_->getDevice()));
 
     dependencies_
@@ -76,7 +76,6 @@ namespace gestalt::graphics {
   void LightingPass::destroy() {}
 
   void LightingPass::execute(VkCommandBuffer cmd) {
-
     begin_renderpass(cmd);
 
     const auto frame = current_frame_index;
@@ -91,28 +90,40 @@ namespace gestalt::graphics {
     const auto shadow_map = registry_->resources_.shadow_map.image;
 
     if (descriptor_buffers_.at(frame) == nullptr) {
-      descriptor_buffers_.at(frame) = resource_manager_->create_descriptor_buffer(
-          descriptor_layouts_.at(1), 5, 0);
-      auto image_info0 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,gbuffer_1->imageView,gbuffer_1->getLayout()};
-       auto image_info1 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,gbuffer_2->imageView,gbuffer_2->getLayout()};
-       auto image_info2 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,gbuffer_3->imageView,gbuffer_3->getLayout()};
-       auto image_info3 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,gbuffer_depth->imageView,gbuffer_depth->getLayout()};
-       auto image_info4 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,shadow_map->imageView,shadow_map->getLayout()};
-       descriptor_buffers_.at(frame)
-           ->
-                 write_image(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info0)
-                 .write_image(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info1)
-                 .write_image(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info2)
-                 .write_image(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info3)
-                 .write_image(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info4)
-                             .update();
+      descriptor_buffers_.at(frame)
+          = resource_manager_->create_descriptor_buffer(descriptor_layouts_.at(2), 5, 0);
+      auto image_info0 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,
+                                               gbuffer_1->imageView, gbuffer_1->getLayout()};
+      auto image_info1 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,
+                                               gbuffer_2->imageView, gbuffer_2->getLayout()};
+      auto image_info2 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,
+                                               gbuffer_3->imageView, gbuffer_3->getLayout()};
+      auto image_info3
+          = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,
+                                  gbuffer_depth->imageView, gbuffer_depth->getLayout()};
+      auto image_info4 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,
+                                               shadow_map->imageView, shadow_map->getLayout()};
+      descriptor_buffers_.at(frame)
+          ->write_image(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info0)
+          .write_image(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info1)
+          .write_image(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info2)
+          .write_image(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info3)
+          .write_image(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info4)
+          .update();
     }
 
-    per_frame_buffers->descriptor_buffers[frame]->bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                       pipeline_layout_, 0);
-    ibl_buffers->descriptor_buffer->bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 1);
-    descriptor_buffers_.at(frame)->bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 2);
-    light_data->descriptor_buffer->bind(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 3);
+    bind_descriptor_buffers(
+        cmd,
+        {per_frame_buffers->descriptor_buffers[frame].get(), ibl_buffers->descriptor_buffer.get(),
+         descriptor_buffers_.at(frame).get(), light_data->descriptor_buffer.get()});
+    per_frame_buffers->descriptor_buffers[frame]->bind_descriptors(
+        cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
+    ibl_buffers->descriptor_buffer->bind_descriptors(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                     pipeline_layout_, 1);
+    descriptor_buffers_.at(frame)->bind_descriptors(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                    pipeline_layout_, 2);
+    light_data->descriptor_buffer->bind_descriptors(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                    pipeline_layout_, 3);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
     vkCmdSetViewport(cmd, 0, 1, &viewport_);

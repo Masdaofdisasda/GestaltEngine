@@ -17,13 +17,13 @@ namespace gestalt::application {
     descriptor_layout_builder_->clear();
     const auto descriptor_layout
         = descriptor_layout_builder_
-              ->add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
-                            false, getMaxDirectionalLights())
+              ->add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                            VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, false,
+                            getMaxLights())
               .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
                            false, getMaxPointLights())
-              .add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                           VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, false,
-                           getMaxLights())
+              .add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
+                           false, getMaxDirectionalLights())
               .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
 
 
@@ -50,13 +50,13 @@ namespace gestalt::application {
     const auto& light_data = repository_->light_buffers;
 
     light_data->descriptor_buffer
-        ->write_buffer_array(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        ->write_buffer(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                              light_data->dir_light_buffer->address,
                              sizeof(GpuDirectionalLight) * getMaxDirectionalLights())
-        .write_buffer_array(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        .write_buffer(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                             light_data->point_light_buffer->address,
                             sizeof(GpuPointLight) * getMaxPointLights())
-        .write_buffer_array(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        .write_buffer(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                             light_data->view_proj_matrices->address,
                             sizeof(glm::mat4) * getMaxLights())
         .update();

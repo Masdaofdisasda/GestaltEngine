@@ -17,9 +17,9 @@ layout( push_constant ) uniform constants
     int toneMappingOption;
 } params;
 
-layout(binding = 10) uniform sampler2D texScene;
-layout(binding = 11) uniform sampler2D texBloom;
-layout(binding = 12) uniform sampler2D texLuminance;
+layout(binding = 0) uniform sampler2D texScene;
+layout(binding = 1) uniform sampler2D texBloom;
+layout(binding = 2) uniform sampler2D texLuminance;
 
 // Extended Reinhard tone mapping operator
 vec3 Reinhard2(vec3 x)

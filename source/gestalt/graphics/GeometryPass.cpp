@@ -153,12 +153,14 @@ namespace gestalt::graphics {
                                                      VK_SHADER_STAGE_FRAGMENT_BIT)
                                         .build(gpu_->getDevice()));
       descriptor_layouts_.push_back(DescriptorLayoutBuilder()
-                                        .add_binding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                                     VK_SHADER_STAGE_FRAGMENT_BIT, true)
+                                        .add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                                     VK_SHADER_STAGE_FRAGMENT_BIT, false,getMaxTextures())
                                         .build(gpu_->getDevice()));
       descriptor_layouts_.push_back(
           DescriptorLayoutBuilder()
-              .add_binding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, true)
+                                        .add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                                     VK_SHADER_STAGE_FRAGMENT_BIT, false,
+                                                     getMaxMaterials())
               .build(gpu_->getDevice()));
       constexpr auto mesh_stages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT
                                    | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT;

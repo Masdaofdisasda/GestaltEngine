@@ -7,7 +7,7 @@
 layout(location = 0) in vec3 TexCoords;
 layout(location = 0) out vec4 FragColor;
 
-layout(set = 1, binding = 15) buffer DirLight{
+layout(set = 1, binding = 0) buffer DirLight{
 	vec3 color;
 	float intensity;
 	vec3 direction;

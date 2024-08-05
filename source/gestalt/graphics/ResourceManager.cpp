@@ -64,27 +64,29 @@ namespace gestalt::graphics {
     }
 
   std::shared_ptr<DescriptorBuffer> ResourceManager::create_descriptor_buffer(
-        VkDescriptorSetLayout descriptor_layout, size_t numBindings, VkBufferUsageFlags usage) {
-      DescriptorBuffer descriptor_buffer{gpu_->getDescriptorBufferProperties()};
+        VkDescriptorSetLayout descriptor_layout, uint32 numBindings, VkBufferUsageFlags usage) {
+      DescriptorBuffer descriptor_buffer{gpu_->getDescriptorBufferProperties(), gpu_->getAllocator(),
+                                       gpu_->getDevice()};
       descriptor_buffer.usage |= usage;
-      descriptor_buffer.device = gpu_->getDevice();
-      descriptor_buffer.allocator = gpu_->getAllocator();
 
-      vkGetDescriptorSetLayoutSizeEXT(gpu_->getDevice(), descriptor_layout,
-                                      &descriptor_buffer.size);
+      vkGetDescriptorSetLayoutSizeEXT(gpu_->getDevice(), descriptor_layout, &descriptor_buffer.size);
 
-      descriptor_buffer.offsets.reserve(numBindings);
-      for (size_t i = 0; i < numBindings; ++i) {
-        VkDeviceSize binding_offset;
+      descriptor_buffer.bindings.reserve(numBindings);
+      VkDeviceSize binding_offset = 0;
+      VkDeviceSize descriptorBufferOffsetAlignment
+          = gpu_->getDescriptorBufferProperties().descriptorBufferOffsetAlignment;
+
+      for (uint32 i = 0; i < numBindings; ++i) {
         vkGetDescriptorSetLayoutBindingOffsetEXT(gpu_->getDevice(), descriptor_layout, i,
                                                  &binding_offset);
-        binding_offset = aligned_size(binding_offset, gpu_->getDescriptorBufferProperties().descriptorBufferOffsetAlignment);
-        descriptor_buffer.offsets.push_back(binding_offset);
+        binding_offset = aligned_size(binding_offset, descriptorBufferOffsetAlignment);
+        descriptor_buffer.bindings.emplace_back(DescriptorBinding{
+            .binding = i,
+            .offset = binding_offset,
+        });
       }
 
-      descriptor_buffer.size
-          = aligned_size(descriptor_buffer.size,
-                         gpu_->getDescriptorBufferProperties().descriptorBufferOffsetAlignment);
+      descriptor_buffer.size = aligned_size(descriptor_buffer.size, descriptorBufferOffsetAlignment);
 
       VkBufferCreateInfo bufferInfo = {};
       bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;

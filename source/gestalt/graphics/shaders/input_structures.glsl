@@ -3,7 +3,7 @@ layout(set = 1, binding = 0) uniform samplerCube texEnvMap;
 layout(set = 1, binding = 1) uniform samplerCube texEnvMapIrradiance;
 layout(set = 1, binding = 2) uniform sampler2D texBdrfLut;
 
-layout(set = 2, binding = 0) uniform sampler2D textures[];
+layout(set = 2, binding = 0) uniform sampler2D textures[1280];
 
 layout(std430, set = 3, binding = 0) readonly buffer MaterialConstants {
     uint16_t albedo_tex_index;
@@ -19,4 +19,4 @@ layout(std430, set = 3, binding = 0) readonly buffer MaterialConstants {
     float alpha_cutoff;
     vec3 emissiveColor;
     float emissiveStrength;
-} materialData[];
+} materialData[256];

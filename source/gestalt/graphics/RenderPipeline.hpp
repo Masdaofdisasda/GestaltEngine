@@ -207,6 +207,7 @@ namespace gestalt::graphics {
       virtual void destroy() = 0;
 
       void begin_renderpass(VkCommandBuffer cmd);
+      static void bind_descriptor_buffers(VkCommandBuffer cmd, const std::vector<DescriptorBuffer*>& descriptor_buffers);
       void begin_compute_pass(VkCommandBuffer cmd);
 
       PipelineBuilder create_pipeline();

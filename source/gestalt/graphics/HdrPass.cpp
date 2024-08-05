@@ -11,7 +11,7 @@ namespace gestalt::graphics {
     fmt::print("Preparing {}\n", get_name());
 
     descriptor_layouts_.emplace_back(DescriptorLayoutBuilder()
-                                         .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                         .add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                       VK_SHADER_STAGE_FRAGMENT_BIT)
                                          .build(gpu_->getDevice()));
 
@@ -53,7 +53,8 @@ namespace gestalt::graphics {
 
     begin_renderpass(cmd);
 
-    descriptor_buffers_[current_frame_index]->bind(
+    bind_descriptor_buffers(cmd, {descriptor_buffers_[current_frame_index].get()});
+    descriptor_buffers_[current_frame_index]->bind_descriptors(
         cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
     vkCmdSetViewport(cmd, 0, 1, &viewport_);
@@ -75,7 +76,7 @@ namespace gestalt::graphics {
     fmt::print("Preparing {}\n", get_name());
 
     descriptor_layouts_.emplace_back(DescriptorLayoutBuilder()
-                                         .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                         .add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                       VK_SHADER_STAGE_FRAGMENT_BIT)
                                          .build(gpu_->getDevice()));
 
@@ -135,7 +136,10 @@ namespace gestalt::graphics {
       VkRenderingInfo renderInfo
           = vkinit::rendering_info(dstImage->getExtent2D(), &colorAttachment, nullptr);
       vkCmdBeginRendering(cmd, &renderInfo);
-      descriptor_buffers_[current_frame_index][i]->bind(
+
+      
+    bind_descriptor_buffers(cmd, {descriptor_buffers_[current_frame_index][i].get()});
+      descriptor_buffers_[current_frame_index][i]->bind_descriptors(
           cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
@@ -157,7 +161,7 @@ namespace gestalt::graphics {
     fmt::print("Preparing {}\n", get_name());
 
     descriptor_layouts_.emplace_back(DescriptorLayoutBuilder()
-                                         .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                         .add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                       VK_SHADER_STAGE_FRAGMENT_BIT)
                                          .build(gpu_->getDevice()));
 
@@ -196,7 +200,8 @@ namespace gestalt::graphics {
 
     begin_renderpass(cmd);
 
-    descriptor_buffers_.at(current_frame_index)->bind(
+    bind_descriptor_buffers(cmd, {descriptor_buffers_.at(current_frame_index).get()});
+    descriptor_buffers_.at(current_frame_index)->bind_descriptors(
         cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
@@ -214,7 +219,7 @@ namespace gestalt::graphics {
     fmt::print("Preparing {}\n", get_name());
 
     descriptor_layouts_.emplace_back(DescriptorLayoutBuilder()
-                                         .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                         .add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                       VK_SHADER_STAGE_FRAGMENT_BIT)
                                          .build(gpu_->getDevice()));
 
@@ -268,7 +273,9 @@ namespace gestalt::graphics {
       VkRenderingInfo newRenderInfo
           = vkinit::rendering_info(dst->getExtent2D(), &newColorAttachment, nullptr);
       vkCmdBeginRendering(cmd, &newRenderInfo);
-      descriptor_buffers_[current_frame_index].at(i)->bind(
+
+      bind_descriptor_buffers(cmd, {descriptor_buffers_[current_frame_index].at(i).get()});
+      descriptor_buffers_[current_frame_index].at(i)->bind_descriptors(
             cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
@@ -289,9 +296,9 @@ namespace gestalt::graphics {
     fmt::print("Preparing {}\n", get_name());
 
     descriptor_layouts_.emplace_back(DescriptorLayoutBuilder()
-                                         .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                         .add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                       VK_SHADER_STAGE_FRAGMENT_BIT)
-                                         .add_binding(11, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                         .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                       VK_SHADER_STAGE_FRAGMENT_BIT)
                                          .build(gpu_->getDevice()));
 
@@ -355,7 +362,8 @@ namespace gestalt::graphics {
         = vkinit::rendering_info(new_lum->getExtent2D(), &newColorAttachment, nullptr);
     vkCmdBeginRendering(cmd, &newRenderInfo);
 
-    descriptor_buffers_.at(frame)->bind(
+    bind_descriptor_buffers(cmd, {descriptor_buffers_.at(frame).get()});
+    descriptor_buffers_.at(frame)->bind_descriptors(
         cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
@@ -375,13 +383,11 @@ namespace gestalt::graphics {
     fmt::print("Preparing {}\n", get_name());
 
     descriptor_layouts_.emplace_back(DescriptorLayoutBuilder()
-                                         .add_binding(10, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                         .add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                       VK_SHADER_STAGE_FRAGMENT_BIT)
-                                         .add_binding(11, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                         .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                       VK_SHADER_STAGE_FRAGMENT_BIT)
-                                         .add_binding(12, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                                      VK_SHADER_STAGE_FRAGMENT_BIT)
-                                         .add_binding(13, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                         .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                       VK_SHADER_STAGE_FRAGMENT_BIT)
                                          .build(gpu_->getDevice()));
 
@@ -436,7 +442,8 @@ namespace gestalt::graphics {
 
     begin_renderpass(cmd);
 
-    descriptor_buffers_.at(current_frame_index)->bind(
+    bind_descriptor_buffers(cmd, {descriptor_buffers_.at(current_frame_index).get()});
+    descriptor_buffers_.at(current_frame_index)->bind_descriptors(
         cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
     vkCmdSetViewport(cmd, 0, 1, &viewport_);

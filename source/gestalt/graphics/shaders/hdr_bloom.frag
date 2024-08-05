@@ -4,7 +4,7 @@
 layout(location = 0) in vec2 texCoord;
 layout(location = 0) out vec4 outColor;
 
-layout(binding = 10) uniform sampler2D texSampler;
+layout(binding = 0) uniform sampler2D texSampler;
 
 layout(push_constant) uniform BlurDirection {
     int direction; // 0 for X, 1 for Y

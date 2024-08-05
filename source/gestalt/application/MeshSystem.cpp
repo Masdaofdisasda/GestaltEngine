@@ -229,26 +229,26 @@ namespace gestalt::application {
 
     for (int i = 0; i < getFramesInFlight(); i++) {
       mesh_buffers->descriptor_buffers[i]
-          ->write_buffer_array(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+          ->write_buffer(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                mesh_buffers->vertex_position_buffer->address,
                                sizeof(GpuVertexPosition) * getMaxVertices())
           .update()
-          .write_buffer_array(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+          .write_buffer(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                               mesh_buffers->vertex_data_buffer->address, sizeof(GpuVertexData)*getMaxVertices())
           .update()
-          .write_buffer_array(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+          .write_buffer(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                               mesh_buffers->meshlet_buffer->address, sizeof(Meshlet)*getMaxMeshlets())
           .update()
-          .write_buffer_array(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+          .write_buffer(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                               mesh_buffers->meshlet_vertices->address, sizeof(uint32)*getMaxVertices())
           .update()
-          .write_buffer_array(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+          .write_buffer(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                               mesh_buffers->meshlet_triangles->address, sizeof(uint8)*getMaxIndices())
-          .write_buffer_array(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+          .write_buffer(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                               mesh_buffers->meshlet_task_commands_buffer[i]->address,
                               sizeof(MeshTaskCommand)* getMaxMeshlets())
           .update()
-          .write_buffer_array(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+          .write_buffer(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                               mesh_buffers->mesh_draw_buffer[i]->address, sizeof(MeshDraw)*
                               getMaxMeshes())
           .update()
