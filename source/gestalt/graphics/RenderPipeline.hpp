@@ -74,6 +74,7 @@ namespace gestalt::graphics {
   struct BufferDependency {
     BufferResource resource;
     BufferUsageType usage;
+    uint32 set; // Descriptor set binding index in GLSL layout
 
     uint32 required_version = 0;
     };
@@ -102,6 +103,7 @@ namespace gestalt::graphics {
 
       RenderPassDependencyBuilder& add_buffer_dependency(const BufferResource& buffer,
                                                          const BufferUsageType usage,
+                                                         const uint32 set,
                                                          const uint32 required_version = 0);
 
       RenderPassDependencyBuilder& set_push_constant_range(uint32 size,
@@ -170,7 +172,6 @@ namespace gestalt::graphics {
         BufferResource materialBuffer = {};
         BufferResource lightBuffer = {};
         BufferResource meshBuffer = {};
-        BufferResource IblBuffer = {};
       } resources_;
 
       std::vector<ImageAttachment> attachment_list_;

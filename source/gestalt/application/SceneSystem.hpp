@@ -42,9 +42,7 @@ namespace gestalt::application {
     class MaterialSystem final : public SceneSystem, public NonCopyable<MaterialSystem> {
       std::array<VkDescriptorImageInfo, getMaxTextures()> image_infos_ = {};
 
-      void create_uniform_buffer();
-      void create_images_buffer();
-      void create_ibl_images();
+      void create_buffers();
       void create_default_material();
       void fill_uniform_buffer();
       void fill_images_buffer();

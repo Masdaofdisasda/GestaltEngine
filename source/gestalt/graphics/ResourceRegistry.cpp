@@ -35,8 +35,6 @@ namespace gestalt::graphics {
     attachment_list_.push_back(resources_.lum_A);
     attachment_list_.push_back(resources_.lum_B);
 
-    resources_.IblBuffer.buffer
-        = repository->ibl_buffers.get();
     resources_.perFrameDataBuffer.buffer
         = repository->per_frame_data_buffers.get();
     resources_.lightBuffer.buffer

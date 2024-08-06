@@ -180,7 +180,7 @@ namespace gestalt::foundation {
   struct BufferCollection {
     virtual ~BufferCollection() = default;
     virtual std::vector<std::shared_ptr<AllocatedBuffer>> get_buffers(int16 frame_index) const = 0;
-    virtual std::vector<std::shared_ptr<DescriptorBuffer>> get_descriptor_buffers(
+    virtual std::shared_ptr<DescriptorBuffer> get_descriptor_buffer(
         int16 frame_index) const
         = 0;
   };
@@ -188,16 +188,21 @@ namespace gestalt::foundation {
   struct MaterialBuffers : BufferCollection, NonCopyable<MaterialBuffers> {
     std::shared_ptr<AllocatedBuffer> uniform_buffer;
 
-    std::shared_ptr<DescriptorBuffer> uniform_descriptor_buffer;
-    std::shared_ptr<DescriptorBuffer> image_descriptor_buffer;
+    TextureHandle environment_map;
+    TextureHandle environment_irradiance_map;
+    TextureHandle bdrf_lut;
+
+    VkSampler cube_map_sampler;
+
+    std::shared_ptr<DescriptorBuffer> descriptor_buffer;
 
     std::vector<std::shared_ptr<AllocatedBuffer>> get_buffers(int16 frame_index) const override {
       return {uniform_buffer};
     }
 
-    std::vector<std::shared_ptr<DescriptorBuffer>> get_descriptor_buffers(
+    std::shared_ptr<DescriptorBuffer> get_descriptor_buffer(
         int16 frame_index) const override {
-      return {uniform_descriptor_buffer, image_descriptor_buffer};
+      return descriptor_buffer;
     }
   };
 
@@ -212,9 +217,9 @@ namespace gestalt::foundation {
       return {uniform_buffers[frame_index]};
     }
 
-    std ::vector<std::shared_ptr<DescriptorBuffer>> get_descriptor_buffers(
+    std::shared_ptr<DescriptorBuffer> get_descriptor_buffer(
         int16 frame_index) const override {
-      return {descriptor_buffers[frame_index]};
+      return descriptor_buffers[frame_index];
     }
   };
 
@@ -229,9 +234,9 @@ namespace gestalt::foundation {
       return {dir_light_buffer, point_light_buffer, view_proj_matrices};
     }
 
-    std::vector<std::shared_ptr<DescriptorBuffer>> get_descriptor_buffers(
+    std::shared_ptr<DescriptorBuffer> get_descriptor_buffer(
         int16 frame_index) const override {
-      return {descriptor_buffer};
+      return descriptor_buffer;
     }
   };
 
@@ -263,28 +268,9 @@ namespace gestalt::foundation {
               draw_count_buffer[frame_index]};
     }
 
-    std::vector<std::shared_ptr<DescriptorBuffer>> get_descriptor_buffers(
+    std::shared_ptr<DescriptorBuffer> get_descriptor_buffer(
         int16 frame_index) const override {
-      return {descriptor_buffers[frame_index]};
-    }
-  };
-
-  struct IblBuffers : BufferCollection {
-    TextureHandle environment_map;
-    TextureHandle environment_irradiance_map;
-    TextureHandle bdrf_lut;
-
-    VkSampler cube_map_sampler;
-
-    std::shared_ptr<DescriptorBuffer> descriptor_buffer;
-
-    std::vector<std::shared_ptr<AllocatedBuffer>> get_buffers(int16 frame_index) const override {
-      return {};
-    }
-
-    std::vector<std::shared_ptr<DescriptorBuffer>> get_descriptor_buffers(
-        int16 frame_index) const override {
-      return {descriptor_buffer};
+      return descriptor_buffers[frame_index];
     }
   };
 

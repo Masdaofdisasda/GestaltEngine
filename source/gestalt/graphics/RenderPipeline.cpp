@@ -49,7 +49,7 @@ namespace gestalt::graphics {
 
     frames_.init(gpu_->getDevice(), gpu_->getGraphicsQueueFamily());
 
-    create_resources();
+    create_resources(); //TODO: Move this up
 
     for (const auto& pass : render_passes_) {
       pass->init(gpu_, resource_manager_, resource_registry_.get(), repository_);
@@ -149,7 +149,7 @@ namespace gestalt::graphics {
       }
     }
 
-    fmt::print("Executing {}\n", render_pass->get_name());
+    //fmt::print("Executing {}\n", render_pass->get_name());
     render_pass->execute(cmd);
 
     if (false && render_pass->get_name() == "Bloom Blur Pass") {

@@ -30,30 +30,30 @@ layout( push_constant ) uniform constants
 	int clusterOcclusionEnabled;
 } PushConstants;
 
-layout(set = 4, binding = 0) readonly buffer VertexPositionBuffer{ 
+layout(set = 2, binding = 0) readonly buffer VertexPositionBuffer{ 
 	VertexPosition vertex_positions[];
 };
 
-layout(set = 4, binding = 1) readonly buffer VertexDataBuffer{ 
+layout(set = 2, binding = 1) readonly buffer VertexDataBuffer{ 
 	VertexData vertex_data[];
 };
 
-layout(set = 4, binding = 2) readonly buffer Meshlets
+layout(set = 2, binding = 2) readonly buffer Meshlets
 {
     Meshlet meshlets[];
 };
 
-layout(set = 4, binding = 3) readonly buffer MeshletVertexBuffer
+layout(set = 2, binding = 3) readonly buffer MeshletVertexBuffer
 {
     int meshletVertices[];
 };
 
-layout(set = 4, binding = 4) readonly buffer MeshletIndexBuffer
+layout(set = 2, binding = 4) readonly buffer MeshletIndexBuffer
 {
     uint8_t meshletIndices[];
 };
 
-layout(set = 4, binding = 6) readonly buffer Draws
+layout(set = 2, binding = 6) readonly buffer Draws
 {
     MeshDraw draws[];
 };

@@ -18,12 +18,6 @@ namespace gestalt::graphics {
                              | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT
                              | VK_SHADER_STAGE_FRAGMENT_BIT)
             .build(gpu_->getDevice()));
-    descriptor_layouts_.emplace_back(
-        DescriptorLayoutBuilder()
-            .add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
-            .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
-            .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
-            .build(gpu_->getDevice()));
     descriptor_layouts_.emplace_back(DescriptorLayoutBuilder()
                                          .add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                       VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -42,9 +36,9 @@ namespace gestalt::graphics {
                          VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, false,
                          getMaxLights())
             .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
-                         getMaxPointLights())
-            .add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
                          getMaxDirectionalLights())
+            .add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
+                         getMaxPointLights())
             .build(gpu_->getDevice()));
 
     dependencies_
@@ -80,7 +74,6 @@ namespace gestalt::graphics {
 
     const auto frame = current_frame_index;
     const auto& per_frame_buffers = repository_->per_frame_data_buffers;
-    const auto& ibl_buffers = repository_->ibl_buffers;
     const auto& light_data = repository_->light_buffers;
 
     const auto gbuffer_1 = registry_->resources_.gbuffer1.image;
@@ -91,7 +84,7 @@ namespace gestalt::graphics {
 
     if (descriptor_buffers_.at(frame) == nullptr) {
       descriptor_buffers_.at(frame)
-          = resource_manager_->create_descriptor_buffer(descriptor_layouts_.at(2), 5, 0);
+          = resource_manager_->create_descriptor_buffer(descriptor_layouts_.at(1), 5, 0);
       auto image_info0 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,
                                                gbuffer_1->imageView, gbuffer_1->getLayout()};
       auto image_info1 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,
@@ -114,16 +107,14 @@ namespace gestalt::graphics {
 
     bind_descriptor_buffers(
         cmd,
-        {per_frame_buffers->descriptor_buffers[frame].get(), ibl_buffers->descriptor_buffer.get(),
+        {per_frame_buffers->descriptor_buffers[frame].get(),
          descriptor_buffers_.at(frame).get(), light_data->descriptor_buffer.get()});
     per_frame_buffers->descriptor_buffers[frame]->bind_descriptors(
         cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
-    ibl_buffers->descriptor_buffer->bind_descriptors(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                     pipeline_layout_, 1);
     descriptor_buffers_.at(frame)->bind_descriptors(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                    pipeline_layout_, 2);
+                                                    pipeline_layout_, 1);
     light_data->descriptor_buffer->bind_descriptors(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                    pipeline_layout_, 3);
+                                                    pipeline_layout_, 2);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
     vkCmdSetViewport(cmd, 0, 1, &viewport_);

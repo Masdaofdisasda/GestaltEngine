@@ -23,9 +23,9 @@ namespace gestalt::graphics {
     }
 
     RenderPassDependencyBuilder& RenderPassDependencyBuilder::add_buffer_dependency(
-        const BufferResource& buffer, const BufferUsageType usage,
+        const BufferResource& buffer, const BufferUsageType usage, const uint32 set,
         const uint32 required_version) {
-      dependency_. buffer_dependencies.push_back({buffer, usage, required_version});
+      dependency_. buffer_dependencies.push_back({buffer, usage, set, required_version});
       return *this;
     }
 
@@ -112,21 +112,15 @@ namespace gestalt::graphics {
             depthAttachment.sType ? &depthAttachment : nullptr);
       }
       if (!dependencies_.buffer_dependencies.empty()) {
-        uint32_t i = 0;
+        std::vector<DescriptorBuffer*> buffers;
+        buffers.resize(dependencies_.buffer_dependencies.size());
         for (const auto& buffer_dependency : dependencies_.buffer_dependencies) {
-          const auto& descriptor_buffers
-              = buffer_dependency.resource.buffer->get_descriptor_buffers(current_frame_index);
+          buffers.at(buffer_dependency.set) = buffer_dependency.resource.buffer->get_descriptor_buffer(current_frame_index).get();
+        }
+        bind_descriptor_buffers(cmd, buffers);
 
-          std::vector<DescriptorBuffer*> buffers;
-          buffers.reserve(descriptor_buffers.size());
-          for ( const auto& descriptor_buffer : descriptor_buffers) {
-            buffers.push_back(descriptor_buffer.get());
-          }
-          bind_descriptor_buffers(cmd, buffers);
-
-          for (const auto& descriptor_buffer : descriptor_buffers) {
-            descriptor_buffer->bind_descriptors(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, i++);
-          }
+        for (uint32 i = 0; i < buffers.size(); ++i) {
+          buffers.at(i)->bind_descriptors(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, i);
         }
       }
 
@@ -148,13 +142,17 @@ namespace gestalt::graphics {
 
   void RenderPass::begin_compute_pass(VkCommandBuffer cmd) {
       if (!dependencies_.buffer_dependencies.empty()) {
-        uint32_t i = 0;
+        std::vector<DescriptorBuffer*> buffers;
+        buffers.resize(dependencies_.buffer_dependencies.size());
         for (const auto& buffer_dependency : dependencies_.buffer_dependencies) {
-          const auto& descriptor_buffers
-              = buffer_dependency.resource.buffer->get_descriptor_buffers(current_frame_index);
-          for (const auto& descriptor_buffer : descriptor_buffers) {
-            descriptor_buffer->bind_descriptors(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_, i++);
-          }
+          buffers.at(buffer_dependency.set)
+              = buffer_dependency.resource.buffer->get_descriptor_buffer(current_frame_index).get();
+        }
+        bind_descriptor_buffers(cmd, buffers);
+
+        for (uint32 i = 0; i < buffers.size(); ++i) {
+          buffers.at(i)->bind_descriptors(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_,
+                                          i);
         }
       }
 

@@ -501,7 +501,7 @@ namespace gestalt::graphics {
       std::string env_file = base_path + "_environment" + extension;
       std::string irr_file = base_path + "_irradiance" + extension;
 
-      auto& Ibl_buffers = repository_->ibl_buffers;
+      auto& Ibl_buffers = repository_->material_buffers;
 
       if (std::filesystem::exists(env_file) && std::filesystem::exists(irr_file)) {
         fmt::print("Loading environment map from file: {}\n", env_file);

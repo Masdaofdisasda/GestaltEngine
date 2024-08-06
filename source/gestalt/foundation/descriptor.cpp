@@ -4,6 +4,7 @@
 
 namespace gestalt::foundation {
   DescriptorBuffer& DescriptorBuffer::update() {
+
     char* descriptor_buf_ptr;
     VK_CHECK(vmaMapMemory(allocator, allocation, reinterpret_cast<void**>(&descriptor_buf_ptr)));
 

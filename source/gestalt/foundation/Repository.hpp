@@ -92,7 +92,6 @@ namespace gestalt::foundation {
     } default_material_ = {};
 
     std::unique_ptr<MaterialBuffers> material_buffers = std::make_unique<MaterialBuffers>();
-    std::unique_ptr<IblBuffers> ibl_buffers = std::make_unique<IblBuffers>();
     std::unique_ptr<MeshBuffers> mesh_buffers = std::make_unique<MeshBuffers>();
     std::unique_ptr<LightBuffers> light_buffers = std::make_unique<LightBuffers>();
     std::unique_ptr<PerFrameDataBuffers> per_frame_data_buffers = std::make_unique<PerFrameDataBuffers>();

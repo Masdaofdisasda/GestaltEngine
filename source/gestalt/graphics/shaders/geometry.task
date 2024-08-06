@@ -20,17 +20,17 @@ layout( push_constant ) uniform constants
 	int clusterOcclusionEnabled;
 } PushConstants;
 
-layout(set = 4, binding = 2) readonly buffer Meshlets
+layout(set = 2, binding = 2) readonly buffer Meshlets
 {
 	Meshlet meshlets[];
 };
 
-layout(set = 4, binding = 5) readonly buffer TaskCommands
+layout(set = 2, binding = 5) readonly buffer TaskCommands
 {
 	MeshTaskCommand taskCommands[];
 };
 
-layout(set = 4, binding = 6) readonly buffer Draws
+layout(set = 2, binding = 6) readonly buffer Draws
 {
 	MeshDraw draws[];
 };

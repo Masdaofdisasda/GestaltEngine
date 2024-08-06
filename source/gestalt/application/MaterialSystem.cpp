@@ -11,53 +11,17 @@ namespace gestalt::application {
   constexpr uint32 kMagenta = 0xFFFF00FF;     // Magenta color for error textures
 
   void MaterialSystem::prepare() {
-    create_uniform_buffer();
-    create_images_buffer();
+    create_buffers();
 
     create_default_material();
 
     fill_uniform_buffer();
     fill_images_buffer();
-
-    create_ibl_images();
   }
 
-  void MaterialSystem::create_uniform_buffer() {
+  void MaterialSystem::create_buffers() {
     const auto& mat_buffers = repository_->material_buffers;
 
-    descriptor_layout_builder_->clear();
-    const auto uniformLayout
-        = descriptor_layout_builder_
-              ->add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false, getMaxMaterials())
-              .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
-
-    mat_buffers->uniform_descriptor_buffer
-        = resource_manager_->create_descriptor_buffer(uniformLayout, 1);
-    vkDestroyDescriptorSetLayout(gpu_->getDevice(), uniformLayout, nullptr);
-
-    mat_buffers->uniform_buffer = resource_manager_->create_buffer(
-        sizeof(PbrMaterial::PbrConstants) * getMaxMaterials(),
-        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VMA_MEMORY_USAGE_CPU_TO_GPU);
-  }
-
-  void MaterialSystem::create_images_buffer() {
-    const auto& mat_buffers = repository_->material_buffers;
-
-    descriptor_layout_builder_->clear();
-    const auto imageLayout
-        = descriptor_layout_builder_
-              ->add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                            VK_SHADER_STAGE_FRAGMENT_BIT, false, getMaxTextures())
-              .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
-
-    repository_->material_buffers->image_descriptor_buffer
-        = resource_manager_->create_descriptor_buffer(
-            imageLayout, 1, VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT);
-    vkDestroyDescriptorSetLayout(gpu_->getDevice(), imageLayout, nullptr);
-  }
-
-  void MaterialSystem::create_ibl_images() {
     descriptor_layout_builder_->clear();
     const auto descriptor_layout
         = descriptor_layout_builder_
@@ -67,16 +31,24 @@ namespace gestalt::application {
                            VK_SHADER_STAGE_FRAGMENT_BIT)
               .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                            VK_SHADER_STAGE_FRAGMENT_BIT)
+                  .add_binding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
+                              false, getMaxMaterials())
+              .add_binding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                           VK_SHADER_STAGE_FRAGMENT_BIT, false, getMaxTextures())
               .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
 
-    repository_->ibl_buffers->descriptor_buffer = resource_manager_->create_descriptor_buffer(
-        descriptor_layout, 3, VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT);
+    mat_buffers->descriptor_buffer
+        = resource_manager_->create_descriptor_buffer(descriptor_layout, 5);
     vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layout, nullptr);
 
-    resource_manager_->load_and_process_cubemap(R"(..\..\assets\san_giuseppe_bridge_4k.hdr)");
+    mat_buffers->uniform_buffer = resource_manager_->create_buffer(
+        sizeof(PbrMaterial::PbrConstants) * getMaxMaterials(),
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        VMA_MEMORY_USAGE_CPU_TO_GPU);
   }
 
   void MaterialSystem::create_default_material() {
+
     auto& default_mat = repository_->default_material_;
 
     default_mat.color_image = resource_manager_->create_image(
@@ -143,6 +115,8 @@ namespace gestalt::application {
     const std::string key = "default_material";
     repository_->materials.add(Material{.name = key, .config = pbr_mat});
     fmt::print("creating material {}, mat_id {}\n", key, material_id);
+    
+    resource_manager_->load_and_process_cubemap(R"(..\..\assets\san_giuseppe_bridge_4k.hdr)");
   }
 
   void MaterialSystem::fill_uniform_buffer() {
@@ -158,11 +132,9 @@ namespace gestalt::application {
 
     vmaUnmapMemory(gpu_->getAllocator(), constant_buffer->allocation);
 
-    const auto& descriptor_buffer = repository_->material_buffers->uniform_descriptor_buffer;
-
-    descriptor_buffer
-        ->write_buffer(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, constant_buffer->address,
-                             sizeof(PbrMaterial::PbrConstants) * getMaxMaterials())
+    repository_->material_buffers->descriptor_buffer
+        ->write_buffer(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, constant_buffer->address,
+                       sizeof(PbrMaterial::PbrConstants) * getMaxMaterials())
         .update();
   }
 
@@ -171,8 +143,9 @@ namespace gestalt::application {
     const auto& default_mat = repository_->default_material_;
 
     std::vector<VkDescriptorImageInfo> image_infos;
+    image_infos.reserve(getMaxTextures());
 
-    for (int i = 0; i < getMaxTextures(); ++i) {
+    for (int i = 0; i < getMaxMaterials(); ++i) {
       image_infos.push_back({default_mat.linearSampler, default_mat.color_image.imageView,
                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
       image_infos.push_back({default_mat.linearSampler,
@@ -186,8 +159,8 @@ namespace gestalt::application {
                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
     }
 
-    mat_buffers->image_descriptor_buffer
-        ->write_image_array(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_infos, 0)
+    mat_buffers->descriptor_buffer
+        ->write_image_array(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_infos, 0)
         .update();
   }
 
@@ -213,11 +186,11 @@ namespace gestalt::application {
   }
 
   void MaterialSystem::cleanup() {
-    const auto& ibl_buffers = repository_->ibl_buffers;
-    resource_manager_->destroy_image(ibl_buffers->bdrf_lut);
-    resource_manager_->destroy_image(ibl_buffers->environment_irradiance_map);
-    resource_manager_->destroy_image(ibl_buffers->environment_map);
-    vkDestroySampler(gpu_->getDevice(), ibl_buffers->cube_map_sampler, nullptr);
+    const auto& material_buffers = repository_->material_buffers;
+    resource_manager_->destroy_image(material_buffers->bdrf_lut);
+    resource_manager_->destroy_image(material_buffers->environment_irradiance_map);
+    resource_manager_->destroy_image(material_buffers->environment_map);
+    vkDestroySampler(gpu_->getDevice(), material_buffers->cube_map_sampler, nullptr);
 
     for (auto texture : repository_->textures.data()) {
       resource_manager_->destroy_image(texture);
@@ -226,7 +199,7 @@ namespace gestalt::application {
 
     repository_->materials.clear();
 
-    resource_manager_->destroy_buffer(repository_->material_buffers->uniform_buffer);
+    resource_manager_->destroy_buffer(material_buffers->uniform_buffer);
 
     const auto& samplers = repository_->samplers.data();
     for (auto& sampler : samplers) {
@@ -236,7 +209,6 @@ namespace gestalt::application {
     repository_->samplers.clear();
   }
 
-  // TODO likely there is no sync between subsequent descriptor set updates
   void MaterialSystem::write_material(PbrMaterial& material, const uint32 material_id) {
     assert(material_id < getMaxMaterials());
 
@@ -258,7 +230,10 @@ namespace gestalt::application {
     // Calculate the start offset in the descriptor buffer
     const uint32_t texture_start = getPbrMaterialTextures() * material_id;
 
-    mat_buffers->image_descriptor_buffer->update();
+    mat_buffers->descriptor_buffer
+        ->write_image_array(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_infos,
+                            texture_start)
+        .update();
 
     if (material.constants.albedo_tex_index != kUnusedTexture) {
       material.constants.albedo_tex_index = texture_start;

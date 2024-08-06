@@ -38,8 +38,8 @@ namespace gestalt::graphics {
 	  dependencies_
 		  = RenderPassDependencyBuilder()
                     .add_shader(ShaderStage::kCompute, "draw_cull.comp.spv")
-                    .add_buffer_dependency(registry_->resources_.perFrameDataBuffer, BufferUsageType::kRead)
-                    .add_buffer_dependency(registry_->resources_.meshBuffer, BufferUsageType::kWrite)
+                    .add_buffer_dependency(registry_->resources_.perFrameDataBuffer, BufferUsageType::kRead, 0)
+                    .add_buffer_dependency(registry_->resources_.meshBuffer, BufferUsageType::kWrite, 1)
                     .set_push_constant_range(sizeof(DrawCullConstants), VK_SHADER_STAGE_COMPUTE_BIT)
 				.build();
 
@@ -106,7 +106,7 @@ namespace gestalt::graphics {
 		  = RenderPassDependencyBuilder()
                               .add_shader(ShaderStage::kCompute, "task_submit.comp.spv")
                               .add_buffer_dependency(registry_->resources_.meshBuffer,
-                                                     BufferUsageType::kWrite)
+                                                     BufferUsageType::kWrite, 0)
 				.build();
 
 	  create_pipeline_layout();
@@ -144,23 +144,18 @@ namespace gestalt::graphics {
                                | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT
                                | VK_SHADER_STAGE_FRAGMENT_BIT)
               .build(gpu_->getDevice()));
-      descriptor_layouts_.push_back(DescriptorLayoutBuilder()
-                                        .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                                     VK_SHADER_STAGE_FRAGMENT_BIT)
-                                        .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                                     VK_SHADER_STAGE_FRAGMENT_BIT)
-                                        .add_binding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                                     VK_SHADER_STAGE_FRAGMENT_BIT)
-                                        .build(gpu_->getDevice()));
-      descriptor_layouts_.push_back(DescriptorLayoutBuilder()
-                                        .add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                                     VK_SHADER_STAGE_FRAGMENT_BIT, false,getMaxTextures())
-                                        .build(gpu_->getDevice()));
       descriptor_layouts_.push_back(
           DescriptorLayoutBuilder()
-                                        .add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                                     VK_SHADER_STAGE_FRAGMENT_BIT, false,
-                                                     getMaxMaterials())
+              .add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                           VK_SHADER_STAGE_FRAGMENT_BIT)
+              .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                           VK_SHADER_STAGE_FRAGMENT_BIT)
+              .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                           VK_SHADER_STAGE_FRAGMENT_BIT)
+              .add_binding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                           VK_SHADER_STAGE_FRAGMENT_BIT, false, getMaxTextures())
+              .add_binding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
+                           false, getMaxMaterials())
               .build(gpu_->getDevice()));
       constexpr auto mesh_stages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT
                                    | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT;
@@ -190,10 +185,9 @@ namespace gestalt::graphics {
                 .add_image_attachment(registry_->resources_.scene_depth, ImageUsageType::kWrite, 0,
                                       ImageClearOperation::kClear)
                 .add_buffer_dependency(registry_->resources_.perFrameDataBuffer,
-                                       BufferUsageType::kRead)
-                .add_buffer_dependency(registry_->resources_.IblBuffer, BufferUsageType::kRead)
-                .add_buffer_dependency(registry_->resources_.materialBuffer, BufferUsageType::kRead)
-                .add_buffer_dependency(registry_->resources_.meshBuffer, BufferUsageType::kRead)
+                                       BufferUsageType::kRead, 0)
+                .add_buffer_dependency(registry_->resources_.materialBuffer, BufferUsageType::kRead, 1)
+                .add_buffer_dependency(registry_->resources_.meshBuffer, BufferUsageType::kRead, 2)
                 .set_push_constant_range(
                     sizeof(MeshletPushConstants),
                     VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT)
@@ -227,7 +221,7 @@ namespace gestalt::graphics {
                          VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT, 0,
                          sizeof(MeshletPushConstants), &meshlet_push_constants);
 
-      // first byte is the task count, so we need offset by one uin32
+      // first byte is the task count, so we need offset by one uint32
       vkCmdDrawMeshTasksIndirectEXT(cmd, mesh_buffers->draw_count_buffer[frame]->buffer,
                                     sizeof(uint32), 1, 0);
 
