@@ -187,11 +187,12 @@ namespace gestalt::graphics {
       void init(IGpu* gpu,
                 ResourceManager* resource_manager,
                 ResourceRegistry* registry,
-                Repository* repository) {
+                Repository* repository, FrameProvider* frame) {
         gpu_ = gpu;
         resource_manager_ = resource_manager;
         registry_ = registry;
         repository_ = repository;
+        frame_ = frame;
 
         prepare();
       }
@@ -230,6 +231,7 @@ namespace gestalt::graphics {
       VkPipelineLayout pipeline_layout_ = nullptr;
       std::vector<VkDescriptorSetLayout> descriptor_layouts_;
 
+      FrameProvider* frame_;
       IGpu* gpu_;
       ResourceManager* resource_manager_;
       ResourceRegistry* registry_;
@@ -284,6 +286,7 @@ namespace gestalt::graphics {
       ResourceManager* resource_manager_;
       Repository* repository_;
       Gui* imgui_;
+      FrameProvider* frame_;
 
       std::unique_ptr<ResourceRegistry> resource_registry_ = std::make_unique<ResourceRegistry>();
 
@@ -307,7 +310,7 @@ namespace gestalt::graphics {
 
     public:
       void init(IGpu* gpu, Window* window, ResourceManager* resource_manager,
-                Repository* repository, Gui* imgui_gui);
+                Repository* repository, Gui* imgui_gui, FrameProvider* frame);
       void execute_passes();
 
       void cleanup();

@@ -115,7 +115,10 @@ namespace gestalt::graphics {
         std::vector<DescriptorBuffer*> buffers;
         buffers.resize(dependencies_.buffer_dependencies.size());
         for (const auto& buffer_dependency : dependencies_.buffer_dependencies) {
-          buffers.at(buffer_dependency.set) = buffer_dependency.resource.buffer->get_descriptor_buffer(current_frame_index).get();
+          buffers.at(buffer_dependency.set)
+              = buffer_dependency.resource.buffer
+                    ->get_descriptor_buffer(frame_->get_current_frame_index())
+                    .get();
         }
         bind_descriptor_buffers(cmd, buffers);
 
@@ -146,7 +149,9 @@ namespace gestalt::graphics {
         buffers.resize(dependencies_.buffer_dependencies.size());
         for (const auto& buffer_dependency : dependencies_.buffer_dependencies) {
           buffers.at(buffer_dependency.set)
-              = buffer_dependency.resource.buffer->get_descriptor_buffer(current_frame_index).get();
+              = buffer_dependency.resource.buffer
+                    ->get_descriptor_buffer(frame_->get_current_frame_index())
+                    .get();
         }
         bind_descriptor_buffers(cmd, buffers);
 

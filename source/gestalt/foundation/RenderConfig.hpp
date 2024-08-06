@@ -8,10 +8,6 @@
 
 namespace gestalt::foundation {
 
-    inline uint8 next_frame_index{1};
-    inline uint8 current_frame_index{0};
-    inline uint8 previous_frame_index{0};
-
     inline struct MeshletPushConstants {
       int cullFlags{0};
       float32 pyramidWidth, pyramidHeight;  // depth pyramid size in texels

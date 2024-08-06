@@ -78,7 +78,7 @@ namespace gestalt::application {
       camera.view_matrix = view;
       camera.projection_matrix = projection;
 
-      const auto frame = current_frame_index;
+      const auto frame = frame_->get_current_frame_index();
 
       auto& buffers = repository_->per_frame_data_buffers;
       buffers->data.view = camera.view_matrix;  // is the camera object actually needed?

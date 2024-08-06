@@ -35,10 +35,10 @@ namespace gestalt {
     resource_manager_->init(gpu_.get(), repository_.get());
 
     scene_manager_->init(gpu_.get(), resource_manager_.get(),
-                         descriptor_layout_builder_.get(), repository_.get());
+                         descriptor_layout_builder_.get(), repository_.get(), frame_provider_.get());
 
     render_pipeline_->init(gpu_.get(), window_.get(), resource_manager_.get(), repository_.get(),
-                           imgui_.get());
+                           imgui_.get(), frame_provider_.get());
 
     register_gui_actions();
     imgui_->init(gpu_.get(), window_.get(), render_pipeline_->get_swapchain_format(), repository_.get(),
@@ -108,6 +108,7 @@ namespace gestalt {
 
       render_pipeline_->execute_passes();
 
+      frame_number++;
       FrameMark;
     }
 

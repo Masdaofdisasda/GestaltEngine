@@ -223,7 +223,9 @@ namespace gestalt::graphics {
     return newPool;
   }
 
-  void FrameData::init(VkDevice device, uint32 graphics_queue_family_index) {
+  void FrameData::init(VkDevice device, uint32 graphics_queue_family_index, FrameProvider* frame) {
+      frame_ = frame;
+
     VkCommandPoolCreateInfo commandPoolInfo = vkinit::command_pool_create_info(
         graphics_queue_family_index, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
     VkCommandBufferAllocateInfo cmdAllocInfo
@@ -257,29 +259,9 @@ namespace gestalt::graphics {
 	}
   }
 
-  void FrameData::advance_frame() {
-    frame_number++;
-
-    next_frame_index = get_next_frame_index();
-    current_frame_index = get_current_frame_index(); //TODO : this is a bit weird
-    previous_frame_index = get_previous_frame_index();
-  }
-
-  uint8 FrameData::get_current_frame_index() const { return frame_number % getFramesInFlight();
-  }
-
-  uint8 FrameData::get_previous_frame_index() const {
-     return (frame_number + getFramesInFlight() - 1) % getFramesInFlight();
-  }
-
-  uint8 FrameData::get_next_frame_index() const {
-     return (frame_number + 1) % getFramesInFlight();
-  }
-
   FrameData::FrameResources& FrameData::get_current_frame() {
-    return frames_[get_current_frame_index()];
+    return frames_[frame_->get_current_frame_index()];
   }
-
 
   VkDescriptorSet DescriptorAllocatorGrowable::allocate(
       VkDevice device, VkDescriptorSetLayout layout,

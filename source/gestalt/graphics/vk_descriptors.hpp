@@ -82,18 +82,13 @@ namespace gestalt::graphics {
       VkCommandBuffer main_command_buffer;
     };
 
-    void init(VkDevice device, uint32 graphics_queue_family_index);
+    void init(VkDevice device, uint32 graphics_queue_family_index, FrameProvider* frame);
     void cleanup(VkDevice device);
-    void advance_frame();
-    [[nodiscard]] uint8 get_current_frame_index() const;
-    [[nodiscard]] uint8 get_previous_frame_index() const;
-    [[nodiscard]] uint8 get_next_frame_index() const;
     FrameResources& get_current_frame();
 
   private:
-    uint64 frame_number{0};
-    // TODO define constants
     std::array<FrameResources, getFramesInFlight()> frames_{};
+    FrameProvider* frame_ = nullptr;
   };
 
 

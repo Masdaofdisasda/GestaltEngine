@@ -53,10 +53,12 @@ namespace gestalt::graphics {
     }
 
     void DrawCullPass::execute(VkCommandBuffer cmd) {
+      const auto frame = frame_->get_current_frame_index();
+
       const auto& mesh_buffers = repository_->mesh_buffers;
 
-      vkCmdFillBuffer(cmd, mesh_buffers->draw_count_buffer[current_frame_index]->buffer, 0,
-                      mesh_buffers->draw_count_buffer[current_frame_index]->info.size, 0);
+      vkCmdFillBuffer(cmd, mesh_buffers->draw_count_buffer[frame]->buffer, 0,
+                      mesh_buffers->draw_count_buffer[frame]->info.size, 0);
 
       const int32 maxCommandCount
           = repository_->mesh_draws.size();  // each mesh gets a draw command
@@ -209,7 +211,7 @@ namespace gestalt::graphics {
     void MeshletPass::execute(VkCommandBuffer cmd) {
       begin_renderpass(cmd);
 
-      const auto frame = current_frame_index;
+      const auto frame = frame_->get_current_frame_index();
       const auto& mesh_buffers = repository_->mesh_buffers;
 
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);

@@ -11,6 +11,13 @@ namespace gestalt::application {
   constexpr uint32 kMagenta = 0xFFFF00FF;     // Magenta color for error textures
 
   void MaterialSystem::prepare() {
+
+    notification_manager_->subscribe(ChangeType::ComponentUpdated, [this](const ChangeEvent& event) {
+      if (repository_->mesh_components.get(event.entityId).has_value()) {
+        updatable_entities_.push_back(event.entityId);
+      }
+    });
+
     create_buffers();
 
     create_default_material();
@@ -182,6 +189,8 @@ namespace gestalt::application {
     if (first_processed) {
       // TODO batch update textures
     }
+
+    updatable_entities_.clear();
   }
 
   void MaterialSystem::cleanup() {

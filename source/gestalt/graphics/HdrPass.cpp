@@ -38,6 +38,8 @@ namespace gestalt::graphics {
   }
 
   void BrightPass::execute(VkCommandBuffer cmd) {
+    const auto frame = frame_->get_current_frame_index();
+
     if (descriptor_buffers_.at(0) == nullptr) {
       for (auto& set : descriptor_buffers_) {
         set = resource_manager_->create_descriptor_buffer(descriptor_layouts_.at(0), 1);
@@ -53,8 +55,8 @@ namespace gestalt::graphics {
 
     begin_renderpass(cmd);
 
-    bind_descriptor_buffers(cmd, {descriptor_buffers_[current_frame_index].get()});
-    descriptor_buffers_[current_frame_index]->bind_descriptors(
+    bind_descriptor_buffers(cmd, {descriptor_buffers_[frame].get()});
+    descriptor_buffers_[frame]->bind_descriptors(
         cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
     vkCmdSetViewport(cmd, 0, 1, &viewport_);
@@ -106,6 +108,8 @@ namespace gestalt::graphics {
   }
 
   void BloomBlurPass::execute(VkCommandBuffer cmd) {
+    const auto frame = frame_->get_current_frame_index();
+
     const auto image_x = registry_->resources_.bright_pass.image;
     const auto image_y = registry_->resources_.blur_y.image;
 
@@ -123,12 +127,12 @@ namespace gestalt::graphics {
       vkutil::TransitionImage(srcImage).toLayoutRead().andSubmitTo(cmd);
       vkutil::TransitionImage(dstImage).toLayoutWrite().andSubmitTo(cmd);
 
-      if (descriptor_buffers_[current_frame_index][i] == nullptr) {
-        descriptor_buffers_[current_frame_index][i]
+      if (descriptor_buffers_[frame][i] == nullptr) {
+        descriptor_buffers_[frame][i]
             = resource_manager_->create_descriptor_buffer(descriptor_layouts_.at(0), 1);
         VkDescriptorImageInfo image_info = {repository_->default_material_.nearestSampler,
                                             srcImage->imageView, srcImage->getLayout()};
-        descriptor_buffers_[current_frame_index][i]
+        descriptor_buffers_[frame][i]
             ->
         write_image(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info)
                   .update();
@@ -142,8 +146,8 @@ namespace gestalt::graphics {
       vkCmdBeginRendering(cmd, &renderInfo);
 
       
-    bind_descriptor_buffers(cmd, {descriptor_buffers_[current_frame_index][i].get()});
-      descriptor_buffers_[current_frame_index][i]->bind_descriptors(
+    bind_descriptor_buffers(cmd, {descriptor_buffers_[frame][i].get()});
+      descriptor_buffers_[frame][i]->bind_descriptors(
           cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
@@ -196,6 +200,8 @@ namespace gestalt::graphics {
   }
 
   void LuminancePass::execute(VkCommandBuffer cmd) {
+    const auto frame = frame_->get_current_frame_index();
+
     const auto scene_color = registry_->resources_.scene_color.image;
 
     if (descriptor_buffers_.at(0) == nullptr) {
@@ -210,8 +216,8 @@ namespace gestalt::graphics {
 
     begin_renderpass(cmd);
 
-    bind_descriptor_buffers(cmd, {descriptor_buffers_.at(current_frame_index).get()});
-    descriptor_buffers_.at(current_frame_index)->bind_descriptors(
+    bind_descriptor_buffers(cmd, {descriptor_buffers_.at(frame).get()});
+    descriptor_buffers_.at(frame)->bind_descriptors(
         cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
@@ -263,6 +269,8 @@ namespace gestalt::graphics {
   }
 
   void LuminanceDownscalePass::execute(VkCommandBuffer cmd) {
+    const auto frame = frame_->get_current_frame_index();
+
     for (size_t i = 0; i < dependencies_.image_attachments.size() - 1; ++i) {
       const auto src = dependencies_.image_attachments.at(i).attachment.image;
       const auto dst = dependencies_.image_attachments.at(i + 1).attachment.image;
@@ -270,12 +278,12 @@ namespace gestalt::graphics {
       vkutil::TransitionImage(src).toLayoutRead().andSubmitTo(cmd);
       vkutil::TransitionImage(dst).toLayoutWrite().andSubmitTo(cmd);
 
-      if (descriptor_buffers_[current_frame_index].at(i) == nullptr) {
-        descriptor_buffers_[current_frame_index].at(i)
+      if (descriptor_buffers_[frame].at(i) == nullptr) {
+        descriptor_buffers_[frame].at(i)
             = resource_manager_->create_descriptor_buffer(descriptor_layouts_.at(0), 1);
          VkDescriptorImageInfo image_info = {repository_->default_material_.nearestSampler,
                                             src->imageView, src->getLayout()};
-        descriptor_buffers_[current_frame_index]
+        descriptor_buffers_[frame]
             .at(i)
             ->
                          write_image(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info)
@@ -288,8 +296,8 @@ namespace gestalt::graphics {
           = vkinit::rendering_info(dst->getExtent2D(), &newColorAttachment, nullptr);
       vkCmdBeginRendering(cmd, &newRenderInfo);
 
-      bind_descriptor_buffers(cmd, {descriptor_buffers_[current_frame_index].at(i).get()});
-      descriptor_buffers_[current_frame_index].at(i)->bind_descriptors(
+      bind_descriptor_buffers(cmd, {descriptor_buffers_[frame].at(i).get()});
+      descriptor_buffers_[frame].at(i)->bind_descriptors(
             cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
       vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
@@ -348,7 +356,7 @@ namespace gestalt::graphics {
   }
 
   void LightAdaptationPass::execute(VkCommandBuffer cmd) {
-    const auto frame = current_frame_index;
+    const auto frame = frame_->get_current_frame_index();
 
     const auto current_lum = registry_->resources_.lum_1.image;
     const auto avg_lum
@@ -435,7 +443,8 @@ namespace gestalt::graphics {
   }
 
   void TonemapPass::execute(VkCommandBuffer cmd) {
-    const auto frame = current_frame_index;
+    const auto frame = frame_->get_current_frame_index();
+
     const auto scene_linear = registry_->resources_.scene_color.image;
     const auto scene_bloom = registry_->resources_.bright_pass.image;
     const auto lum_image
@@ -460,8 +469,8 @@ namespace gestalt::graphics {
 
     begin_renderpass(cmd);
 
-    bind_descriptor_buffers(cmd, {descriptor_buffers_.at(current_frame_index).get()});
-    descriptor_buffers_.at(current_frame_index)->bind_descriptors(
+    bind_descriptor_buffers(cmd, {descriptor_buffers_.at(frame).get()});
+    descriptor_buffers_.at(frame)->bind_descriptors(
         cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
     vkCmdSetViewport(cmd, 0, 1, &viewport_);

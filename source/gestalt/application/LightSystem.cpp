@@ -7,6 +7,14 @@
 namespace gestalt::application {
 
   void LightSystem::prepare() {
+
+    notification_manager_->subscribe(
+        ChangeType::ComponentUpdated, [this](const ChangeEvent& event) {
+          if (repository_->light_components.get(event.entityId).has_value()) {
+            updatable_entities_.push_back(event.entityId);
+          }
+        });
+
     create_buffers();
     fill_buffers();
   }
@@ -171,6 +179,8 @@ namespace gestalt::application {
                           &mapped_data));
     memcpy(mapped_data, matrices.data(), sizeof(glm::mat4) * matrices.size());
     vmaUnmapMemory(gpu_->getAllocator(), light_data->view_proj_matrices->allocation);
+
+    updatable_entities_.clear();
   }
 
   void LightSystem::cleanup() {

@@ -17,13 +17,13 @@
 namespace gestalt::graphics {
   void RenderPipeline::init(IGpu* gpu, Window* window,
                             ResourceManager* resource_manager,
-                            Repository* repository,
-                            Gui* imgui_gui) {
+                            Repository* repository, Gui* imgui_gui, FrameProvider* frame) {
     gpu_ = gpu;
     window_ = window;
     resource_manager_ = resource_manager;
     repository_ = repository;
     imgui_ = imgui_gui;
+    frame_ = frame;
 
     swapchain_->init(gpu_, {window_->extent.width, window_->extent.height, 1});
 
@@ -47,12 +47,11 @@ namespace gestalt::graphics {
     render_passes_.push_back(std::make_shared<BoundingSphereDebugPass>());
     render_passes_.push_back(std::make_shared<TonemapPass>());
 
-    frames_.init(gpu_->getDevice(), gpu_->getGraphicsQueueFamily());
-
+    frames_.init(gpu_->getDevice(), gpu_->getGraphicsQueueFamily(), frame_);
     create_resources(); //TODO: Move this up
 
     for (const auto& pass : render_passes_) {
-      pass->init(gpu_, resource_manager_, resource_registry_.get(), repository_);
+      pass->init(gpu_, resource_manager_, resource_registry_.get(), repository_, frame_);
     }
 
     resource_registry_->clear_shader_cache();
@@ -139,11 +138,12 @@ namespace gestalt::graphics {
     for (auto& dependency : renderDependencies.buffer_dependencies) {
       switch (dependency.usage) {
         case BufferUsageType::kRead:
-          for (auto& resource : dependency.resource.buffer->get_buffers(current_frame_index))
+          for (auto& resource :
+               dependency.resource.buffer->get_buffers(frame_->get_current_frame_index()))
             vkutil::TransitionBuffer(resource).waitForRead().andSubmitTo(cmd);
           break;
         case BufferUsageType::kWrite:
-          for (auto& resource : dependency.resource.buffer->get_buffers(current_frame_index))
+          for (auto& resource : dependency.resource.buffer->get_buffers(frame_->get_current_frame_index()))
             vkutil::TransitionBuffer(resource).waitForWrite().andSubmitTo(cmd);
           break;
       }
@@ -325,8 +325,6 @@ namespace gestalt::graphics {
     if (presentResult == VK_ERROR_OUT_OF_DATE_KHR) {
       resize_requested_ = true;
     }
-
-    frames_.advance_frame();
   }
 
   void VkSwapchain::init(IGpu* gpu, const VkExtent3D& extent) {

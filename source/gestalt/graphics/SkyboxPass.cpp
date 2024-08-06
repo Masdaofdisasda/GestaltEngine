@@ -51,8 +51,8 @@ namespace gestalt::graphics {
 
   void SkyboxPass::execute(const VkCommandBuffer cmd) {
     begin_renderpass(cmd);
+    const auto frame = frame_->get_current_frame_index();
 
-    const auto frame = current_frame_index;
     const auto& per_frame_buffers = repository_->per_frame_data_buffers;
     const auto& light_data = repository_->light_buffers;
 
@@ -111,8 +111,8 @@ namespace gestalt::graphics {
 
   void InfiniteGridPass::execute(const VkCommandBuffer cmd) {
     begin_renderpass(cmd);
+    const auto frame = frame_->get_current_frame_index();
 
-    const auto frame = current_frame_index;
     const auto& per_frame_buffers = repository_->per_frame_data_buffers;
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
@@ -177,8 +177,8 @@ namespace gestalt::graphics {
     }
 
     begin_renderpass(cmd);
+    const auto frame = frame_->get_current_frame_index();
 
-    const auto frame = current_frame_index;
     const auto& per_frame_buffers = repository_->per_frame_data_buffers;
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
@@ -249,8 +249,7 @@ namespace gestalt::graphics {
     }
 
     begin_renderpass(cmd);
-
-    const auto frame = current_frame_index;
+    const auto frame = frame_->get_current_frame_index();
     const auto& per_frame_buffers = repository_->per_frame_data_buffers;
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);

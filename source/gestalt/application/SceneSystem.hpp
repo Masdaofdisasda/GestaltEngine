@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include <queue>
 #include <unordered_map>
 
 #include "Components.hpp"
@@ -12,16 +13,63 @@
 namespace gestalt::application {
     struct Movement;
 
+    enum class ChangeType {
+      ComponentUpdated,
+    };
+    struct ChangeEvent {
+      ChangeType type;
+      Entity entityId;
+    };
+
+  
+class NotificationManager {
+    public:
+      using Callback = std::function<void(const ChangeEvent&)>;
+
+      // Subscribe to a specific change type
+      void subscribe(ChangeType changeType, Callback callback) {
+        subscribers_[changeType].push_back(callback);
+      }
+
+      // Notify all subscribers of a specific change event
+      void notify(const ChangeEvent& event) {
+        for (const auto& callback : subscribers_[event.type]) {
+          callback(event);
+        }
+      }
+
+      // Record a change event for later processing
+      void recordChange(ChangeType changeType, Entity entityId) {
+        changeQueue_.push(ChangeEvent{changeType, entityId});
+      }
+
+      // Process all recorded change events
+      void processChanges() {
+        while (!changeQueue_.empty()) {
+          const auto& event = changeQueue_.front();
+          notify(event);
+          changeQueue_.pop();
+        }
+      }
+
+    private:
+      std::unordered_map<ChangeType, std::vector<Callback>> subscribers_;
+      std::queue<ChangeEvent> changeQueue_;
+    };
+
     class SceneSystem {
     public:
       void init(IGpu* gpu,
                 IResourceManager* resource_manager,
                 IDescriptorLayoutBuilder* builder,
-                Repository* repository) {
+                Repository* repository, NotificationManager* notification_manager,
+                FrameProvider* frame) {
         gpu_ = gpu;
         resource_manager_ = resource_manager;
         descriptor_layout_builder_ = builder;
         repository_ = repository;
+        notification_manager_ = notification_manager;
+        frame_ = frame; 
 
         prepare();
       }
@@ -37,6 +85,10 @@ namespace gestalt::application {
       IResourceManager* resource_manager_ = nullptr;
       IDescriptorLayoutBuilder* descriptor_layout_builder_ = nullptr;
       Repository* repository_ = nullptr;
+      NotificationManager* notification_manager_ = nullptr;
+      FrameProvider* frame_ = nullptr;
+
+      std::vector<Entity> updatable_entities_;
     };
 
     class MaterialSystem final : public SceneSystem, public NonCopyable<MaterialSystem> {
@@ -85,10 +137,10 @@ namespace gestalt::application {
     };
 
     class TransformSystem final : public SceneSystem, public NonCopyable<TransformSystem> {
-      void mark_children_dirty(Entity entity);
-      void mark_as_dirty(Entity entity);
-      void update_aabb(Entity entity, const glm::mat4& parent_transform);
-      void mark_parent_dirty(Entity entity);
+      void mark_children_bounds_dirty(Entity entity);
+      void mark_bounds_as_dirty(Entity entity);
+      void update_aabb(Entity entity, const TransformComponent& parent_transform);
+      void mark_parent_bounds_dirty(Entity entity);
 
     public:
       static glm::mat4 get_model_matrix(const TransformComponent& transform);
@@ -100,7 +152,7 @@ namespace gestalt::application {
 
     class MeshSystem final : public SceneSystem, public NonCopyable<MeshSystem> {
       size_t meshes_ = 0;
-      void traverse_scene(Entity entity, const glm::mat4& parent_transform);
+      void traverse_scene(Entity entity, const TransformComponent& parent_transform);
       void upload_mesh();
 
       void create_buffers();

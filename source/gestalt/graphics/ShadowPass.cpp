@@ -67,8 +67,8 @@ namespace gestalt::graphics {
 
   void DirectionalDepthPass::execute(VkCommandBuffer cmd) {
     begin_renderpass(cmd);
+    const auto frame = frame_->get_current_frame_index();
 
-    const auto frame = current_frame_index;
     const auto& per_frame_buffers = repository_->per_frame_data_buffers;
     const auto& light_data = repository_->light_buffers;
     const auto& mesh_buffers = repository_->mesh_buffers;

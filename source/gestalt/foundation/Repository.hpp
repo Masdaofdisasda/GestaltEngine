@@ -102,7 +102,6 @@ namespace gestalt::foundation {
     GpuDataContainer<Meshlet> meshlets;
     GpuDataContainer<uint32> meshlet_vertices;
     GpuDataContainer<uint8> meshlet_triangles;
-    GpuDataContainer<glm::mat4> model_matrices;
     GpuDataContainer<glm::mat4> light_view_projections;
     GpuDataContainer<GpuDirectionalLight> directional_lights;
     GpuDataContainer<GpuPointLight> point_lights;

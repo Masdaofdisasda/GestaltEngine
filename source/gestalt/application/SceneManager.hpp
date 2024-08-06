@@ -38,10 +38,10 @@ namespace gestalt::application {
 
       void link_entity_to_parent(Entity child, Entity parent);
       void update_transform_component(unsigned entity, const glm::vec3& position,
-                                      const glm::quat& rotation = glm::quat(0.f, 0.f, 0.f, 0.f),
+                                      const glm::quat& rotation = glm::quat(1.f, 0.f, 0.f, 0.f),
                                       const float& scale = 1.f);
       void create_transform_component(unsigned entity, const glm::vec3& position,
-                                      const glm::quat& rotation = glm::quat(0.f, 0.f, 0.f, 0.f),
+                                      const glm::quat& rotation = glm::quat(1.f, 0.f, 0.f, 0.f),
                                       const float& scale = 1.f) const;
     };
 
@@ -116,7 +116,7 @@ namespace gestalt::application {
       std::unique_ptr<AssetLoader> asset_loader_ = std::make_unique<AssetLoader>();
       std::unique_ptr<ComponentFactory> component_factory_
           = std::make_unique<ComponentFactory>();
-
+      std::unique_ptr<NotificationManager> notification_manager_ = std::make_unique<NotificationManager>();
       std::unique_ptr<MaterialSystem> material_system_;
       std::unique_ptr<SceneSystem> light_system_;
       std::unique_ptr<CameraSystem> camera_system_;
@@ -136,7 +136,7 @@ namespace gestalt::application {
       void init(IGpu* gpu,
                 IResourceManager* resource_manager,
                 IDescriptorLayoutBuilder* builder,
-                Repository* repository);
+                Repository* repository, FrameProvider* frame);
       void cleanup() const;
 
       void update_scene(float delta_time, const Movement& movement, float aspect);

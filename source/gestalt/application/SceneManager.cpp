@@ -13,8 +13,8 @@
 namespace gestalt::application {
 
     void SceneManager::init(IGpu* gpu, IResourceManager* resource_manager,
-                          IDescriptorLayoutBuilder* builder,
-      Repository* repository) {
+                          IDescriptorLayoutBuilder* builder, Repository* repository,
+                          FrameProvider* frame) {
     gpu_ = gpu;
     resource_manager_ = resource_manager;
     repository_ = repository;
@@ -34,15 +34,19 @@ namespace gestalt::application {
                                            get_root_entity());
 
     material_system_ = std::make_unique<MaterialSystem>();
-    material_system_->init(gpu_, resource_manager_, builder, repository_);
+    material_system_->init(gpu_, resource_manager_, builder, repository_, notification_manager_.get(), frame);
     light_system_ = std::make_unique<LightSystem>();
-    light_system_->init(gpu_, resource_manager_, builder, repository_);
+    light_system_->init(gpu_, resource_manager_, builder, repository_, notification_manager_.get(),
+                        frame);
     camera_system_ = std::make_unique<CameraSystem>();
-    camera_system_->init(gpu_, resource_manager_, builder, repository_);
+    camera_system_->init(gpu_, resource_manager_, builder, repository_, notification_manager_.get(),
+                         frame);
     transform_system_ = std::make_unique<TransformSystem>();
-    transform_system_->init(gpu_, resource_manager_, builder, repository_);
+    transform_system_->init(gpu_, resource_manager_, builder, repository_,
+                            notification_manager_.get(), frame);
     mesh_system_ = std::make_unique<MeshSystem>();
-    mesh_system_->init(gpu_, resource_manager_, builder, repository_);
+    mesh_system_->init(gpu_, resource_manager_, builder, repository_, notification_manager_.get(),
+                       frame);
   }
 
     void SceneManager::load_scene(const std::string& path) {
@@ -156,8 +160,6 @@ namespace gestalt::application {
                                                                const glm::quat& rotation,
                                                                const float& scale) const {
       repository_->transform_components.add(entity, TransformComponent{true, position, rotation, scale});
-      auto& transform = repository_->transform_components.get(entity)->get();
-      transform.matrix = repository_->model_matrices.add(glm::mat4(1.0));
     }
 
     void ComponentFactory::update_transform_component(const Entity entity,

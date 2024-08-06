@@ -21,10 +21,17 @@ namespace gestalt::application {
   constexpr size_t kMaxDrawCountBufferSize = 4 * sizeof(uint32); // commandCount, x, y, z
 
   void MeshSystem::prepare() {
+    notification_manager_->subscribe(
+        ChangeType::ComponentUpdated, [this](const ChangeEvent& event) {
+          if (repository_->mesh_components.get(event.entityId).has_value()) {
+            updatable_entities_.push_back(event.entityId);
+          } else if (repository_->transform_components.get(event.entityId).has_value()) {
+            updatable_entities_.push_back(event.entityId);
+          }
+        });
 
-      create_buffers();
+    create_buffers();
     fill_descriptors();
-
   }
 
   void MeshSystem::upload_mesh() {
@@ -262,7 +269,15 @@ namespace gestalt::application {
       upload_mesh();
     }
 
-    constexpr auto root_transform = glm::mat4(1.0f);
+    constexpr auto root_transform = TransformComponent{
+        false,
+        glm::vec3(0),
+        glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
+        1.f,
+        glm::vec3(0),
+        glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
+        1.f,
+    };
 
     traverse_scene(0, root_transform);
 
@@ -274,32 +289,31 @@ namespace gestalt::application {
     const size_t mesh_draw_buffer_size = mesh_draws.size() * sizeof(MeshDraw);
 
     const auto& mesh_buffers = repository_->mesh_buffers;
-    const auto frame = current_frame_index;
+    const auto frame = frame_->get_current_frame_index();
 
     if (kMaxMeshDrawBufferSize < mesh_draw_buffer_size) {
       fmt::println("mesh_draw_buffer size needs to be increased by {}",
                    mesh_draw_buffer_size - mesh_buffers->mesh_draw_buffer[frame]->info.size);
     }
-    {
-      void* mapped_data;
-      const VmaAllocation allocation = mesh_buffers->mesh_draw_buffer[frame]->allocation;
-      VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation, &mapped_data));
-      const auto mesh_draw_data = static_cast<MeshDraw*>(mapped_data);
-      std::memcpy(mesh_draw_data, mesh_draws.data().data(), mesh_draws.size() * sizeof(MeshDraw));
-      vmaUnmapMemory(gpu_->getAllocator(), mesh_buffers->mesh_draw_buffer[frame]->allocation);
-    }
+    void* mapped_data;
+    const VmaAllocation allocation = mesh_buffers->mesh_draw_buffer[frame]->allocation;
+    VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation, &mapped_data));
+    const auto mesh_draw_data = static_cast<MeshDraw*>(mapped_data);
+    std::memcpy(mesh_draw_data, mesh_draws.data().data(), mesh_draws.size() * sizeof(MeshDraw));
+    vmaUnmapMemory(gpu_->getAllocator(), mesh_buffers->mesh_draw_buffer[frame]->allocation);
 
+    updatable_entities_.clear();
   }
 
-  void MeshSystem::traverse_scene(const Entity entity, const glm::mat4& parent_transform) {
+  void MeshSystem::traverse_scene(const Entity entity, const TransformComponent& parent_transform) {
     const auto& node = repository_->scene_graph.get(entity).value().get();
     if (!node.visible) {
       return;
     }
 
-    const auto& transform = repository_->transform_components.get(entity)->get();
-    const glm::mat4 world_transform  // TODO check if matrix vector is needed
-        = parent_transform * repository_->model_matrices.get(transform.matrix);
+    const auto& local_transform = repository_->transform_components.get(entity)->get();
+
+    TransformComponent world_transform = parent_transform * local_transform;
 
     const auto& mesh_component = repository_->mesh_components.get(entity);
     if (mesh_component.has_value()) {
@@ -308,18 +322,10 @@ namespace gestalt::application {
       for (const auto surface : mesh.surfaces) {
         const auto& material = repository_->materials.get(surface.material);
 
-        //TODO Replace this
-        glm::vec3 position;
-        glm::quat orientation;
-        glm::vec3 scale;
-        glm::vec3 skew;
-        glm::vec4 perspective;
-        decompose(world_transform, scale, orientation, position, skew, perspective);
-
         MeshDraw draw{
-            .position = position,
-            .scale = scale.x,
-            .orientation = orientation,
+            .position = world_transform.position,
+            .scale = world_transform.scale,
+            .orientation = world_transform.rotation,
             .center = glm::vec3(surface.local_bounds.center),
             .radius = surface.local_bounds.radius,
             .meshlet_offset = surface.meshlet_offset,
