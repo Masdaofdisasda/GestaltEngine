@@ -50,36 +50,32 @@ namespace gestalt::application {
       Repository* repository_ = nullptr;
       ComponentFactory* component_factory_ = nullptr;
 
-      static VkFilter extract_filter(fastgltf::Filter filter);
-      VkSamplerMipmapMode extract_mipmap_mode(fastgltf::Filter filter);
       std::optional<fastgltf::Asset> parse_gltf(const std::filesystem::path& file_path);
-      void import_samplers(fastgltf::Asset& gltf);
       std::optional<TextureHandle> load_image(fastgltf::Asset& asset,
                                               fastgltf::Image& image) const;
       void import_textures(fastgltf::Asset& gltf) const;
       size_t create_material(const PbrMaterial& config, const std::string& name) const;
-      std::tuple<TextureHandle, VkSampler> get_textures(const fastgltf::Asset& gltf,
+      TextureHandle get_textures(const fastgltf::Asset& gltf,
                                                         const size_t& texture_index,
-                                                        const size_t& image_offset,
-                                                        const size_t& sampler_offset) const;
-      void import_albedo(const fastgltf::Asset& gltf, const size_t& sampler_offset,
+                                                        const size_t& image_offset) const;
+      void import_albedo(const fastgltf::Asset& gltf,
                          const size_t& image_offset, const fastgltf::Material& mat,
                          PbrMaterial& pbr_config) const;
-      void import_metallic_roughness(const fastgltf::Asset& gltf, const size_t& sampler_offset,
+      void import_metallic_roughness(const fastgltf::Asset& gltf,
                                      const size_t& image_offset, const fastgltf::Material& mat,
                                      PbrMaterial& pbr_config) const;
-      void import_normal(const fastgltf::Asset& gltf, const size_t& sampler_offset,
+      void import_normal(const fastgltf::Asset& gltf, 
                          const size_t& image_offset, const fastgltf::Material& mat,
                          PbrMaterial& pbr_config) const;
-      void import_emissive(const fastgltf::Asset& gltf, const size_t& sampler_offset,
+      void import_emissive(const fastgltf::Asset& gltf, 
                            const size_t& image_offset, const fastgltf::Material& mat,
                            PbrMaterial& pbr_config) const;
-      void import_occlusion(const fastgltf::Asset& gltf, const size_t& sampler_offset,
+      void import_occlusion(const fastgltf::Asset& gltf, 
                             const size_t& image_offset, const fastgltf::Material& mat,
                             PbrMaterial& pbr_config) const;
-      void import_material(fastgltf::Asset& gltf, size_t& sampler_offset, size_t& image_offset,
+      void import_material(fastgltf::Asset& gltf, size_t& image_offset,
                            fastgltf::Material& mat) const;
-      void import_materials(fastgltf::Asset& gltf, size_t& sampler_offset,
+      void import_materials(fastgltf::Asset& gltf,
                             size_t& image_offset) const;
       static void optimize_mesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices);
       void simplify_mesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices);

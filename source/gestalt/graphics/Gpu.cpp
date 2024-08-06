@@ -34,7 +34,8 @@ namespace gestalt::graphics {
     // create the device
     window->create_surface(instance, &surface);
 
-    VkPhysicalDeviceFeatures features10 = {.fillModeNonSolid = VK_TRUE, .shaderInt16 = VK_TRUE};
+    VkPhysicalDeviceFeatures features10
+        = {.fillModeNonSolid = VK_TRUE, .samplerAnisotropy = VK_TRUE,.shaderInt16 = VK_TRUE};
 
     VkPhysicalDeviceVulkan11Features features11
         = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,

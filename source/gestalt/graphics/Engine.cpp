@@ -44,7 +44,6 @@ namespace gestalt {
     imgui_->init(gpu_.get(), window_.get(), render_pipeline_->get_swapchain_format(), repository_.get(),
                  descriptor_layout_builder_.get(), gui_actions_);
 
-    // everything went fine
     is_initialized_ = true;
     fmt::print("Engine initialized\n");
   }

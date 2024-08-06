@@ -80,15 +80,17 @@ namespace gestalt::foundation {
 
     struct default_material {
       TextureHandle color_image;
+      VkSampler color_sampler;
       TextureHandle metallic_roughness_image;
+       VkSampler metallic_roughness_sampler;
       TextureHandle normal_image;
+      VkSampler normal_sampler;
       TextureHandle emissive_image;
+      VkSampler emissive_sampler;
       TextureHandle occlusion_image;
+      VkSampler occlusion_sampler;
 
       TextureHandle error_checkerboard_image;
-
-      VkSampler linearSampler;
-      VkSampler nearestSampler;
     } default_material_ = {};
 
     std::unique_ptr<MaterialBuffers> material_buffers = std::make_unique<MaterialBuffers>();
@@ -106,11 +108,18 @@ namespace gestalt::foundation {
     GpuDataContainer<GpuDirectionalLight> directional_lights;
     GpuDataContainer<GpuPointLight> point_lights;
     GpuDataContainer<TextureHandle> textures;
-    GpuDataContainer<VkSampler> samplers;
     GpuDataContainer<Material> materials;
     GpuDataContainer<Mesh> meshes;
     GpuDataContainer<MeshDraw> mesh_draws;
     GpuDataContainer<CameraData> cameras;
+    std::unordered_map<SamplerConfig, VkSampler, SamplerConfigHash> sampler_cache;
+
+    VkSampler get_sampler(const SamplerConfig& config = {}) {
+      if (const auto it = sampler_cache.find(config); it != sampler_cache.end()) {
+        return it->second;
+      }
+      return nullptr;
+    }
 
     ComponentContainer<NodeComponent> scene_graph;
     ComponentContainer<MeshComponent> mesh_components;

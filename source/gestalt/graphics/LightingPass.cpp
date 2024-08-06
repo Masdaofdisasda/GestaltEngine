@@ -97,16 +97,15 @@ namespace gestalt::graphics {
     if (descriptor_buffers_.at(frame) == nullptr) {
       descriptor_buffers_.at(frame)
           = resource_manager_->create_descriptor_buffer(descriptor_layouts_.at(1), 5, 0);
-      auto image_info0 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,
+      auto image_info0 = VkDescriptorImageInfo{post_process_sampler,
                                                gbuffer_1->imageView, gbuffer_1->getLayout()};
-      auto image_info1 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,
+      auto image_info1 = VkDescriptorImageInfo{post_process_sampler,
                                                gbuffer_2->imageView, gbuffer_2->getLayout()};
-      auto image_info2 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,
+      auto image_info2 = VkDescriptorImageInfo{post_process_sampler,
                                                gbuffer_3->imageView, gbuffer_3->getLayout()};
-      auto image_info3
-          = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,
+      auto image_info3 = VkDescriptorImageInfo{post_process_sampler,
                                   gbuffer_depth->imageView, gbuffer_depth->getLayout()};
-      auto image_info4 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,
+      auto image_info4 = VkDescriptorImageInfo{post_process_sampler,
                                                shadow_map->imageView, shadow_map->getLayout()};
       descriptor_buffers_.at(frame)
           ->write_image(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info0)

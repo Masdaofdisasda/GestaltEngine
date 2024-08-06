@@ -48,7 +48,8 @@ namespace gestalt::graphics {
     render_passes_.push_back(std::make_shared<TonemapPass>());
 
     frames_.init(gpu_->getDevice(), gpu_->getGraphicsQueueFamily(), frame_);
-    create_resources(); //TODO: Move this up
+
+    create_resources();
 
     for (const auto& pass : render_passes_) {
       pass->init(gpu_, resource_manager_, resource_registry_.get(), repository_, frame_);
@@ -181,7 +182,7 @@ namespace gestalt::graphics {
           .andSubmitTo(cmd);
 
       imgui_->set_debug_texture(copyImg.image->imageView,
-                                repository_->default_material_.linearSampler);
+                                repository_->default_material_.color_sampler);
     }
   }
 

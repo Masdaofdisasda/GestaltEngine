@@ -35,23 +35,21 @@ namespace gestalt::graphics {
                     .disable_blending()
                     .disable_depthtest()
                     .build_graphics_pipeline(gpu_->getDevice());
+
+      for (auto& set : descriptor_buffers_) {
+      set = resource_manager_->create_descriptor_buffer(descriptor_layouts_.at(0), 1);
+
+      VkDescriptorImageInfo image_info
+          = {post_process_sampler,
+                                          registry_->resources_.scene_color.image->imageView,
+                                          registry_->resources_.scene_color.image->getLayout()};
+      set->write_image(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info).update();
+    }
   }
 
   void BrightPass::execute(VkCommandBuffer cmd) {
     const auto frame = frame_->get_current_frame_index();
 
-    if (descriptor_buffers_.at(0) == nullptr) {
-      for (auto& set : descriptor_buffers_) {
-        set = resource_manager_->create_descriptor_buffer(descriptor_layouts_.at(0), 1);
-
-        VkDescriptorImageInfo image_info = {repository_->default_material_.nearestSampler,
-                                            registry_->resources_.scene_color.image->imageView,
-                                            registry_->resources_.scene_color.image->getLayout()};
-        set->
-                  write_image(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info)
-                  .update();
-      }
-    }
 
     begin_renderpass(cmd);
 
@@ -130,7 +128,8 @@ namespace gestalt::graphics {
       if (descriptor_buffers_[frame][i] == nullptr) {
         descriptor_buffers_[frame][i]
             = resource_manager_->create_descriptor_buffer(descriptor_layouts_.at(0), 1);
-        VkDescriptorImageInfo image_info = {repository_->default_material_.nearestSampler,
+        VkDescriptorImageInfo image_info
+            = {post_process_sampler,
                                             srcImage->imageView, srcImage->getLayout()};
         descriptor_buffers_[frame][i]
             ->
@@ -197,22 +196,21 @@ namespace gestalt::graphics {
                     .disable_blending()
                     .disable_depthtest()
                     .build_graphics_pipeline(gpu_->getDevice());
+
+      for (auto& set : descriptor_buffers_) {
+        set = resource_manager_->create_descriptor_buffer(descriptor_layouts_.at(0), 1);
+        auto image_info = VkDescriptorImageInfo{
+            post_process_sampler,
+                                                registry_->resources_.scene_color.image->imageView,
+                                                registry_->resources_.scene_color.image->getLayout()};
+        set->write_image(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info)
+                  .update();
+      }
+
   }
 
   void LuminancePass::execute(VkCommandBuffer cmd) {
     const auto frame = frame_->get_current_frame_index();
-
-    const auto scene_color = registry_->resources_.scene_color.image;
-
-    if (descriptor_buffers_.at(0) == nullptr) {
-      for (auto& set : descriptor_buffers_) {
-        set = resource_manager_->create_descriptor_buffer(descriptor_layouts_.at(0), 1);
-        auto image_info = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,
-                                              scene_color->imageView, scene_color->getLayout()};
-        set->write_image(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info)
-                  .update();
-      }
-    }
 
     begin_renderpass(cmd);
 
@@ -281,7 +279,7 @@ namespace gestalt::graphics {
       if (descriptor_buffers_[frame].at(i) == nullptr) {
         descriptor_buffers_[frame].at(i)
             = resource_manager_->create_descriptor_buffer(descriptor_layouts_.at(0), 1);
-         VkDescriptorImageInfo image_info = {repository_->default_material_.nearestSampler,
+        VkDescriptorImageInfo image_info = {post_process_sampler,
                                             src->imageView, src->getLayout()};
         descriptor_buffers_[frame]
             .at(i)
@@ -372,9 +370,10 @@ namespace gestalt::graphics {
       descriptor_buffers_.at(frame)
           = resource_manager_->create_descriptor_buffer(descriptor_layouts_.at(0), 2);
 
-      auto image_info0 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,
+      auto image_info0 = VkDescriptorImageInfo{post_process_sampler,
                                                current_lum->imageView, current_lum->getLayout()};
-      auto image_info1 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,
+      auto image_info1
+          = VkDescriptorImageInfo{post_process_sampler,
                                                avg_lum->imageView, avg_lum->getLayout()};
       descriptor_buffers_.at(frame)
           ->write_image(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info0)
@@ -453,11 +452,11 @@ namespace gestalt::graphics {
     if (descriptor_buffers_.at(0) == nullptr) {
       for (auto& set : descriptor_buffers_) {
         set = resource_manager_->create_descriptor_buffer(descriptor_layouts_.at(0), 3);
-        auto image_info0 = VkDescriptorImageInfo{repository_->default_material_.nearestSampler,
+        auto image_info0 = VkDescriptorImageInfo{post_process_sampler,
                                               scene_linear->imageView, scene_linear->getLayout()};
-         auto image_info1 = VkDescriptorImageInfo{repository_->default_material_.linearSampler,
+        auto image_info1 = VkDescriptorImageInfo{post_process_sampler,
                                                     scene_bloom->imageView, scene_bloom->getLayout()};
-         auto image_info2 = VkDescriptorImageInfo{repository_->default_material_.linearSampler,
+        auto image_info2 = VkDescriptorImageInfo{post_process_sampler,
                                                     lum_image->imageView, lum_image->getLayout()};
          set->
                          write_image(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_info0)

@@ -91,30 +91,29 @@ namespace gestalt::application {
         pixels.data(), VkExtent3D{16, 16, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
     repository_->textures.add(default_mat.error_checkerboard_image);
 
-    VkSamplerCreateInfo sampler = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-                                   .magFilter = VK_FILTER_NEAREST,
-                                   .minFilter = VK_FILTER_NEAREST};
-    vkCreateSampler(gpu_->getDevice(), &sampler, nullptr, &default_mat.nearestSampler);
-    repository_->samplers.add(default_mat.nearestSampler);
-
-    sampler.magFilter = VK_FILTER_LINEAR;
-    sampler.minFilter = VK_FILTER_LINEAR;
-    vkCreateSampler(gpu_->getDevice(), &sampler, nullptr, &default_mat.linearSampler);
-    repository_->samplers.add(default_mat.linearSampler);
+    default_mat.color_sampler = repository_->get_sampler();
+    default_mat.metallic_roughness_sampler
+        = repository_->get_sampler({.magFilter = VK_FILTER_NEAREST,
+                                    .minFilter = VK_FILTER_NEAREST, .anisotropyEnable = VK_FALSE});
+    default_mat.normal_sampler = repository_->get_sampler();
+    default_mat.emissive_sampler = repository_->get_sampler();
+    default_mat.occlusion_sampler = repository_->get_sampler({.magFilter = VK_FILTER_NEAREST,
+                                    .minFilter = VK_FILTER_NEAREST, .anisotropyEnable = VK_FALSE
+  });
 
     PbrMaterial pbr_mat{};
 
     // default the material textures
     pbr_mat.textures.albedo_image = default_mat.color_image;
-    pbr_mat.textures.albedo_sampler = default_mat.linearSampler;
+    pbr_mat.textures.albedo_sampler = default_mat.color_sampler;
     pbr_mat.textures.metal_rough_image = default_mat.metallic_roughness_image;
-    pbr_mat.textures.metal_rough_sampler = default_mat.linearSampler;
+    pbr_mat.textures.metal_rough_sampler = default_mat.metallic_roughness_sampler;
     pbr_mat.textures.normal_image = default_mat.normal_image;
-    pbr_mat.textures.normal_sampler = default_mat.linearSampler;
+    pbr_mat.textures.normal_sampler = default_mat.normal_sampler;
     pbr_mat.textures.emissive_image = default_mat.emissive_image;
-    pbr_mat.textures.emissive_sampler = default_mat.linearSampler;
+    pbr_mat.textures.emissive_sampler = default_mat.emissive_sampler;
     pbr_mat.textures.occlusion_image = default_mat.occlusion_image;
-    pbr_mat.textures.occlusion_sampler = default_mat.nearestSampler;
+    pbr_mat.textures.occlusion_sampler = default_mat.occlusion_sampler;
 
     // build material
     const size_t material_id = repository_->materials.size();
@@ -152,16 +151,16 @@ namespace gestalt::application {
     image_infos.reserve(getMaxTextures());
 
     for (int i = 0; i < getMaxMaterials(); ++i) {
-      image_infos.push_back({default_mat.linearSampler, default_mat.color_image.imageView,
+      image_infos.push_back({default_mat.color_sampler, default_mat.color_image.imageView,
                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
-      image_infos.push_back({default_mat.linearSampler,
+      image_infos.push_back({default_mat.metallic_roughness_sampler,
                              default_mat.metallic_roughness_image.imageView,
                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
-      image_infos.push_back({default_mat.linearSampler, default_mat.normal_image.imageView,
+      image_infos.push_back({default_mat.normal_sampler, default_mat.normal_image.imageView,
                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
-      image_infos.push_back({default_mat.linearSampler, default_mat.emissive_image.imageView,
+      image_infos.push_back({default_mat.emissive_sampler, default_mat.emissive_image.imageView,
                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
-      image_infos.push_back({default_mat.nearestSampler, default_mat.occlusion_image.imageView,
+      image_infos.push_back({default_mat.occlusion_sampler, default_mat.occlusion_image.imageView,
                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
     }
 
@@ -210,12 +209,11 @@ namespace gestalt::application {
 
     resource_manager_->destroy_buffer(material_buffers->uniform_buffer);
 
-    const auto& samplers = repository_->samplers.data();
-    for (auto& sampler : samplers) {
+    for (const auto& sampler : repository_->sampler_cache | std::views::values) {
       vkDestroySampler(gpu_->getDevice(), sampler, nullptr);
     }
 
-    repository_->samplers.clear();
+    repository_->sampler_cache.clear();
   }
 
   void MaterialSystem::write_material(PbrMaterial& material, const uint32 material_id) {

@@ -49,13 +49,11 @@ namespace gestalt::application {
       fastgltf::Asset gltf = parse_gltf(file_path).value();
 
       size_t image_offset = repository_->textures.size();
-      size_t sampler_offset = repository_->samplers.size();
       size_t material_offset = repository_->materials.size();
 
-      import_samplers(gltf);
       import_textures(gltf);
 
-      import_materials(gltf, sampler_offset, image_offset);
+      import_materials(gltf, image_offset);
 
       import_meshes(gltf, material_offset);
 
@@ -64,35 +62,6 @@ namespace gestalt::application {
       return gltf.nodes;
     }
 
-    VkFilter AssetLoader::extract_filter(fastgltf::Filter filter) {
-      switch (filter) {
-        // nearest samplers
-        case fastgltf::Filter::Nearest:
-        case fastgltf::Filter::NearestMipMapNearest:
-        case fastgltf::Filter::NearestMipMapLinear:
-          return VK_FILTER_NEAREST;
-
-        // linear samplers
-        case fastgltf::Filter::Linear:
-        case fastgltf::Filter::LinearMipMapNearest:
-        case fastgltf::Filter::LinearMipMapLinear:
-        default:
-          return VK_FILTER_LINEAR;
-      }
-    }
-
-    VkSamplerMipmapMode AssetLoader::extract_mipmap_mode(fastgltf::Filter filter) {
-      switch (filter) {
-        case fastgltf::Filter::NearestMipMapNearest:
-        case fastgltf::Filter::LinearMipMapNearest:
-          return VK_SAMPLER_MIPMAP_MODE_NEAREST;
-
-        case fastgltf::Filter::NearestMipMapLinear:
-        case fastgltf::Filter::LinearMipMapLinear:
-        default:
-          return VK_SAMPLER_MIPMAP_MODE_LINEAR;
-      }
-    }
 
     std::optional<fastgltf::Asset> AssetLoader::parse_gltf(const std::filesystem::path& file_path) {
       static constexpr auto gltf_extensions
@@ -124,28 +93,6 @@ namespace gestalt::application {
       fmt::print("Failed to load glTF: {}\n", to_underlying(load_result.error()));
 
       return std::nullopt;
-    }
-
-    void AssetLoader::import_samplers(fastgltf::Asset& gltf) {
-      fmt::print("importing samplers\n");
-      for (fastgltf::Sampler& sampler : gltf.samplers) {
-        VkSamplerCreateInfo sampl
-            = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO, .pNext = nullptr};
-        sampl.maxLod = VK_LOD_CLAMP_NONE;
-        sampl.minLod = 0;
-
-        sampl.magFilter = extract_filter(sampler.magFilter.value_or(fastgltf::Filter::Nearest));
-        sampl.minFilter = extract_filter(sampler.minFilter.value_or(fastgltf::Filter::Nearest));
-
-        sampl.mipmapMode
-            = extract_mipmap_mode(sampler.minFilter.value_or(fastgltf::Filter::Nearest));
-
-        VkSampler new_sampler = resource_manager_->create_sampler(sampl);
-
-        fmt::print("created sampler {}, sampler_id {}\n", sampler.name,
-                   repository_->samplers.size());
-        repository_->samplers.add(new_sampler);
-      }
     }
 
     std::optional<TextureHandle> AssetLoader::load_image(fastgltf::Asset& asset,
@@ -239,28 +186,25 @@ namespace gestalt::application {
       return material_id;
     }
 
-    std::tuple<TextureHandle, VkSampler> AssetLoader::get_textures(
-        const fastgltf::Asset& gltf, const size_t& texture_index, const size_t& image_offset,
-        const size_t& sampler_offset) const {
+    TextureHandle AssetLoader::get_textures(
+        const fastgltf::Asset& gltf, const size_t& texture_index, const size_t& image_offset) const {
       const size_t image_index = gltf.textures[texture_index].imageIndex.value();
       const size_t sampler_index = gltf.textures[texture_index].samplerIndex.value();
 
-      TextureHandle image = repository_->textures.get(image_index + image_offset);
-      VkSampler sampler = repository_->samplers.get(sampler_index + sampler_offset);
-      return std::make_tuple(image, sampler);
+      return repository_->textures.get(image_index + image_offset);
     }
 
-    void AssetLoader::import_albedo(const fastgltf::Asset& gltf, const size_t& sampler_offset,
+    void AssetLoader::import_albedo(const fastgltf::Asset& gltf,
                                     const size_t& image_offset, const fastgltf::Material& mat,
                                     PbrMaterial& pbr_config) const {
       if (mat.pbrData.baseColorTexture.has_value()) {
         pbr_config.constants.flags |= kAlbedoTextureFlag;
         pbr_config.constants.albedo_tex_index = 0;
-        auto [image, sampler] = get_textures(
-            gltf, mat.pbrData.baseColorTexture.value().textureIndex, image_offset, sampler_offset);
+        const auto image
+            = get_textures(
+            gltf, mat.pbrData.baseColorTexture.value().textureIndex, image_offset);
 
         pbr_config.textures.albedo_image = image;
-        pbr_config.textures.albedo_sampler = sampler;
       } else {
         pbr_config.constants.albedo_color
             = glm::vec4(mat.pbrData.baseColorFactor.at(0), mat.pbrData.baseColorFactor.at(1),
@@ -269,16 +213,15 @@ namespace gestalt::application {
     }
 
     void AssetLoader::import_metallic_roughness(const fastgltf::Asset& gltf,
-                                                const size_t& sampler_offset,
                                                 const size_t& image_offset,
                                                 const fastgltf::Material& mat,
                                                 PbrMaterial& pbr_config) const {
       if (mat.pbrData.metallicRoughnessTexture.has_value()) {
         pbr_config.constants.flags |= kMetalRoughTextureFlag;
         pbr_config.constants.metal_rough_tex_index = 0;
-        auto [image, sampler]
+        const auto image
             = get_textures(gltf, mat.pbrData.metallicRoughnessTexture.value().textureIndex,
-                           image_offset, sampler_offset);
+                           image_offset);
 
         pbr_config.textures.metal_rough_image = image;
         assert(image.image != repository_->default_material_.error_checkerboard_image.image);
@@ -289,32 +232,30 @@ namespace gestalt::application {
       }
     }
 
-    void AssetLoader::import_normal(const fastgltf::Asset& gltf, const size_t& sampler_offset,
+    void AssetLoader::import_normal(const fastgltf::Asset& gltf,
                                     const size_t& image_offset, const fastgltf::Material& mat,
                                     PbrMaterial& pbr_config) const {
       if (mat.normalTexture.has_value()) {
         pbr_config.constants.flags |= kNormalTextureFlag;
         pbr_config.constants.normal_tex_index = 0;
-        auto [image, sampler] = get_textures(gltf, mat.normalTexture.value().textureIndex,
-                                             image_offset, sampler_offset);
+        const auto image = get_textures(gltf, mat.normalTexture.value().textureIndex,
+                                        image_offset);
 
         pbr_config.textures.normal_image = image;
-        pbr_config.textures.normal_sampler = sampler;
         // pbr_config.normal_scale = 1.f;  // TODO
       }
     }
 
-    void AssetLoader::import_emissive(const fastgltf::Asset& gltf, const size_t& sampler_offset,
+    void AssetLoader::import_emissive(const fastgltf::Asset& gltf,
                                       const size_t& image_offset, const fastgltf::Material& mat,
                                       PbrMaterial& pbr_config) const {
       if (mat.emissiveTexture.has_value()) {
         pbr_config.constants.flags |= kEmissiveTextureFlag;
         pbr_config.constants.emissive_tex_index = 0;
-        auto [image, sampler] = get_textures(gltf, mat.emissiveTexture.value().textureIndex,
-                                             image_offset, sampler_offset);
+        const auto image = get_textures(gltf, mat.emissiveTexture.value().textureIndex,
+                                        image_offset);
 
         pbr_config.textures.emissive_image = image;
-        pbr_config.textures.emissive_sampler = sampler;
       } else {
         const glm::vec3 emissiveColor = glm::vec3(mat.emissiveFactor.at(0), mat.emissiveFactor.at(1),
                                                   mat.emissiveFactor.at(2));
@@ -325,22 +266,21 @@ namespace gestalt::application {
       }
     }
 
-    void AssetLoader::import_occlusion(const fastgltf::Asset& gltf, const size_t& sampler_offset,
+    void AssetLoader::import_occlusion(const fastgltf::Asset& gltf,
                                        const size_t& image_offset, const fastgltf::Material& mat,
                                        PbrMaterial& pbr_config) const {
       if (mat.occlusionTexture.has_value()) {
         pbr_config.constants.flags |= kOcclusionTextureFlag;
         pbr_config.constants.occlusion_tex_index = 0;
-        auto [image, sampler] = get_textures(gltf, mat.occlusionTexture.value().textureIndex,
-                                             image_offset, sampler_offset);
+        const auto image = get_textures(gltf, mat.occlusionTexture.value().textureIndex,
+                                        image_offset);
 
         pbr_config.textures.occlusion_image = image;
-        pbr_config.textures.occlusion_sampler = sampler;
         pbr_config.constants.occlusionStrength = 1.f;
       }
     }
 
-    void AssetLoader::import_material(fastgltf::Asset& gltf, size_t& sampler_offset,
+    void AssetLoader::import_material(fastgltf::Asset& gltf,
                                       size_t& image_offset, fastgltf::Material& mat) const {
       PbrMaterial pbr_config{};
 
@@ -353,35 +293,35 @@ namespace gestalt::application {
       auto& default_material = repository_->default_material_;
 
       pbr_config.textures = {.albedo_image = default_material.color_image,
-                              .albedo_sampler = default_material.linearSampler,
+                             .albedo_sampler = default_material.color_sampler,
                               .metal_rough_image = default_material.metallic_roughness_image,
-                              .metal_rough_sampler = default_material.linearSampler,
+             .metal_rough_sampler = default_material.metallic_roughness_sampler,
                               .normal_image = default_material.normal_image,
-                              .normal_sampler = default_material.linearSampler,
+                             .normal_sampler = default_material.normal_sampler,
                               .emissive_image = default_material.emissive_image,
-                              .emissive_sampler = default_material.linearSampler,
+                             .emissive_sampler = default_material.emissive_sampler,
                               .occlusion_image = default_material.occlusion_image,
-                              .occlusion_sampler = default_material.nearestSampler};
+                             .occlusion_sampler = default_material.occlusion_sampler};
 
       // grab textures from gltf file
-      import_albedo(gltf, sampler_offset, image_offset, mat, pbr_config);
-      import_metallic_roughness(gltf, sampler_offset, image_offset, mat, pbr_config);
-      import_normal(gltf, sampler_offset, image_offset, mat, pbr_config);
-      import_emissive(gltf, sampler_offset, image_offset, mat, pbr_config);
-      import_occlusion(gltf, sampler_offset, image_offset, mat, pbr_config);
+      import_albedo(gltf, image_offset, mat, pbr_config);
+      import_metallic_roughness(gltf, image_offset, mat, pbr_config);
+      import_normal(gltf, image_offset, mat, pbr_config);
+      import_emissive(gltf, image_offset, mat, pbr_config);
+      import_occlusion(gltf, image_offset, mat, pbr_config);
 
       // build material
       create_material(pbr_config, std::string(mat.name));
     }
 
-    void AssetLoader::import_materials(fastgltf::Asset& gltf, size_t& sampler_offset,
+    void AssetLoader::import_materials(fastgltf::Asset& gltf,
                                        size_t& image_offset) const {
       fmt::print("importing materials\n");
       for (fastgltf::Material& mat : gltf.materials) {
         if (mat.name == "arch.002") {
           mat.name = "material_" + std::to_string(repository_->materials.size());
         }
-        import_material(gltf, sampler_offset, image_offset, mat);
+        import_material(gltf, image_offset, mat);
       }
     }
 

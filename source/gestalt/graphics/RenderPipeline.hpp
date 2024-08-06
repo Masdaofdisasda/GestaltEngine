@@ -194,6 +194,16 @@ namespace gestalt::graphics {
         repository_ = repository;
         frame_ = frame;
 
+        post_process_sampler = repository_->get_sampler({
+            .magFilter = VK_FILTER_LINEAR,
+            .minFilter = VK_FILTER_LINEAR,
+            .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+            .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            .anisotropyEnable = VK_FALSE,
+        });
+
         prepare();
       }
       RenderPassDependency& get_dependencies() { return dependencies_; }
@@ -230,6 +240,7 @@ namespace gestalt::graphics {
       VkPipeline pipeline_ = nullptr;
       VkPipelineLayout pipeline_layout_ = nullptr;
       std::vector<VkDescriptorSetLayout> descriptor_layouts_;
+      VkSampler post_process_sampler = nullptr;
 
       FrameProvider* frame_;
       IGpu* gpu_;

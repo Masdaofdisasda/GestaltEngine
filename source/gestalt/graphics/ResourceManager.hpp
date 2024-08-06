@@ -74,6 +74,7 @@ namespace gestalt::graphics {
       void destroy_descriptor_buffer(std::shared_ptr<DescriptorBuffer> buffer) const override;
 
       VkSampler create_sampler(const VkSamplerCreateInfo& sampler_create_info) const override;
+      void generate_samplers() const;
 
       TextureHandle create_image(void* data, VkExtent3D size, VkFormat format,
                                  VkImageUsageFlags usage, bool mipmapped = false) override;
