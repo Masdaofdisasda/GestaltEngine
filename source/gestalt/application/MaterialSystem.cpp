@@ -186,6 +186,7 @@ namespace gestalt::application {
 
   void MaterialSystem::cleanup() {
     const auto& material_buffers = repository_->material_buffers;
+    resource_manager_->destroy_descriptor_buffer(material_buffers->descriptor_buffer);
     resource_manager_->destroy_image(material_buffers->bdrf_lut);
     resource_manager_->destroy_image(material_buffers->environment_irradiance_map);
     resource_manager_->destroy_image(material_buffers->environment_map);

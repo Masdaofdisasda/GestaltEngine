@@ -66,6 +66,10 @@ namespace gestalt::graphics {
 
   void BrightPass::destroy() {
     vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layouts_.at(0), nullptr);
+
+    for (const auto& descriptor_buffer : descriptor_buffers_) {
+      resource_manager_->destroy_descriptor_buffer(descriptor_buffer);
+    }
   }
 
   struct BlurDirection {
@@ -155,6 +159,12 @@ namespace gestalt::graphics {
 
   void BloomBlurPass::destroy() {
     vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layouts_.at(0), nullptr);
+
+    for (const auto& buffers : descriptor_buffers_) {
+      for (const auto& buffer : buffers) {
+            resource_manager_->destroy_descriptor_buffer(buffer);
+        }
+    }
   }
 
   void LuminancePass::prepare() {
@@ -213,6 +223,10 @@ namespace gestalt::graphics {
 
   void LuminancePass::destroy() {
     vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layouts_.at(0), nullptr);
+
+    for (const auto& buffer : descriptor_buffers_) {
+        resource_manager_->destroy_descriptor_buffer(buffer);
+    }
   }
 
   void LuminanceDownscalePass::prepare() {
@@ -327,6 +341,10 @@ namespace gestalt::graphics {
 
   void LightAdaptationPass::destroy() {
     vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layouts_.at(0), nullptr);
+
+    for (const auto& descriptor_buffer : descriptor_buffers_) {
+      resource_manager_->destroy_descriptor_buffer(descriptor_buffer);
+    }
   }
 
   void LightAdaptationPass::execute(VkCommandBuffer cmd) {
@@ -456,5 +474,9 @@ namespace gestalt::graphics {
 
   void TonemapPass::destroy() {
     vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layouts_.at(0), nullptr);
+
+    for (const auto& descriptor_buffer : descriptor_buffers_) {
+      resource_manager_->destroy_descriptor_buffer(descriptor_buffer);
+    }
   }
 }  // namespace gestalt::graphics

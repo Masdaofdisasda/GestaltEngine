@@ -347,6 +347,10 @@ namespace gestalt::application {
 
   void MeshSystem::cleanup() {
     const auto& mesh_buffers = repository_->mesh_buffers;
+
+    for (int i = 0; i < getFramesInFlight(); i++) {
+      resource_manager_->destroy_descriptor_buffer(mesh_buffers->descriptor_buffers[i]);
+    }
     resource_manager_->destroy_buffer(mesh_buffers->vertex_position_buffer);
     resource_manager_->destroy_buffer(mesh_buffers->vertex_data_buffer);
     resource_manager_->destroy_buffer(mesh_buffers->index_buffer);

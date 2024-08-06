@@ -53,6 +53,8 @@ namespace gestalt::foundation {
     = 0;
     virtual void destroy_buffer(const std::shared_ptr<AllocatedBuffer> buffer) = 0;
 
+    virtual void destroy_descriptor_buffer(std::shared_ptr<DescriptorBuffer> buffer) const = 0;
+
     virtual VkSampler create_sampler(const VkSamplerCreateInfo& sampler_create_info) const = 0;
 
     virtual TextureHandle create_image(void* data, VkExtent3D size, VkFormat format,

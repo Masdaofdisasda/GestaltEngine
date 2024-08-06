@@ -72,7 +72,13 @@ namespace gestalt::graphics {
                     .build_graphics_pipeline(gpu_->getDevice());
   }
 
-  void LightingPass::destroy() {}
+  void LightingPass::destroy() {
+    vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layouts_.at(1), nullptr);
+
+    for (const auto& descriptor_buffer : descriptor_buffers_) {
+      resource_manager_->destroy_descriptor_buffer(descriptor_buffer);
+    }
+  }
 
   void LightingPass::execute(VkCommandBuffer cmd) {
     begin_renderpass(cmd);

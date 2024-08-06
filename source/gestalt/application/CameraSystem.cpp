@@ -123,8 +123,10 @@ namespace gestalt::application {
       const auto& buffers = repository_->per_frame_data_buffers;
 
       for (int i = 0; i < 2; ++i) {
+        resource_manager_->destroy_descriptor_buffer(buffers->descriptor_buffers[i]);
         resource_manager_->destroy_buffer(buffers->uniform_buffers[i]);
       }
+
     }
 
 }  // namespace gestalt

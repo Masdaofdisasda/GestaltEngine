@@ -71,6 +71,7 @@ namespace gestalt::graphics {
       std::shared_ptr<DescriptorBuffer> create_descriptor_buffer(VkDescriptorSetLayout descriptor_layout, uint32 numBindings,
                                                                  VkBufferUsageFlags usage = 0) override;
       void destroy_buffer(const std::shared_ptr<AllocatedBuffer> buffer) override;
+      void destroy_descriptor_buffer(std::shared_ptr<DescriptorBuffer> buffer) const override;
 
       VkSampler create_sampler(const VkSamplerCreateInfo& sampler_create_info) const override;
 

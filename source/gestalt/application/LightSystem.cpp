@@ -179,9 +179,11 @@ namespace gestalt::application {
     repository_->light_view_projections.clear();
 
     const auto& light_buffers = repository_->light_buffers;
+    resource_manager_->destroy_descriptor_buffer(light_buffers->descriptor_buffer);
     resource_manager_->destroy_buffer(light_buffers->dir_light_buffer);
     resource_manager_->destroy_buffer(light_buffers->point_light_buffer);
     resource_manager_->destroy_buffer(light_buffers->view_proj_matrices);
+
   }
 
 }  // namespace gestalt::application

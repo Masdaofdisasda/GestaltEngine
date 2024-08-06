@@ -111,6 +111,9 @@ namespace gestalt::graphics {
     void ResourceManager::destroy_buffer(const std::shared_ptr<AllocatedBuffer> buffer) {
       vmaDestroyBuffer(gpu_->getAllocator(), buffer->buffer, buffer->allocation);
     }
+    void ResourceManager::destroy_descriptor_buffer(const std::shared_ptr<DescriptorBuffer> buffer) const {
+      vmaDestroyBuffer(gpu_->getAllocator(), buffer->buffer, buffer->allocation);
+    }
 
     VkSampler ResourceManager::create_sampler(const VkSamplerCreateInfo& sampler_create_info) const {
       VkSampler new_sampler;
