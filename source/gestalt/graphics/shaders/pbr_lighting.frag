@@ -3,7 +3,9 @@
 #extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_GOOGLE_include_directive : require
 #extension GL_EXT_shader_16bit_storage : require
+// set 0
 #include "per_frame_structs.glsl"
+// set 1
 #include "input_structures.glsl"
 #include "pbr.glsl"
 #include "shadow_mapping.glsl"
@@ -12,11 +14,6 @@ layout(location = 0) in vec2 texCoord;
 
 layout (location = 0) out vec4 outFragColor;
 
-layout(set = 1, binding = 0) uniform sampler2D gbuffer1;
-layout(set = 1, binding = 1) uniform sampler2D gbuffer2;
-layout(set = 1, binding = 2) uniform sampler2D gbuffer3;
-layout(set = 1, binding = 3) uniform sampler2D depthBuffer;
-layout(set = 1, binding = 4) uniform sampler2D shadowMap;
 
 layout(set = 2, binding = 0) buffer LightViewProj{
 	mat4 viewProj;
@@ -36,6 +33,11 @@ layout(set = 2, binding = 2) buffer PointLight{
 	bool enabled;
 } pointLight[256];
 
+layout(set = 3, binding = 0) uniform sampler2D gbuffer1;
+layout(set = 3, binding = 1) uniform sampler2D gbuffer2;
+layout(set = 3, binding = 2) uniform sampler2D gbuffer3;
+layout(set = 3, binding = 3) uniform sampler2D depthBuffer;
+layout(set = 3, binding = 4) uniform sampler2D shadowMap;
 
 layout( push_constant ) uniform constants
 {	

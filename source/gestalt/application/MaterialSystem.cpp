@@ -31,10 +31,9 @@ namespace gestalt::application {
                            VK_SHADER_STAGE_FRAGMENT_BIT)
               .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                            VK_SHADER_STAGE_FRAGMENT_BIT)
-                  .add_binding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
-                              false, getMaxMaterials())
-              .add_binding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+              .add_binding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                            VK_SHADER_STAGE_FRAGMENT_BIT, false, getMaxTextures())
+                  .add_binding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
               .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
 
     mat_buffers->descriptor_buffer
@@ -133,7 +132,7 @@ namespace gestalt::application {
     vmaUnmapMemory(gpu_->getAllocator(), constant_buffer->allocation);
 
     repository_->material_buffers->descriptor_buffer
-        ->write_buffer(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, constant_buffer->address,
+        ->write_buffer(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, constant_buffer->address,
                        sizeof(PbrMaterial::PbrConstants) * getMaxMaterials())
         .update();
   }
@@ -160,7 +159,7 @@ namespace gestalt::application {
     }
 
     mat_buffers->descriptor_buffer
-        ->write_image_array(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_infos, 0)
+        ->write_image_array(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_infos)
         .update();
   }
 
@@ -231,7 +230,7 @@ namespace gestalt::application {
     const uint32_t texture_start = getPbrMaterialTextures() * material_id;
 
     mat_buffers->descriptor_buffer
-        ->write_image_array(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_infos,
+        ->write_image_array(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_infos,
                             texture_start)
         .update();
 

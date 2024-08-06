@@ -69,24 +69,22 @@ namespace gestalt::graphics {
                                        gpu_->getDevice()};
       descriptor_buffer.usage |= usage;
 
+      const VkDeviceSize descriptor_buffer_offset_alignment
+          = gpu_->getDescriptorBufferProperties().descriptorBufferOffsetAlignment;
       vkGetDescriptorSetLayoutSizeEXT(gpu_->getDevice(), descriptor_layout, &descriptor_buffer.size);
+      descriptor_buffer.size = aligned_size(descriptor_buffer.size, descriptor_buffer_offset_alignment);
 
       descriptor_buffer.bindings.reserve(numBindings);
       VkDeviceSize binding_offset = 0;
-      VkDeviceSize descriptorBufferOffsetAlignment
-          = gpu_->getDescriptorBufferProperties().descriptorBufferOffsetAlignment;
 
       for (uint32 i = 0; i < numBindings; ++i) {
         vkGetDescriptorSetLayoutBindingOffsetEXT(gpu_->getDevice(), descriptor_layout, i,
                                                  &binding_offset);
-        binding_offset = aligned_size(binding_offset, descriptorBufferOffsetAlignment);
         descriptor_buffer.bindings.emplace_back(DescriptorBinding{
             .binding = i,
             .offset = binding_offset,
         });
       }
-
-      descriptor_buffer.size = aligned_size(descriptor_buffer.size, descriptorBufferOffsetAlignment);
 
       VkBufferCreateInfo bufferInfo = {};
       bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;

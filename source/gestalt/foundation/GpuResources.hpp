@@ -185,7 +185,7 @@ namespace gestalt::foundation {
         = 0;
   };
 
-  struct MaterialBuffers : BufferCollection, NonCopyable<MaterialBuffers> {
+  struct MaterialBuffers final : BufferCollection, NonCopyable<MaterialBuffers> {
     std::shared_ptr<AllocatedBuffer> uniform_buffer;
 
     TextureHandle environment_map;
@@ -206,7 +206,7 @@ namespace gestalt::foundation {
     }
   };
 
-  struct PerFrameDataBuffers : BufferCollection {
+  struct PerFrameDataBuffers final : BufferCollection {
     PerFrameData data;
     bool freezeCullCamera = false;
     std::array<std::shared_ptr<AllocatedBuffer>, getFramesInFlight()> uniform_buffers;
@@ -223,7 +223,7 @@ namespace gestalt::foundation {
     }
   };
 
-  struct LightBuffers : BufferCollection {  // TODO double buffering
+  struct LightBuffers final : BufferCollection {
     std::shared_ptr<AllocatedBuffer> dir_light_buffer;
     std::shared_ptr<AllocatedBuffer> point_light_buffer;
     std::shared_ptr<AllocatedBuffer> view_proj_matrices;
@@ -240,7 +240,7 @@ namespace gestalt::foundation {
     }
   };
 
-  struct MeshBuffers : BufferCollection {
+  struct MeshBuffers final : BufferCollection {
     std::shared_ptr<AllocatedBuffer> index_buffer;            // regular index buffer
     std::shared_ptr<AllocatedBuffer> vertex_position_buffer;  // only vertex positions
     std::shared_ptr<AllocatedBuffer> vertex_data_buffer;      // normals, tangents, uvs

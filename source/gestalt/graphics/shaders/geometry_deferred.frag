@@ -57,7 +57,6 @@ void main() {
 	bool hasEmissiveTexture = (textureFlags & 0x08) != 0;
 	bool hasOcclusionTexture = (textureFlags & 0x10) != 0;
 
-
     vec2 UV = inUV;
 	vec3 inNormal = normalize(inNormal_BiTanX.xyz);
 	vec3 inTangent = normalize(inTangent_BiTanY.xyz);

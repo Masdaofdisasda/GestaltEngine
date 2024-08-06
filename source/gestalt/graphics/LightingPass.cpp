@@ -18,18 +18,15 @@ namespace gestalt::graphics {
                              | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT
                              | VK_SHADER_STAGE_FRAGMENT_BIT)
             .build(gpu_->getDevice()));
-    descriptor_layouts_.emplace_back(DescriptorLayoutBuilder()
-                                         .add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                                      VK_SHADER_STAGE_FRAGMENT_BIT)
-                                         .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                                      VK_SHADER_STAGE_FRAGMENT_BIT)
-                                         .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                                      VK_SHADER_STAGE_FRAGMENT_BIT)
-                                         .add_binding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                                      VK_SHADER_STAGE_FRAGMENT_BIT)
-                                         .add_binding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                                      VK_SHADER_STAGE_FRAGMENT_BIT)
-            .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT));
+    descriptor_layouts_.push_back(
+        DescriptorLayoutBuilder()
+            .add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+            .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+            .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+            .add_binding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT,
+                         false, getMaxTextures())
+            .add_binding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
+            .build(gpu_->getDevice()));
     descriptor_layouts_.emplace_back(
         DescriptorLayoutBuilder()
             .add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
@@ -40,6 +37,14 @@ namespace gestalt::graphics {
             .add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
                          getMaxPointLights())
             .build(gpu_->getDevice()));
+    descriptor_layouts_.emplace_back(
+        DescriptorLayoutBuilder()
+            .add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+            .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+            .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+            .add_binding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+            .add_binding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+            .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT));
 
     dependencies_
         = RenderPassDependencyBuilder()
@@ -74,6 +79,7 @@ namespace gestalt::graphics {
 
     const auto frame = current_frame_index;
     const auto& per_frame_buffers = repository_->per_frame_data_buffers;
+    const auto& material_buffers = repository_->material_buffers;
     const auto& light_data = repository_->light_buffers;
 
     const auto gbuffer_1 = registry_->resources_.gbuffer1.image;
@@ -106,15 +112,17 @@ namespace gestalt::graphics {
     }
 
     bind_descriptor_buffers(
-        cmd,
-        {per_frame_buffers->descriptor_buffers[frame].get(),
-         descriptor_buffers_.at(frame).get(), light_data->descriptor_buffer.get()});
+        cmd, {per_frame_buffers->descriptor_buffers[frame].get(),
+              material_buffers->descriptor_buffer.get(), light_data->descriptor_buffer.get(),
+              descriptor_buffers_.at(frame).get()});
     per_frame_buffers->descriptor_buffers[frame]->bind_descriptors(
         cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0);
-    descriptor_buffers_.at(frame)->bind_descriptors(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                    pipeline_layout_, 1);
+    material_buffers->descriptor_buffer->bind_descriptors(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                          pipeline_layout_, 1);
     light_data->descriptor_buffer->bind_descriptors(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                                     pipeline_layout_, 2);
+    descriptor_buffers_.at(frame)->bind_descriptors(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                    pipeline_layout_, 3);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
     vkCmdSetViewport(cmd, 0, 1, &viewport_);

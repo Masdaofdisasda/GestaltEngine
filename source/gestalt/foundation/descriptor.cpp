@@ -5,6 +5,7 @@
 namespace gestalt::foundation {
   DescriptorBuffer& DescriptorBuffer::update() {
 
+    vkDeviceWaitIdle(device);
     char* descriptor_buf_ptr;
     VK_CHECK(vmaMapMemory(allocator, allocation, reinterpret_cast<void**>(&descriptor_buf_ptr)));
 
@@ -85,6 +86,7 @@ namespace gestalt::foundation {
                                                .descriptorSize = MapDescriptorSize(type),
                                                .binding = binding,
                                                .addr_info = addr_info});
+    bindings.at(binding).descriptorSize = MapDescriptorSize(type);
     return *this;
   }
 
@@ -93,15 +95,16 @@ namespace gestalt::foundation {
       uint32 first_descriptor) {
 
     update_infos.reserve(image_infos.size());
-    for (uint32 descriptor = first_descriptor; descriptor < image_infos.size(); ++descriptor) {
+    for (uint32 i = 0; i < image_infos.size();
+         ++i) {
       DescriptorUpdate update_info{.type = type,
                                .descriptorSize = MapDescriptorSize(type),
                                .binding = binding,
-                               .descriptorIndex = descriptor,
-                               .image_info = image_infos[descriptor]};
+                               .descriptorIndex = i + first_descriptor,
+                               .image_info = image_infos[i]};
       update_infos.emplace_back(update_info);
     }
-
+    bindings.at(binding).descriptorSize = MapDescriptorSize(type) * image_infos.size();
     return *this;
   }
 
