@@ -181,36 +181,36 @@ namespace gestalt::application {
         kMaxVertexPositionBufferSize,
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
             | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VMA_MEMORY_USAGE_GPU_ONLY);
+        VMA_MEMORY_USAGE_GPU_ONLY, "Vertex Position Buffer");
     mesh_buffers->vertex_data_buffer = resource_manager_->create_buffer(
         kMaxVertexDataBufferSize,
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
             | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VMA_MEMORY_USAGE_GPU_ONLY);
+        VMA_MEMORY_USAGE_GPU_ONLY, "Vertex Data Buffer");
 
     // Create index buffer
     mesh_buffers->index_buffer = resource_manager_->create_buffer(
         kMaxIndexBufferSize,
         VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
             | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VMA_MEMORY_USAGE_GPU_ONLY);
+        VMA_MEMORY_USAGE_GPU_ONLY, "Index Buffer");
 
     // Create meshlet buffers
     mesh_buffers->meshlet_buffer = resource_manager_->create_buffer(
         kMaxMeshletBufferSize,
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_TRANSFER_DST_BIT
             | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VMA_MEMORY_USAGE_GPU_ONLY);
+        VMA_MEMORY_USAGE_GPU_ONLY, "Meshlet Buffer");
     mesh_buffers->meshlet_vertices = resource_manager_->create_buffer(
         kMaxMeshletVertexBufferSize,
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_TRANSFER_DST_BIT
             | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VMA_MEMORY_USAGE_GPU_ONLY);
+        VMA_MEMORY_USAGE_GPU_ONLY, "Meshlet Vertex Buffer");
     mesh_buffers->meshlet_triangles = resource_manager_->create_buffer(
         kMaxMeshletIndexBufferSize,
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_TRANSFER_DST_BIT
             | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VMA_MEMORY_USAGE_GPU_ONLY);
+        VMA_MEMORY_USAGE_GPU_ONLY, "Meshlet Triangle Buffer");
 
     // Create mesh task commands and draw buffers
     for (int i = 0; i < getFramesInFlight(); i++) {
@@ -218,16 +218,16 @@ namespace gestalt::application {
           kMaxMeshletTaskCommandsBufferSize,
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
               | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-          VMA_MEMORY_USAGE_GPU_ONLY);
+          VMA_MEMORY_USAGE_GPU_ONLY, "Meshlet Task Commands Buffer");
       mesh_buffers->mesh_draw_buffer[i] = resource_manager_->create_buffer(
           kMaxMeshDrawBufferSize,
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-          VMA_MEMORY_USAGE_CPU_TO_GPU);
+          VMA_MEMORY_USAGE_CPU_TO_GPU, "Mesh Draw Buffer");
       mesh_buffers->draw_count_buffer[i] = resource_manager_->create_buffer(
           kMaxDrawCountBufferSize,
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
               | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-          VMA_MEMORY_USAGE_GPU_ONLY);
+          VMA_MEMORY_USAGE_GPU_ONLY, "Drawcount Buffer");
     }
   }
 

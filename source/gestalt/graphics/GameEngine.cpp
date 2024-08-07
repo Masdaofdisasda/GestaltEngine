@@ -1,4 +1,4 @@
-﻿#include "Engine.hpp"
+﻿#include "GameEngine.hpp"
 
 #if 0
 #define VMA_DEBUG_INITIALIZE_ALLOCATIONS 1
@@ -17,9 +17,9 @@
 
 namespace gestalt {
 
-  Engine* engine = nullptr;
+  GameEngine* engine = nullptr;
 
-  void Engine::init() {
+  void GameEngine::init() {
     assert(engine == nullptr);
     engine = this;
 
@@ -48,7 +48,7 @@ namespace gestalt {
     fmt::print("Engine initialized\n");
   }
 
-  void Engine::register_gui_actions() {
+  void GameEngine::register_gui_actions() {
     gui_actions_.exit = [this]() { quit_ = true; };
     gui_actions_.load_gltf
         = [this](const std::string& path) { scene_manager_->request_scene(path); };
@@ -63,7 +63,7 @@ namespace gestalt {
     };
   }
 
-  void Engine::run() {
+  void GameEngine::run() {
     fmt::print("Render loop starts\n");
 
     const auto start = std::chrono::system_clock::now();  // todo replace with timetracker
@@ -116,7 +116,7 @@ namespace gestalt {
     stats_.frametime = elapsed.count() / 1000.f;
   }
 
-  void Engine::cleanup() const {
+  void GameEngine::cleanup() const {
     fmt::print("Engine shutting down\n");
     if (is_initialized_) {
       vkDeviceWaitIdle(gpu_->getDevice());

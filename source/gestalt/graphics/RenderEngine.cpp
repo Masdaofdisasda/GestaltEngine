@@ -1,4 +1,4 @@
-﻿#include "RenderPipeline.hpp"
+﻿#include "RenderEngine.hpp"
 
 #include <queue>
 #include <set>
@@ -15,7 +15,7 @@
 #include "vk_initializers.hpp"
 
 namespace gestalt::graphics {
-  void RenderPipeline::init(IGpu* gpu, Window* window,
+  void RenderEngine::init(IGpu* gpu, Window* window,
                             ResourceManager* resource_manager,
                             Repository* repository, Gui* imgui_gui, FrameProvider* frame) {
     gpu_ = gpu;
@@ -58,7 +58,7 @@ namespace gestalt::graphics {
     resource_registry_->clear_shader_cache();
   }
 
-  void RenderPipeline::create_resources() const {
+  void RenderEngine::create_resources() const {
     resource_manager_->flush_loader();
 
     gpu_->immediateSubmit([&](VkCommandBuffer cmd) {
@@ -114,7 +114,7 @@ namespace gestalt::graphics {
     });
   }
 
-  void RenderPipeline::execute(const std::shared_ptr<RenderPass>& render_pass,
+  void RenderEngine::execute(const std::shared_ptr<RenderPass>& render_pass,
                                VkCommandBuffer cmd) {
     auto renderDependencies = render_pass->get_dependencies();
 
@@ -186,7 +186,7 @@ namespace gestalt::graphics {
     }
   }
 
-  bool RenderPipeline::acquire_next_image() {
+  bool RenderEngine::acquire_next_image() {
     VK_CHECK(vkWaitForFences(gpu_->getDevice(), 1, &frame().render_fence, true, UINT64_MAX));
 
     VkResult e
@@ -203,7 +203,7 @@ namespace gestalt::graphics {
     return false;
   }
 
-  VkCommandBuffer RenderPipeline::start_draw() {
+  VkCommandBuffer RenderEngine::start_draw() {
     VkCommandBuffer cmd = frame().main_command_buffer;
     VkCommandBufferBeginInfo cmdBeginInfo
         = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -213,7 +213,7 @@ namespace gestalt::graphics {
     return cmd;
   }
 
-  void RenderPipeline::execute_passes() {
+  void RenderEngine::execute_passes() {
     FrameGraphWIP frame_graph{render_passes_};
     frame_graph.topologicalSort();
 
@@ -287,7 +287,7 @@ namespace gestalt::graphics {
     present(cmd);
   }
 
-  void RenderPipeline::cleanup() {
+  void RenderEngine::cleanup() {
     for (auto& attachment : resource_registry_->attachment_list_) {
       resource_manager_->destroy_image(*attachment.image.get());
     }
@@ -303,7 +303,7 @@ namespace gestalt::graphics {
     swapchain_->destroy_swapchain();
   }
 
-  void RenderPipeline::present(VkCommandBuffer cmd) {
+  void RenderEngine::present(VkCommandBuffer cmd) {
     VK_CHECK(vkEndCommandBuffer(cmd));
 
     VkCommandBufferSubmitInfo cmdinfo = vkinit::command_buffer_submit_info(cmd);

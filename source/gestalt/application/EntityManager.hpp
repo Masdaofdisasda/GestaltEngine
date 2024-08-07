@@ -11,38 +11,38 @@
 namespace gestalt::application {
 
     struct Vertex;
-    class AssetLoader;
 
     class ComponentFactory : public NonCopyable<ComponentFactory> {
       IResourceManager* resource_manager_ = nullptr;
       Repository* repository_ = nullptr;
 
-      Entity next_entity_id_ = 0;
+      Entity next_entity_id_{0};
+
+      Entity next_entity();
+      void create_transform_component(unsigned entity, const glm::vec3& position = glm::vec3(0.f),
+                                      const glm::quat& rotation = glm::quat(1.f, 0.f, 0.f, 0.f),
+                                      const float& scale = 1.f) const;
 
     public:
       void init(IResourceManager* resource_manager, Repository* repository);
 
-      Entity create_entity();
-      std::pair<Entity, std::reference_wrapper<NodeComponent>> create_entity_node(
+      std::pair<Entity, std::reference_wrapper<NodeComponent>> create_entity(
           std::string node_name = "");
       void add_mesh_component(Entity entity, size_t mesh_index);
       void add_camera_component(Entity entity, const CameraComponent& camera);
 
-      Entity create_directional_light(const glm::vec3& color, const float intensity,
+      Entity create_directional_light(const glm::vec3& color, float intensity,
                                       const glm::vec3& direction, Entity parent = 0);
-      Entity create_spot_light(const glm::vec3& color, const float intensity,
+      Entity create_spot_light(const glm::vec3& color, float intensity,
                                const glm::vec3& direction, const glm::vec3& position,
-                               const float innerCone, const float outerCone, Entity parent = 0);
-      Entity create_point_light(const glm::vec3& color, const float intensity,
+                               float innerCone, float outerCone, Entity parent = 0);
+      Entity create_point_light(const glm::vec3& color, float intensity,
                                 const glm::vec3& position, Entity parent = 0);
 
       void link_entity_to_parent(Entity child, Entity parent);
       void update_transform_component(unsigned entity, const glm::vec3& position,
                                       const glm::quat& rotation = glm::quat(1.f, 0.f, 0.f, 0.f),
                                       const float& scale = 1.f);
-      void create_transform_component(unsigned entity, const glm::vec3& position,
-                                      const glm::quat& rotation = glm::quat(1.f, 0.f, 0.f, 0.f),
-                                      const float& scale = 1.f) const;
     };
 
     class AssetLoader : public NonCopyable<AssetLoader> {
@@ -104,7 +104,7 @@ namespace gestalt::application {
     /**
      * @brief Class responsible for managing scenes, entities, and their components.
      */
-    class SceneManager : public NonCopyable<SceneManager> {
+    class EntityManager : public NonCopyable<EntityManager> {
       IGpu* gpu_ = nullptr;
       IResourceManager* resource_manager_ = nullptr;
       Repository* repository_ = nullptr;

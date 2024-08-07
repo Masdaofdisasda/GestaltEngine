@@ -4,7 +4,7 @@
 
 #include "RenderConfig.hpp"
 #include "vk_types.hpp"
-#include "SceneManager.hpp"
+#include "EntityManager.hpp"
 #include "Window.hpp"
 
 namespace gestalt::application {

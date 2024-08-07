@@ -291,7 +291,7 @@ namespace gestalt::graphics {
       std::vector<std::shared_ptr<RenderPass>> sorted_passes_;
     };
 
-    class RenderPipeline : public NonCopyable<RenderPipeline> {
+    class RenderEngine : public NonCopyable<RenderEngine> {
       IGpu* gpu_;
       Window* window_;
       ResourceManager* resource_manager_;

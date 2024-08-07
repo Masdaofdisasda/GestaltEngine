@@ -27,7 +27,7 @@ namespace gestalt::application {
         per_frame_data_buffers->uniform_buffers[i] = resource_manager_->create_buffer(
             sizeof(PerFrameData),
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-            VMA_MEMORY_USAGE_CPU_TO_GPU);
+            VMA_MEMORY_USAGE_CPU_TO_GPU, "perFrameBuffer");
         per_frame_data_buffers->descriptor_buffers[i] = resource_manager_->create_descriptor_buffer(
             descriptor_layout, 1,
             0);

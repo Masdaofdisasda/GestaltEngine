@@ -50,7 +50,7 @@ namespace gestalt::application {
     mat_buffers->uniform_buffer = resource_manager_->create_buffer(
         sizeof(PbrMaterial::PbrConstants) * getMaxMaterials(),
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VMA_MEMORY_USAGE_CPU_TO_GPU);
+        VMA_MEMORY_USAGE_CPU_TO_GPU, "Material Data Buffer");
   }
 
   void MaterialSystem::create_default_material() {

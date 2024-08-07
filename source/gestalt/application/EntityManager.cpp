@@ -1,0 +1,164 @@
+﻿
+#include "EntityManager.hpp"
+
+#include "vk_types.hpp"
+
+#include <fastgltf/glm_element_traits.hpp>
+#include <fastgltf/core.hpp>
+
+#include <glm/gtx/matrix_decompose.hpp>
+
+#include "fmt/printf.h"
+
+namespace gestalt::application {
+
+    void EntityManager::init(IGpu* gpu, IResourceManager* resource_manager,
+                          IDescriptorLayoutBuilder* builder, Repository* repository,
+                          FrameProvider* frame) {
+    gpu_ = gpu;
+    resource_manager_ = resource_manager;
+    repository_ = repository;
+
+    component_factory_->init(resource_manager_, repository_);
+    asset_loader_->init(resource_manager_, component_factory_.get(), repository_);
+
+    // TODO add lights from gltf to resource manager
+
+    const size_t camera_index = repository_->cameras.add(CameraData{});
+    repository_->camera_components.add(component_factory_->create_entity().first,
+                                       CameraComponent{true, camera_index});
+
+    component_factory_->create_directional_light(
+        glm::vec3(1.f, 0.957f, 0.917f), 5.f, glm::vec3(-0.216, 0.941, -0.257), get_root_entity());
+    component_factory_->create_point_light(glm::vec3(1.0f), 5.0f, glm ::vec3(0.0, 6.0, 0.0),
+                                           get_root_entity());
+
+    material_system_ = std::make_unique<MaterialSystem>();
+    material_system_->init(gpu_, resource_manager_, builder, repository_, notification_manager_.get(), frame);
+    light_system_ = std::make_unique<LightSystem>();
+    light_system_->init(gpu_, resource_manager_, builder, repository_, notification_manager_.get(),
+                        frame);
+    camera_system_ = std::make_unique<CameraSystem>();
+    camera_system_->init(gpu_, resource_manager_, builder, repository_, notification_manager_.get(),
+                         frame);
+    transform_system_ = std::make_unique<TransformSystem>();
+    transform_system_->init(gpu_, resource_manager_, builder, repository_,
+                            notification_manager_.get(), frame);
+    mesh_system_ = std::make_unique<MeshSystem>();
+    mesh_system_->init(gpu_, resource_manager_, builder, repository_, notification_manager_.get(),
+                       frame);
+  }
+
+    void EntityManager::load_scene(const std::string& path) {
+      size_t mesh_offset = repository_->meshes.size();
+      const auto nodes = asset_loader_->load_scene_from_gltf(path);
+      build_scene_graph(nodes, mesh_offset);
+    }
+
+    void EntityManager::create_entities(std::vector<fastgltf::Node> nodes,
+                                       const size_t& mesh_offset) {
+      for (fastgltf::Node& node : nodes) {
+        if (node.lightIndex.has_value()) {
+          // TODO
+        }
+
+        const auto [entity, node_component]
+            = component_factory_->create_entity(std::string(node.name));
+
+        if (node.meshIndex.has_value()) {
+          component_factory_->add_mesh_component(entity, mesh_offset + *node.meshIndex);
+        }
+
+        if (std::holds_alternative<fastgltf::TRS>(node.transform)) {
+          const auto& trs = std::get<fastgltf::TRS>(node.transform);
+
+          glm::vec3 translation(trs.translation[0], trs.translation[1], trs.translation[2]);
+          glm::quat rotation(trs.rotation[3], trs.rotation[0], trs.rotation[1], trs.rotation[2]);
+          float scale = (trs.scale[0] + trs.scale[1] + trs.scale[2])
+                        / 3.f;  // TODO handle non-uniform scale
+
+          component_factory_->update_transform_component(entity, translation, rotation, scale);
+        }
+      }
+    }
+
+    void EntityManager::build_hierarchy(std::vector<fastgltf::Node> nodes,
+                                       const size_t& node_offset) {
+      for (int i = 0; i < nodes.size(); i++) {
+        fastgltf::Node& node = nodes[i];
+        Entity parent_entity = node_offset + i;
+        auto& scene_object = repository_->scene_graph.get(parent_entity).value().get();
+
+        for (auto& c : node.children) {
+          Entity child_entity = node_offset + c;
+          auto& child = repository_->scene_graph.get(child_entity).value().get();
+          scene_object.children.push_back(child_entity);
+          child.parent = parent_entity;
+        }
+      }
+    }
+
+    void EntityManager::link_orphans_to_root() {
+      for (auto& [entity, node] : repository_->scene_graph.components()) {
+        if (entity == get_root_entity()) {
+          continue;
+        }
+
+        if (node.parent == invalid_entity) {
+          get_root_node().children.push_back(entity);
+          node.parent = get_root_entity();
+        }
+      }
+    }
+
+    void EntityManager::build_scene_graph(const std::vector<fastgltf::Node>& nodes,
+                                         const size_t& mesh_offset) {
+      const size_t node_offset = repository_->scene_graph.size();
+
+      create_entities(nodes, mesh_offset);
+      build_hierarchy(nodes, node_offset);
+      link_orphans_to_root();
+    }
+
+    void EntityManager::cleanup() const {
+      mesh_system_->cleanup();
+      transform_system_->cleanup();
+      camera_system_->cleanup();
+      light_system_->cleanup();
+      material_system_->cleanup();
+
+      repository_->transform_components.clear();
+      repository_->camera_components.clear();
+      repository_->light_components.clear();
+      repository_->mesh_components.clear();
+      repository_->scene_graph.clear();
+    }
+
+    NodeComponent& EntityManager::get_root_node() {
+      return repository_->scene_graph.get(get_root_entity()).value();
+    }
+
+    void EntityManager::add_to_root(Entity entity, NodeComponent& node) {
+      assert(entity != invalid_entity);
+      get_root_node().children.push_back(entity);
+      node.parent = get_root_entity();
+    }
+
+    void EntityManager::update_scene(const float delta_time, const Movement& movement, const float aspect) {
+      if (!scene_path_.empty()) {
+        load_scene(scene_path_);
+        scene_path_.clear();
+      }
+      resource_manager_->flush_loader();
+
+      material_system_->update();
+      light_system_->update();
+      camera_system_->update_cameras(delta_time, movement, aspect);
+      camera_system_->update();
+      transform_system_->update();
+      mesh_system_->update();
+    }
+
+    void EntityManager::request_scene(const std::string& path) { scene_path_ = path; }
+
+}  // namespace gestalt

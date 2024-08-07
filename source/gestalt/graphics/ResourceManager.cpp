@@ -31,10 +31,23 @@ namespace gestalt::graphics {
 
     void ResourceManager::flush_loader() { resource_loader_.flush(); }
 
+  void SetDebugName(std::string name, VkObjectType type, VkDevice device, uint64_t handle) {
+      if (name.empty()) {
+        return;
+      }
+      VkDebugUtilsObjectNameInfoEXT nameInfo = {};
+      nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+      nameInfo.objectType = type;
+      nameInfo.objectHandle = handle;
+      nameInfo.pObjectName = name.c_str();
+      vkSetDebugUtilsObjectNameEXT(device, &nameInfo);
+    }
 
     std::shared_ptr<AllocatedBuffer> ResourceManager::create_buffer(size_t allocSize,
                                                                     VkBufferUsageFlags usage,
-                                                   VmaMemoryUsage memoryUsage) {
+                                                                    VmaMemoryUsage memoryUsage,
+                                                                    std::string name)
+    {
       usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
       VkBufferCreateInfo bufferInfo = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
@@ -52,6 +65,8 @@ namespace gestalt::graphics {
       VK_CHECK(vmaCreateBuffer(gpu_->getAllocator(), &bufferInfo, &vmaallocInfo, &new_buffer.buffer,
                                &new_buffer.allocation, &new_buffer.info));
 
+      SetDebugName( name, VK_OBJECT_TYPE_BUFFER, gpu_->getDevice(), reinterpret_cast<uint64_t>(new_buffer.buffer));
+
       const VkBufferDeviceAddressInfo device_address_info = {.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = new_buffer.buffer};
       new_buffer.address
           = vkGetBufferDeviceAddress(gpu_->getDevice(), &device_address_info);
@@ -65,7 +80,7 @@ namespace gestalt::graphics {
     }
 
   std::shared_ptr<DescriptorBuffer> ResourceManager::create_descriptor_buffer(
-        VkDescriptorSetLayout descriptor_layout, uint32 numBindings, VkBufferUsageFlags usage) {
+        VkDescriptorSetLayout descriptor_layout, uint32 numBindings, VkBufferUsageFlags usage, std::string name) {
       DescriptorBuffer descriptor_buffer{gpu_->getDescriptorBufferProperties(), gpu_->getAllocator(),
                                        gpu_->getDevice()};
       descriptor_buffer.usage |= usage;
@@ -100,6 +115,10 @@ namespace gestalt::graphics {
       VK_CHECK(vmaCreateBuffer(gpu_->getAllocator(), &bufferInfo, &vmaallocInfo,
                                &descriptor_buffer.buffer, &descriptor_buffer.allocation,
                                &descriptor_buffer.info));
+
+      SetDebugName(name, VK_OBJECT_TYPE_BUFFER, gpu_->getDevice(),
+                   reinterpret_cast<uint64_t>(descriptor_buffer.buffer));
+
 
       VkBufferDeviceAddressInfo deviceAddressInfo
           = {.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};

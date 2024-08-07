@@ -3,13 +3,13 @@
 #include "Gpu.hpp"
 #include "Gui.hpp"
 #include "InputSystem.hpp"
-#include "RenderPipeline.hpp"
-#include "SceneManager.hpp"
+#include "RenderEngine.hpp"
+#include "EntityManager.hpp"
 #include "TmeTrackingService.hpp"
 #include "Window.hpp"
 
 namespace gestalt {
-  class Engine {
+  class GameEngine {
   public:
     void init();
     void cleanup() const;
@@ -23,10 +23,10 @@ namespace gestalt {
     std::unique_ptr<application::Window> window_ = std::make_unique<application::Window>();
     std::unique_ptr<graphics::Gpu> gpu_ = std::make_unique<graphics::Gpu>();
 
-    std::unique_ptr<graphics::RenderPipeline> render_pipeline_
-        = std::make_unique<graphics::RenderPipeline>();
-    std::unique_ptr<application::SceneManager> scene_manager_
-        = std::make_unique<application::SceneManager>();
+    std::unique_ptr<graphics::RenderEngine> render_pipeline_
+        = std::make_unique<graphics::RenderEngine>();
+    std::unique_ptr<application::EntityManager> scene_manager_
+        = std::make_unique<application::EntityManager>();
     std::unique_ptr<foundation::Repository> repository_
         = std::make_unique<foundation::Repository>();
 

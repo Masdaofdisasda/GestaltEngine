@@ -45,11 +45,12 @@ namespace gestalt::foundation {
     virtual void flush_loader() = 0;
 
     virtual std::shared_ptr<AllocatedBuffer> create_buffer(size_t allocSize, VkBufferUsageFlags usage,
-                                          VmaMemoryUsage memoryUsage)
+                                                           VmaMemoryUsage memoryUsage,
+                                                           std::string name = "")
         = 0;
     virtual std::shared_ptr<DescriptorBuffer> create_descriptor_buffer(
-        VkDescriptorSetLayout descriptor_layout, uint32 numBindings,
-        VkBufferUsageFlags usage = 0)
+        VkDescriptorSetLayout descriptor_layout, uint32 numBindings, VkBufferUsageFlags usage = 0 ,
+        std::string name = "")
     = 0;
     virtual void destroy_buffer(const std::shared_ptr<AllocatedBuffer> buffer) = 0;
 

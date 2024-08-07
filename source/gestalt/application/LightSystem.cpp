@@ -42,15 +42,15 @@ namespace gestalt::application {
     light_data->view_proj_matrices = resource_manager_->create_buffer(
         sizeof(glm::mat4) * getMaxLights(),
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VMA_MEMORY_USAGE_CPU_TO_GPU);
+        VMA_MEMORY_USAGE_CPU_TO_GPU, "Light Matrix Buffer");
     light_data->dir_light_buffer = resource_manager_->create_buffer(
         sizeof(GpuDirectionalLight) * getMaxDirectionalLights(),
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VMA_MEMORY_USAGE_CPU_TO_GPU);
+        VMA_MEMORY_USAGE_CPU_TO_GPU, "Direction Lights Buffer");
     light_data->point_light_buffer = resource_manager_->create_buffer(
         sizeof(GpuPointLight) * getMaxPointLights(),
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VMA_MEMORY_USAGE_CPU_TO_GPU);
+        VMA_MEMORY_USAGE_CPU_TO_GPU, "Point Light Buffer");
 
   }
 
