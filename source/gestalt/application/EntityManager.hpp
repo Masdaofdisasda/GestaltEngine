@@ -77,19 +77,6 @@ namespace gestalt::application {
                            fastgltf::Material& mat) const;
       void import_materials(fastgltf::Asset& gltf,
                             size_t& image_offset) const;
-      static void optimize_mesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices);
-      void simplify_mesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices);
-      std::vector<Meshlet> generate_meshlets(std::vector<GpuVertexPosition>& vertices,
-                                             std::vector<uint32_t>& indices,
-                                             std::vector<uint32>& meshlet_vertices,
-                                             std::vector<uint8>& meshlet_indices,
-                                             size_t global_surfaces_count);
-      MeshSurface create_surface(std::vector<GpuVertexPosition>& vertex_positions,
-                                 std::vector<GpuVertexData>& vertex_data,
-                                 std::vector<uint32_t>& indices, std::vector<Meshlet>&& meshlets,
-                                 std::vector<uint32>&& meshlet_vertices,
-                                 std::vector<uint8>&& meshlet_indices) const;
-      size_t create_mesh(std::vector<MeshSurface> surfaces, const std::string& name) const;
       void add_material_component(MeshSurface& surface, const size_t material) const;
       void import_meshes(fastgltf::Asset& gltf, size_t material_offset);
 
