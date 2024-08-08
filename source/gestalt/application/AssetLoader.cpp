@@ -120,54 +120,52 @@ namespace gestalt::application {
       std::vector<Meshlet> meshlets;
     };
 
-    static MeshletData generate_meshlets(std::vector<GpuVertexPosition>& vertices,
-                                         const std::vector<uint32_t>& indices,
-                                         size_t global_surfaces_count,
-                                         size_t global_meshlet_vertex_offset,
-                                         size_t global_meshlet_index_offset) {
+    static std::vector<meshopt_Meshlet> BuildMeshlets(
+        const std::vector<uint32_t>& indices, const std::vector<GpuVertexPosition>& vertices,
+        std::vector<uint32_t>& meshlet_vertices_local, std::vector<uint8_t>& meshlet_triangles) {
       constexpr size_t max_vertices = 64;
-      constexpr size_t max_triangles = 64;  // Must be divisible by 4
-      constexpr float cone_weight = 0.5f;   // Set between 0 and 1 if using cone culling
+      constexpr size_t max_triangles = 64;
+      constexpr float cone_weight = 0.5f;
 
-      // Compute the maximum number of meshlets
       size_t max_meshlets = meshopt_buildMeshletsBound(indices.size(), max_vertices, max_triangles);
 
-      // Allocate buffers for meshopt meshlets, vertices, and triangles
-      std::vector<meshopt_Meshlet> meshopt_meshlets(max_meshlets);
-      std::vector<unsigned int> meshlet_vertices_local(max_meshlets * max_vertices);
-      std::vector<unsigned char> meshlet_triangles(max_meshlets * max_triangles * 3);
+      meshlet_vertices_local.resize(max_meshlets * max_vertices);
+      meshlet_triangles.resize(max_meshlets * max_triangles * 3);
 
-      // Build the meshlets
-      const size_t meshlet_count = meshopt_buildMeshlets(
+      std::vector<meshopt_Meshlet> meshopt_meshlets(max_meshlets);
+      size_t meshlet_count = meshopt_buildMeshlets(
           meshopt_meshlets.data(), meshlet_vertices_local.data(), meshlet_triangles.data(),
           indices.data(), indices.size(), reinterpret_cast<const float*>(vertices.data()),
           vertices.size(), sizeof(GpuVertexPosition), max_vertices, max_triangles, cone_weight);
 
-      // Resize the arrays based on actual meshlet count and last meshlet's offsets + counts
-      const auto& last = meshopt_meshlets[meshlet_count - 1];
-      meshlet_vertices_local.resize(last.vertex_offset + last.vertex_count);
-      meshlet_triangles.resize(last.triangle_offset + ((last.triangle_count * 3 + 3) & ~3));
       meshopt_meshlets.resize(meshlet_count);
+      meshlet_vertices_local.resize(meshopt_meshlets.back().vertex_offset
+                                    + meshopt_meshlets.back().vertex_count);
+      meshlet_triangles.resize(meshopt_meshlets.back().triangle_offset
+                               + ((meshopt_meshlets.back().triangle_count * 3 + 3) & ~3));
 
-      // Prepare the result meshlets
-      std::vector<Meshlet> result_meshlets(meshlet_count);
+      return meshopt_meshlets;
+    }
 
-      for (size_t i = 0; i < meshlet_count; ++i) {
+    static std::vector<Meshlet> ComputeMeshletBounds(
+                                                    const std::vector<meshopt_Meshlet>& meshopt_meshlets,
+                                                    const std::vector<uint32_t>& meshlet_vertices_local,
+                                                    const std::vector<uint8_t>& meshlet_triangles,
+                                                    const std::vector<GpuVertexPosition>& vertices,
+                                                    size_t global_meshlet_vertex_offset,
+                                                    size_t global_meshlet_index_offset, size_t global_mesh_draw_count) {
+      std::vector<Meshlet> result_meshlets(meshopt_meshlets.size());
+
+      for (size_t i = 0; i < meshopt_meshlets.size(); ++i) {
         const auto& local_meshlet = meshopt_meshlets[i];
         auto& meshlet = result_meshlets[i];
 
-        /** TODO update meshopt and do Meshlet optimization **/
-        /*meshopt_optimizeMeshlet(&meshlet_vertices[meshlet.vertex_offset],
-                                &meshlet_triangles[meshlet.triangle_offset], meshlet.triangle_count,
-                                meshlet.vertex_count);*/
-
-        // Compute the bounds for the current meshlet
         meshopt_Bounds meshlet_bounds = meshopt_computeMeshletBounds(
             meshlet_vertices_local.data() + local_meshlet.vertex_offset,
             meshlet_triangles.data() + local_meshlet.triangle_offset, local_meshlet.triangle_count,
-            reinterpret_cast<float*>(vertices.data()), vertices.size(), sizeof(GpuVertexPosition));
+            reinterpret_cast<const float*>(vertices.data()), vertices.size(),
+            sizeof(GpuVertexPosition));
 
-        // Set meshlet data
         meshlet.vertex_offset = local_meshlet.vertex_offset + global_meshlet_vertex_offset;
         meshlet.index_offset = local_meshlet.triangle_offset + global_meshlet_index_offset;
         meshlet.vertex_count = local_meshlet.vertex_count;
@@ -180,26 +178,48 @@ namespace gestalt::application {
         meshlet.cone_axis[0] = meshlet_bounds.cone_axis_s8[0];
         meshlet.cone_axis[1] = meshlet_bounds.cone_axis_s8[1];
         meshlet.cone_axis[2] = meshlet_bounds.cone_axis_s8[2];
-
         meshlet.cone_cutoff = meshlet_bounds.cone_cutoff_s8;
-        // a meshlet belongs not to a mesh but to a surface, because we can have multiple surfaces
-        // per mesh in order to use different materials. A MeshDraw dictates how to draw a surface
-        // with a given material
-        meshlet.mesh_draw_index = static_cast<uint32>(global_surfaces_count);
+
+        meshlet.mesh_draw_index = static_cast<uint32_t>(global_mesh_draw_count);
       }
+      return result_meshlets;
+    }
 
-      std::vector<uint32> meshlet_vertices;
-      std::vector<uint8> meshlet_indices;
-
+    static std::vector<uint8_t> ConvertAndStoreIndices(
+        const std::vector<uint8_t>& meshlet_triangles) {
+      std::vector<uint8_t> meshlet_indices;
       meshlet_indices.reserve(meshlet_triangles.size());
-      for (const auto& idx : meshlet_triangles) {
-        meshlet_indices.push_back(idx);
-      }
+      meshlet_indices.insert(meshlet_indices.end(), meshlet_triangles.begin(),
+                             meshlet_triangles.end());
+      return meshlet_indices;
+    }
 
+    static std::vector<uint32_t> ConvertAndStoreVertices(
+        const std::vector<uint32_t>& meshlet_vertices_local) {
+      std::vector<uint32_t> meshlet_vertices;
       meshlet_vertices.reserve(meshlet_vertices_local.size());
-      for (const auto& idx : meshlet_vertices_local) {
-        meshlet_vertices.push_back(idx);
-      }
+      meshlet_vertices.insert(meshlet_vertices.end(), meshlet_vertices_local.begin(),
+                              meshlet_vertices_local.end());
+      return meshlet_vertices;
+    }
+
+
+    static MeshletData generate_meshlets(std::vector<GpuVertexPosition>& vertices,
+                                         const std::vector<uint32_t>& indices,
+                                         size_t global_mesh_draw_count,
+                                         size_t global_meshlet_vertex_offset,
+                                         size_t global_meshlet_index_offset) {
+      std::vector<uint32_t> meshlet_vertices_local;
+      std::vector<uint8_t> meshlet_triangles;
+
+      auto meshopt_meshlets
+          = BuildMeshlets(indices, vertices, meshlet_vertices_local, meshlet_triangles);
+
+      auto result_meshlets = ComputeMeshletBounds(meshopt_meshlets, meshlet_vertices_local,
+                           meshlet_triangles, vertices, global_meshlet_vertex_offset, global_meshlet_index_offset, global_mesh_draw_count);
+
+      std::vector<uint8_t> meshlet_indices = ConvertAndStoreIndices(meshlet_triangles);
+      std::vector<uint32_t> meshlet_vertices = ConvertAndStoreVertices(meshlet_vertices_local);
 
       return {meshlet_vertices, meshlet_indices, result_meshlets};
     }
@@ -256,30 +276,6 @@ namespace gestalt::application {
 
       return surface;
     }
-
-    static size_t create_mesh(std::vector<MeshSurface> surfaces, const std::string& name,
-                              Repository* repository) {
-      size_t mesh_id = repository->meshes.size();
-      const std::string key = name.empty() ? "mesh_" + std::to_string(mesh_id) : name;
-
-      glm::vec3 combined_center(0.0f);
-      for (const auto& surface : surfaces) {
-        combined_center += surface.local_bounds.center;
-      }
-      combined_center /= static_cast<float>(surfaces.size());
-
-      float combined_radius = 0.0f;
-      for (const auto& surface : surfaces) {
-        float distance = glm::distance(combined_center, surface.local_bounds.center)
-                         + surface.local_bounds.radius;
-        combined_radius = std::max(combined_radius, distance);
-      }
-
-      mesh_id = repository->meshes.add(
-          Mesh{key, std::move(surfaces), BoundingSphere{combined_center, combined_radius}});
-      fmt::print("created mesh {}, mesh_id {}\n", key, mesh_id);
-      return mesh_id;
-    }
   };
 
   class GltfParser {
@@ -330,12 +326,9 @@ namespace gestalt::application {
       }
       return vertices;
     }
-  public:
 
-    static MeshSurface extract_mesh_surface(const fastgltf::Asset& gltf, fastgltf::Primitive& primitive,
-                                            size_t& global_surfaces_count, size_t material_offset,
+    static MeshSurface extract_mesh_surface(const fastgltf::Asset& gltf, fastgltf::Primitive& primitive, size_t material_offset,
                                             Repository* repository) {
-      const size_t global_index_offset = repository->vertex_positions.size();
 
       std::vector<uint32_t> indices = extract_indices(gltf, primitive);
       std::vector<Vertex> vertices = extract_vertices(gltf, primitive);
@@ -347,10 +340,12 @@ namespace gestalt::application {
 
       const size_t global_meshlet_vertex_offset = repository->meshlet_vertices.size();
       const size_t global_meshlet_index_offset = repository->meshlet_triangles.size();
+      const size_t global_mesh_draw_count = repository->mesh_draws.size();
       auto [meshlet_vertices, meshlet_indices, meshlets] = MeshProcessor::generate_meshlets(
-          vertex_positions, indices, global_surfaces_count, global_meshlet_vertex_offset,
+          vertex_positions, indices, global_mesh_draw_count, global_meshlet_vertex_offset,
           global_meshlet_index_offset);
 
+      const size_t global_index_offset = repository->vertex_positions.size();
       for (auto& idx : indices) {
         idx += global_index_offset;
       }
@@ -359,13 +354,29 @@ namespace gestalt::application {
           vertex_positions, vertex_data, indices, std::move(meshlets), std::move(meshlet_vertices),
           std::move(meshlet_indices), repository);
       if (primitive.materialIndex.has_value()) {
-        //add_material_component(surface, material_offset + primitive.materialIndex.value());
-
+        surface.material = material_offset + primitive.materialIndex.value();
       } else {
-        //add_material_component(surface, default_material);
+        surface.material = default_material;
       }
-      global_surfaces_count++;
       return surface;
+    }
+
+  public:
+
+    struct ExtractedMesh {
+      std::vector<MeshSurface> surfaces;
+    };
+
+    static ExtractedMesh extract_mesh(const fastgltf::Asset& gltf, fastgltf::Mesh& mesh,
+                             size_t material_offset, Repository* repository) {
+      std::vector<MeshSurface> surfaces;
+      surfaces.reserve(mesh.primitives.size());
+      for (fastgltf::Primitive& primitive : mesh.primitives) {
+        MeshSurface surface = extract_mesh_surface(
+            gltf, primitive, material_offset, repository);
+        surfaces.push_back(surface);
+      }
+      return { surfaces};
     }
 
   };
@@ -661,34 +672,17 @@ namespace gestalt::application {
   void AssetLoader::import_materials(fastgltf::Asset& gltf, size_t& image_offset) const {
     fmt::print("importing materials\n");
     for (fastgltf::Material& mat : gltf.materials) {
-      if (mat.name == "arch.002") {
-        mat.name = "material_" + std::to_string(repository_->materials.size());
-      }
       import_material(gltf, image_offset, mat);
     }
   }
 
-  void AssetLoader::add_material_component(MeshSurface& surface, const size_t material) const {
-    assert(material != no_component);
-    assert(material <= repository_->materials.size());
-    assert(surface.material == default_material);
-    surface.material = material;
-  }
-
-  void AssetLoader::import_meshes(fastgltf::Asset& gltf, const size_t material_offset) {
-    std::vector<MeshSurface> surfaces;
-    size_t global_surfaces_count = 0;
+  void AssetLoader::import_meshes(fastgltf::Asset& gltf, const size_t material_offset) const {
 
     fmt::print("importing meshes\n");
     for (fastgltf::Mesh& mesh : gltf.meshes) {
-      surfaces.clear();
+      auto [surfaces] = GltfParser::extract_mesh(gltf, mesh, material_offset, repository_);
 
-      for (fastgltf::Primitive& primitive : mesh.primitives) {
-        MeshSurface surface = GltfParser::extract_mesh_surface(
-            gltf, primitive, global_surfaces_count, material_offset, repository_);
-        surfaces.push_back(surface);
-      }
-      MeshProcessor::create_mesh(surfaces, std::string(mesh.name), repository_);
+       component_factory_->create_mesh(surfaces, std::string(mesh.name));
     }
   }
 }  // namespace gestalt::application

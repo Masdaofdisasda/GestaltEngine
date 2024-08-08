@@ -29,6 +29,7 @@ namespace gestalt::application {
       std::pair<Entity, std::reference_wrapper<NodeComponent>> create_entity(
           std::string node_name = "");
       void add_mesh_component(Entity entity, size_t mesh_index);
+      void create_mesh(std::vector<MeshSurface> surfaces, const std::string& name) const;
       void add_camera_component(Entity entity, const CameraComponent& camera);
 
       Entity create_directional_light(const glm::vec3& color, float intensity,
@@ -78,7 +79,7 @@ namespace gestalt::application {
       void import_materials(fastgltf::Asset& gltf,
                             size_t& image_offset) const;
       void add_material_component(MeshSurface& surface, const size_t material) const;
-      void import_meshes(fastgltf::Asset& gltf, size_t material_offset);
+      void import_meshes(fastgltf::Asset& gltf, size_t material_offset) const;
 
     public:
       void init(IResourceManager* resource_manager,

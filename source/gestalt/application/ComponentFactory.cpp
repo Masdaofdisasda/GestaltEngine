@@ -64,6 +64,28 @@ namespace gestalt::application {
       repository_->mesh_components.add(entity, MeshComponent{{true}, mesh_index});
     }
 
+  void ComponentFactory::create_mesh(std::vector<MeshSurface> surfaces, const std::string& name) const {
+      size_t mesh_id = repository_->meshes.size();
+      const std::string key = name.empty() ? "mesh_" + std::to_string(mesh_id) : name;
+
+      glm::vec3 combined_center(0.0f);
+      for (const auto& surface : surfaces) {
+        combined_center += surface.local_bounds.center;
+      }
+      combined_center /= static_cast<float>(surfaces.size());
+
+      float combined_radius = 0.0f;
+      for (const auto& surface : surfaces) {
+        float distance = glm::distance(combined_center, surface.local_bounds.center)
+                         + surface.local_bounds.radius;
+        combined_radius = std::max(combined_radius, distance);
+      }
+
+      mesh_id = repository_->meshes.add(
+          Mesh{key, std::move(surfaces), BoundingSphere{combined_center, combined_radius}});
+      fmt::print("created mesh {}, mesh_id {}\n", key, mesh_id);
+    }
+
     void ComponentFactory::add_camera_component(const Entity entity,
                                                          const CameraComponent& camera) {
       assert(entity != invalid_entity);
