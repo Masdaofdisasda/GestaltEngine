@@ -323,15 +323,17 @@ namespace gestalt::application {
         if (ImGui::Begin("Add Point Light", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
           static glm::vec3 color = glm::vec3(1.0f);  // Default to white
           static float intensity = 1.0f;
+          static float range = 5.0f;
           static glm::vec3 position = glm::vec3(0.0f);
 
           ImGui::ColorEdit3("Color", &color.x);
           ImGui::SliderFloat("Intensity", &intensity, 0.0f, 100.0f, "%.3f",
                              ImGuiSliderFlags_Logarithmic);
+          ImGui::SliderFloat("Range", &range, 0.0f, 100.0f, "%.3f", ImGuiSliderFlags_Logarithmic);
           ImGui::InputFloat3("Position", &position.x);
 
           if (ImGui::Button("Add Light")) {
-            actions_.get_component_factory().create_point_light(color, intensity, position);
+            actions_.get_component_factory().create_point_light(color, intensity, position, range);
 
             current_action_ = action::none;
           }
@@ -347,12 +349,15 @@ namespace gestalt::application {
           static glm::vec3 min_bounds = root.bounds.min;
           static glm::vec3 max_bounds = root.bounds.max;
           static glm::vec2 intensity_range = glm::vec2(1.f);
+          static float radius = 5.0f;
           static int32 light_count = 10;
 
           ImGui::InputFloat3("Min Bounds", &min_bounds.x);
           ImGui::InputFloat3("Max Bounds", &max_bounds.x);
           ImGui::SliderFloat2("Intensity Range", &intensity_range.x, 0.0f, 100.0f, "%.3f",
                               ImGuiSliderFlags_Logarithmic);
+          ImGui::SliderFloat("Radius", &radius, 0.0f, 100.0f, "%.3f",
+                             ImGuiSliderFlags_Logarithmic);
           ImGui::InputInt("Light Count", &light_count);
 
           if (ImGui::Button("Generate")) {
@@ -373,7 +378,8 @@ namespace gestalt::application {
                   glm::vec3 color = linearRand(glm::vec3(0.0f), glm::vec3(1.0f));
                   float intensity = glm::linearRand(intensity_range.x, intensity_range.y);
 
-                  actions_.get_component_factory().create_point_light(color, intensity, position);
+                  actions_.get_component_factory().create_point_light(color, intensity, position,
+                                                                      radius);
                 }
               }
             }
@@ -946,14 +952,21 @@ namespace gestalt::application {
     }
 
     void Gui::show_light_component(LightComponent& light, TransformComponent& transform) {
-      if (ImGui::ColorPicker3("Color", &light.color.x, ImGuiColorEditFlags_Float)) {
+      if (ImGui::ColorPicker3("Color", &light.base.color.x, ImGuiColorEditFlags_Float)) {
         light.is_dirty = true;
       }
-      if (ImGui::SliderFloat("Intensity", &light.intensity, 0.0f, 100.0f, "%.3f",
+      if (ImGui::SliderFloat("Intensity", &light.base.intensity, 0.0f, 100.0f, "%.3f",
                              ImGuiSliderFlags_Logarithmic)) {
         light.is_dirty = true;
       }
       if (light.type == LightType::kPoint) {
+        if (auto* point_light_data = std::get_if<PointLightData>(&light.specific)) {
+          if (ImGui::SliderFloat("Radius", &point_light_data->range, 0.0f, 100.0f, "%.3f",
+                                 ImGuiSliderFlags_Logarithmic)) {
+            light.is_dirty = true;
+          }
+        }
+
         if (ImGui::DragFloat3("Position", &transform.position.x, 0.1f)) {
           light.is_dirty = true;
         }

@@ -14,8 +14,9 @@ namespace gestalt::application {
 
     Entity ComponentFactory::next_entity() { return next_entity_id_++; }
 
-    std::pair<Entity, std::reference_wrapper<NodeComponent>>
-    ComponentFactory::create_entity(std::string node_name) {
+    std::pair<Entity, std::reference_wrapper<NodeComponent>> ComponentFactory::create_entity(
+        std::string node_name, const glm::vec3& position, const glm::quat& rotation,
+        const float& scale) {
       const Entity new_entity = next_entity();
 
       if (node_name.empty()) {
@@ -25,7 +26,7 @@ namespace gestalt::application {
           .name = node_name,
       };
 
-      create_transform_component(new_entity);
+      create_transform_component(new_entity, position, rotation, scale);
       repository_->scene_graph.add(new_entity, node);
 
       fmt::print("created entity {}\n", new_entity);
@@ -38,23 +39,6 @@ namespace gestalt::application {
                                                                const glm::quat& rotation,
                                                                const float& scale) const {
       repository_->transform_components.add(entity, TransformComponent{true, position, rotation, scale});
-    }
-
-    void ComponentFactory::update_transform_component(const Entity entity,
-                                                               const glm::vec3& position,
-                                                               const glm::quat& rotation,
-                                                               const float& scale) {
-      const std::optional<std::reference_wrapper<TransformComponent>> transform_optional
-          = repository_->transform_components.get(entity);
-
-      if (transform_optional.has_value()) {
-        auto& transform = transform_optional->get();
-
-        transform.position = position;
-        transform.rotation = rotation;
-        transform.scale = scale;
-        transform.is_dirty = true;
-      }
     }
 
     void ComponentFactory::add_mesh_component(const Entity entity,
@@ -103,16 +87,10 @@ namespace gestalt::application {
       auto& transform = repository_->transform_components.get(entity).value().get();
       transform.rotation = glm::quat(lookAt(glm::vec3(0), direction, glm::vec3(0, 1, 0)));
 
-      const LightComponent light{
-          .type = LightType::kDirectional,
-          .color = color,
-          .intensity = intensity,
-      };
+      const uint32 matrix_id = repository_->light_view_projections.add(glm::mat4(1.0));
+      const LightComponent light(color, intensity, matrix_id);
 
       repository_->light_components.add(entity, light);
-      const size_t matrix_id = repository_->light_view_projections.add(glm::mat4(1.0));
-      repository_->light_components.get(entity).value().get().light_view_projections.push_back(
-          matrix_id);
 
       return entity;
     }
@@ -127,43 +105,29 @@ namespace gestalt::application {
       transform.rotation = glm::quat(lookAt(glm::vec3(0), direction, glm::vec3(0, 1, 0)));
       transform.position = position;
 
-      const LightComponent light{
-          .type = LightType::kSpot,
-          .color = color,
-          .intensity = intensity,
-          .inner_cone = innerCone,
-          .outer_cone = outerCone,
-      };
+      const LightComponent light(color, intensity, innerCone, outerCone);
 
       repository_->light_components.add(entity, light);
-      const size_t matrix_id = repository_->light_view_projections.add(glm::mat4(1.0));
-      repository_->light_components.get(entity).value().get().light_view_projections.push_back(
-          matrix_id);
 
       return entity;
     }
 
     Entity ComponentFactory::create_point_light(const glm::vec3& color,
-                                                         const float intensity,
-                                                         const glm::vec3& position, Entity parent) {
+                                                         const float32 intensity,
+                                                         const glm::vec3& position, const float32 range, Entity parent) {
       auto [entity, node] = create_entity("point_light");
       link_entity_to_parent(entity, parent);
 
       auto& transform = repository_->transform_components.get(entity).value().get();
       transform.position = position;
 
-      const LightComponent light{
-          .type = LightType::kPoint,
-          .color = color,
-          .intensity = intensity,
-      };
+      const uint32 matrix_id = repository_->light_view_projections.add(glm::mat4(1.0));
+      for (int i = 0; i < 5; i++) {
+        repository_->light_view_projections.add(glm::mat4(1.0));
+      }
+      const LightComponent light(color, intensity, range, matrix_id);
 
       repository_->light_components.add(entity, light);
-      for (int i = 0; i < 6; i++) {
-        const size_t matrix_id = repository_->light_view_projections.add(glm::mat4(1.0));
-        repository_->light_components.get(entity).value().get().light_view_projections.push_back(
-            matrix_id);
-      }
       return entity;
     }
 

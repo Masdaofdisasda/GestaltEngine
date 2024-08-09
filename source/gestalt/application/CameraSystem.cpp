@@ -81,34 +81,34 @@ namespace gestalt::application {
       const auto frame = frame_->get_current_frame_index();
 
       auto& buffers = repository_->per_frame_data_buffers;
-      buffers->data.view = camera.view_matrix;  // is the camera object actually needed?
-      buffers->data.proj = camera.projection_matrix;
-      buffers->data.inv_view = inverse(camera.view_matrix);
-      buffers->data.inv_viewProj = inverse(camera.projection_matrix * camera.view_matrix);
-      buffers->data.P00 = projection_t[0][0];
-      buffers->data.P11 = projection_t[1][1];
+      buffers->data[frame].view = camera.view_matrix;  // is the camera object actually needed?
+      buffers->data[frame].proj = camera.projection_matrix;
+      buffers->data[frame].inv_view = inverse(camera.view_matrix);
+      buffers->data[frame].inv_viewProj = inverse(camera.projection_matrix * camera.view_matrix);
+      buffers->data[frame].P00 = projection_t[0][0];
+      buffers->data[frame].P11 = projection_t[1][1];
 
       if (!buffers->freezeCullCamera) {
 
-        buffers->data.cullView = camera.view_matrix;
-        buffers->data.cullProj = camera.projection_matrix;
+        buffers->data[frame].cullView = camera.view_matrix;
+        buffers->data[frame].cullProj = camera.projection_matrix;
 
-        buffers->data.znear = near_plane_;
-        buffers->data.zfar = far_plane_;
+        buffers->data[frame].znear = near_plane_;
+        buffers->data[frame].zfar = far_plane_;
 
-        buffers->data.frustum[0] = normalizePlane(projection_t[3] + projection_t[0]);
-        buffers->data.frustum[1] = normalizePlane(projection_t[3] - projection_t[0]);
-        buffers->data.frustum[2] = normalizePlane(projection_t[3] + projection_t[1]);
-        buffers->data.frustum[3] = normalizePlane(projection_t[3] - projection_t[1]);
-        buffers->data.frustum[4] = normalizePlane(projection_t[3] + projection_t[2]);
-        buffers->data.frustum[5] = normalizePlane(projection_t[3] - projection_t[2]);
+        buffers->data[frame].frustum[0] = normalizePlane(projection_t[3] + projection_t[0]);
+        buffers->data[frame].frustum[1] = normalizePlane(projection_t[3] - projection_t[0]);
+        buffers->data[frame].frustum[2] = normalizePlane(projection_t[3] + projection_t[1]);
+        buffers->data[frame].frustum[3] = normalizePlane(projection_t[3] - projection_t[1]);
+        buffers->data[frame].frustum[4] = normalizePlane(projection_t[3] + projection_t[2]);
+        buffers->data[frame].frustum[5] = normalizePlane(projection_t[3] - projection_t[2]);
       }
 
       void* mapped_data;
       const VmaAllocation allocation = buffers->uniform_buffers[frame]->allocation;
       VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation, &mapped_data));
       const auto scene_uniform_data = static_cast<PerFrameData*>(mapped_data);
-      *scene_uniform_data = buffers->data;
+      *scene_uniform_data = buffers->data[frame];
       vmaUnmapMemory(gpu_->getAllocator(), buffers->uniform_buffers[frame]->allocation);
 
       //TODO

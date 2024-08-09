@@ -231,8 +231,29 @@ namespace gestalt::graphics {
       // if the format is a depth format, we will need to have it use the correct
       // aspect flag
       VkImageAspectFlags aspectFlag = VK_IMAGE_ASPECT_COLOR_BIT;
-      if (format == VK_FORMAT_D32_SFLOAT) {
-        aspectFlag = VK_IMAGE_ASPECT_DEPTH_BIT;
+      switch (format) {
+        // Depth-only formats
+        case VK_FORMAT_D32_SFLOAT:
+        case VK_FORMAT_D16_UNORM:
+          aspectFlag = VK_IMAGE_ASPECT_DEPTH_BIT;
+          break;
+
+        // Depth and stencil formats
+        case VK_FORMAT_D24_UNORM_S8_UINT:
+        case VK_FORMAT_D32_SFLOAT_S8_UINT:
+        case VK_FORMAT_D16_UNORM_S8_UINT:
+          aspectFlag = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+          break;
+
+        // Stencil-only format
+        case VK_FORMAT_S8_UINT:
+          aspectFlag = VK_IMAGE_ASPECT_STENCIL_BIT;
+          break;
+
+        // Color formats (or fallback)
+        default:
+          aspectFlag = VK_IMAGE_ASPECT_COLOR_BIT;
+          break;
       }
 
       if (cubemap) {

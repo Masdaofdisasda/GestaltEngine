@@ -30,7 +30,7 @@ layout(set = 2, binding = 2) buffer PointLight{
 	vec3 color;
 	float intensity;
 	vec3 position;
-	bool enabled;
+	float range;
 } pointLight[256];
 
 layout(set = 3, binding = 0) uniform sampler2D gbuffer1;
@@ -177,7 +177,7 @@ void main() {
 
         // Calculation of analytical light
         // https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
-        vec3 intensity = getPointLighIntensity(pointLight[i].color, pointLight[i].intensity, pointToLight);
+        vec3 intensity = getPointLighIntensity(pointLight[i].color, pointLight[i].intensity, pointLight[i].range, pointToLight);
         materialInfo.f_diffuse += intensity * NdotL *  BRDF_lambertian(materialInfo.f0, materialInfo.f90, materialInfo.c_diff, materialInfo.specularWeight, VdotH);
         materialInfo.f_specular += intensity * NdotL * BRDF_specularGGX(materialInfo.f0, materialInfo.f90, materialInfo.alphaRoughness, materialInfo.specularWeight, VdotH, NdotL, NdotV, NdotH);
 		}

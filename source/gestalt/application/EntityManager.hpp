@@ -27,7 +27,8 @@ namespace gestalt::application {
       void init(IResourceManager* resource_manager, Repository* repository);
 
       std::pair<Entity, std::reference_wrapper<NodeComponent>> create_entity(
-          std::string node_name = "");
+          std::string node_name = "", const glm::vec3& position = glm::vec3(0.f),
+          const glm::quat& rotation = glm::quat(1.f, 0.f, 0.f, 0.f), const float& scale = 1.f);
       void add_mesh_component(Entity entity, size_t mesh_index);
       void create_mesh(std::vector<MeshSurface> surfaces, const std::string& name) const;
       void add_camera_component(Entity entity, const CameraComponent& camera);
@@ -37,13 +38,10 @@ namespace gestalt::application {
       Entity create_spot_light(const glm::vec3& color, float intensity,
                                const glm::vec3& direction, const glm::vec3& position,
                                float innerCone, float outerCone, Entity parent = 0);
-      Entity create_point_light(const glm::vec3& color, float intensity,
-                                const glm::vec3& position, Entity parent = 0);
+      Entity create_point_light(const glm::vec3& color, float intensity, const glm::vec3& position,
+                                float32 range, Entity parent = 0);
 
       void link_entity_to_parent(Entity child, Entity parent);
-      void update_transform_component(unsigned entity, const glm::vec3& position,
-                                      const glm::quat& rotation = glm::quat(1.f, 0.f, 0.f, 0.f),
-                                      const float& scale = 1.f);
     };
 
     class AssetLoader : public NonCopyable<AssetLoader> {
@@ -78,7 +76,6 @@ namespace gestalt::application {
                            fastgltf::Material& mat) const;
       void import_materials(fastgltf::Asset& gltf,
                             size_t& image_offset) const;
-      void add_material_component(MeshSurface& surface, const size_t material) const;
       void import_meshes(fastgltf::Asset& gltf, size_t material_offset) const;
 
     public:
@@ -86,7 +83,8 @@ namespace gestalt::application {
                 ComponentFactory* component_factory,
                 Repository* repository);
       void import_lights(const fastgltf::Asset& gltf);
-      std::vector<fastgltf::Node> load_scene_from_gltf(const std::string& file_path);
+      void import_nodes(fastgltf::Asset& gltf) const;
+      void load_scene_from_gltf(const std::string& file_path);
     };
 
     /**
@@ -107,10 +105,6 @@ namespace gestalt::application {
       std::unique_ptr<SceneSystem> transform_system_;
       std::unique_ptr<SceneSystem> mesh_system_;
 
-      void build_scene_graph(const std::vector<fastgltf::Node>& nodes, const size_t& mesh_offset);
-      void create_entities(std::vector<fastgltf::Node> nodes, const size_t& mesh_offset);
-      void build_hierarchy(std::vector<fastgltf::Node> nodes, const size_t& node_offset);
-      void link_orphans_to_root();
       Entity root_entity_ = 0;
 
       void load_scene(const std::string& path);

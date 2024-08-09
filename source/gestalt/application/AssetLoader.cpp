@@ -363,11 +363,7 @@ namespace gestalt::application {
 
   public:
 
-    struct ExtractedMesh {
-      std::vector<MeshSurface> surfaces;
-    };
-
-    static ExtractedMesh extract_mesh(const fastgltf::Asset& gltf, fastgltf::Mesh& mesh,
+    static std::vector<MeshSurface> extract_mesh(const fastgltf::Asset& gltf, fastgltf::Mesh& mesh,
                              size_t material_offset, Repository* repository) {
       std::vector<MeshSurface> surfaces;
       surfaces.reserve(mesh.primitives.size());
@@ -376,7 +372,65 @@ namespace gestalt::application {
             gltf, primitive, material_offset, repository);
         surfaces.push_back(surface);
       }
-      return { surfaces};
+      return surfaces;
+    }
+
+    static void create_nodes(fastgltf::Asset& gltf, const size_t& mesh_offset,
+                             ComponentFactory* component_factory) {
+      for (fastgltf::Node& node : gltf.nodes) {
+        glm::vec3 position(0.f);
+        glm::quat orientation(1.f, 0.f, 0.f, 0.f);
+        float uniform_scale = 1.f;
+
+        if (std::holds_alternative<fastgltf::TRS>(node.transform)) {
+          const auto& [translation, rotation, scale] = std::get<fastgltf::TRS>(node.transform);
+
+          position = glm::vec3(translation[0], translation[1], translation[2]);
+          orientation = glm::quat(rotation[3], rotation[0], rotation[1], rotation[2]);
+          uniform_scale = (scale[0] + scale[1] + scale[2]) / 3.f;  // handle non-uniform scale
+        }
+
+        const auto [entity, node_component] = component_factory->create_entity(
+            std::string(node.name), position, orientation, uniform_scale);
+
+        if (node.lightIndex.has_value()) {
+          // TODO
+        }
+
+        if (node.meshIndex.has_value()) {
+          component_factory->add_mesh_component(entity, mesh_offset + *node.meshIndex);
+        }
+
+      }
+    }
+
+    static void build_hierarchy(std::vector<fastgltf::Node> nodes, const size_t& node_offset, Repository* repository) {
+      for (int i = 0; i < nodes.size(); i++) {
+        fastgltf::Node& node = nodes[i];
+        Entity parent_entity = node_offset + i;
+        auto& scene_object = repository->scene_graph.get(parent_entity).value().get();
+
+        for (auto& c : node.children) {
+          Entity child_entity = node_offset + c;
+          auto& child = repository->scene_graph.get(child_entity).value().get();
+          scene_object.children.push_back(child_entity);
+          child.parent = parent_entity;
+        }
+      }
+    }
+
+    static void link_orphans_to_root(const Entity root, NodeComponent& root_node,
+                                     std::unordered_map<Entity, NodeComponent>& nodes) {
+      for (auto& [entity, node] : nodes) {
+        if (entity == root) {
+          continue;
+        }
+
+        if (node.parent == invalid_entity) {
+          root_node.children.push_back(entity);
+          node.parent = root;
+        }
+      }
     }
 
   };
@@ -389,18 +443,45 @@ namespace gestalt::application {
     component_factory_ = component_factory;
   }
 
+  void AssetLoader::load_scene_from_gltf(const std::string& file_path) {
+    fmt::print("Loading GLTF: {}\n", file_path);
+
+    fastgltf::Asset gltf;
+    if (auto asset = parse_gltf(file_path)) {
+      gltf = std::move(asset.value());
+    } else {
+      return;
+    }
+
+    size_t image_offset = repository_->textures.size();
+    const size_t material_offset = repository_->materials.size();
+
+    import_nodes(gltf);
+
+    import_meshes(gltf, material_offset);
+
+    import_textures(gltf);
+
+    import_materials(gltf, image_offset);
+
+    import_lights(gltf);
+  }
+
   void AssetLoader::import_lights(const fastgltf::Asset& gltf) {
     fmt::print("importing lights\n");
-    for (auto& light : gltf.lights) {
+    for (const fastgltf::Light& light : gltf.lights) {
       if (light.type == fastgltf::LightType::Directional) {
         component_factory_->create_directional_light(
             glm::vec3(light.color.at(0), light.color.at(1), light.color.at(2)), light.intensity,
             glm::vec3(0.f));
 
       } else if (light.type == fastgltf::LightType::Point) {
+        float range = 100.f;
+        if (light.range.has_value()) range = light.range.value();
+
         component_factory_->create_point_light(
             glm::vec3(light.color.at(0), light.color.at(1), light.color.at(2)), light.intensity,
-            glm::vec3(0.f));
+            glm::vec3(0.f), range);
 
       } else if (light.type == fastgltf::LightType::Spot) {
         // TODO;
@@ -408,23 +489,15 @@ namespace gestalt::application {
     }
   }
 
-  std::vector<fastgltf::Node> AssetLoader::load_scene_from_gltf(const std::string& file_path) {
-    fmt::print("Loading GLTF: {}\n", file_path);
+  void AssetLoader::import_nodes(fastgltf::Asset& gltf) const {
+    const size_t mesh_offset = repository_->meshes.size();
+    const size_t node_offset = repository_->scene_graph.size();
 
-    fastgltf::Asset gltf = parse_gltf(file_path).value();
-
-    size_t image_offset = repository_->textures.size();
-    size_t material_offset = repository_->materials.size();
-
-    import_textures(gltf);
-
-    import_materials(gltf, image_offset);
-
-    import_meshes(gltf, material_offset);
-
-    import_lights(gltf);
-
-    return gltf.nodes;
+    GltfParser::create_nodes(gltf, mesh_offset, component_factory_);
+    GltfParser::build_hierarchy(gltf.nodes, node_offset, repository_);
+    constexpr Entity root = 0;
+    GltfParser::link_orphans_to_root(root, repository_->scene_graph.get(root).value().get(),
+                                     repository_->scene_graph.components());
   }
 
   std::optional<fastgltf::Asset> AssetLoader::parse_gltf(const std::filesystem::path& file_path) {
@@ -680,7 +753,7 @@ namespace gestalt::application {
 
     fmt::print("importing meshes\n");
     for (fastgltf::Mesh& mesh : gltf.meshes) {
-      auto [surfaces] = GltfParser::extract_mesh(gltf, mesh, material_offset, repository_);
+      const auto surfaces = GltfParser::extract_mesh(gltf, mesh, material_offset, repository_);
 
        component_factory_->create_mesh(surfaces, std::string(mesh.name));
     }

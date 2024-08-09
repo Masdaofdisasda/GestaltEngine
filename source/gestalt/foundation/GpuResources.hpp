@@ -166,15 +166,17 @@ namespace gestalt::foundation {
     glm::vec3 color;
     float intensity;
     glm::vec3 direction;
-    uint32_t viewProj;
+    uint32 viewProj;
   };
+
 
   struct alignas(32) GpuPointLight {
     glm::vec3 color;
-    float intensity;
+    float32 intensity;
     glm::vec3 position;
-    bool enabled;
+    float32 range;
   };
+  static_assert(sizeof(GpuPointLight) == 32);
 
   // BUFFER TYPES
   struct BufferCollection {
@@ -207,7 +209,7 @@ namespace gestalt::foundation {
   };
 
   struct PerFrameDataBuffers final : BufferCollection {
-    PerFrameData data;
+    std::array<PerFrameData, getFramesInFlight()> data;
     bool freezeCullCamera = false;
     std::array<std::shared_ptr<AllocatedBuffer>, getFramesInFlight()> uniform_buffers;
 

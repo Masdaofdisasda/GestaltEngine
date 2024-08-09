@@ -301,7 +301,6 @@ namespace gestalt::application {
     const auto mesh_draw_data = static_cast<MeshDraw*>(mapped_data);
     std::memcpy(mesh_draw_data, mesh_draws.data().data(), mesh_draws.size() * sizeof(MeshDraw));
     vmaUnmapMemory(gpu_->getAllocator(), mesh_buffers->mesh_draw_buffer[frame]->allocation);
-
     updatable_entities_.clear();
   }
 

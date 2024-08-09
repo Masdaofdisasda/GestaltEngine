@@ -132,7 +132,7 @@ namespace gestalt::graphics {
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
     vkCmdSetViewport(cmd, 0, 1, &viewport_);
     vkCmdSetScissor(cmd, 0, 1, &scissor_);
-    registry_->config_.lighting.invViewProj = per_frame_buffers->data.inv_viewProj;
+    registry_->config_.lighting.invViewProj = per_frame_buffers->data[frame].inv_viewProj;
     registry_->config_.lighting.num_dir_lights = repository_->directional_lights.size();
     registry_->config_.lighting.num_point_lights = repository_->point_lights.size();
 

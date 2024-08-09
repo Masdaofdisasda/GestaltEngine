@@ -188,6 +188,7 @@ namespace gestalt::graphics {
 
   bool RenderEngine::acquire_next_image() {
     VK_CHECK(vkWaitForFences(gpu_->getDevice(), 1, &frame().render_fence, true, UINT64_MAX));
+    vkDeviceWaitIdle(gpu_->getDevice());
 
     VkResult e
         = vkAcquireNextImageKHR(gpu_->getDevice(), swapchain_->swapchain, UINT64_MAX,

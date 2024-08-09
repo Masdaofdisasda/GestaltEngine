@@ -96,13 +96,13 @@ namespace gestalt::application {
   }
 
   bool has_dirty_light(const std::unordered_map<Entity, LightComponent>& lights) {
-    return std::any_of(
-        lights.begin(), lights.end(),
-        [](const std::pair<Entity, LightComponent>& light) { return light.second.is_dirty; });
+    return std::ranges::any_of(lights, [](const std::pair<Entity, LightComponent>& light) {
+      return light.second.is_dirty;
+    });
   }
 
   void LightSystem::update_directional_lights(std::unordered_map<Entity, LightComponent>& lights) {
-    auto& light_data = repository_->light_buffers;
+    const auto& light_data = repository_->light_buffers;
 
     repository_->directional_lights.clear();
     for (auto& light_source : lights) {
@@ -111,20 +111,23 @@ namespace gestalt::application {
         continue;
       }
 
-      auto& rotation = repository_->transform_components.get(entity).value().get().rotation;
-      glm::vec3 direction = normalize(glm::vec3(0, 0, -1.f) * rotation);
+      if (auto* dir_light_data = std::get_if<DirectionalLightData>(&light.specific)) {
+        auto& rotation = repository_->transform_components.get(entity).value().get().rotation;
+        glm::vec3 direction = normalize(glm::vec3(0, 0, -1.f) * rotation);
 
-      auto& view_proj = repository_->light_view_projections.get(light.light_view_projections.at(0));
-      view_proj = calculate_sun_view_proj(direction);
+        auto& view_proj
+            = repository_->light_view_projections.get(dir_light_data->light_view_projection);
+        view_proj = calculate_sun_view_proj(direction);
 
-      GpuDirectionalLight dir_light = {};
-      dir_light.color = light.color;
-      dir_light.intensity = light.intensity;
-      dir_light.direction = direction;
-      dir_light.viewProj = light.light_view_projections.at(0);
-      repository_->directional_lights.add(dir_light);
+        GpuDirectionalLight dir_light = {};
+        dir_light.color = light.base.color;
+        dir_light.intensity = light.base.intensity;
+        dir_light.direction = direction;
+        dir_light.viewProj = dir_light_data->light_view_projection;
+        repository_->directional_lights.add(dir_light);
 
-      light.is_dirty = false;
+        light.is_dirty = false;
+      }
     }
 
     void* mapped_data;
@@ -144,16 +147,19 @@ namespace gestalt::application {
       if (light.type != LightType::kPoint) {
         continue;
       }
-      auto& position = repository_->transform_components.get(entity).value().get().position;
 
-      GpuPointLight point_light = {};
-      point_light.color = light.color;
-      point_light.intensity = light.intensity;
-      point_light.position = position;
-      point_light.enabled = true;
-      repository_->point_lights.add(point_light);
+      if (auto* point_light_data = std::get_if<PointLightData>(&light.specific)) {
+        const auto& position = repository_->transform_components.get(entity).value().get().position;
 
-      light.is_dirty = false;
+        GpuPointLight point_light = {};
+        point_light.color = light.base.color;
+        point_light.intensity = light.base.intensity;
+        point_light.position = position;
+        point_light.range = point_light_data->range;
+        repository_->point_lights.add(point_light);
+
+        light.is_dirty = false;
+      }
     }
 
     void* mapped_data;

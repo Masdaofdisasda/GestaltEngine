@@ -372,9 +372,8 @@ float getSpotAttenuation(vec3 pointToLight, vec3 spotDirection, float outerConeC
     return 0.0;
 }
 
-vec3 getPointLighIntensity(vec3 lightColor, float lightIntensity, vec3 pointToLight)
+vec3 getPointLighIntensity(vec3 lightColor, float lightIntensity, float range, vec3 pointToLight)
 {
-    float range = 5.0;
     float rangeAttenuation = getRangeAttenuation(range, length(pointToLight));
 
     return rangeAttenuation * lightIntensity * lightColor;

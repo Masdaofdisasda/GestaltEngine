@@ -151,9 +151,6 @@ namespace gestalt::application {
       };
 
       update_aabb(root_entity, root_transform);
-
-      // mark the directional light as dirty to update the view-projection matrix
-      repository_->light_components.asVector().at(0).second.get().is_dirty = true;
     }
 
     updatable_entities_.clear();

@@ -30,7 +30,7 @@ namespace gestalt::application {
 
     component_factory_->create_directional_light(
         glm::vec3(1.f, 0.957f, 0.917f), 5.f, glm::vec3(-0.216, 0.941, -0.257), get_root_entity());
-    component_factory_->create_point_light(glm::vec3(1.0f), 5.0f, glm ::vec3(0.0, 6.0, 0.0),
+    component_factory_->create_point_light(glm::vec3(1.0f), 5.0f, glm ::vec3(0.0, 6.0, 0.0), 100.f,
                                            get_root_entity());
 
     material_system_ = std::make_unique<MaterialSystem>();
@@ -50,74 +50,7 @@ namespace gestalt::application {
   }
 
     void EntityManager::load_scene(const std::string& path) {
-      size_t mesh_offset = repository_->meshes.size();
-      const auto nodes = asset_loader_->load_scene_from_gltf(path);
-      build_scene_graph(nodes, mesh_offset);
-    }
-
-    void EntityManager::create_entities(std::vector<fastgltf::Node> nodes,
-                                       const size_t& mesh_offset) {
-      for (fastgltf::Node& node : nodes) {
-        if (node.lightIndex.has_value()) {
-          // TODO
-        }
-
-        const auto [entity, node_component]
-            = component_factory_->create_entity(std::string(node.name));
-
-        if (node.meshIndex.has_value()) {
-          component_factory_->add_mesh_component(entity, mesh_offset + *node.meshIndex);
-        }
-
-        if (std::holds_alternative<fastgltf::TRS>(node.transform)) {
-          const auto& trs = std::get<fastgltf::TRS>(node.transform);
-
-          glm::vec3 translation(trs.translation[0], trs.translation[1], trs.translation[2]);
-          glm::quat rotation(trs.rotation[3], trs.rotation[0], trs.rotation[1], trs.rotation[2]);
-          float scale = (trs.scale[0] + trs.scale[1] + trs.scale[2])
-                        / 3.f;  // TODO handle non-uniform scale
-
-          component_factory_->update_transform_component(entity, translation, rotation, scale);
-        }
-      }
-    }
-
-    void EntityManager::build_hierarchy(std::vector<fastgltf::Node> nodes,
-                                       const size_t& node_offset) {
-      for (int i = 0; i < nodes.size(); i++) {
-        fastgltf::Node& node = nodes[i];
-        Entity parent_entity = node_offset + i;
-        auto& scene_object = repository_->scene_graph.get(parent_entity).value().get();
-
-        for (auto& c : node.children) {
-          Entity child_entity = node_offset + c;
-          auto& child = repository_->scene_graph.get(child_entity).value().get();
-          scene_object.children.push_back(child_entity);
-          child.parent = parent_entity;
-        }
-      }
-    }
-
-    void EntityManager::link_orphans_to_root() {
-      for (auto& [entity, node] : repository_->scene_graph.components()) {
-        if (entity == get_root_entity()) {
-          continue;
-        }
-
-        if (node.parent == invalid_entity) {
-          get_root_node().children.push_back(entity);
-          node.parent = get_root_entity();
-        }
-      }
-    }
-
-    void EntityManager::build_scene_graph(const std::vector<fastgltf::Node>& nodes,
-                                         const size_t& mesh_offset) {
-      const size_t node_offset = repository_->scene_graph.size();
-
-      create_entities(nodes, mesh_offset);
-      build_hierarchy(nodes, node_offset);
-      link_orphans_to_root();
+      asset_loader_->load_scene_from_gltf(path);
     }
 
     void EntityManager::cleanup() const {

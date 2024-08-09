@@ -85,7 +85,7 @@ namespace gestalt::graphics {
     };
     descriptorBufferFeatures.pNext = &shading_rate_features;
 
-    std::vector extensions = {VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
+    std::vector extensions = {
                               VK_EXT_MESH_SHADER_EXTENSION_NAME,
           VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME
     };
