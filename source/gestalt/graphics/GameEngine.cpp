@@ -73,6 +73,7 @@ namespace gestalt {
     SDL_Event e;
 
     while (!quit_) {
+      input_system_.reset_frame();
       while (SDL_PollEvent(&e) != 0) {
         if (e.type == SDL_QUIT) quit_ = true;
 

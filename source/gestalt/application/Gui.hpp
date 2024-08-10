@@ -53,6 +53,7 @@ namespace gestalt::application {
       void show_transform_component(NodeComponent& node, TransformComponent& transform);
       void show_mesh_component(MeshComponent& mesh_component);
       void show_light_component(LightComponent& light, TransformComponent& transform);
+      void show_camera_component(CameraComponent& camera);
       void show_node_component();
       void show_scene_hierarchy_window();
       void light_adaptation_settings();

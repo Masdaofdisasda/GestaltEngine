@@ -4,6 +4,7 @@
 #include <unordered_map>
 
 #include "Components.hpp"
+#include "InputTypes.hpp"
 #include "Camera.hpp"
 #include "GpuTypes.hpp"
 #include "Repository.hpp"
@@ -11,7 +12,6 @@
 #include "fastgltf/types.hpp"
 
 namespace gestalt::application {
-    struct Movement;
 
     enum class ChangeType {
       ComponentUpdated,
@@ -122,9 +122,10 @@ class NotificationManager {
     };
 
     class CameraSystem final : public SceneSystem, public NonCopyable<CameraSystem> {
-      std::unique_ptr<Camera> active_camera_;
-      std::unique_ptr<FreeFlyCamera> free_fly_camera_; // move to components
-      float32 aspect_{1.f};
+      Entity active_camera_{0};
+      std::unique_ptr<FreeFlyCamera> free_fly_camera_;
+      std::unique_ptr<OrbitCamera> orbit_camera_;
+      float32 aspect_ratio_{1.f};
       float32 near_plane_{0.1f};
       float32 far_plane_{10000.f};
       float32 fov_{70.f};

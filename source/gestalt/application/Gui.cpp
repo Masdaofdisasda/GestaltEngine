@@ -145,7 +145,9 @@ namespace gestalt::application {
     void Gui::guizmo() {
       ImGuizmo::BeginFrame();
 
-      auto [viewCam, proj] = repository_->cameras.get(0);
+      auto cam = repository_->camera_components.get(0);
+      auto viewCam = cam->get().view_matrix;
+      auto proj = cam->get().projection_matrix;
       proj[1][1] *= -1;  // Flip the Y-axis for opengl like system
 
       // Convert glm matrices to arrays for ImGuizmo
@@ -991,6 +993,23 @@ namespace gestalt::application {
       }
     }
 
+    void Gui::show_camera_component(CameraComponent& camera) {
+      const char* camera_type_items[] = {"Perspective", "Orthographic"};
+      int camera_type_index = static_cast<int>(camera.type);
+      if (ImGui::Combo("Camera Type", &camera_type_index, camera_type_items,
+                       IM_ARRAYSIZE(camera_type_items))) {
+        camera.type = static_cast<CameraType>(camera_type_index);
+      }
+
+      // UI for Camera Positioner Type
+      const char* positioner_type_items[] = {"FreeFly", "Orbit"};
+      int positioner_type_index = static_cast<int>(camera.positioner);
+      if (ImGui::Combo("Positioner Type", &positioner_type_index, positioner_type_items,
+                       IM_ARRAYSIZE(positioner_type_items))) {
+        camera.positioner = static_cast<CameraPositionerType>(positioner_type_index);
+      }
+    }
+
     void Gui::show_node_component() {
       if (selected_entity_ != invalid_entity) {
         auto& selected_node = repository_->scene_graph.get(selected_entity_)->get();
@@ -1014,6 +1033,13 @@ namespace gestalt::application {
         if (light_optional.has_value() && transform_optional.has_value()) {
           if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen)) {
             show_light_component(light_optional.value().get(), transform_optional.value().get());
+          }
+        }
+
+        const auto& camera_optional = repository_->camera_components.get(selected_entity_);
+        if (camera_optional.has_value()) {
+          if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
+            show_camera_component(camera_optional.value().get());
           }
         }
       }

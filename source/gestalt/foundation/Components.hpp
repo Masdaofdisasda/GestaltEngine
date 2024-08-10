@@ -69,12 +69,17 @@ namespace gestalt::foundation {
       BoundingSphere local_bounds;
     };
 
-    struct CameraComponent : Component {
-      size_t camera_data;
-      // TODO : add more camera settings
-    };
+  enum CameraType { kPerspective, kOrthographic };
+  enum CameraPositionerType { kFreeFly, kOrbit };
 
-    struct CameraData {
+    struct CameraComponent : Component {
+
+      explicit CameraComponent(CameraType type, CameraPositionerType positioner)
+        : type(type), positioner(positioner) {
+      }
+
+      CameraType type;
+      CameraPositionerType positioner;
       glm::mat4 view_matrix{1.0f};
       glm::mat4 projection_matrix{1.0};
     };

@@ -7,10 +7,11 @@
 namespace gestalt::application {
 
     void CameraSystem::prepare() {
-      free_fly_camera_ = std::make_unique<FreeFlyCamera>();
-      free_fly_camera_->init(glm::vec3(7, 1.8, -7), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-      active_camera_ = std::make_unique<Camera>();
-      active_camera_->init(*free_fly_camera_);
+      const auto main_camera = CameraComponent(kPerspective, kFreeFly);
+      free_fly_camera_ = std::make_unique<FreeFlyCamera>(glm::vec3(7, 1.8, -7), glm::vec3(0, 0, 0),
+                                                         glm::vec3(0, 1, 0));
+      orbit_camera_ = std::make_unique<OrbitCamera>(glm::vec3(0, 0, 0), 10.f, 0.1, 100.f);
+      repository_->camera_components.add(root_entity, main_camera);
 
       const auto& per_frame_data_buffers = repository_->per_frame_data_buffers;
 
@@ -49,8 +50,14 @@ namespace gestalt::application {
     }
 
     void CameraSystem::update_cameras(const float delta_time, const Movement& movement, float aspect) {
-      aspect_ = aspect;
-              active_camera_->update(delta_time, movement);
+      aspect_ratio_ = aspect;
+
+      const auto cam = repository_->camera_components.get(root_entity).value().get();
+      if (cam.positioner == kFreeFly) {
+        free_fly_camera_->update(delta_time, movement);
+      } else if (cam.positioner == kOrbit) {
+        orbit_camera_->update(delta_time, movement);
+      }
     }
 
     glm::vec4 normalizePlane(glm::vec4 p) { return p / length(glm::vec3(p)); }
@@ -63,35 +70,50 @@ namespace gestalt::application {
     }
 
     void CameraSystem::update() {
-      const glm::mat4 view = active_camera_->get_view_matrix();
+      const auto frame = frame_->get_current_frame_index();
 
-      // camera projection
-      //glm::mat4 projection = perspectiveProjection(glm::radians(fov_), aspect_, near_plane_);
-      glm::mat4 projection = glm::perspective(glm::radians(fov_), aspect_, near_plane_, far_plane_);
-      glm::mat4 projection_t = transpose(projection);
+      const auto& buffers = repository_->per_frame_data_buffers;
+      auto& camera_component = repository_->camera_components.get(root_entity).value().get();
+
+      glm::mat4 view_matrix;
+      if (camera_component.positioner == kFreeFly) {
+        view_matrix = free_fly_camera_->get_view_matrix();
+      }
+      else if (camera_component.positioner == kOrbit) {
+        view_matrix = orbit_camera_->get_view_matrix();
+      }
+      glm::mat4 projection;
+      if (camera_component.type == kPerspective) {
+        projection = glm::perspective(glm::radians(fov_), aspect_ratio_, near_plane_, far_plane_);
 
       // invert the Y direction on projection matrix so that we are more similar
       // to opengl and gltf axis
       projection[1][1] *= -1;
 
-      auto& camera = repository_->cameras.get(0);  // assume this as the main camera for now
-      camera.view_matrix = view;
-      camera.projection_matrix = projection;
+      } else if (camera_component.type == kOrthographic) {
+        //TODO this is broken
+        float ortho_width = 5.f; 
+        float ortho_height = ortho_width / aspect_ratio_;
+        float left = -ortho_width / 2.0f;
+        float right = ortho_width / 2.0f;
+        float bottom = -ortho_height / 2.0f;
+        float top = ortho_height / 2.0f;
+        projection = glm::ortho(left, right, bottom, top, near_plane_, far_plane_);
+    }
 
-      const auto frame = frame_->get_current_frame_index();
-
-      auto& buffers = repository_->per_frame_data_buffers;
-      buffers->data[frame].view = camera.view_matrix;  // is the camera object actually needed?
-      buffers->data[frame].proj = camera.projection_matrix;
-      buffers->data[frame].inv_view = inverse(camera.view_matrix);
-      buffers->data[frame].inv_viewProj = inverse(camera.projection_matrix * camera.view_matrix);
+      glm::mat4 projection_t = transpose(projection);
+      camera_component.view_matrix = view_matrix;
+      camera_component.projection_matrix = projection;
+      buffers->data[frame].view = view_matrix;  // is the camera object actually needed?
+      buffers->data[frame].proj = projection;
+      buffers->data[frame].inv_view = inverse(view_matrix);
+      buffers->data[frame].inv_viewProj = inverse(projection * view_matrix);
       buffers->data[frame].P00 = projection_t[0][0];
       buffers->data[frame].P11 = projection_t[1][1];
 
       if (!buffers->freezeCullCamera) {
-
-        buffers->data[frame].cullView = camera.view_matrix;
-        buffers->data[frame].cullProj = camera.projection_matrix;
+        buffers->data[frame].cullView = view_matrix;
+        buffers->data[frame].cullProj = projection;
 
         buffers->data[frame].znear = near_plane_;
         buffers->data[frame].zfar = far_plane_;
@@ -103,7 +125,6 @@ namespace gestalt::application {
         buffers->data[frame].frustum[4] = normalizePlane(projection_t[3] + projection_t[2]);
         buffers->data[frame].frustum[5] = normalizePlane(projection_t[3] - projection_t[2]);
       }
-
       void* mapped_data;
       const VmaAllocation allocation = buffers->uniform_buffers[frame]->allocation;
       VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation, &mapped_data));
@@ -111,14 +132,14 @@ namespace gestalt::application {
       *scene_uniform_data = buffers->data[frame];
       vmaUnmapMemory(gpu_->getAllocator(), buffers->uniform_buffers[frame]->allocation);
 
-      //TODO
+      // TODO
       meshlet_push_constants.pyramidWidth = 0;
       meshlet_push_constants.pyramidHeight = 0;
       meshlet_push_constants.clusterOcclusionEnabled = 0;
     }
 
     void CameraSystem::cleanup() {
-      repository_->cameras.clear();
+      repository_->camera_components.clear();
 
       const auto& buffers = repository_->per_frame_data_buffers;
 

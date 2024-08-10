@@ -111,7 +111,6 @@ namespace gestalt::foundation {
     GpuDataContainer<Material> materials;
     GpuDataContainer<Mesh> meshes;
     GpuDataContainer<MeshDraw> mesh_draws;
-    GpuDataContainer<CameraData> cameras;
     std::unordered_map<SamplerConfig, VkSampler, SamplerConfigHash> sampler_cache;
 
     VkSampler get_sampler(const SamplerConfig& config = {}) {
