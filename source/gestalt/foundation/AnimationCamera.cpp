@@ -39,8 +39,4 @@ namespace gestalt::foundation {
     camera_data.angles_current = ClipAngles(camera_data.angles_current);
   }
 
-  glm::mat4 MoveToCamera::get_view_matrix(const AnimationCameraData& data) {
-    const auto& camera_data = data;
-    return camera_data.get_view_matrix();
-  }
 }  // namespace gestalt::application

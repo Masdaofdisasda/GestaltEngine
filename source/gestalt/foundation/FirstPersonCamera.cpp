@@ -28,10 +28,4 @@ namespace gestalt::foundation {
     camera_data.set_up_vector(camera_data.up);
   }
 
-  glm::mat4 FirstPersonCamera::get_view_matrix(const FirstPersonCameraData& data) {
-    const auto& camera_data = data;
-    return camera_data.get_view_matrix();
-  }
-
-
 }  // namespace gestalt::application

@@ -96,13 +96,13 @@ namespace gestalt::application {
           []<typename CameraDataType>(const CameraDataType& camera_data) -> glm::mat4 {
             using T = std::decay_t<CameraDataType>;
             if constexpr (std::is_same_v<T, FreeFlyCameraData>) {
-              return FreeFlyCamera::get_view_matrix(camera_data);
+              return camera_data.get_view_matrix();
             } else if constexpr (std::is_same_v<T, OrbitCameraData>) {
-              return OrbitCamera::get_view_matrix(camera_data);
+              return camera_data.get_view_matrix();
             } else if constexpr (std::is_same_v<T, FirstPersonCameraData>) {
-              return FirstPersonCamera::get_view_matrix(camera_data);
+              return camera_data.get_view_matrix();
             } else if constexpr (std::is_same_v<T, AnimationCameraData>) {
-              return MoveToCamera::get_view_matrix(camera_data);
+              return camera_data.get_view_matrix();
             } else {
               return glm::mat4(1.0f);  // Default return value if no match
             }

@@ -51,9 +51,4 @@ namespace gestalt::foundation {
     camera_data.mouse_pos = glm::vec2(movement.mouse_position_x, movement.mouse_position_y);
   }
 
-  glm::mat4 OrbitCamera::get_view_matrix(const OrbitCameraData& data) {
-    const auto& camera_data = data;
-    return camera_data.get_view_matrix();
-  }
-
 }  // namespace gestalt::foundation

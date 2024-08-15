@@ -72,11 +72,4 @@ namespace gestalt::foundation {
     camera_data.camera_position += camera_data.move_speed * static_cast<float32>(delta_seconds);
   }
 
-  glm::mat4 FreeFlyCamera::get_view_matrix(const FreeFlyCameraData& data) {
-    const auto& camera_data = data;
-
-    return camera_data.get_view_matrix();
-  }
-
-
 }  // namespace gestalt::application
