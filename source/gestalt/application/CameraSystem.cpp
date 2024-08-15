@@ -11,6 +11,10 @@ namespace gestalt::application {
       free_fly_camera_ = std::make_unique<FreeFlyCamera>(glm::vec3(7, 1.8, -7), glm::vec3(0, 0, 0),
                                                          glm::vec3(0, 1, 0));
       orbit_camera_ = std::make_unique<OrbitCamera>(glm::vec3(0, 0, 0), 10.f, 0.1, 100.f);
+      first_person_camera_ = std::make_unique<FirstPersonCamera>(glm::vec3(0, 2.0, 0), glm::vec3(0, 1, 0));
+      move_to_camera_
+          = std::make_unique<MoveToCamera>(glm::vec3(0.f, 2.f, -10.f), glm::vec3(10.0f, 0.0f, 0.0f), glm::vec3(0.f, 2.f, 10.f),
+          glm::vec3(5.0f, -45.0f, 0.0f));
       repository_->camera_components.add(root_entity, main_camera);
 
       const auto& per_frame_data_buffers = repository_->per_frame_data_buffers;
@@ -57,6 +61,10 @@ namespace gestalt::application {
         free_fly_camera_->update(delta_time, movement);
       } else if (cam.positioner == kOrbit) {
         orbit_camera_->update(delta_time, movement);
+      } else if (cam.positioner == kFirstPerson) {
+        first_person_camera_->update(delta_time, movement);
+      } else if (cam.positioner == kAnimation) {
+        move_to_camera_->update(delta_time, movement);
       }
     }
 
@@ -81,6 +89,12 @@ namespace gestalt::application {
       }
       else if (camera_component.positioner == kOrbit) {
         view_matrix = orbit_camera_->get_view_matrix();
+      }
+      else if (camera_component.positioner == kFirstPerson) {
+        view_matrix = first_person_camera_->get_view_matrix();
+      }
+      else if (camera_component.positioner == kAnimation) {
+        view_matrix = move_to_camera_->get_view_matrix();
       }
       glm::mat4 projection;
       if (camera_component.type == kPerspective) {

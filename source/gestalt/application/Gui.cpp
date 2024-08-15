@@ -1002,7 +1002,7 @@ namespace gestalt::application {
       }
 
       // UI for Camera Positioner Type
-      const char* positioner_type_items[] = {"FreeFly", "Orbit"};
+      const char* positioner_type_items[] = {"Free Fly", "Orbit", "First Person", "Animation"};
       int positioner_type_index = static_cast<int>(camera.positioner);
       if (ImGui::Combo("Positioner Type", &positioner_type_index, positioner_type_items,
                        IM_ARRAYSIZE(positioner_type_items))) {

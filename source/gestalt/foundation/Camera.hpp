@@ -44,11 +44,7 @@ namespace gestalt::foundation {
 
     class FreeFlyCamera final : public CameraPositioner {
     public:
-      FreeFlyCamera(const glm::vec3& pos, const glm::vec3& target, const glm::vec3& up) {
-        set_position(pos);
-        set_orientation(target, up);
-        set_up_vector(up);
-      }
+      FreeFlyCamera(const glm::vec3& pos, const glm::vec3& target, const glm::vec3& up);
 
       void update(float64 delta_seconds, const Movement& movement) override;
 
@@ -82,13 +78,7 @@ namespace gestalt::foundation {
 
   class OrbitCamera final : public CameraPositioner {
     public:
-      OrbitCamera(const glm::vec3& target, float distance, float minDistance, float maxDistance)
-          : target_(target),
-            distance_(distance),
-            minDistance_(minDistance),
-            maxDistance_(maxDistance) {
-        update_orientation();
-      }
+      OrbitCamera(const glm::vec3& target, float distance, float minDistance, float maxDistance);
 
       void update(float64 delta_seconds, const Movement& movement) override;
 
@@ -127,6 +117,77 @@ namespace gestalt::foundation {
       float pan_speed_ = 10.0f;
     };
 
+  class FirstPersonCamera final : public CameraPositioner {
+    public:
+      explicit FirstPersonCamera(const glm::vec3& startPosition,
+                                 const glm::vec3& startUp = glm::vec3(0.0f, 1.0f, 0.0f));
 
+      void update(float64 delta_seconds, const Movement& movement) override;
+
+      [[nodiscard]] glm::mat4 get_view_matrix() const override;
+
+      [[nodiscard]] glm::vec3 get_position() const override;
+
+      [[nodiscard]] glm::quat get_orientation() const override;
+
+      void set_position(const glm::vec3& pos);
+
+      void set_orientation(const glm::vec3& target, const glm::vec3& up);
+
+      void set_up_vector(const glm::vec3& up);
+
+    private:
+      glm::vec3 camera_position_;
+      glm::quat camera_orientation_ = glm::quat(glm::vec3(0.0f));
+      glm::vec3 up_;
+
+      glm::mat4 view_matrix_ = glm::mat4(1.0f);
+      glm::vec2 mouse_pos_ = glm::vec2(0.0f);
+
+      float mouse_speed_ = 2.5f;  // Adjust based on your desired sensitivity
+      glm::vec3 move_speed_ = glm::vec3(0.0f);
+    };
+
+  
+class MoveToCamera final : public CameraPositioner {
+    public:
+      MoveToCamera(const glm::vec3& pos, const glm::vec3& angles, const glm::vec3& desired_pos, const glm::vec3& desired_angles);
+
+      void update(float64 delta_seconds, const Movement& movement) override;
+
+      void setPosition(const glm::vec3& p);
+
+      void setAngles(float pitch, float pan, float roll);
+      void setAngles(const glm::vec3& angles);
+      void setDesiredPosition(const glm::vec3& p);
+
+      void SetDesiredAngles(float pitch, float pan, float roll);
+      void setDesiredAngles(const glm::vec3& angles);
+
+      glm::vec3 get_position() const override;
+      glm::mat4 get_view_matrix() const override;
+  glm::quat get_orientation() const override;
+
+    public:
+      float dampingLinear_ = 10000.0f;
+      glm::vec3 dampingEulerAngles_ = glm::vec3(5.0f, 5.0f, 5.0f);
+
+    private:
+      glm::vec3 positionCurrent_ = glm::vec3(0.0f);
+      glm::vec3 positionDesired_ = glm::vec3(0.0f);
+
+      /// pitch, pan, roll
+      glm::vec3 anglesCurrent_ = glm::vec3(0.0f);
+      glm::vec3 anglesDesired_ = glm::vec3(0.0f);
+
+      glm::mat4 currentTransform_ = glm::mat4(1.0f);
+
+      static float ClipAngle(float d);
+
+      static glm::vec3 clipAngles(const glm::vec3& angles);
+
+      static glm::vec3 angleDelta(const glm::vec3& anglesCurrent,
+                                  const glm::vec3& anglesDesired);
+};
 
 }  // namespace gestalt::application

@@ -10,12 +10,14 @@ namespace gestalt::application {
 
       SDL_Init(SDL_INIT_VIDEO);
 
-      constexpr auto window_flags
-          = static_cast<SDL_WindowFlags>(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
+      constexpr auto window_flags = static_cast<SDL_WindowFlags>(
+          SDL_WINDOW_VULKAN | SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI);
 
       handle = SDL_CreateWindow("Gestalt Engine", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                                 static_cast<int>(extent.width), static_cast<int>(extent.height),
                                 window_flags);
+
+      //SDL_SetRelativeMouseMode(SDL_TRUE);
     }
 
     void Window::create_surface(const VkInstance instance, VkSurfaceKHR* surface) const {

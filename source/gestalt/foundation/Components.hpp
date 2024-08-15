@@ -70,7 +70,7 @@ namespace gestalt::foundation {
     };
 
   enum CameraType { kPerspective, kOrthographic };
-  enum CameraPositionerType { kFreeFly, kOrbit };
+  enum CameraPositionerType { kFreeFly, kOrbit, kFirstPerson, kAnimation };
 
     struct CameraComponent : Component {
 

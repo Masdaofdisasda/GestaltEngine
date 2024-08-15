@@ -27,13 +27,18 @@ namespace gestalt::application {
     }
 
     void InputSystem::reset_frame() {
-	  movement_.scroll = 0;
+      movement_.scroll = 0;
+      movement_.mouse_position_y_rel = 0.f;
+      movement_.mouse_position_x_rel = 0.f;
     }
 
     void InputSystem::handle_mouse_motion(const SDL_Event& e, uint32 window_size_x,
                                           uint32 window_size_y) {
       movement_.mouse_position_x = static_cast<float>(e.motion.x) / window_size_x;
       movement_.mouse_position_y = static_cast<float>(e.motion.y) / window_size_y;
+
+      movement_.mouse_position_x_rel = static_cast<float>(e.motion.xrel) / window_size_x;
+      movement_.mouse_position_y_rel = static_cast<float>(e.motion.yrel) / window_size_y;
     }
 
     void InputSystem::handle_mouse_button(const SDL_Event& e) {
