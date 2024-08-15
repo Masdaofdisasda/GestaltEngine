@@ -10,8 +10,8 @@
 namespace gestalt::foundation {
 
   void FirstPersonCamera::update(float64 delta_seconds, const Movement& movement,
-                                 CameraData& data) {
-    auto& camera_data = std::get<FirstPersonCameraData>(data);
+                                 FirstPersonCameraData& data) {
+    auto& camera_data = data;
     const auto mouse_pos = glm::vec2(movement.mouse_position_x_rel, movement.mouse_position_y_rel);
 
     const glm::vec2 delta = mouse_pos - camera_data.mouse_pos;
@@ -28,8 +28,8 @@ namespace gestalt::foundation {
     camera_data.set_up_vector(camera_data.up);
   }
 
-  glm::mat4 FirstPersonCamera::get_view_matrix(CameraData& data) const {
-    const auto& camera_data = std::get<FirstPersonCameraData>(data);
+  glm::mat4 FirstPersonCamera::get_view_matrix(const FirstPersonCameraData& data) {
+    const auto& camera_data = data;
     return camera_data.get_view_matrix();
   }
 

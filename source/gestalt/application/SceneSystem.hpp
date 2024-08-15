@@ -123,10 +123,6 @@ class NotificationManager {
 
     class CameraSystem final : public SceneSystem, public NonCopyable<CameraSystem> {
       Entity active_camera_{0};
-      std::unique_ptr<FreeFlyCamera> free_fly_camera_;
-      std::unique_ptr<OrbitCamera> orbit_camera_;
-      std::unique_ptr<FirstPersonCamera> first_person_camera_;
-      std::unique_ptr<MoveToCamera> move_to_camera_;
       float32 aspect_ratio_{1.f};
       float32 near_plane_{0.1f};
       float32 far_plane_{10000.f};

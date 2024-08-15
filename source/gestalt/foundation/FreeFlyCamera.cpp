@@ -8,8 +8,9 @@
 #include "InputTypes.hpp"
 
 namespace gestalt::foundation {
-  void FreeFlyCamera::update(float64 delta_seconds, const Movement& movement, CameraData& data) {
-    auto& camera_data = std::get<FreeFlyCameraData>(data);
+  void FreeFlyCamera::update(float64 delta_seconds, const Movement& movement,
+                             FreeFlyCameraData& data) {
+    auto& camera_data = data;
 
     auto mouse_pos = glm::vec2(movement.mouse_position_x, movement.mouse_position_y);
     if (movement.right_mouse_button) {
@@ -71,8 +72,8 @@ namespace gestalt::foundation {
     camera_data.camera_position += camera_data.move_speed * static_cast<float32>(delta_seconds);
   }
 
-  glm::mat4 FreeFlyCamera::get_view_matrix(CameraData& data) const {
-    const auto& camera_data = std::get<FreeFlyCameraData>(data);
+  glm::mat4 FreeFlyCamera::get_view_matrix(const FreeFlyCameraData& data) {
+    const auto& camera_data = data;
 
     return camera_data.get_view_matrix();
   }

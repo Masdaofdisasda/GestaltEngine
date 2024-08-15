@@ -21,12 +21,7 @@ namespace gestalt::application {
         AnimationCameraData(glm::vec3(0.f, 2.f, -10.f), glm::vec3(10.0f, 0.0f, 0.0f),
                             glm::vec3(0.f, 2.f, 10.f), glm::vec3(5.0f, -45.0f, 0.0f)));
 
-    free_fly_camera_ = std::make_unique<FreeFlyCamera>();
-    orbit_camera_ = std::make_unique<OrbitCamera>();
-    first_person_camera_ = std::make_unique<FirstPersonCamera>();
-    move_to_camera_ = std::make_unique<MoveToCamera>();
-
-    repository_->camera_components.add(root_entity, first_person_component);
+    repository_->camera_components.add(root_entity, free_fly_component);
 
     const auto& per_frame_data_buffers = repository_->per_frame_data_buffers;
 
@@ -66,24 +61,29 @@ namespace gestalt::application {
       aspect_ratio_ = aspect;
 
       auto& camera_component = repository_->camera_components.get(root_entity).value().get();
-      if (camera_component.positioner == kFreeFly) {
-        free_fly_camera_->update(delta_time, movement, camera_component.camera_data);
-      } else if (camera_component.positioner == kOrbit) {
-        orbit_camera_->update(delta_time, movement, camera_component.camera_data);
-      } else if (camera_component.positioner == kFirstPerson) {
-        first_person_camera_->update(delta_time, movement, camera_component.camera_data);
-      } else if (camera_component.positioner == kAnimation) {
-        move_to_camera_->update(delta_time, movement, camera_component.camera_data);
-      }
+      std::visit(
+          [&]<typename CameraDataType>(CameraDataType& camera_data) {
+            using T = std::decay_t<CameraDataType>;
+            if constexpr (std::is_same_v<T, FreeFlyCameraData>) {
+              FreeFlyCamera::update(delta_time, movement, camera_data);
+            } else if constexpr (std::is_same_v<T, OrbitCameraData>) {
+              OrbitCamera::update(delta_time, movement, camera_data);
+            } else if constexpr (std::is_same_v<T, FirstPersonCameraData>) {
+              FirstPersonCamera::update(delta_time, movement, camera_data);
+            } else if constexpr (std::is_same_v<T, AnimationCameraData>) {
+              MoveToCamera::update(delta_time, movement, camera_data);
+            }
+          },
+          camera_component.camera_data);
     }
 
-    glm::vec4 normalizePlane(glm::vec4 p) { return p / length(glm::vec3(p)); }
+    glm::vec4 NormalizePlane(glm::vec4 p) { return p / length(glm::vec3(p)); }
 
   
-    glm::mat4 perspectiveProjection(float fovY, float aspectWbyH, float zNear) {
-      float f = 1.0f / tanf(fovY / 2.0f);
-      return glm::mat4(f / aspectWbyH, 0.0f, 0.0f, 0.0f, 0.0f, f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-                  0.0f, 0.0f, zNear, 0.0f);
+    glm::mat4 PerspectiveProjection(float fovY, float aspectWbyH, float zNear) {
+      const float32 f = 1.0f / tanf(fovY / 2.0f);
+      return glm::mat4{f / aspectWbyH, 0.0f, 0.0f, 0.0f, 0.0f, f,    0.0f,  0.0f,
+                       0.0f,           0.0f, 0.0f, 1.0f, 0.0f, 0.0f, zNear, 0.0f};
     }
 
     void CameraSystem::update() {
@@ -92,19 +92,22 @@ namespace gestalt::application {
       const auto& buffers = repository_->per_frame_data_buffers;
       auto& camera_component = repository_->camera_components.get(root_entity).value().get();
 
-      glm::mat4 view_matrix;
-      if (camera_component.positioner == kFreeFly) {
-        view_matrix = free_fly_camera_->get_view_matrix(camera_component.camera_data);
-      }
-      else if (camera_component.positioner == kOrbit) {
-        view_matrix = orbit_camera_->get_view_matrix(camera_component.camera_data);
-      }
-      else if (camera_component.positioner == kFirstPerson) {
-        view_matrix = first_person_camera_->get_view_matrix(camera_component.camera_data);
-      }
-      else if (camera_component.positioner == kAnimation) {
-        view_matrix = move_to_camera_->get_view_matrix(camera_component.camera_data);
-      }
+      const glm::mat4 view_matrix = std::visit(
+          []<typename CameraDataType>(const CameraDataType& camera_data) -> glm::mat4 {
+            using T = std::decay_t<CameraDataType>;
+            if constexpr (std::is_same_v<T, FreeFlyCameraData>) {
+              return FreeFlyCamera::get_view_matrix(camera_data);
+            } else if constexpr (std::is_same_v<T, OrbitCameraData>) {
+              return OrbitCamera::get_view_matrix(camera_data);
+            } else if constexpr (std::is_same_v<T, FirstPersonCameraData>) {
+              return FirstPersonCamera::get_view_matrix(camera_data);
+            } else if constexpr (std::is_same_v<T, AnimationCameraData>) {
+              return MoveToCamera::get_view_matrix(camera_data);
+            } else {
+              return glm::mat4(1.0f);  // Default return value if no match
+            }
+          },
+          camera_component.camera_data);
       glm::mat4 projection;
       if (camera_component.projection == kPerspective) {
         projection = glm::perspective(glm::radians(fov_), aspect_ratio_, near_plane_, far_plane_);
@@ -141,12 +144,12 @@ namespace gestalt::application {
         buffers->data[frame].znear = near_plane_;
         buffers->data[frame].zfar = far_plane_;
 
-        buffers->data[frame].frustum[0] = normalizePlane(projection_t[3] + projection_t[0]);
-        buffers->data[frame].frustum[1] = normalizePlane(projection_t[3] - projection_t[0]);
-        buffers->data[frame].frustum[2] = normalizePlane(projection_t[3] + projection_t[1]);
-        buffers->data[frame].frustum[3] = normalizePlane(projection_t[3] - projection_t[1]);
-        buffers->data[frame].frustum[4] = normalizePlane(projection_t[3] + projection_t[2]);
-        buffers->data[frame].frustum[5] = normalizePlane(projection_t[3] - projection_t[2]);
+        buffers->data[frame].frustum[0] = NormalizePlane(projection_t[3] + projection_t[0]);
+        buffers->data[frame].frustum[1] = NormalizePlane(projection_t[3] - projection_t[0]);
+        buffers->data[frame].frustum[2] = NormalizePlane(projection_t[3] + projection_t[1]);
+        buffers->data[frame].frustum[3] = NormalizePlane(projection_t[3] - projection_t[1]);
+        buffers->data[frame].frustum[4] = NormalizePlane(projection_t[3] + projection_t[2]);
+        buffers->data[frame].frustum[5] = NormalizePlane(projection_t[3] - projection_t[2]);
       }
       void* mapped_data;
       const VmaAllocation allocation = buffers->uniform_buffers[frame]->allocation;

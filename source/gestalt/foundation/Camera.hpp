@@ -9,60 +9,32 @@
 namespace gestalt::foundation {
   struct Movement;
 
-  class CameraPositioner {
+  class FreeFlyCamera final {
   public:
-    virtual ~CameraPositioner() = default;
+    static void update(float64 delta_seconds, const Movement& movement, FreeFlyCameraData& data);
 
-    [[nodiscard]] virtual glm::mat4 get_view_matrix(CameraData& data) const = 0;
-
-    virtual void update(float64 delta_seconds, const Movement& movement, CameraData& data) = 0;
+    [[nodiscard]] static glm::mat4 get_view_matrix(const FreeFlyCameraData& data);
   };
 
-  class Camera final {
+  class OrbitCamera final {
   public:
-    explicit Camera(CameraPositioner& positioner) : positioner_(&positioner) {}
+    static void update(float64 delta_seconds, const Movement& movement, OrbitCameraData& data);
 
-    Camera(const Camera&) = default;
-    Camera& operator=(const Camera&) = default;
-
-    [[nodiscard]] glm::mat4 get_view_matrix(CameraData& data) const {
-      return positioner_->get_view_matrix(data);
-    }
-    void set_positioner(CameraPositioner* new_positioner) { positioner_ = new_positioner; }
-    void update(float64 delta_seconds, const Movement& movement, CameraData& data) const {
-      positioner_->update(delta_seconds, movement, data);
-    }
-
-  private:
-    CameraPositioner* positioner_;
+    [[nodiscard]] static glm::mat4 get_view_matrix(const OrbitCameraData& data);
   };
 
-  class FreeFlyCamera final : public CameraPositioner {
+  class FirstPersonCamera final {
   public:
-    void update(float64 delta_seconds, const Movement& movement, CameraData& data) override;
+    static void update(float64 delta_seconds, const Movement& movement, FirstPersonCameraData& data);
 
-    [[nodiscard]] glm::mat4 get_view_matrix(CameraData& data) const override;
+    [[nodiscard]] static glm::mat4 get_view_matrix(const FirstPersonCameraData& data);
   };
 
-  class OrbitCamera final : public CameraPositioner {
+  class MoveToCamera final {
   public:
-    void update(float64 delta_seconds, const Movement& movement, CameraData& data) override;
+    static void update(float64 delta_seconds, const Movement& movement, AnimationCameraData& data);
 
-    [[nodiscard]] glm::mat4 get_view_matrix(CameraData& data) const override;
-  };
-
-  class FirstPersonCamera final : public CameraPositioner {
-  public:
-    void update(float64 delta_seconds, const Movement& movement, CameraData& data) override;
-
-    [[nodiscard]] glm::mat4 get_view_matrix(CameraData& data) const override;
-  };
-
-  class MoveToCamera final : public CameraPositioner {
-  public:
-    void update(float64 delta_seconds, const Movement& movement, CameraData& data) override;
-
-    glm::mat4 get_view_matrix(CameraData& data) const override;
+    static glm::mat4 get_view_matrix(const AnimationCameraData& data);
   };
 
 }  // namespace gestalt::foundation

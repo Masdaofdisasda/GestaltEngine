@@ -208,7 +208,7 @@ namespace gestalt::foundation {
           angles_desired(desired_angles) {}
 
     glm::mat4 get_view_matrix() const {
-      const glm::vec3 a = glm::radians(angles_current);
+      const glm::vec3 a = radians(angles_current);
       return translate(glm::yawPitchRoll(a.y, a.x, a.z), -position_current);
     }
 
