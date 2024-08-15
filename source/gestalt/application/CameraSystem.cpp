@@ -7,64 +7,73 @@
 namespace gestalt::application {
 
     void CameraSystem::prepare() {
-      const auto main_camera = CameraComponent(kPerspective, kFreeFly);
-      free_fly_camera_ = std::make_unique<FreeFlyCamera>(glm::vec3(7, 1.8, -7), glm::vec3(0, 0, 0),
-                                                         glm::vec3(0, 1, 0));
-      orbit_camera_ = std::make_unique<OrbitCamera>(glm::vec3(0, 0, 0), 10.f, 0.1, 100.f);
-      first_person_camera_ = std::make_unique<FirstPersonCamera>(glm::vec3(0, 2.0, 0), glm::vec3(0, 1, 0));
-      move_to_camera_
-          = std::make_unique<MoveToCamera>(glm::vec3(0.f, 2.f, -10.f), glm::vec3(10.0f, 0.0f, 0.0f), glm::vec3(0.f, 2.f, 10.f),
-          glm::vec3(5.0f, -45.0f, 0.0f));
-      repository_->camera_components.add(root_entity, main_camera);
+    // NOTE this is just for development purposes
+    const auto free_fly_component = CameraComponent(
+        kPerspective, kFreeFly,
+        FreeFlyCameraData(glm::vec3(7, 1.8, -7), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0)));
+    const auto orbit_component = CameraComponent(
+        kPerspective, kOrbit, OrbitCameraData(glm::vec3(0, 0, 0), 10.f, 0.1, 100.f));
+    const auto first_person_component
+        = CameraComponent(kPerspective, kFirstPerson,
+                          FirstPersonCameraData(glm::vec3(0, 2.0, 0), glm::vec3(0, 1, 0)));
+    const auto animation_component = CameraComponent(
+        kPerspective, kAnimation,
+        AnimationCameraData(glm::vec3(0.f, 2.f, -10.f), glm::vec3(10.0f, 0.0f, 0.0f),
+                            glm::vec3(0.f, 2.f, 10.f), glm::vec3(5.0f, -45.0f, 0.0f)));
 
-      const auto& per_frame_data_buffers = repository_->per_frame_data_buffers;
+    free_fly_camera_ = std::make_unique<FreeFlyCamera>();
+    orbit_camera_ = std::make_unique<OrbitCamera>();
+    first_person_camera_ = std::make_unique<FirstPersonCamera>();
+    move_to_camera_ = std::make_unique<MoveToCamera>();
 
-      descriptor_layout_builder_->clear();
-      const auto descriptor_layout
-          = descriptor_layout_builder_->add_binding(
-                0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                              VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT
-                                  | VK_SHADER_STAGE_FRAGMENT_BIT)
-                .build(gpu_->getDevice(),
-                       VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
+    repository_->camera_components.add(root_entity, first_person_component);
 
-      for (int i = 0; i < getFramesInFlight(); ++i) {
-        per_frame_data_buffers->uniform_buffers[i] = resource_manager_->create_buffer(
-            sizeof(PerFrameData),
-            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-            VMA_MEMORY_USAGE_CPU_TO_GPU, "perFrameBuffer");
-        per_frame_data_buffers->descriptor_buffers[i] = resource_manager_->create_descriptor_buffer(
-            descriptor_layout, 1,
-            0);
+    const auto& per_frame_data_buffers = repository_->per_frame_data_buffers;
 
-        VkBufferDeviceAddressInfo deviceAdressInfo{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-            .buffer = per_frame_data_buffers->uniform_buffers[i]->buffer};
-        VkDeviceAddress per_frame_data_buffer_address
-            = vkGetBufferDeviceAddress(gpu_->getDevice(), &deviceAdressInfo);
+    descriptor_layout_builder_->clear();
+    const auto descriptor_layout
+        = descriptor_layout_builder_
+              ->add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT
+                                | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT
+                                | VK_SHADER_STAGE_FRAGMENT_BIT)
+              .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
 
-        per_frame_data_buffers->descriptor_buffers[i]->
-                               write_buffer(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                                             per_frame_data_buffer_address, sizeof(PerFrameData))
-                               .update();
-      }
+    for (int i = 0; i < getFramesInFlight(); ++i) {
+      per_frame_data_buffers->uniform_buffers[i] = resource_manager_->create_buffer(
+          sizeof(PerFrameData),
+          VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+          VMA_MEMORY_USAGE_CPU_TO_GPU, "perFrameBuffer");
+      per_frame_data_buffers->descriptor_buffers[i]
+          = resource_manager_->create_descriptor_buffer(descriptor_layout, 1, 0);
 
-      vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layout, nullptr);
+      VkBufferDeviceAddressInfo deviceAdressInfo{
+          .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+          .buffer = per_frame_data_buffers->uniform_buffers[i]->buffer};
+      VkDeviceAddress per_frame_data_buffer_address
+          = vkGetBufferDeviceAddress(gpu_->getDevice(), &deviceAdressInfo);
 
+      per_frame_data_buffers->descriptor_buffers[i]
+          ->write_buffer(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, per_frame_data_buffer_address,
+                         sizeof(PerFrameData))
+          .update();
     }
+
+    vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layout, nullptr);
+  }
 
     void CameraSystem::update_cameras(const float delta_time, const Movement& movement, float aspect) {
       aspect_ratio_ = aspect;
 
-      const auto cam = repository_->camera_components.get(root_entity).value().get();
-      if (cam.positioner == kFreeFly) {
-        free_fly_camera_->update(delta_time, movement);
-      } else if (cam.positioner == kOrbit) {
-        orbit_camera_->update(delta_time, movement);
-      } else if (cam.positioner == kFirstPerson) {
-        first_person_camera_->update(delta_time, movement);
-      } else if (cam.positioner == kAnimation) {
-        move_to_camera_->update(delta_time, movement);
+      auto& camera_component = repository_->camera_components.get(root_entity).value().get();
+      if (camera_component.positioner == kFreeFly) {
+        free_fly_camera_->update(delta_time, movement, camera_component.camera_data);
+      } else if (camera_component.positioner == kOrbit) {
+        orbit_camera_->update(delta_time, movement, camera_component.camera_data);
+      } else if (camera_component.positioner == kFirstPerson) {
+        first_person_camera_->update(delta_time, movement, camera_component.camera_data);
+      } else if (camera_component.positioner == kAnimation) {
+        move_to_camera_->update(delta_time, movement, camera_component.camera_data);
       }
     }
 
@@ -85,26 +94,26 @@ namespace gestalt::application {
 
       glm::mat4 view_matrix;
       if (camera_component.positioner == kFreeFly) {
-        view_matrix = free_fly_camera_->get_view_matrix();
+        view_matrix = free_fly_camera_->get_view_matrix(camera_component.camera_data);
       }
       else if (camera_component.positioner == kOrbit) {
-        view_matrix = orbit_camera_->get_view_matrix();
+        view_matrix = orbit_camera_->get_view_matrix(camera_component.camera_data);
       }
       else if (camera_component.positioner == kFirstPerson) {
-        view_matrix = first_person_camera_->get_view_matrix();
+        view_matrix = first_person_camera_->get_view_matrix(camera_component.camera_data);
       }
       else if (camera_component.positioner == kAnimation) {
-        view_matrix = move_to_camera_->get_view_matrix();
+        view_matrix = move_to_camera_->get_view_matrix(camera_component.camera_data);
       }
       glm::mat4 projection;
-      if (camera_component.type == kPerspective) {
+      if (camera_component.projection == kPerspective) {
         projection = glm::perspective(glm::radians(fov_), aspect_ratio_, near_plane_, far_plane_);
 
       // invert the Y direction on projection matrix so that we are more similar
       // to opengl and gltf axis
       projection[1][1] *= -1;
 
-      } else if (camera_component.type == kOrthographic) {
+      } else if (camera_component.projection == kOrthographic) {
         //TODO this is broken
         float ortho_width = 5.f; 
         float ortho_height = ortho_width / aspect_ratio_;

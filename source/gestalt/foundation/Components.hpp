@@ -2,6 +2,7 @@
 #include <variant>
 #include <vector>
 #include "vk_types.hpp"
+#include <glm/gtx/euler_angles.hpp>
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/transform.hpp>
 
@@ -69,19 +70,173 @@ namespace gestalt::foundation {
       BoundingSphere local_bounds;
     };
 
-  enum CameraType { kPerspective, kOrthographic };
+  enum CameraProjectionType { kPerspective, kOrthographic };
   enum CameraPositionerType { kFreeFly, kOrbit, kFirstPerson, kAnimation };
+
+  struct FreeFlyCameraData {
+
+    FreeFlyCameraData(const glm::vec3& pos, const glm::vec3& target, const glm::vec3& up) {
+      set_position(pos);
+      set_orientation(target, up);
+      set_up_vector(up);
+    }
+
+    void set_up_vector(const glm::vec3& up) {
+      this->up = up;
+      const glm::mat4 view = get_view_matrix();
+      const glm::vec3 dir = -glm::vec3(view[0][2], view[1][2], view[2][2]);
+      camera_orientation = lookAtRH(camera_position, camera_position + dir, up);
+    }
+
+    void set_position(const glm::vec3& pos) {
+      camera_position = pos;
+    }
+
+    void set_orientation(const glm::vec3& target, const glm::vec3& up) {
+      camera_orientation = quat_cast(lookAtRH(camera_position, target, up));
+    }
+
+    [[nodiscard]] glm::mat4 get_view_matrix() const {
+      const glm::mat4 t = translate(glm::mat4(1.0f), -camera_position);
+      const glm::mat4 r = mat4_cast(camera_orientation);
+      return r * t;
+    }
+
+    void reset_mouse_position(const glm::vec2& p) { mouse_pos = p; }
+
+    glm::vec3 camera_position = glm::vec3(0.0f, 0.0f, 5.0f);
+    glm::vec3 up = glm::vec3(0.0f, 1.0f, 1.0f);
+    glm::quat camera_orientation = glm::quat(glm::vec3(0.0f, 0.0f, 0.0f));
+    glm::vec3 move_speed = glm::vec3(0.0f);
+    glm::vec2 mouse_pos = glm::vec2(0);
+
+    float mouse_speed = 4.5f;
+    float acceleration = .01f;
+    float damping = 15.f;
+    float max_speed = .05f;
+    float fast_coef = 5.f;
+    float slow_coef = .001f;
+  };
+
+  struct OrbitCameraData {
+
+    OrbitCameraData(const glm::vec3& target, const float32 distance, const float32 min_distance, const float32 max_distance)
+        : min_distance(min_distance),
+          max_distance(max_distance) {
+      set_target(target);
+      set_distance(distance);
+    }
+
+    void set_target(const glm::vec3& target) {
+      this->target = target;
+    }
+
+    void set_distance(const float32 distance) {
+      this->distance = glm::clamp(distance, min_distance, max_distance);
+    }
+
+
+    [[nodiscard]] glm::mat4 get_view_matrix() const {
+      return lookAtRH(position, target, up);
+    }
+
+
+    glm::vec3 target;
+    float32 distance;
+    float32 min_distance;
+    float32 max_distance;
+
+    float32 yaw = 45.0f;
+    float32 pitch = .3f;
+    glm::vec3 position = glm::vec3(0.0f);
+    glm::quat orientation = glm::quat(glm::vec3(0.0f));
+    glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+
+    glm::vec2 mouse_pos = glm::vec2(0);
+
+    // Configuration parameters
+    float32 orbit_speed = 2.f;
+    float32 zoom_speed = 0.1f;
+    float32 pan_speed = 10.0f;
+  };
+
+  struct FirstPersonCameraData {
+
+    FirstPersonCameraData(const glm::vec3& start_position, const glm::vec3& start_up) {
+      set_position(start_position);
+      set_orientation(start_position + glm::vec3(0.0f, 0.0f, -1.0f), start_up);
+      set_up_vector(start_up);
+    }
+
+    void set_position(const glm::vec3& pos) {
+      camera_position = pos;
+    }
+
+    void set_orientation(const glm::vec3& target, const glm::vec3& up) {
+      camera_orientation = quat_cast(lookAtRH(camera_position, target, up));
+    }
+
+    void set_up_vector(const glm::vec3& up) {
+      this->up = up;
+      const glm::mat4 view = get_view_matrix();
+      const glm::vec3 dir = -glm::vec3(view[0][2], view[1][2], view[2][2]);
+      camera_orientation = lookAtRH(camera_position, camera_position + dir, up);
+    }
+
+    [[nodiscard]] glm::mat4 get_view_matrix() const {
+      const glm::mat4 t = translate(glm::mat4(1.0f), -camera_position);
+      const glm::mat4 r = mat4_cast(camera_orientation);
+      return r * t;
+    }
+
+    glm::vec3 camera_position;
+    glm::quat camera_orientation = glm::quat(glm::vec3(0.0f));
+    glm::vec3 up;
+
+    glm::vec2 mouse_pos = glm::vec2(0.0f);
+
+    float32 mouse_speed = 2.5f;  // Adjust based on your desired sensitivity
+    glm::vec3 move_speed = glm::vec3(0.0f);
+  };
+
+  struct AnimationCameraData {
+
+    AnimationCameraData(const glm::vec3& pos, const glm::vec3& angles, const glm::vec3& desired_pos, const glm::vec3& desired_angles)
+        : position_current(pos),
+          position_desired(desired_pos),
+          angles_current(angles),
+          angles_desired(desired_angles) {}
+
+    glm::mat4 get_view_matrix() const {
+      const glm::vec3 a = glm::radians(angles_current);
+      return translate(glm::yawPitchRoll(a.y, a.x, a.z), -position_current);
+    }
+
+    float32 damping_linear = 10000.0f;
+    glm::vec3 damping_euler_angles = glm::vec3(5.0f, 5.0f, 5.0f);
+
+    glm::vec3 position_current = glm::vec3(0.0f);
+    glm::vec3 position_desired = glm::vec3(0.0f);
+
+    /// pitch, pan, roll
+    glm::vec3 angles_current = glm::vec3(0.0f);
+    glm::vec3 angles_desired = glm::vec3(0.0f);
+  };
+
+  using CameraData = std::variant<FreeFlyCameraData, FirstPersonCameraData, OrbitCameraData, AnimationCameraData>;
 
     struct CameraComponent : Component {
 
-      explicit CameraComponent(CameraType type, CameraPositionerType positioner)
-        : type(type), positioner(positioner) {
+      explicit CameraComponent(const CameraProjectionType projection, const CameraPositionerType positioner, const CameraData& camera_data)
+          : projection(projection), positioner(positioner), camera_data(camera_data) {
       }
 
-      CameraType type;
-      CameraPositionerType positioner;
+      CameraProjectionType projection;
+      const CameraPositionerType positioner;
       glm::mat4 view_matrix{1.0f};
       glm::mat4 projection_matrix{1.0};
+
+      CameraData camera_data;
     };
 
     enum class LightType { kDirectional, kPoint, kSpot };

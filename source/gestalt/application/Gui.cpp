@@ -995,10 +995,10 @@ namespace gestalt::application {
 
     void Gui::show_camera_component(CameraComponent& camera) {
       const char* camera_type_items[] = {"Perspective", "Orthographic"};
-      int camera_type_index = static_cast<int>(camera.type);
+      int camera_type_index = static_cast<int>(camera.projection);
       if (ImGui::Combo("Camera Type", &camera_type_index, camera_type_items,
                        IM_ARRAYSIZE(camera_type_items))) {
-        camera.type = static_cast<CameraType>(camera_type_index);
+        camera.projection = static_cast<CameraProjectionType>(camera_type_index);
       }
 
       // UI for Camera Positioner Type
@@ -1006,7 +1006,7 @@ namespace gestalt::application {
       int positioner_type_index = static_cast<int>(camera.positioner);
       if (ImGui::Combo("Positioner Type", &positioner_type_index, positioner_type_items,
                        IM_ARRAYSIZE(positioner_type_items))) {
-        camera.positioner = static_cast<CameraPositionerType>(positioner_type_index);
+        //camera.positioner = static_cast<CameraPositionerType>(positioner_type_index);
       }
     }
 
