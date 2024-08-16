@@ -7,6 +7,7 @@
 
 #include "SceneSystem.hpp"
 #include "Material/PbrMaterial.hpp"
+#include "fastgltf/types.hpp"
 
 namespace gestalt::application {
 

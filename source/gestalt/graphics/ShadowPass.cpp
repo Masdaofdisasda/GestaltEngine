@@ -6,6 +6,8 @@
 #include "vk_pipelines.hpp"
 #include <fmt/core.h>
 
+#include "FrameProvider.hpp"
+
 
 namespace gestalt::graphics {
 

@@ -2,8 +2,7 @@
 
 #include <glm/detail/_noise.hpp>
 
-#include "ValidationCallback.hpp"
-#include <fmt/core.h>
+#include "VulkanCheck.hpp"
 
 namespace gestalt::application {
 

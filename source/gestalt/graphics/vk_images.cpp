@@ -5,11 +5,10 @@
 #include "vk_images.hpp"
 #include "vk_initializers.hpp"
 
-#include "GpuResources.hpp"
 #include <vma/vk_mem_alloc.h>
-
+#include <cmath>
 namespace gestalt::graphics {
-  vkutil::TransitionBuffer::TransitionBuffer(const std::shared_ptr<AllocatedBuffer>& buffer) {
+  vkutil::TransitionBuffer::TransitionBuffer(const std::shared_ptr<foundation::AllocatedBuffer>& buffer) {
     buffer_ = buffer;
 
     bufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
@@ -80,7 +79,7 @@ namespace gestalt::graphics {
     buffer_->currentStage = bufferBarrier.dstStageMask;    // Update current stage
   }
 
-  vkutil::TransitionImage::TransitionImage(const std::shared_ptr<TextureHandle>& image) {
+  vkutil::TransitionImage::TransitionImage(const std::shared_ptr<foundation::TextureHandle>& image) {
     image_ = image;
 
     imageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
@@ -94,7 +93,7 @@ namespace gestalt::graphics {
 
     imageBarrier.newLayout = new_layout;
 
-    const auto aspectMask_ = image_->getType() == TextureType::kDepth ? VK_IMAGE_ASPECT_DEPTH_BIT
+    const auto aspectMask_ = image_->getType() == foundation::TextureType::kDepth ? VK_IMAGE_ASPECT_DEPTH_BIT
                                                                       : VK_IMAGE_ASPECT_COLOR_BIT;
     imageBarrier.subresourceRange = vkinit::image_subresource_range(aspectMask_);
 
@@ -118,7 +117,7 @@ namespace gestalt::graphics {
   void vkutil::TransitionImage::andSubmitTo(const VkCommandBuffer cmd) {
     imageBarrier.image = image_->image;
 
-    if (image_->getType() == TextureType::kCubeMap) {
+    if (image_->getType() == foundation::TextureType::kCubeMap) {
       imageBarrier.subresourceRange.baseMipLevel = 0;
       imageBarrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
       imageBarrier.subresourceRange.baseArrayLayer = 0;
@@ -144,7 +143,7 @@ namespace gestalt::graphics {
   }
 
   vkutil::TransitionImage& vkutil::TransitionImage::toLayoutRead() {
-    if (image_->getType() == TextureType::kColor) {
+    if (image_->getType() == foundation::TextureType::kColor) {
       imageBarrier.subresourceRange = vkinit::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
       imageBarrier.oldLayout = image_->getLayout();
       imageBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -153,7 +152,7 @@ namespace gestalt::graphics {
       imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
       imageBarrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
 
-    } else if (image_->getType() == TextureType::kDepth) {
+    } else if (image_->getType() == foundation::TextureType::kDepth) {
       imageBarrier.subresourceRange = vkinit::image_subresource_range(VK_IMAGE_ASPECT_DEPTH_BIT);
       imageBarrier.oldLayout = image_->getLayout();
       imageBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL;
@@ -168,7 +167,7 @@ namespace gestalt::graphics {
   }
 
   vkutil::TransitionImage& vkutil::TransitionImage::toLayoutWrite() {
-    if (image_->getType() == TextureType::kColor) {
+    if (image_->getType() == foundation::TextureType::kColor) {
       imageBarrier.subresourceRange = vkinit::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
       imageBarrier.oldLayout = image_->getLayout();
       imageBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -183,7 +182,7 @@ namespace gestalt::graphics {
       imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
       imageBarrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
 
-    } else if (image_->getType() == TextureType::kDepth) {
+    } else if (image_->getType() == foundation::TextureType::kDepth) {
       imageBarrier.subresourceRange = vkinit::image_subresource_range(VK_IMAGE_ASPECT_DEPTH_BIT);
       imageBarrier.oldLayout = image_->getLayout();
       imageBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
@@ -239,7 +238,7 @@ namespace gestalt::graphics {
     vkCmdBlitImage2(cmd, &blitInfo);
   }
 
-  void vkutil::generate_mipmaps(VkCommandBuffer cmd, std::shared_ptr<TextureHandle>& handle) {
+  void vkutil::generate_mipmaps(VkCommandBuffer cmd, std::shared_ptr<foundation::TextureHandle>& handle) {
     VkExtent2D imageSize = {handle->imageExtent.width, handle->imageExtent.height};
     int mipLevels = int(std::floor(
                         std::log2(std::max(handle->imageExtent.width, handle->imageExtent.height))))

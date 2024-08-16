@@ -11,8 +11,7 @@
 #include <fastgltf/glm_element_traits.hpp>
 
 #include "CubemapUtils.hpp"
-#include "ValidationCallback.hpp"
-#include <fmt/core.h>
+#include "VulkanCheck.hpp"
 
 
 namespace gestalt::graphics {

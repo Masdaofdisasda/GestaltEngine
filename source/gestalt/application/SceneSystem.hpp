@@ -8,9 +8,8 @@
 #include "GpuTypes.hpp"
 #include "Repository.hpp"
 
-#include "fastgltf/types.hpp"
-
 namespace gestalt::foundation {
+  struct FrameProvider;
   struct PbrMaterial;
 }
 

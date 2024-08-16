@@ -1,9 +1,13 @@
 ﻿#pragma once
 
+#include <memory>
 #include <optional>
 #include <unordered_map>
 
-#include "GpuResources.hpp"
+#include "Buffer/LightBuffer.hpp"
+#include "Buffer/MaterialBuffer.hpp"
+#include "Buffer/MeshBuffer.hpp"
+#include "Buffer/PerFrameDataBuffer.hpp"
 #include "Components/CameraComponent.hpp"
 #include "Components/Entity.hpp"
 #include "Components/LightComponent.hpp"
@@ -11,8 +15,15 @@
 #include "Components/NodeComponent.hpp"
 #include "Components/TransformComponent.hpp"
 #include "Material/Material.hpp"
+#include "Material/SamplerConfig.hpp"
 #include "Mesh/Mesh.hpp"
+#include "Mesh/MeshDraw.hpp"
 #include "Mesh/Meshlet.hpp"
+#include "Resources/GpuDirectionalLight.hpp"
+#include "Resources/GpuPointLight.hpp"
+#include "Resources/GpuVertexData.hpp"
+#include "Resources/GpuVertexPosition.hpp"
+#include "Resources/TextureHandle.hpp"
 
 namespace gestalt::foundation {
 

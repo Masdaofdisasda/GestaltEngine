@@ -1,10 +1,12 @@
-﻿#include "GpuResources.hpp"
-#include "GpuTypes.hpp"
-#include "ValidationCallback.hpp"
+﻿#pragma once
+#include "DescriptorBuffer.hpp"
 
-#include "fmt/core.h"
+#include "VulkanCheck.hpp"
+
+#include <cassert>
 
 namespace gestalt::foundation {
+
   DescriptorBuffer& DescriptorBuffer::update() {
 
     vkDeviceWaitIdle(device);
@@ -115,4 +117,4 @@ namespace gestalt::foundation {
       uint32 descriptor_index) {
     return write_image_array(binding, type, {image_info}, descriptor_index);
   }
-}  // namespace gestalt::foundation
+}  // namespace gestalt

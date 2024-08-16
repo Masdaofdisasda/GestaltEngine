@@ -11,8 +11,9 @@
 #include "Repository.hpp"
 #include <VkBootstrap.h>
 
-#include "ValidationCallback.hpp"
-#include <fmt/core.h>
+#include "VulkanCheck.hpp"
+
+#include "FrameProvider.hpp"
 #include "vk_images.hpp"
 #include "vk_initializers.hpp"
 
@@ -49,7 +50,7 @@ namespace gestalt::graphics {
     render_passes_.push_back(std::make_shared<BoundingSphereDebugPass>());
     render_passes_.push_back(std::make_shared<TonemapPass>());
 
-    frames_.init(gpu_->getDevice(), gpu_->getGraphicsQueueFamily(), frame_);
+    frames_.init(gpu_->getDevice(), gpu_->getGraphicsQueueFamily(), *frame_);
 
     create_resources();
 

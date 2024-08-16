@@ -2,8 +2,6 @@
 
 #include "common.hpp"
 
-#include <glm/gtx/transform.hpp>
-
 namespace gestalt::foundation {
 
     struct alignas(16) Meshlet {

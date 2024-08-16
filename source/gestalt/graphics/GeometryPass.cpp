@@ -5,6 +5,8 @@
 
 #include <fmt/core.h>
 
+#include "FrameProvider.hpp"
+
 namespace gestalt::graphics {
 
   struct DrawCullConstants {

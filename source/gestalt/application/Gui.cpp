@@ -1,8 +1,7 @@
 ﻿#include "Gui.hpp"
 
 #include "VulkanTypes.hpp"
-#include "ValidationCallback.hpp"
-#include <fmt/core.h>
+#include "VulkanCheck.hpp"
 
 #include <imgui.h>
 #include <imgui_impl_sdl2.h>

@@ -1,4 +1,9 @@
 ﻿#pragma once
+
+#include "common.hpp"
+#include <glm/gtx/transform.hpp>
+#include "VulkanTypes.hpp"
+#include "Resources/TextureHandle.hpp"
 #include "MaterialFlags.hpp"
 
 namespace gestalt::foundation {

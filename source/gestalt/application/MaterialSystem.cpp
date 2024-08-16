@@ -1,6 +1,5 @@
 ﻿#include "SceneSystem.hpp"
-#include "ValidationCallback.hpp"
-#include <fmt/core.h>
+#include "VulkanCheck.hpp"
 
 namespace gestalt::application {
 

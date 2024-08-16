@@ -1,10 +1,15 @@
 ﻿#pragma once
 
+#include <array>
 #include <deque>
 
 #include "EngineConfig.hpp"
 #include "GpuTypes.hpp"
 
+
+namespace gestalt::foundation {
+  struct FrameProvider;
+}
 
 namespace gestalt::graphics {
 
@@ -81,7 +86,7 @@ namespace gestalt::graphics {
       VkCommandBuffer main_command_buffer;
     };
 
-    void init(VkDevice device, uint32 graphics_queue_family_index, FrameProvider* frame);
+    void init(VkDevice device, uint32 graphics_queue_family_index, FrameProvider& frame);
     void cleanup(VkDevice device);
     FrameResources& get_current_frame();
 

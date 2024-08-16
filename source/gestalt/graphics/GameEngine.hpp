@@ -5,6 +5,7 @@
 #include "InputSystem.hpp"
 #include "RenderEngine.hpp"
 #include "EntityManager.hpp"
+#include "FrameProvider.hpp"
 #include "TmeTrackingService.hpp"
 #include "Window.hpp"
 

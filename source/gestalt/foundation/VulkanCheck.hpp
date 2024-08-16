@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include <fmt/core.h>
+
 #define VK_CHECK(x)                                                     \
     do {                                                                \
         VkResult err = x;                                               \
@@ -8,3 +10,4 @@
             abort();                                                    \
         }                                                               \
     } while (0)
+

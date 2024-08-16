@@ -1,12 +1,15 @@
 ﻿#pragma once
 
 #include "VulkanTypes.hpp"
-#include <vma/vk_mem_alloc.h>
-#include "GpuResources.hpp"
 
 #include <functional>
 #include <optional>
 #include <span>
+#include <memory>
+#include <vector>
+
+#include "Descriptor/DescriptorBuffer.hpp"
+#include "Resources/AllocatedBuffer.hpp"
 
 namespace gestalt::foundation {
   class Repository;

@@ -2,10 +2,10 @@
 #include <string>
 #include <vector>
 
+#include "MeshSurface.hpp"
 #include "BoundingSphere.hpp"
 
 namespace gestalt::foundation {
-  struct MeshSurface;
 
   /**
      * \brief A Mesh holds all the data for a single renderable "object" in the scene. It has one or more MeshSurfaces

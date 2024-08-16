@@ -2,8 +2,9 @@
 
 #include "vk_initializers.hpp"
 #include "RenderConfig.hpp"
-#include "ValidationCallback.hpp"
-#include <fmt/core.h>
+#include "VulkanCheck.hpp"
+
+#include "FrameProvider.hpp"
 
 namespace gestalt::graphics {
   DescriptorLayoutBuilder& DescriptorLayoutBuilder::add_binding(uint32_t binding,
@@ -11,7 +12,7 @@ namespace gestalt::graphics {
                                                                 VkShaderStageFlags shader_stages,
                                                                 bool bindless,
                                                                 uint32_t descriptor_count) {
-    uint32_t descriptorCount = bindless ? 4096 : descriptor_count;  // TODO rethink this design
+    const uint32 descriptorCount = bindless ? 4096 : descriptor_count;  // TODO rethink this design
 
     bindings.emplace_back(VkDescriptorSetLayoutBinding{
         .binding = binding,
@@ -225,8 +226,8 @@ namespace gestalt::graphics {
     return newPool;
   }
 
-  void FrameData::init(VkDevice device, uint32 graphics_queue_family_index, FrameProvider* frame) {
-      frame_ = frame;
+  void FrameData::init(VkDevice device, uint32 graphics_queue_family_index, FrameProvider& frame) {
+      frame_ = &frame;
 
     VkCommandPoolCreateInfo commandPoolInfo = vkinit::command_pool_create_info(
         graphics_queue_family_index, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
