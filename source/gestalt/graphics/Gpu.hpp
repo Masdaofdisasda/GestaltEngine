@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include "vk_types.hpp"
+#include "VulkanTypes.hpp"
 #include "GpuTypes.hpp"
 #include "Window.hpp"
 

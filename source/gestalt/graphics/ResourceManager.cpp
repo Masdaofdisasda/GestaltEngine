@@ -10,9 +10,9 @@
 #include <fastgltf/core.hpp>
 #include <fastgltf/glm_element_traits.hpp>
 
-#include "Components.hpp"
 #include "CubemapUtils.hpp"
-#include "descriptor.hpp"
+#include "ValidationCallback.hpp"
+#include <fmt/core.h>
 
 
 namespace gestalt::graphics {

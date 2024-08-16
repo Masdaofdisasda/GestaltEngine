@@ -1,12 +1,18 @@
 ﻿#pragma once
 
 #include <optional>
-#include <typeindex>
 #include <unordered_map>
 
-#include "vk_types.hpp"
-#include "Components.hpp"
 #include "GpuResources.hpp"
+#include "Components/CameraComponent.hpp"
+#include "Components/Entity.hpp"
+#include "Components/LightComponent.hpp"
+#include "Components/MeshComponent.hpp"
+#include "Components/NodeComponent.hpp"
+#include "Components/TransformComponent.hpp"
+#include "Material/Material.hpp"
+#include "Mesh/Mesh.hpp"
+#include "Mesh/Meshlet.hpp"
 
 namespace gestalt::foundation {
 

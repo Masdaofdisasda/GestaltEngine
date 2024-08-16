@@ -1,5 +1,6 @@
 #include "Camera.hpp"
 
+#include "Camera/AnimationCameraData.hpp"
 #include <glm/gtx/euler_angles.hpp>
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/quaternion.hpp>

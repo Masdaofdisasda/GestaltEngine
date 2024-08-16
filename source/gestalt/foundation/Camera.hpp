@@ -1,10 +1,13 @@
 #pragma once
 
 #include "common.hpp"
-#include "Components.hpp"
 
 
 namespace gestalt::foundation {
+  struct AnimationCameraData;
+  struct FirstPersonCameraData;
+  struct OrbitCameraData;
+  struct FreeFlyCameraData;
   struct Movement;
 
   class FreeFlyCamera final {

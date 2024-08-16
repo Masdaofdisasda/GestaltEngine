@@ -2,6 +2,8 @@
 
 #include "vk_initializers.hpp"
 #include "RenderConfig.hpp"
+#include "ValidationCallback.hpp"
+#include <fmt/core.h>
 
 namespace gestalt::graphics {
   DescriptorLayoutBuilder& DescriptorLayoutBuilder::add_binding(uint32_t binding,

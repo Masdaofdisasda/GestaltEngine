@@ -1,17 +1,15 @@
 ﻿#pragma once
 
+#include "VulkanTypes.hpp"
 #include <vma/vk_mem_alloc.h>
+#include "GpuResources.hpp"
 
 #include <functional>
-#include <memory>
 #include <optional>
 #include <span>
-#include <string>
-
-#include "GpuResources.hpp"
-#include "Repository.hpp"
 
 namespace gestalt::foundation {
+  class Repository;
   class IDescriptorAllocatorGrowable;
 
   class IGpu {

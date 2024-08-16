@@ -3,7 +3,6 @@
 #include <functional>
 
 #include "RenderConfig.hpp"
-#include "vk_types.hpp"
 #include "EntityManager.hpp"
 #include "Window.hpp"
 
@@ -17,7 +16,6 @@ namespace gestalt::application {
     struct GuiCapabilities {
       std::function<void()> exit;
       std::function<void(std::string)> load_gltf;
-      std::function<EngineStats&()> get_stats;
       std::function<ComponentFactory&()> get_component_factory;
       std::function<RenderConfig&()> get_render_config;
       std::function<std::shared_ptr<TextureHandle>()> get_debug_image;
@@ -42,11 +40,9 @@ namespace gestalt::application {
       bool show_shading_settings = false;
       bool show_tone_map_settings = false;
       bool show_guizmo_ = true;
-      bool show_stats_ = false;
       bool show_lights_ = false;
 
       void menu_bar();
-      void stats();
       void lights();
       void scene_graph();
       void display_scene_hierarchy(Entity entity);

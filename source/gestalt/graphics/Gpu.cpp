@@ -2,6 +2,8 @@
 
 #include <VkBootstrap.h>
 
+#include "ValidationCallback.hpp"
+#include <fmt/core.h>
 #include "vk_initializers.hpp"
 
 namespace gestalt::graphics {

@@ -2,7 +2,9 @@
 
 #include "RenderConfig.hpp"
 #include "SceneSystem.hpp"
-#include "descriptor.hpp"
+#include "ValidationCallback.hpp"
+#include <fmt/core.h>
+#include "VulkanTypes.hpp"
 
 namespace gestalt::application {
 

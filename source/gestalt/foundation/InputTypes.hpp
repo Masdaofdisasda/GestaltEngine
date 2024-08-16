@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common.hpp"
+
 namespace gestalt::foundation {
 	  
     struct Movement {

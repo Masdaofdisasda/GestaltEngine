@@ -2,7 +2,9 @@
 
 #include <SDL.h>
 #include <SDL_vulkan.h>
-#include "vk_types.hpp"
+
+#include "common.hpp"
+#include "VulkanTypes.hpp"
 
 namespace gestalt::application {
 

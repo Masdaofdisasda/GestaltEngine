@@ -1,6 +1,9 @@
 ﻿#include "vk_pipelines.hpp"
 #include <fstream>
+
+#include "common.hpp"
 #include "vk_initializers.hpp"
+#include "fmt/core.h"
 
 namespace gestalt {
   namespace graphics {

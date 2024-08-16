@@ -1,8 +1,6 @@
 #include "Camera.hpp"
 
-#include <fmt/core.h>
-
-#include <glm/gtx/transform.hpp>
+#include "Camera/FirstPersonCameraData.hpp"
 #include <glm/gtx/quaternion.hpp>
 
 #include "InputTypes.hpp"

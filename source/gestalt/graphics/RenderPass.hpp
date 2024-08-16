@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include "RenderEngine.hpp"
-#include "vk_types.hpp"
+#include "VulkanTypes.hpp"
 
 namespace gestalt::graphics {
     class DirectionalDepthPass final : public RenderPass {

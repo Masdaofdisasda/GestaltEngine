@@ -1,7 +1,7 @@
 #pragma once
 #include <queue>
 
-#include "vk_types.hpp"
+#include "VulkanTypes.hpp"
 #include "vk_descriptors.hpp"
 #include "Repository.hpp"
 

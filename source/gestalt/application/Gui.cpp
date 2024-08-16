@@ -1,5 +1,9 @@
 ﻿#include "Gui.hpp"
 
+#include "VulkanTypes.hpp"
+#include "ValidationCallback.hpp"
+#include <fmt/core.h>
+
 #include <imgui.h>
 #include <imgui_impl_sdl2.h>
 #include <imgui_impl_vulkan.h>
@@ -12,6 +16,7 @@
 #include <glm/gtc/random.hpp>
 
 #include "vk_initializers.hpp"
+#include "Mesh/MeshSurface.hpp"
 
 namespace gestalt::application {
 
@@ -301,7 +306,6 @@ namespace gestalt::application {
         if (ImGui::BeginMenu("Window")) {
           ImGui::MenuItem("Scene Graph", nullptr, &show_scene_hierarchy_);
           ImGui::MenuItem("Light View", nullptr, &show_lights_);
-          ImGui::MenuItem("Stats", nullptr, &show_stats_);
           ImGui::MenuItem("Guizmo", nullptr, &show_guizmo_);
 
           if (ImGui::BeginMenu("Settings")) {
@@ -418,19 +422,6 @@ namespace gestalt::application {
       }
     }
 
-    void Gui::stats() {
-      if (ImGui::Begin("Stats")) {
-        const auto& stats = actions_.get_stats();
-
-        ImGui::Text("frametime %f ms", stats.frametime);
-        ImGui::Text("draw time %f ms", stats.mesh_draw_time);
-        ImGui::Text("update time %f ms", stats.scene_update_time);
-        ImGui::Text("triangles %i", stats.triangle_count);
-        ImGui::Text("draws %i", stats.drawcall_count);
-      }
-      ImGui::End();
-    }
-
     void Gui::lights() {
       if (ImGui::Begin("Lights")) {
         const char* lightOptions[] = {"Directional Light", "Point Light", "Spot Light"};
@@ -505,10 +496,6 @@ namespace gestalt::application {
 
       if (show_scene_hierarchy_) {
         scene_graph();
-      }
-
-      if (show_stats_) {
-        stats();
       }
 
       if (show_lights_) {

@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <vk_types.hpp>
+#include "VulkanTypes.hpp"
 
 namespace gestalt {
   namespace vkinit {

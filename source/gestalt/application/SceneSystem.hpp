@@ -3,13 +3,16 @@
 #include <queue>
 #include <unordered_map>
 
-#include "Components.hpp"
 #include "InputTypes.hpp"
 #include "Camera.hpp"
 #include "GpuTypes.hpp"
 #include "Repository.hpp"
 
 #include "fastgltf/types.hpp"
+
+namespace gestalt::foundation {
+  struct PbrMaterial;
+}
 
 namespace gestalt::application {
 

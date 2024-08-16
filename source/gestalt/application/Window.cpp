@@ -6,7 +6,7 @@
 namespace gestalt::application {
 
     void Window::init() {
-    extent = {foundation::getResolutionWidth(), foundation::getResolutionHeight()};
+    extent = {getResolutionWidth(), getResolutionHeight()};
 
       SDL_Init(SDL_INIT_VIDEO);
 

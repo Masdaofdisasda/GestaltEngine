@@ -15,6 +15,8 @@
 
 #include <chrono>
 
+#include "fmt/core.h"
+
 namespace gestalt {
 
   GameEngine* engine = nullptr;
@@ -52,7 +54,6 @@ namespace gestalt {
     gui_actions_.exit = [this]() { quit_ = true; };
     gui_actions_.load_gltf
         = [this](const std::string& path) { scene_manager_->request_scene(path); };
-    gui_actions_.get_stats = [this]() -> foundation::EngineStats& { return stats_; };
     gui_actions_.get_component_factory = [this]() -> application::ComponentFactory& {
       return scene_manager_->get_component_factory();
     };
@@ -65,8 +66,6 @@ namespace gestalt {
 
   void GameEngine::run() {
     fmt::print("Render loop starts\n");
-
-    const auto start = std::chrono::system_clock::now();  // todo replace with timetracker
 
     time_tracking_service_.update_timer();
 
@@ -111,10 +110,6 @@ namespace gestalt {
       frame_number++;
       FrameMark;
     }
-
-    const auto end = std::chrono::system_clock::now();
-    const auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    stats_.frametime = elapsed.count() / 1000.f;
   }
 
   void GameEngine::cleanup() const {

@@ -1,5 +1,6 @@
 #include "Camera.hpp"
 
+#include "Camera/OrbitCameraData.hpp"
 #include <glm/gtx/transform.hpp>
 
 #include "InputTypes.hpp"

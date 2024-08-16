@@ -5,8 +5,8 @@
 
 #include "common.hpp"
 
-#include "Components.hpp"
 #include "SceneSystem.hpp"
+#include "Material/PbrMaterial.hpp"
 
 namespace gestalt::application {
 

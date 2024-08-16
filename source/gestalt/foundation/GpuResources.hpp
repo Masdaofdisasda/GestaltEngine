@@ -1,12 +1,16 @@
 ﻿#pragma once
 
-#include "vk_types.hpp"
+#include "VulkanTypes.hpp"
 
 #include <vma/vk_mem_alloc.h>
 #include <glm/gtc/quaternion.hpp>
 
 #include <EngineConfig.hpp>
 #include <array>
+#include <memory>
+#include <vector>
+
+#include "PerFrameData.hpp"
 
 namespace gestalt::foundation {
   class IGpu;

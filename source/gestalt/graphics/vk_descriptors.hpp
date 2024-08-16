@@ -2,10 +2,9 @@
 
 #include <deque>
 
-#include "vk_types.hpp"
 #include "EngineConfig.hpp"
+#include "GpuTypes.hpp"
 
-#include "Gpu.hpp"
 
 namespace gestalt::graphics {
 

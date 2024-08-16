@@ -11,6 +11,8 @@
 #include "Repository.hpp"
 #include <VkBootstrap.h>
 
+#include "ValidationCallback.hpp"
+#include <fmt/core.h>
 #include "vk_images.hpp"
 #include "vk_initializers.hpp"
 

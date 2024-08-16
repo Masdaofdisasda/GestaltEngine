@@ -8,6 +8,8 @@
 #include "RenderPass.hpp"
 #include <VkBootstrap.h>
 
+#include "ValidationCallback.hpp"
+#include <fmt/core.h>
 #include "vk_images.hpp"
 #include "vk_initializers.hpp"
 #include "vk_pipelines.hpp"

@@ -47,7 +47,5 @@ namespace gestalt {
     uint64 frame_number{0};
     std::unique_ptr<foundation::FrameProvider> frame_provider_
         = std::make_unique<graphics::FrameProvider>(&frame_number);
-
-    foundation::EngineStats stats_ = {};
   };
 }  // namespace gestalt

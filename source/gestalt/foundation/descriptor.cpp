@@ -1,6 +1,8 @@
 ﻿#include "GpuResources.hpp"
 #include "GpuTypes.hpp"
+#include "ValidationCallback.hpp"
 
+#include "fmt/core.h"
 
 namespace gestalt::foundation {
   DescriptorBuffer& DescriptorBuffer::update() {

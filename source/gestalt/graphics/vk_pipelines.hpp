@@ -1,5 +1,6 @@
 ﻿#pragma once 
-#include <vk_types.hpp>
+#include <VulkanTypes.hpp>
+#include <vector>
 
 namespace gestalt::graphics {
 

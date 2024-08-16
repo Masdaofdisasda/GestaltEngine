@@ -4,6 +4,7 @@
 #include "vk_images.hpp"
 #include "vk_initializers.hpp"
 #include "vk_pipelines.hpp"
+#include <fmt/core.h>
 
 
 namespace gestalt::graphics {

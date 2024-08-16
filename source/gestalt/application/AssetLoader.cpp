@@ -6,6 +6,8 @@
 #include <meshoptimizer.h>
 
 #include "EntityManager.hpp"
+#include "Mesh/MeshSurface.hpp"
+#include "fmt/core.h"
 
 namespace gestalt::application {
 
