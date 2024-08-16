@@ -13,21 +13,6 @@
 namespace gestalt::application {
 
     void CameraSystem::prepare() {
-    // NOTE this is just for development purposes
-    const auto free_fly_component = CameraComponent(
-        kPerspective, kFreeFly,
-        FreeFlyCameraData(glm::vec3(7, 1.8, -7), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0)));
-    const auto orbit_component = CameraComponent(
-        kPerspective, kOrbit, OrbitCameraData(glm::vec3(0, 0, 0), 10.f, 0.1, 100.f));
-    const auto first_person_component
-        = CameraComponent(kPerspective, kFirstPerson,
-                          FirstPersonCameraData(glm::vec3(0, 2.0, 0), glm::vec3(0, 1, 0)));
-    const auto animation_component = CameraComponent(
-        kPerspective, kAnimation,
-        AnimationCameraData(glm::vec3(0.f, 2.f, -10.f), glm::vec3(10.0f, 0.0f, 0.0f),
-                            glm::vec3(0.f, 2.f, 10.f), glm::vec3(5.0f, -45.0f, 0.0f)));
-
-    repository_->camera_components.add(root_entity, free_fly_component);
 
     const auto& per_frame_data_buffers = repository_->per_frame_data_buffers;
 
@@ -66,7 +51,7 @@ namespace gestalt::application {
     void CameraSystem::update_cameras(const float delta_time, const UserInput& movement, float aspect) {
       aspect_ratio_ = aspect;
 
-      auto& camera_component = repository_->camera_components.get(root_entity).value().get();
+      auto& camera_component = repository_->camera_components.get(active_camera_).value().get();
       std::visit(
           [&]<typename CameraDataType>(CameraDataType& camera_data) {
             using T = std::decay_t<CameraDataType>;
@@ -96,7 +81,7 @@ namespace gestalt::application {
       const auto frame = frame_->get_current_frame_index();
 
       const auto& buffers = repository_->per_frame_data_buffers;
-      auto& camera_component = repository_->camera_components.get(root_entity).value().get();
+      auto& camera_component = repository_->camera_components.get(active_camera_).value().get();
 
       const glm::mat4 view_matrix = std::visit(
           []<typename CameraDataType>(const CameraDataType& camera_data) -> glm::mat4 {

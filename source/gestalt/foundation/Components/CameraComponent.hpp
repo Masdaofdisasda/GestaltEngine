@@ -15,16 +15,25 @@ namespace gestalt::foundation {
 
   struct CameraComponent : Component {
 
-    explicit CameraComponent(const CameraProjectionType projection, const CameraPositionerType positioner, const CameraData& camera_data)
-        : projection(projection), positioner(positioner), camera_data(camera_data) {
-    }
+      CameraComponent(const CameraProjectionType projection, const FreeFlyCameraData& camera_data)
+          : projection(projection), positioner(kFreeFly), camera_data(camera_data) {}
 
-    CameraProjectionType projection;
-    const CameraPositionerType positioner;
-    glm::mat4 view_matrix{1.0f};
-    glm::mat4 projection_matrix{1.0};
+      CameraComponent(const CameraProjectionType projection,
+                      const FirstPersonCameraData& camera_data)
+          : projection(projection), positioner(kFirstPerson), camera_data(camera_data) {}
 
-    CameraData camera_data;
-  };
+      CameraComponent(const CameraProjectionType projection, const OrbitCameraData& camera_data)
+          : projection(projection), positioner(kOrbit), camera_data(camera_data) {}
+
+      CameraComponent(const CameraProjectionType projection, const AnimationCameraData& camera_data)
+          : projection(projection), positioner(kAnimation), camera_data(camera_data) {}
+
+      CameraProjectionType projection;
+      const CameraPositionerType positioner;
+      glm::mat4 view_matrix{1.0f};
+      glm::mat4 projection_matrix{1.0};
+
+      CameraData camera_data;
+    };
 
 }  // namespace gestalt

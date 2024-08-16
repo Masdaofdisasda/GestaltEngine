@@ -34,14 +34,16 @@ namespace gestalt::foundation {
       return r * t;
     }
 
+    // Configuration Values
     glm::vec3 camera_position;
     glm::quat camera_orientation = glm::quat(glm::vec3(0.0f));
     glm::vec3 up;
 
-    glm::vec2 mouse_pos = glm::vec2(0.0f);
-
+    // Adjustable Parameters
     float32 mouse_speed = 2.5f;  // Adjust based on your desired sensitivity
-    glm::vec3 move_speed = glm::vec3(0.0f);
+
+    // State Variables
+    glm::vec2 mouse_pos = glm::vec2(0.0f);
   };
 
 }  // namespace gestalt

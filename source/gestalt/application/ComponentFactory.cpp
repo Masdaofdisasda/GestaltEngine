@@ -69,13 +69,6 @@ namespace gestalt::application {
       fmt::print("created mesh {}, mesh_id {}\n", key, mesh_id);
     }
 
-    void ComponentFactory::add_camera_component(const Entity entity,
-                                                         const CameraComponent& camera) {
-      assert(entity != invalid_entity);
-
-      repository_->camera_components.add(entity, camera);
-    }
-
     Entity ComponentFactory::create_directional_light(const glm::vec3& color,
                                                                const float intensity,
                                                                const glm::vec3& direction,
@@ -127,6 +120,34 @@ namespace gestalt::application {
       const LightComponent light(color, intensity, range, matrix_id);
 
       repository_->light_components.add(entity, light);
+      return entity;
+    }
+
+  Entity ComponentFactory::add_free_fly_camera(const glm::vec3& position,
+                                                    const glm::vec3& direction, const glm::vec3& up, Entity entity) const {
+      const auto free_fly_component = CameraComponent(
+          kPerspective,
+          FreeFlyCameraData(position, direction, up));
+      repository_->camera_components.add(entity, free_fly_component);
+
+      return entity;
+    }
+
+  Entity ComponentFactory::add_orbit_camera(const glm::vec3& target, Entity entity) const {
+      const auto orbit_component = CameraComponent(
+          kPerspective,
+          OrbitCameraData(target));
+      repository_->camera_components.add(entity, orbit_component);
+
+      return entity;
+    }
+
+  Entity ComponentFactory::add_first_person_camera(const glm::vec3& position, Entity entity) const {
+      const auto first_person_component = CameraComponent(
+          kPerspective,
+          FirstPersonCameraData(position, glm::vec3(0.f,1.f, 0.f)));
+      repository_->camera_components.add(entity, first_person_component);
+
       return entity;
     }
 

@@ -126,7 +126,7 @@ class NotificationManager {
     };
 
     class CameraSystem final : public SceneSystem, public NonCopyable<CameraSystem> {
-      Entity active_camera_{0};
+      Entity active_camera_{3};
       float32 aspect_ratio_{1.f};
       float32 near_plane_{0.1f};
       float32 far_plane_{10000.f};

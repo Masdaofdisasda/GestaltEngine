@@ -18,14 +18,15 @@ namespace gestalt::foundation {
       return translate(glm::yawPitchRoll(a.y, a.x, a.z), -position_current);
     }
 
-    float32 damping_linear = 10000.0f;
-    glm::vec3 damping_euler_angles = glm::vec3(5.0f, 5.0f, 5.0f);
-
+    // Configuration Values
     glm::vec3 position_current = glm::vec3(0.0f);
     glm::vec3 position_desired = glm::vec3(0.0f);
-
     /// pitch, pan, roll
     glm::vec3 angles_current = glm::vec3(0.0f);
     glm::vec3 angles_desired = glm::vec3(0.0f);
+
+    // Adjustable Parameters
+    float32 damping_linear = 10000.0f;
+    glm::vec3 damping_euler_angles = glm::vec3(5.0f, 5.0f, 5.0f);
   };
 }  // namespace gestalt

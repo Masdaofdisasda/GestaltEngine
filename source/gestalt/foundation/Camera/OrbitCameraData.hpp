@@ -5,10 +5,9 @@
 namespace gestalt::foundation {
 
   struct OrbitCameraData {
-
-    OrbitCameraData(const glm::vec3& target, const float32 distance, const float32 min_distance, const float32 max_distance)
-        : min_distance(min_distance),
-          max_distance(max_distance) {
+    explicit OrbitCameraData(const glm::vec3& target, const float32 distance = 5.f, const float32 yaw = 45.f, const float32 pitch = .3f)
+        : yaw(yaw),
+          pitch(pitch) {
       set_target(target);
       set_distance(distance);
     }
@@ -26,23 +25,23 @@ namespace gestalt::foundation {
       return lookAtRH(position, target, up);
     }
 
-
+    // Configuration Values
     glm::vec3 target;
     float32 distance;
-    float32 min_distance;
-    float32 max_distance;
+    float32 yaw;
+    float32 pitch;
 
-    float32 yaw = 45.0f;
-    float32 pitch = .3f;
-    glm::vec3 position = glm::vec3(0.0f);
-    glm::quat orientation = glm::quat(glm::vec3(0.0f));
-    glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-
-    glm::vec2 mouse_pos = glm::vec2(0);
-
-    // Configuration parameters
+    // Adjustable Parameters
+    float32 min_distance = 1.0f;
+    float32 max_distance = 100.0f;
     float32 orbit_speed = 2.f;
     float32 zoom_speed = 0.1f;
     float32 pan_speed = 10.0f;
+
+    // State Variables 
+    glm::vec3 position = glm::vec3(0.0f);
+    glm::quat orientation = glm::quat(glm::vec3(0.0f));
+    glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+    glm::vec2 mouse_pos = glm::vec2(0);
   };
 }  // namespace gestalt

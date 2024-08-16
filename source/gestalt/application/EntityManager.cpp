@@ -26,6 +26,15 @@ namespace gestalt::application {
     component_factory_->create_point_light(glm::vec3(1.0f), 5.0f, glm ::vec3(0.0, 6.0, 0.0), 100.f,
                                            get_root_entity());
 
+     auto [main_cam, main_cam_node] = component_factory_->create_entity("Editor Camera");
+    component_factory_->link_entity_to_parent(main_cam, root_entity_);
+    component_factory_->add_free_fly_camera(glm::vec3(7, 1.8, -7), glm::vec3(0, 0, 0),
+                                             glm::vec3(0, 1, 0), main_cam);
+
+    auto [player, player_node] = component_factory_->create_entity("Player");
+    component_factory_->link_entity_to_parent(player, root_entity_);
+    component_factory_->add_first_person_camera(glm::vec3(7, 1.8, -7), player);
+
     material_system_ = std::make_unique<MaterialSystem>();
     material_system_->init(gpu_, resource_manager_, builder, repository_, notification_manager_.get(), frame);
     light_system_ = std::make_unique<LightSystem>();

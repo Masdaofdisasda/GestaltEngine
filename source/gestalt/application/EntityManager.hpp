@@ -38,7 +38,6 @@ namespace gestalt::application {
           const glm::quat& rotation = glm::quat(1.f, 0.f, 0.f, 0.f), const float& scale = 1.f);
       void add_mesh_component(Entity entity, size_t mesh_index);
       void create_mesh(std::vector<MeshSurface> surfaces, const std::string& name) const;
-      void add_camera_component(Entity entity, const CameraComponent& camera);
 
       Entity create_directional_light(const glm::vec3& color, float intensity,
                                       const glm::vec3& direction, Entity parent = 0);
@@ -47,6 +46,12 @@ namespace gestalt::application {
                                float innerCone, float outerCone, Entity parent = 0);
       Entity create_point_light(const glm::vec3& color, float intensity, const glm::vec3& position,
                                 float32 range, Entity parent = 0);
+      Entity add_free_fly_camera(const glm::vec3& position, const glm::vec3& direction,
+                                 const glm::vec3& up, Entity entity) const;
+
+      Entity add_orbit_camera(const glm::vec3& target, Entity entity) const;
+
+      Entity add_first_person_camera(const glm::vec3& position, Entity entity) const;
 
       void link_entity_to_parent(Entity child, Entity parent);
     };

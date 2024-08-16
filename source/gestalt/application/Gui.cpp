@@ -151,7 +151,7 @@ namespace gestalt::application {
     void Gui::guizmo() {
       ImGuizmo::BeginFrame();
 
-      auto cam = repository_->camera_components.get(0);
+      auto cam = repository_->camera_components.get(3);
       auto viewCam = cam->get().view_matrix;
       auto proj = cam->get().projection_matrix;
       proj[1][1] *= -1;  // Flip the Y-axis for opengl like system

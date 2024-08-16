@@ -15,21 +15,21 @@ namespace gestalt::application {
       const glm::vec2 delta = mouse_pos - camera_data.mouse_pos;
       glm::quat deltaQuat = glm::quat(
           glm::vec3(camera_data.mouse_speed * delta.y, camera_data.mouse_speed * delta.x, 0.0f));
-      glm::quat unclamped_rotation = deltaQuat * camera_data.camera_orientation;
+      glm::quat unclamped_rotation = deltaQuat * camera_data.orientation;
       float32 pitch = glm::pitch(unclamped_rotation);
       float32 yaw = glm::yaw(unclamped_rotation);
 
       if ((std::abs(yaw) >= 0.01
            || (std::abs(pitch) <= glm::half_pi<float>())))  // clamp y-rotation
-        camera_data.camera_orientation = unclamped_rotation;
+        camera_data.orientation = unclamped_rotation;
 
-      camera_data.camera_orientation = normalize(camera_data.camera_orientation);
+      camera_data.orientation = normalize(camera_data.orientation);
       camera_data.set_up_vector(camera_data.up);
     }
     camera_data.mouse_pos = mouse_pos;
 
     // translate camera by adding or subtracting to the orthographic vectors
-    const glm::mat4 v = mat4_cast(camera_data.camera_orientation);
+    const glm::mat4 v = mat4_cast(camera_data.orientation);
 
     const glm::vec3 forward = -glm::vec3(v[0][2], v[1][2], v[2][2]);
     const glm::vec3 right = glm::vec3(v[0][0], v[1][0], v[2][0]);
@@ -67,7 +67,7 @@ namespace gestalt::application {
         camera_data.move_speed = normalize(camera_data.move_speed) * maxSpeed;
     }
 
-    camera_data.camera_position += camera_data.move_speed * static_cast<float32>(delta_seconds);
+    camera_data.position += camera_data.move_speed * static_cast<float32>(delta_seconds);
   }
 
 }  // namespace gestalt::application
