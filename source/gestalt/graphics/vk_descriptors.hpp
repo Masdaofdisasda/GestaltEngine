@@ -2,10 +2,14 @@
 
 #include <array>
 #include <deque>
+#include <span>
+#include <vector>
 
 #include "EngineConfig.hpp"
-#include "GpuTypes.hpp"
-
+#include "vk_images.hpp"
+#include "Interface/IDescriptorAllocatorGrowable.hpp"
+#include "Interface/IDescriptorLayoutBuilder.hpp"
+#include "Interface/IDescriptorWriter.hpp"
 
 namespace gestalt::foundation {
   struct FrameProvider;

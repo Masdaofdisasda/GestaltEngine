@@ -5,6 +5,9 @@
 #include "VulkanCheck.hpp"
 
 #include "FrameProvider.hpp"
+#include "Interface/IDescriptorLayoutBuilder.hpp"
+#include "Interface/IGpu.hpp"
+#include "Interface/IResourceManager.hpp"
 #include "Mesh/MeshSurface.hpp"
 #include "Mesh/MeshTaskCommand.hpp"
 

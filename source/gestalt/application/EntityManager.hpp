@@ -9,6 +9,12 @@
 #include "Material/PbrMaterial.hpp"
 #include "fastgltf/types.hpp"
 
+namespace gestalt::foundation {
+  class IDescriptorLayoutBuilder;
+  class IGpu;
+  class IResourceManager;
+}
+
 namespace gestalt::application {
 
     struct Vertex;
@@ -118,7 +124,7 @@ namespace gestalt::application {
                 Repository* repository, FrameProvider* frame);
       void cleanup() const;
 
-      void update_scene(float delta_time, const Movement& movement, float aspect);
+      void update_scene(float delta_time, const UserInput& movement, float aspect);
 
       void request_scene(const std::string& path);
       ComponentFactory& get_component_factory() const { return *component_factory_; }

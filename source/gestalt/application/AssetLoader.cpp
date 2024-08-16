@@ -5,7 +5,10 @@
 
 #include <meshoptimizer.h>
 
+#include <functional>
+
 #include "EntityManager.hpp"
+#include "Interface/IResourceManager.hpp"
 #include "Mesh/MeshSurface.hpp"
 #include "fmt/core.h"
 

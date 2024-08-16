@@ -3,11 +3,11 @@
 #include "Camera/FirstPersonCameraData.hpp"
 #include <glm/gtx/quaternion.hpp>
 
-#include "InputTypes.hpp"
+#include "UserInput.hpp"
 
-namespace gestalt::foundation {
+namespace gestalt::application {
 
-  void FirstPersonCamera::update(float64 delta_seconds, const Movement& movement,
+  void FirstPersonCamera::update(float64 delta_seconds, const UserInput& movement,
                                  FirstPersonCameraData& data) {
     auto& camera_data = data;
     const auto mouse_pos = glm::vec2(movement.mouse_position_x_rel, movement.mouse_position_y_rel);

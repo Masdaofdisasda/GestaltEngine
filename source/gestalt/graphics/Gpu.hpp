@@ -2,12 +2,13 @@
 #pragma once
 
 #include "VulkanTypes.hpp"
-#include "GpuTypes.hpp"
 #include "Window.hpp"
 
 #include <vma/vk_mem_alloc.h>
 
 #include <functional>
+
+#include "Interface/IGpu.hpp"
 
 
 namespace gestalt::graphics {

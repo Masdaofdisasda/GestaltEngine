@@ -3,11 +3,11 @@
 #include "Camera/OrbitCameraData.hpp"
 #include <glm/gtx/transform.hpp>
 
-#include "InputTypes.hpp"
+#include "UserInput.hpp"
 
-namespace gestalt::foundation {
+namespace gestalt::application {
 
-  void OrbitCamera::update(float64 delta_seconds, const Movement& movement, OrbitCameraData& data) {
+  void OrbitCamera::update(float64 delta_seconds, const UserInput& movement, OrbitCameraData& data) {
     auto& camera_data = data;
 
     glm::mat4 view_matrix = camera_data.get_view_matrix();

@@ -16,6 +16,7 @@
 #include "FrameProvider.hpp"
 #include "vk_images.hpp"
 #include "vk_initializers.hpp"
+#include "Interface/IGpu.hpp"
 
 namespace gestalt::graphics {
   void RenderEngine::init(IGpu* gpu, Window* window,

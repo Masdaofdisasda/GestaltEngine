@@ -5,7 +5,7 @@
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/quaternion.hpp>
 
-namespace gestalt::foundation {
+namespace gestalt::application {
 
   glm::vec3 ClipAngles(const glm::vec3& angles) {
     return {std::fmod(angles.x, 360.0f), std::fmod(angles.y, 360.0f), std::fmod(angles.z, 360.0f)};
@@ -21,7 +21,7 @@ namespace gestalt::foundation {
     const glm::vec3 d = ClipAngles(anglesCurrent) - ClipAngles(anglesDesired);
     return {ClipAngle(d.x), ClipAngle(d.y), ClipAngle(d.z)};
   }
-  void MoveToCamera::update(float64 delta_seconds, const Movement& movement,
+  void MoveToCamera::update(float64 delta_seconds, const UserInput& movement,
                             AnimationCameraData& data) {
     auto& camera_data = data;
     camera_data.position_current += camera_data.damping_linear * static_cast<float32>(delta_seconds)

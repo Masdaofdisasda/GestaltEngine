@@ -15,6 +15,8 @@
 #include <glm/gtc/random.hpp>
 
 #include "vk_initializers.hpp"
+#include "Interface/IDescriptorLayoutBuilder.hpp"
+#include "Interface/IGpu.hpp"
 #include "Mesh/MeshSurface.hpp"
 
 namespace gestalt::application {

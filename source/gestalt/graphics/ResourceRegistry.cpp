@@ -6,6 +6,8 @@
 #include "RenderPass.hpp"
 #include <VkBootstrap.h>
 
+#include "Interface/IGpu.hpp"
+
 namespace gestalt::graphics {
 
     void ResourceRegistry::init(IGpu* gpu,

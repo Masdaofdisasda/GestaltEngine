@@ -45,7 +45,12 @@ file(GLOB_RECURSE DESCRIPTOR
     "${CMAKE_CURRENT_SOURCE_DIR}/Descriptor/*.cpp"
 )
 
-add_library(${FOUNDATION_MODULE} ${SOURCES} ${COMPONENTS} ${CAMERA} ${MESH} ${LIGHT} ${MATERIAL} ${RESOURCES} ${BUFFER} ${DESCRIPTOR})
+file(GLOB_RECURSE INTERFACES
+    "${CMAKE_CURRENT_SOURCE_DIR}/Interface/*.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Interface/*.cpp"
+)
+
+add_library(${FOUNDATION_MODULE} ${SOURCES} ${COMPONENTS} ${CAMERA} ${MESH} ${LIGHT} ${MATERIAL} ${RESOURCES} ${BUFFER} ${DESCRIPTOR} ${INTERFACES})
 
 source_group("Source Files" FILES ${SOURCES})
 source_group("Components" FILES ${COMPONENTS})
@@ -56,6 +61,7 @@ source_group("Material" FILES ${MATERIAL})
 source_group("GPU Resources" FILES ${RESOURCES})
 source_group("Buffer" FILES ${BUFFER})
 source_group("Descriptor" FILES ${DESCRIPTOR})
+source_group("Interface" FILES ${INTERFACES})
 
 target_compile_features(${FOUNDATION_MODULE} PRIVATE cxx_std_20)
 

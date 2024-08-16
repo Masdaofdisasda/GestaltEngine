@@ -4,7 +4,7 @@
 
 namespace gestalt::foundation {
 	  
-    struct Movement {
+    struct UserInput {
       float32 mouse_position_x{0.f};
       float32 mouse_position_y{0.f};
       float32 mouse_position_x_rel{0.f};

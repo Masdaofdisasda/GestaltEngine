@@ -12,6 +12,7 @@
 
 #include "CubemapUtils.hpp"
 #include "VulkanCheck.hpp"
+#include "Interface/IGpu.hpp"
 
 
 namespace gestalt::graphics {

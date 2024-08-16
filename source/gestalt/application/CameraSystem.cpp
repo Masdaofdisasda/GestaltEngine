@@ -6,6 +6,9 @@
 
 #include "FrameProvider.hpp"
 #include "VulkanTypes.hpp"
+#include "Interface/IDescriptorLayoutBuilder.hpp"
+#include "Interface/IGpu.hpp"
+#include "Interface/IResourceManager.hpp"
 
 namespace gestalt::application {
 
@@ -60,7 +63,7 @@ namespace gestalt::application {
     vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layout, nullptr);
   }
 
-    void CameraSystem::update_cameras(const float delta_time, const Movement& movement, float aspect) {
+    void CameraSystem::update_cameras(const float delta_time, const UserInput& movement, float aspect) {
       aspect_ratio_ = aspect;
 
       auto& camera_component = repository_->camera_components.get(root_entity).value().get();

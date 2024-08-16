@@ -27,31 +27,31 @@ namespace gestalt::application {
     }
 
     void InputSystem::reset_frame() {
-      movement_.scroll = 0;
-      movement_.mouse_position_y_rel = 0.f;
-      movement_.mouse_position_x_rel = 0.f;
+      user_input_.scroll = 0;
+      user_input_.mouse_position_y_rel = 0.f;
+      user_input_.mouse_position_x_rel = 0.f;
     }
 
     void InputSystem::handle_mouse_motion(const SDL_Event& e, uint32 window_size_x,
                                           uint32 window_size_y) {
-      movement_.mouse_position_x = static_cast<float>(e.motion.x) / window_size_x;
-      movement_.mouse_position_y = static_cast<float>(e.motion.y) / window_size_y;
+      user_input_.mouse_position_x = static_cast<float>(e.motion.x) / window_size_x;
+      user_input_.mouse_position_y = static_cast<float>(e.motion.y) / window_size_y;
 
-      movement_.mouse_position_x_rel = static_cast<float>(e.motion.xrel) / window_size_x;
-      movement_.mouse_position_y_rel = static_cast<float>(e.motion.yrel) / window_size_y;
+      user_input_.mouse_position_x_rel = static_cast<float>(e.motion.xrel) / window_size_x;
+      user_input_.mouse_position_y_rel = static_cast<float>(e.motion.yrel) / window_size_y;
     }
 
     void InputSystem::handle_mouse_button(const SDL_Event& e) {
       const bool pressed = (e.type == SDL_MOUSEBUTTONDOWN);
       switch (e.button.button) {
         case SDL_BUTTON_LEFT:
-          movement_.left_mouse_button = pressed;
+          user_input_.left_mouse_button = pressed;
           break;
         case SDL_BUTTON_RIGHT:
-          movement_.right_mouse_button = pressed;
+          user_input_.right_mouse_button = pressed;
           break;
         case SDL_BUTTON_MIDDLE:
-          movement_.middle_mouse_button = pressed;
+          user_input_.middle_mouse_button = pressed;
           break;
         default:
           break;
@@ -59,35 +59,35 @@ namespace gestalt::application {
     }
 
     void InputSystem::handle_mouse_wheel(const SDL_Event& e) {
-      movement_.scroll = e.wheel.y;  // `y` is positive for scroll up and negative for scroll down
+      user_input_.scroll = e.wheel.y;  // `y` is positive for scroll up and negative for scroll down
     }
 
     void InputSystem::handle_keyboard(const SDL_Event& e) {
       const bool pressed = (e.type == SDL_KEYDOWN);
       switch (e.key.keysym.scancode) {
         case SDL_SCANCODE_W:
-          movement_.forward = pressed;
+          user_input_.forward = pressed;
           break;
         case SDL_SCANCODE_S:
-          movement_.backward = pressed;
+          user_input_.backward = pressed;
           break;
         case SDL_SCANCODE_A:
-          movement_.left = pressed;
+          user_input_.left = pressed;
           break;
         case SDL_SCANCODE_D:
-          movement_.right = pressed;
+          user_input_.right = pressed;
           break;
         case SDL_SCANCODE_SPACE:
-          movement_.up = pressed;
+          user_input_.up = pressed;
           break;
         case SDL_SCANCODE_LSHIFT:
-          movement_.down = pressed;
+          user_input_.down = pressed;
           break;
         case SDL_SCANCODE_LCTRL:
-          movement_.left_control = pressed;
+          user_input_.left_control = pressed;
           break;
         case SDL_SCANCODE_LALT:
-          movement_.crouch = pressed;
+          user_input_.crouch = pressed;
           break;
         default:
           break;

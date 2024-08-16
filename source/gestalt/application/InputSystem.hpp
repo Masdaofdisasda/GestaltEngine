@@ -1,16 +1,16 @@
 #pragma once
 
 #include "common.hpp"
-#include "InputTypes.hpp"
 
 #include <SDL.h>
 
+#include "UserInput.hpp"
 
 
 namespace gestalt::application {
 
     class InputSystem {
-      Movement movement_{};
+      UserInput user_input_{};
 
       void handle_mouse_motion(const SDL_Event& e, uint32 window_size_x, uint32 window_size_y);
       void handle_mouse_button(const SDL_Event& e);
@@ -21,6 +21,6 @@ namespace gestalt::application {
       void handle_event(const SDL_Event& e, uint32 window_size_x, uint32 window_size_y);
       void reset_frame();
 
-      [[nodiscard]] const Movement& get_movement() const { return movement_; }
+      [[nodiscard]] const UserInput& get_movement() const { return user_input_; }
     };
 }  // namespace gestalt

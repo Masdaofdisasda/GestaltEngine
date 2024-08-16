@@ -3,10 +3,10 @@
 #include "Camera/FreeFlyCameraData.hpp"
 #include <glm/gtx/quaternion.hpp>
 
-#include "InputTypes.hpp"
+#include "UserInput.hpp"
 
-namespace gestalt::foundation {
-  void FreeFlyCamera::update(float64 delta_seconds, const Movement& movement,
+namespace gestalt::application {
+  void FreeFlyCamera::update(float64 delta_seconds, const UserInput& movement,
                              FreeFlyCameraData& data) {
     auto& camera_data = data;
 

@@ -6,6 +6,7 @@
 
 #include <glm/gtx/matrix_decompose.hpp>
 
+#include "Interface/IResourceManager.hpp"
 #include "fmt/printf.h"
 
 namespace gestalt::application {
@@ -69,7 +70,7 @@ namespace gestalt::application {
       node.parent = get_root_entity();
     }
 
-    void EntityManager::update_scene(const float delta_time, const Movement& movement, const float aspect) {
+    void EntityManager::update_scene(const float delta_time, const UserInput& movement, const float aspect) {
       if (!scene_path_.empty()) {
         load_scene(scene_path_);
         scene_path_.clear();

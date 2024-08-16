@@ -4,7 +4,12 @@
 #include "VulkanTypes.hpp"
 #include "vk_descriptors.hpp"
 #include "Repository.hpp"
+#include "Interface/IResourceManager.hpp"
 
+
+namespace gestalt::foundation {
+  class IGpu;
+}
 
 namespace gestalt::graphics {
 

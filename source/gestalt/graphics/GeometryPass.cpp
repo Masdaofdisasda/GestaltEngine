@@ -6,6 +6,7 @@
 #include <fmt/core.h>
 
 #include "FrameProvider.hpp"
+#include "Interface/IGpu.hpp"
 
 namespace gestalt::graphics {
 

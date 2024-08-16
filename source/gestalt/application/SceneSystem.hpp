@@ -1,14 +1,16 @@
 ﻿#pragma once
 
+#include <functional>
 #include <queue>
 #include <unordered_map>
 
-#include "InputTypes.hpp"
 #include "Camera.hpp"
-#include "GpuTypes.hpp"
 #include "Repository.hpp"
 
 namespace gestalt::foundation {
+  class IResourceManager;
+  class IDescriptorLayoutBuilder;
+  class IGpu;
   struct FrameProvider;
   struct PbrMaterial;
 }
@@ -132,7 +134,7 @@ class NotificationManager {
 
     public:
       void prepare() override;
-      void update_cameras(float delta_time, const Movement& movement, float aspect);
+      void update_cameras(float delta_time, const UserInput& movement, float aspect);
       void update() override;
       void cleanup() override;
     };
