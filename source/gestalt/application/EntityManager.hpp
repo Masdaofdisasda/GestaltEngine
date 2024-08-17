@@ -116,6 +116,7 @@ namespace gestalt::application {
       std::unique_ptr<CameraSystem> camera_system_;
       std::unique_ptr<SceneSystem> transform_system_;
       std::unique_ptr<SceneSystem> mesh_system_;
+      std::unique_ptr<SceneSystem> physics_system_;
 
       Entity root_entity_ = 0;
 

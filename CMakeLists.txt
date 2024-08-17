@@ -29,6 +29,7 @@ include(source/external/vulkan.cmake)
 include(source/external/vkb.cmake)
 include(source/external/sdl2.cmake)
 include(source/external/imgui.cmake)
+include(source/external/jolt.cmake)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)

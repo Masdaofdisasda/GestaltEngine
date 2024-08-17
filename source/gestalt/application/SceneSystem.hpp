@@ -167,4 +167,11 @@ class NotificationManager {
       void cleanup() override;
     };
 
+    class PhysicSystem final : public SceneSystem, public NonCopyable<PhysicSystem> {
+    public:
+      void prepare() override;
+      void update() override;
+      void cleanup() override;
+    };
+
 }  // namespace gestalt

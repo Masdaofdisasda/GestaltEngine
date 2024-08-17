@@ -22,6 +22,7 @@ target_include_directories(
          "${imgui_SOURCE_DIR}/backends"
          "${ImGuiFileDialog_SOURCE_DIR}"
          "${ImGuizmo_SOURCE_DIR}"
+         "${JoltPhysics_SOURCE_DIR}"
 )
 
 target_link_libraries(${APPLICATION_MODULE} PUBLIC ${FOUNDATION_MODULE})
