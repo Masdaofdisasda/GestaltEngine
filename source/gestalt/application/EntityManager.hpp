@@ -6,6 +6,7 @@
 #include "common.hpp"
 
 #include "SceneSystem.hpp"
+#include "Components/PhysicsComponent.hpp"
 #include "Material/PbrMaterial.hpp"
 #include "fastgltf/types.hpp"
 
@@ -38,6 +39,10 @@ namespace gestalt::application {
           const glm::quat& rotation = glm::quat(1.f, 0.f, 0.f, 0.f), const float& scale = 1.f);
       void add_mesh_component(Entity entity, size_t mesh_index);
       void create_mesh(std::vector<MeshSurface> surfaces, const std::string& name) const;
+      void create_physics_component(Entity entity, BodyType body_type,
+                                    const BoxCollider& collider) const;
+      void create_physics_component(Entity entity, BodyType body_type,
+                                    const SphereCollider& collider) const;
 
       Entity create_directional_light(const glm::vec3& color, float intensity,
                                       const glm::vec3& direction, Entity parent = 0);
@@ -116,7 +121,7 @@ namespace gestalt::application {
       std::unique_ptr<CameraSystem> camera_system_;
       std::unique_ptr<SceneSystem> transform_system_;
       std::unique_ptr<SceneSystem> mesh_system_;
-      std::unique_ptr<SceneSystem> physics_system_;
+      std::unique_ptr<PhysicSystem> physics_system_;
 
       Entity root_entity_ = 0;
 

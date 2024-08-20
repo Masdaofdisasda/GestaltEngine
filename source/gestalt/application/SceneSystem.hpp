@@ -5,7 +5,17 @@
 #include <unordered_map>
 
 #include "Camera.hpp"
+#include "PhysicEngine.hpp"
 #include "Repository.hpp"
+
+namespace JPH {
+  class Body;
+  class BodyID;
+  class JobSystemThreadPool;
+  class TempAllocatorImpl;
+  class BodyInterface;
+  class PhysicsSystem;
+}
 
 namespace gestalt::foundation {
   class IResourceManager;
@@ -16,8 +26,13 @@ namespace gestalt::foundation {
 }
 
 namespace gestalt::application {
+  class MyContactListener;
+  class MyBodyActivationListener;
+  class ObjectLayerPairFilterImpl;
+  class ObjectVsBroadPhaseLayerFilterImpl;
+  class BPLayerInterfaceImpl;
 
-    enum class ChangeType {
+  enum class ChangeType {
       ComponentUpdated,
     };
     struct ChangeEvent {
@@ -168,8 +183,10 @@ class NotificationManager {
     };
 
     class PhysicSystem final : public SceneSystem, public NonCopyable<PhysicSystem> {
+      std::unique_ptr<PhysicEngine> physic_engine_;
     public:
       void prepare() override;
+      void update(float delta_time) const;
       void update() override;
       void cleanup() override;
     };

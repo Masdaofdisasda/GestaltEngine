@@ -90,7 +90,7 @@ namespace gestalt::application {
       }
       resource_manager_->flush_loader();
 
-      physics_system_->update();
+      physics_system_->update(delta_time);
       material_system_->update();
       light_system_->update();
       camera_system_->update_cameras(delta_time, movement, aspect);

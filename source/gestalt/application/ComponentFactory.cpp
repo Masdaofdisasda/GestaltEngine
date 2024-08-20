@@ -6,6 +6,7 @@
 
 #include <glm/gtx/matrix_decompose.hpp>
 
+#include "Components/PhysicsComponent.hpp"
 #include "Mesh/MeshSurface.hpp"
 #include "fmt/printf.h"
 
@@ -64,9 +65,27 @@ namespace gestalt::application {
         combined_radius = std::max(combined_radius, distance);
       }
 
+      glm::vec3 min(FLT_MAX);
+      glm::vec3 max(-FLT_MAX);
+
+      for (const auto& surface : surfaces) {
+        min = glm::min(min, surface.local_aabb.min);
+        max = glm::max(max, surface.local_aabb.max);
+      }
+
       mesh_id = repository_->meshes.add(
-          Mesh{key, std::move(surfaces), BoundingSphere{combined_center, combined_radius}});
+          Mesh{key, std::move(surfaces), BoundingSphere{combined_center, combined_radius}, AABB{min, max}});
       fmt::print("created mesh {}, mesh_id {}\n", key, mesh_id);
+    }
+
+  void ComponentFactory::create_physics_component(const Entity entity, const BodyType body_type,
+                                                  const BoxCollider& collider) const {
+      repository_->physics_components.add(entity, PhysicsComponent(body_type, collider));
+    }
+
+  void ComponentFactory::create_physics_component(const Entity entity, const BodyType body_type,
+                                                  const SphereCollider& collider) const {
+      repository_->physics_components.add(entity, PhysicsComponent(body_type, collider));
     }
 
     Entity ComponentFactory::create_directional_light(const glm::vec3& color,

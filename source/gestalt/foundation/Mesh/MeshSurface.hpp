@@ -19,6 +19,7 @@ namespace gestalt::foundation {
       uint32 first_index;
       uint32 vertex_offset;
       BoundingSphere local_bounds;
+      AABB local_aabb;
 
       size_t material = default_material;
       size_t mesh_draw = no_component;

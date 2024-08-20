@@ -255,6 +255,14 @@ namespace gestalt::application {
         radius = std::max(radius, distance);
       }
 
+      glm::vec3 min(FLT_MAX);
+      glm::vec3 max(-FLT_MAX);
+
+      for (const auto& vertex : vertex_positions) {
+        min = glm::min(min, vertex.position);
+        max = glm::max(max, vertex.position);
+      }
+
       auto meshlet_count = meshlets.size();
       auto meshlet_offset = repository->meshlets.size();
       repository->meshlets.add(meshlets);
@@ -270,6 +278,7 @@ namespace gestalt::application {
           .first_index = static_cast<uint32>(repository->indices.size()),
           .vertex_offset = static_cast<uint32>(repository->vertex_positions.size()),
           .local_bounds = BoundingSphere{center, radius},
+          .local_aabb = AABB{min, max},
           .mesh_draw = mesh_draw,
       };
 
@@ -470,6 +479,33 @@ namespace gestalt::application {
     import_materials(gltf, image_offset);
 
     import_lights(gltf);
+
+    {
+      for (const auto& entity : repository_->scene_graph.components() | std::views::keys) {
+        if (repository_->mesh_components.get(entity).has_value()) {
+          const auto& mesh = repository_->meshes.get(repository_->mesh_components[entity].mesh);
+
+          for (const auto& surface : mesh.surfaces) {
+            auto name = repository_->materials.get(surface.material).name;
+            if (name == "DY_SP") {
+              component_factory_->create_physics_component(
+                  entity, DYNAMIC, SphereCollider{mesh.local_bounds.radius});
+            } else if (name == "DY_BO") {
+              const glm::vec3 bounds = mesh.local_aabb.max - mesh.local_aabb.min;
+              component_factory_->create_physics_component(
+                  entity, DYNAMIC, BoxCollider{bounds});
+            } else if (name == "ST_BO") {
+              const glm::vec3 bounds = mesh.local_aabb.max - mesh.local_aabb.min;
+              component_factory_->create_physics_component(
+                  entity, STATIC, BoxCollider{bounds});
+            } else if (name == "ST_SP") {
+              component_factory_->create_physics_component(
+                  entity, STATIC, SphereCollider{mesh.local_bounds.radius});
+            }
+          }
+        }
+      }
+    }
   }
 
   void AssetLoader::import_lights(const fastgltf::Asset& gltf) {

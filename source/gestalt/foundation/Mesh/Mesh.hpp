@@ -16,5 +16,6 @@ namespace gestalt::foundation {
       std::string name;
       std::vector<MeshSurface> surfaces;
       BoundingSphere local_bounds;
+      AABB local_aabb;
     };
 }  // namespace gestalt

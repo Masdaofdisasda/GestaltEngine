@@ -14,6 +14,7 @@
 #include "Components/MeshComponent.hpp"
 #include "Components/NodeComponent.hpp"
 #include "Components/TransformComponent.hpp"
+#include "Components/PhysicsComponent.hpp"
 #include "Material/Material.hpp"
 #include "Material/SamplerConfig.hpp"
 #include "Mesh/Mesh.hpp"
@@ -37,6 +38,22 @@ namespace gestalt::foundation {
         return std::ref(it->second);
       }
       return std::nullopt;
+    }
+
+    // NOTE: this does not check if the entity exists
+    ComponentType& operator[](const Entity& ent) {
+      auto it = components_.find(ent);
+      if (it != components_.end()) {
+        return it->second;
+      }
+    }
+
+    // NOTE: this does not check if the entity exists
+    const ComponentType& operator[](const Entity& ent) const {
+      auto it = components_.find(ent);
+      if (it != components_.end()) {
+        return it->second;
+      }
     }
 
     std::unordered_map<Entity, ComponentType>& components() { return components_; }
@@ -142,5 +159,6 @@ namespace gestalt::foundation {
     ComponentContainer<CameraComponent> camera_components;
     ComponentContainer<LightComponent> light_components;
     ComponentContainer<TransformComponent> transform_components;
+    ComponentContainer<PhysicsComponent> physics_components;
   };
 }  // namespace gestalt::foundation
