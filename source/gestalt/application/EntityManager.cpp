@@ -33,6 +33,13 @@ namespace gestalt::application {
     auto [player, player_node] = component_factory_->create_entity("Player");
     component_factory_->link_entity_to_parent(player, root_entity_);
     component_factory_->add_first_person_camera(glm::vec3(7, 1.8, -7), player);
+    repository_->transform_components[player].position = glm::vec3(0, 20.f, 0);
+    component_factory_->create_physics_component(player, DYNAMIC, CapsuleCollider{1.f, 1.8f});
+
+      auto [floor, floor_node] = component_factory_->create_entity("Floor");
+      component_factory_->link_entity_to_parent(floor, root_entity_);
+      component_factory_->create_physics_component(floor, STATIC,
+                                                   BoxCollider{glm::vec3(1000.f, 0.1f, 1000.f)});
 
     material_system_ = std::make_unique<MaterialSystem>();
     material_system_->init(gpu_, resource_manager_, builder, repository_,
@@ -90,7 +97,7 @@ namespace gestalt::application {
       }
       resource_manager_->flush_loader();
 
-      physics_system_->update(delta_time);
+      physics_system_->update(delta_time, movement);
       material_system_->update();
       light_system_->update();
       camera_system_->update_cameras(delta_time, movement, aspect);

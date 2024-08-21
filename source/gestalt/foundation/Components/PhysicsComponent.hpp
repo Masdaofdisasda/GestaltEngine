@@ -12,7 +12,7 @@ namespace gestalt::foundation {
 
   enum BodyType { STATIC, DYNAMIC };
 
-  enum class ColliderType { BOX, SPHERE, CAPSULE, MESH, TERRAIN };
+  enum ColliderType { BOX, SPHERE, CAPSULE, MESH, TERRAIN };
 
   struct BoxCollider {
     glm::vec3 bounds;
@@ -49,10 +49,13 @@ namespace gestalt::foundation {
     JPH::Shape* shape = nullptr;      // Pointer to the shape of the collider
 
     PhysicsComponent(const BodyType type, SphereCollider collider)
-        : body_type(type), collider_type(ColliderType::SPHERE), collider(collider) {}
+        : body_type(type), collider_type(SPHERE), collider(collider) {}
 
     PhysicsComponent(const BodyType type, BoxCollider collider)
-        : body_type(type), collider_type(ColliderType::BOX), collider(collider) {}
+        : body_type(type), collider_type(BOX), collider(collider) {}
+
+    PhysicsComponent(const BodyType type, CapsuleCollider collider)
+        : body_type(type), collider_type(CAPSULE), collider(collider) {}
   };
 
 }  // namespace gestalt

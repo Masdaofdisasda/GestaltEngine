@@ -88,6 +88,11 @@ namespace gestalt::application {
       repository_->physics_components.add(entity, PhysicsComponent(body_type, collider));
     }
 
+  void ComponentFactory::create_physics_component(const Entity entity, const BodyType body_type,
+                                                  const CapsuleCollider& collider) const {
+      repository_->physics_components.add(entity, PhysicsComponent(body_type, collider));
+    }
+
     Entity ComponentFactory::create_directional_light(const glm::vec3& color,
                                                                const float intensity,
                                                                const glm::vec3& direction,

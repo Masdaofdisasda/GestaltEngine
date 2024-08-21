@@ -43,6 +43,8 @@ namespace gestalt::application {
                                     const BoxCollider& collider) const;
       void create_physics_component(Entity entity, BodyType body_type,
                                     const SphereCollider& collider) const;
+      void create_physics_component(Entity entity, BodyType body_type,
+                                    const CapsuleCollider& collider) const;
 
       Entity create_directional_light(const glm::vec3& color, float intensity,
                                       const glm::vec3& direction, Entity parent = 0);

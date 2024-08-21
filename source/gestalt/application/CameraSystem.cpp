@@ -51,16 +51,23 @@ namespace gestalt::application {
     void CameraSystem::update_cameras(const float delta_time, const UserInput& movement, float aspect) {
       aspect_ratio_ = aspect;
 
-      auto& camera_component = repository_->camera_components.get(active_camera_).value().get();
+      auto& camera_component = repository_->camera_components[active_camera_];
+      auto& transform_component = repository_->transform_components[active_camera_];
       std::visit(
           [&]<typename CameraDataType>(CameraDataType& camera_data) {
             using T = std::decay_t<CameraDataType>;
             if constexpr (std::is_same_v<T, FreeFlyCameraData>) {
               FreeFlyCamera::update(delta_time, movement, camera_data);
+              transform_component.rotation = camera_data.orientation;
+              transform_component.position = camera_data.position;
             } else if constexpr (std::is_same_v<T, OrbitCameraData>) {
               OrbitCamera::update(delta_time, movement, camera_data);
+              transform_component.rotation = camera_data.orientation;
+              transform_component.position = camera_data.position;
             } else if constexpr (std::is_same_v<T, FirstPersonCameraData>) {
+              camera_data.set_position(transform_component.position);
               FirstPersonCamera::update(delta_time, movement, camera_data);
+              transform_component.rotation = camera_data.orientation;
             } else if constexpr (std::is_same_v<T, AnimationCameraData>) {
               MoveToCamera::update(delta_time, movement, camera_data);
             }

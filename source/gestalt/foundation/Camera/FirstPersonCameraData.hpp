@@ -14,29 +14,29 @@ namespace gestalt::foundation {
     }
 
     void set_position(const glm::vec3& pos) {
-      camera_position = pos;
+      position = pos;
     }
 
     void set_orientation(const glm::vec3& target, const glm::vec3& up) {
-      camera_orientation = quat_cast(lookAtRH(camera_position, target, up));
+      orientation = quat_cast(lookAtRH(position, target, up));
     }
 
     void set_up_vector(const glm::vec3& up) {
       this->up = up;
       const glm::mat4 view = get_view_matrix();
       const glm::vec3 dir = -glm::vec3(view[0][2], view[1][2], view[2][2]);
-      camera_orientation = lookAtRH(camera_position, camera_position + dir, up);
+      orientation = lookAtRH(position, position + dir, up);
     }
 
     [[nodiscard]] glm::mat4 get_view_matrix() const {
-      const glm::mat4 t = translate(glm::mat4(1.0f), -camera_position);
-      const glm::mat4 r = mat4_cast(camera_orientation);
+      const glm::mat4 t = translate(glm::mat4(1.0f), -position);
+      const glm::mat4 r = mat4_cast(orientation);
       return r * t;
     }
 
     // Configuration Values
-    glm::vec3 camera_position;
-    glm::quat camera_orientation = glm::quat(glm::vec3(0.0f));
+    glm::vec3 position;
+    glm::quat orientation = glm::quat(glm::vec3(0.0f));
     glm::vec3 up;
 
     // Adjustable Parameters

@@ -18,6 +18,7 @@
 #include <cstdarg>
 #include <thread>
 
+#include "PhysicUtil.hpp"
 #include "Components/PhysicsComponent.hpp"
 #include "Jolt/Physics/Collision/Shape/CapsuleShape.h"
 #include "Jolt/Physics/Collision/Shape/MeshShape.h"
@@ -106,7 +107,7 @@ namespace gestalt::application {
     virtual JPH::ValidateResult OnContactValidate(
         const JPH::Body &inBody1, const JPH::Body &inBody2, JPH::RVec3Arg inBaseOffset,
         const JPH::CollideShapeResult &inCollisionResult) override {
-      std::cout << "Contact validate callback" << std::endl;
+      //std::cout << "Contact validate callback" << std::endl;
 
       // Allows you to ignore a contact before it is created (using layers to not make objects
       // collide is cheaper!)
@@ -116,17 +117,17 @@ namespace gestalt::application {
     virtual void OnContactAdded(const JPH::Body &inBody1, const JPH::Body &inBody2,
                                 const JPH::ContactManifold &inManifold,
                                 JPH::ContactSettings &ioSettings) override {
-      std::cout << "A contact was added" << std::endl;
+      //std::cout << "A contact was added" << std::endl;
     }
 
     virtual void OnContactPersisted(const JPH::Body &inBody1, const JPH::Body &inBody2,
                                     const JPH::ContactManifold &inManifold,
                                     JPH::ContactSettings &ioSettings) override {
-      std::cout << "A contact was persisted" << std::endl;
+      //std::cout << "A contact was persisted" << std::endl;
     }
 
     virtual void OnContactRemoved(const JPH::SubShapeIDPair &inSubShapePair) override {
-      std::cout << "A contact was removed" << std::endl;
+      //std::cout << "A contact was removed" << std::endl;
     }
   };
 
@@ -134,11 +135,11 @@ namespace gestalt::application {
   class MyBodyActivationListener : public JPH::BodyActivationListener {
   public:
     virtual void OnBodyActivated(const JPH::BodyID &inBodyID, uint64 inBodyUserData) override {
-      std::cout << "A body got activated" << std::endl;
+      //std::cout << "A body got activated" << std::endl;
     }
 
     virtual void OnBodyDeactivated(const JPH::BodyID &inBodyID, uint64 inBodyUserData) override {
-      std::cout << "A body went to sleep" << std::endl;
+      //std::cout << "A body went to sleep" << std::endl;
     }
   };
 
@@ -179,14 +180,6 @@ namespace gestalt::application {
     physics_system->OptimizeBroadPhase();
   }
 
-  JPH::RVec3 to(const glm::vec3 &v) { return {v.x, v.y, v.z}; }
-
-  JPH::Quat to(const glm::quat &q) { return {q.x, q.y, q.z, q.w}; }
-
-  glm::vec3 to(const JPH::RVec3 &v) { return {v.GetX(), v.GetY(), v.GetZ()}; }
-
-  glm::quat to(const JPH::Quat &q) { return {q.GetW(), q.GetX(), q.GetY(), q.GetZ()}; }
-
   JPH::Body* PhysicEngine::create_body(PhysicsComponent &physics_component,
                                         const glm::vec3 &position,
                                         const glm::quat &orientation) const {
@@ -201,21 +194,30 @@ namespace gestalt::application {
       layer = Layers::NON_MOVING;
     }
 
-    if (physics_component.collider_type == ColliderType::BOX) {
+    if (physics_component.collider_type == BOX) {
       const auto &[bounds] = std::get<BoxCollider>(physics_component.collider);
-      physics_component.shape = new JPH::BoxShape(to(bounds));
-    } else if (physics_component.collider_type == ColliderType::SPHERE) {
+      physics_component.shape = new JPH::BoxShape(to(bounds * 0.5f));
+    } else if (physics_component.collider_type == SPHERE) {
       const auto &[radius] = std::get<SphereCollider>(physics_component.collider);
       physics_component.shape = new JPH::SphereShape(radius);
-    } else if (physics_component.collider_type == ColliderType::CAPSULE) {
+    } else if (physics_component.collider_type == CAPSULE) {
       const auto &[radius, height] = std::get<CapsuleCollider>(physics_component.collider);
       physics_component.shape = new JPH::CapsuleShape(height, radius);
     } else {
       physics_component.shape = new JPH::MeshShape();
     }
 
-    const auto body_settings = JPH::BodyCreationSettings(physics_component.shape, to(position),
+    auto body_settings = JPH::BodyCreationSettings(physics_component.shape, to(position),
                                                          to(orientation), motion_type, layer);
+    if (physics_component.collider_type == CAPSULE) {
+      // assumes player is capsule
+      //body_settings.mLinearDamping = 0.1f;
+      //body_settings.mAngularDamping = 0.1f;
+      body_settings.mAllowedDOFs = JPH::EAllowedDOFs::TranslationX | JPH::EAllowedDOFs::TranslationY | JPH::EAllowedDOFs::TranslationZ;
+      body_settings.mFriction = 0.1f;
+      body_settings.mRestitution = 0.1f;
+      body_settings.mAllowSleeping = false;
+    }
 
     JPH::Body* body = body_interface->CreateBody(body_settings);
     body_interface->AddBody(body->GetID(), JPH::EActivation::Activate);
@@ -223,17 +225,19 @@ namespace gestalt::application {
     return body;
   }
 
-  void PhysicEngine::step_simulation(float delta_time) const {
+  void PhysicEngine::step_simulation(const float delta_time) const {
     constexpr float fixed_time_step = 1.0f / 60.0f;  // 60 updates per second
-    const int num_steps = static_cast<int>(std::ceil(delta_time / fixed_time_step));
+    int num_steps = static_cast<int>(std::floor(delta_time / fixed_time_step));
 
+    // Update the physics system in fixed time steps
     for (int i = 0; i < num_steps; ++i) {
-      const float time_step = std::min(fixed_time_step, delta_time);
+      physics_system->Update(fixed_time_step, 1, temp_allocator, job_system);
+    }
 
-      physics_system->Update(time_step, 1, temp_allocator, job_system);
-
-      // Reduce delta_time by the time step we've just processed
-      delta_time -= time_step;
+    // Handle the remaining time
+    float remaining_time = delta_time - num_steps * fixed_time_step;
+    if (remaining_time > 0.0f) {
+      physics_system->Update(remaining_time, 1, temp_allocator, job_system);
     }
   }
 

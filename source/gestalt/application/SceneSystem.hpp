@@ -141,7 +141,7 @@ class NotificationManager {
     };
 
     class CameraSystem final : public SceneSystem, public NonCopyable<CameraSystem> {
-      Entity active_camera_{3};
+      Entity active_camera_{4};
       float32 aspect_ratio_{1.f};
       float32 near_plane_{0.1f};
       float32 far_plane_{10000.f};
@@ -184,9 +184,11 @@ class NotificationManager {
 
     class PhysicSystem final : public SceneSystem, public NonCopyable<PhysicSystem> {
       std::unique_ptr<PhysicEngine> physic_engine_;
+      Entity player_ = invalid_entity;
     public:
       void prepare() override;
-      void update(float delta_time) const;
+      void move_player(float delta_time, const UserInput& movement) const;
+      void update(float delta_time, const UserInput& movement) const;
       void update() override;
       void cleanup() override;
     };
