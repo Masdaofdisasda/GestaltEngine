@@ -4,13 +4,13 @@
 #include <fastgltf/glm_element_traits.hpp>
 
 #include <meshoptimizer.h>
+#include <fmt/core.h>
 
 #include <functional>
 
 #include "EntityManager.hpp"
 #include "Interface/IResourceManager.hpp"
 #include "Mesh/MeshSurface.hpp"
-#include "fmt/core.h"
 
 namespace gestalt::application {
 

@@ -1,4 +1,5 @@
 ﻿#include "Window.hpp"
+#include <SDL_vulkan.h>
 
 #include "EngineConfig.hpp"
 

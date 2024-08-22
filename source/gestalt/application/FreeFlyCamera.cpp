@@ -5,7 +5,6 @@
 #include <glm/detail/type_quat.hpp>
 #include <glm/detail/type_vec2.hpp>
 #include <glm/detail/type_vec3.hpp>
-#include <glm/fwd.hpp>
 #include <glm/gtc/quaternion.hpp>
 
 #include "UserInput.hpp"

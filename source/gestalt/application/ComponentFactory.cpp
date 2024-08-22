@@ -1,14 +1,10 @@
 ﻿
 #include "EntityManager.hpp"
 
-#include <fastgltf/glm_element_traits.hpp>
-#include <fastgltf/core.hpp>
-
-#include <glm/gtx/matrix_decompose.hpp>
+#include <fmt/core.h>
 
 #include "Components/PhysicsComponent.hpp"
 #include "Mesh/MeshSurface.hpp"
-#include "fmt/printf.h"
 
 namespace gestalt::application {
 

@@ -1,7 +1,5 @@
 ﻿#include "SceneSystem.hpp"
 
-#include <glm/gtx/matrix_decompose.hpp>
-
 #include "VulkanCheck.hpp"
 
 #include "FrameProvider.hpp"

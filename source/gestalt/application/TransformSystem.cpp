@@ -1,7 +1,5 @@
 ﻿#include "SceneSystem.hpp"
 
-#include <glm/detail/_noise.hpp>
-
 namespace gestalt::application {
 
   glm::mat4 TransformSystem::get_model_matrix(const TransformComponent& transform) {

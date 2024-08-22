@@ -1,7 +1,5 @@
 ﻿#pragma once
-#include <glm/gtx/transform.hpp>
-
-#include "common.hpp"
+#include <glm/fwd.hpp>
 
 namespace gestalt::foundation {
   struct PhysicsComponent;
@@ -39,8 +37,8 @@ namespace gestalt::application {
     public:
     void init();
 
-    JPH::Body* create_body(PhysicsComponent& physics_component,
-                            const glm::vec3& position, const glm::quat& orientation) const;
+    JPH::Body* create_body(foundation::PhysicsComponent& physics_component,
+                           const glm::vec3& position, const glm::quat& orientation) const;
     void remove_body(JPH::BodyID body_id);
 
     void step_simulation(float delta_time) const;

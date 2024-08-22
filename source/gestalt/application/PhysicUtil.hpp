@@ -1,8 +1,8 @@
 ﻿#pragma once
 
 #include <Jolt/Jolt.h>
-#include <glm/gtx/transform.hpp>
-#include <glm/gtx/quaternion.hpp>
+#include <glm/detail/type_quat.hpp>
+#include <glm/detail/type_vec3.hpp>
 
 inline JPH::RVec3 to(const glm::vec3 &v) { return {v.x, v.y, v.z}; }
 

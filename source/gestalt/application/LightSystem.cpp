@@ -1,7 +1,5 @@
 ﻿#include "SceneSystem.hpp"
 
-#include <glm/detail/_noise.hpp>
-
 #include "VulkanCheck.hpp"
 #include "Interface/IDescriptorLayoutBuilder.hpp"
 #include "Interface/IGpu.hpp"

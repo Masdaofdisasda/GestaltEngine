@@ -1,4 +1,5 @@
 ﻿#include "SceneSystem.hpp"
+
 #include "VulkanCheck.hpp"
 #include "Interface/IDescriptorLayoutBuilder.hpp"
 #include "Interface/IGpu.hpp"

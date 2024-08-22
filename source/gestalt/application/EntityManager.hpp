@@ -8,7 +8,12 @@
 #include "SceneSystem.hpp"
 #include "Components/PhysicsComponent.hpp"
 #include "Material/PbrMaterial.hpp"
-#include "fastgltf/types.hpp"
+
+namespace fastgltf {
+  struct Material;
+  struct Image;
+  class Asset;
+}
 
 namespace gestalt::foundation {
   class IDescriptorLayoutBuilder;
