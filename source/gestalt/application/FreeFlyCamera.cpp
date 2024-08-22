@@ -4,6 +4,7 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include "UserInput.hpp"
+#include <utility>
 
 namespace gestalt::application {
   void FreeFlyCamera::update(float64 delta_seconds, const UserInput& movement,
