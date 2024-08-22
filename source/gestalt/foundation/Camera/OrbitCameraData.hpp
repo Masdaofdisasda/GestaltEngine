@@ -1,6 +1,9 @@
 ﻿#pragma once
 #include "common.hpp"
-#include <glm/gtx/quaternion.hpp>
+#include <glm/mat4x4.hpp>
+#include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 namespace gestalt::foundation {
 

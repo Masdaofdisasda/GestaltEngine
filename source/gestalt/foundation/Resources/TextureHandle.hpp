@@ -2,7 +2,6 @@
 
 #include "TextureType.hpp"
 
-#include "VulkanTypes.hpp"
 #include <vma/vk_mem_alloc.h>
 
 namespace gestalt::foundation {

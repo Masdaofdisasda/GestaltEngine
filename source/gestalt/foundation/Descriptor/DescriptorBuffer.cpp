@@ -1,5 +1,4 @@
-﻿#pragma once
-#include "DescriptorBuffer.hpp"
+﻿#include "DescriptorBuffer.hpp"
 
 #include "VulkanCheck.hpp"
 
@@ -90,7 +89,7 @@ namespace gestalt::foundation {
                                                .descriptorSize = MapDescriptorSize(type),
                                                .binding = binding,
                                                .addr_info = addr_info});
-    bindings.at(binding).descriptorSize = MapDescriptorSize(type);
+    bindings.at(binding).descriptor_size = MapDescriptorSize(type);
     return *this;
   }
 
@@ -108,7 +107,7 @@ namespace gestalt::foundation {
                                .image_info = image_infos[i]};
       update_infos.emplace_back(update_info);
     }
-    bindings.at(binding).descriptorSize = MapDescriptorSize(type) * image_infos.size();
+    bindings.at(binding).descriptor_size = MapDescriptorSize(type) * image_infos.size();
     return *this;
   }
 

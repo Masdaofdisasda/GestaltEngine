@@ -2,7 +2,7 @@
 
 #include "common.hpp"
 
-#include <glm/gtx/transform.hpp>
+#include <glm/fwd.hpp>
 
 namespace gestalt::foundation {
 

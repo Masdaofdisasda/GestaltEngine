@@ -1,6 +1,5 @@
 ﻿#pragma once
 #include "common.hpp"
-#include <glm/gtx/transform.hpp>
 
 namespace gestalt::foundation {
 

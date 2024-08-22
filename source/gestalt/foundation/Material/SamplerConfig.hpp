@@ -10,7 +10,7 @@ namespace gestalt::foundation {
     VkSamplerAddressMode addressModeU{VK_SAMPLER_ADDRESS_MODE_REPEAT};
     VkSamplerAddressMode addressModeV{VK_SAMPLER_ADDRESS_MODE_REPEAT};
     VkSamplerAddressMode addressModeW{VK_SAMPLER_ADDRESS_MODE_REPEAT};
-    float maxAnisotropy{16.f};
+    float32 maxAnisotropy{16.f};
     VkBool32 anisotropyEnable{VK_TRUE};
 
     bool operator==(const SamplerConfig& other) const {
@@ -22,14 +22,14 @@ namespace gestalt::foundation {
   };
   struct SamplerConfigHash {
     std::size_t operator()(const SamplerConfig& config) const {
-      return std::hash<int>()(static_cast<int>(config.magFilter))
-             ^ std::hash<int>()(static_cast<int>(config.minFilter))
-             ^ std::hash<int>()(static_cast<int>(config.mipmapMode))
-             ^ std::hash<int>()(static_cast<int>(config.addressModeU))
-             ^ std::hash<int>()(static_cast<int>(config.addressModeV))
-             ^ std::hash<int>()(static_cast<int>(config.addressModeW))
-             ^ std::hash<float>()(config.maxAnisotropy)
-             ^ std::hash<int>()(static_cast<int>(config.anisotropyEnable));
+      return std::hash<int32>()(config.magFilter)
+             ^ std::hash<int32>()(config.minFilter)
+             ^ std::hash<int32>()(config.mipmapMode)
+             ^ std::hash<int32>()(config.addressModeU)
+             ^ std::hash<int32>()(config.addressModeV)
+             ^ std::hash<int32>()(config.addressModeW)
+             ^ std::hash<float32>()(config.maxAnisotropy)
+             ^ std::hash<int32>()(static_cast<int>(config.anisotropyEnable));
     }
   };
 }  // namespace gestalt

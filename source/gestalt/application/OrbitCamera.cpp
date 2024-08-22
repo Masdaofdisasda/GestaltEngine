@@ -1,7 +1,11 @@
 #include "Camera.hpp"
 
 #include "Camera/OrbitCameraData.hpp"
-#include <glm/gtx/transform.hpp>
+#include <glm/detail/type_vec2.hpp>
+#include <glm/detail/type_vec3.hpp>
+#include <glm/mat4x4.hpp>
+#include <glm/gtc/constants.hpp> 
+#include <glm/trigonometric.hpp>
 
 #include "UserInput.hpp"
 

@@ -3,7 +3,6 @@
 
 #include "DescriptorBinding.hpp"
 #include "DescriptorUpdate.hpp"
-#include "VulkanTypes.hpp"
 
 #include <vma/vk_mem_alloc.h>
 
