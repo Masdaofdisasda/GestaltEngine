@@ -29,7 +29,7 @@ namespace gestalt::application {
     component_factory_->link_entity_to_parent(player, root_entity_);
     component_factory_->add_first_person_camera(glm::vec3(7, 1.8, -7), player);
     repository_->transform_components[player].position = glm::vec3(0, 20.f, 0);
-    component_factory_->create_physics_component(player, DYNAMIC, CapsuleCollider{1.f, 1.8f});
+    component_factory_->create_physics_component(player, DYNAMIC, CapsuleCollider{.9f, 1.8f});
 
       auto [floor, floor_node] = component_factory_->create_entity("Floor");
       component_factory_->link_entity_to_parent(floor, root_entity_);

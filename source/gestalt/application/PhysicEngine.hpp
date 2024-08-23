@@ -47,6 +47,8 @@ namespace gestalt::application {
     static void apply_force(JPH::Body* body, const glm::vec3& force);
     static void apply_velocity(JPH::Body* body, const glm::vec3& velocity);
 
+    void set_rotation(const JPH::Body* body, const glm::quat& orientation) const;
+
     void set_gravity_enabled(JPH::BodyID body_id, bool enabled);
 
     void cleanup() const;

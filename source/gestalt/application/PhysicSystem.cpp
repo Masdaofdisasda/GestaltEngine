@@ -24,26 +24,39 @@ namespace gestalt::application {
   }
 
   void PhysicSystem::move_player(const float delta_time, const UserInput& movement) const {
-    auto& player_physics = repository_->physics_components[player_];
+    const auto& player_physics = repository_->physics_components[player_];
     if (player_physics.body == nullptr) return;
-    auto& player_transform = repository_->transform_components[player_];
+    const auto& player_transform = repository_->transform_components[player_];
 
-    // Transform movement direction based on the player's orientation
-    glm::vec3 forward = player_transform.rotation * glm::vec3(0, 0, -1);  // Forward
-    glm::vec3 right = player_transform.rotation * glm::vec3(1, 0, 0);     // Right
+    auto orientation = player_transform.rotation;
+    orientation.w *= -1; // Jolt uses a different handedness convention (i guess)
+    glm::vec3 forward = orientation * glm::vec3(0, 0, -1);
+    glm::vec3 right = orientation * glm::vec3(1, 0, 0);
+    forward.y = 0; // ignore vertical movement
+    right.y = 0;
+    forward = glm::normalize(forward); // ensure consistent speed in all directions
+    right = glm::normalize(right);
+
+    const JPH::Vec3 jph_forward = to(forward);
+    const JPH::Vec3 jph_right = to(right);
 
     // Calculate movement direction based on input
-    JPH::Vec3 movement_force(0.0f, 0.0f, 0.0f);
-    constexpr float movement_speed = 750000.0f;
+    JPH::Vec3 movement_direction(0.0f, 0.0f, 0.0f);
+    constexpr float movement_speed = 250000.0f;
 
 
     // Calculate movement direction based on input
-    if (movement.forward) movement_force += to(forward);
-    if (movement.backward) movement_force -= to(forward);
-    if (movement.left) movement_force -= to(right);
-    if (movement.right) movement_force += to(right);
+    if (movement.forward) movement_direction += jph_forward;
+    if (movement.backward) movement_direction -= jph_forward;
+    if (movement.left) movement_direction -= jph_right;
+    if (movement.right) movement_direction += jph_right;
 
-    player_physics.body->AddForce(movement_force * movement_speed * delta_time);
+    // Normalize the accumulated movement direction to prevent faster diagonal movement
+    if (movement_direction.LengthSq() > 0.0f) {  // Avoid division by zero
+      movement_direction = movement_direction.Normalized();
+    }
+
+    player_physics.body->AddForce(movement_direction * movement_speed * delta_time);
 
     // Ground detection logic (simplified for illustration)
     bool mIsGrounded = true;  // check_if_grounded(player_physics.body);

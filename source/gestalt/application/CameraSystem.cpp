@@ -36,7 +36,7 @@ namespace gestalt::application {
       VkBufferDeviceAddressInfo deviceAdressInfo{
           .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
           .buffer = per_frame_data_buffers->uniform_buffers[i]->buffer};
-      VkDeviceAddress per_frame_data_buffer_address
+      const VkDeviceAddress per_frame_data_buffer_address
           = vkGetBufferDeviceAddress(gpu_->getDevice(), &deviceAdressInfo);
 
       per_frame_data_buffers->descriptor_buffers[i]

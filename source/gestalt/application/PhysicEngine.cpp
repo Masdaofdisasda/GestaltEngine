@@ -202,7 +202,7 @@ namespace gestalt::application {
       physics_component.shape = new JPH::SphereShape(radius);
     } else if (physics_component.collider_type == CAPSULE) {
       const auto &[radius, height] = std::get<CapsuleCollider>(physics_component.collider);
-      physics_component.shape = new JPH::CapsuleShape(height, radius);
+      physics_component.shape = new JPH::CapsuleShape(height * 0.5f, radius);
     } else {
       physics_component.shape = new JPH::MeshShape();
     }
@@ -213,7 +213,7 @@ namespace gestalt::application {
       // assumes player is capsule
       //body_settings.mLinearDamping = 0.1f;
       //body_settings.mAngularDamping = 0.1f;
-      body_settings.mAllowedDOFs = JPH::EAllowedDOFs::TranslationX | JPH::EAllowedDOFs::TranslationY | JPH::EAllowedDOFs::TranslationZ;
+      body_settings.mAllowedDOFs = JPH::EAllowedDOFs::TranslationX | JPH::EAllowedDOFs::TranslationY | JPH::EAllowedDOFs::TranslationZ | JPH::EAllowedDOFs::RotationY;
       body_settings.mFriction = 0.1f;
       body_settings.mRestitution = 0.1f;
       body_settings.mAllowSleeping = false;
@@ -255,6 +255,10 @@ namespace gestalt::application {
 
   void PhysicEngine::apply_velocity(JPH::Body *body, const glm::vec3 &velocity) {
     body->SetLinearVelocity(to(velocity));
+  }
+
+  void PhysicEngine::set_rotation(const JPH::Body *body, const glm::quat &orientation) const {
+    body_interface->SetRotation(body->GetID(), to(orientation), JPH::EActivation::Activate);
   }
 
   void PhysicEngine::cleanup() const {
