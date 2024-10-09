@@ -7,26 +7,24 @@ namespace gestalt::foundation {
 
   struct AnimationCameraData {
 
-    AnimationCameraData(const glm::vec3& pos, const glm::vec3& angles, const glm::vec3& desired_pos, const glm::vec3& desired_angles)
-        : position_current(pos),
-          position_desired(desired_pos),
-          angles_current(angles),
-          angles_desired(desired_angles) {}
+    AnimationCameraData(const glm::vec3& starting_pos, const glm::quat& starting_orientation)
+        : position(starting_pos), orientation(starting_orientation) {}
 
     [[nodiscard]] glm::mat4 get_view_matrix() const {
-      const glm::vec3 a = radians(angles_current);
-      return translate(glm::yawPitchRoll(a.y, a.x, a.z), -position_current);
+      const glm::mat4 rotation_matrix = mat4_cast(orientation);
+      const glm::mat4 translation_matrix = translate(glm::mat4(1.0f), -position);
+
+      return rotation_matrix * translation_matrix;
+    }
+
+    void set_position(const glm::vec3& new_position) { position = new_position; }
+    void set_orientation(const glm::quat& new_orientation) { orientation = new_orientation; }
+    void set_euler_angles(float pitch, float yaw, float roll) {
+      orientation = glm::quat(glm::vec3(pitch, yaw, roll));
     }
 
     // Configuration Values
-    glm::vec3 position_current = glm::vec3(0.0f);
-    glm::vec3 position_desired = glm::vec3(0.0f);
-    /// pitch, pan, roll
-    glm::vec3 angles_current = glm::vec3(0.0f);
-    glm::vec3 angles_desired = glm::vec3(0.0f);
-
-    // Adjustable Parameters
-    float32 damping_linear = 10000.0f;
-    glm::vec3 damping_euler_angles = glm::vec3(5.0f, 5.0f, 5.0f);
+    glm::vec3 position = glm::vec3(0.0f);
+    glm::quat orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
   };
 }  // namespace gestalt

@@ -16,6 +16,8 @@ namespace gestalt::application {
       void init();
       void create_surface(VkInstance instance, VkSurfaceKHR* surface) const;
       void update_window_size();
+      void capture_mouse() const;
+      void release_mouse() const;
       void cleanup() const;
     };
 }  // namespace gestalt

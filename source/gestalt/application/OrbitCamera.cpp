@@ -11,7 +11,7 @@
 
 namespace gestalt::application {
 
-  void OrbitCamera::update(float64 delta_seconds, const UserInput& movement, OrbitCameraData& data) {
+  void OrbitCamera::update(float32 delta_seconds, const UserInput& movement, OrbitCameraData& data) {
     auto& camera_data = data;
 
     glm::mat4 view_matrix = camera_data.get_view_matrix();
@@ -19,8 +19,8 @@ namespace gestalt::application {
     if (movement.right_mouse_button) {
       const glm::vec2 delta
           = glm::vec2(movement.mouse_position_x, movement.mouse_position_y) - camera_data.mouse_pos;
-      camera_data.yaw -= delta.x * camera_data.orbit_speed * static_cast<float>(delta_seconds);
-      camera_data.pitch += delta.y * camera_data.orbit_speed * static_cast<float>(delta_seconds);
+      camera_data.yaw -= delta.x * camera_data.orbit_speed * delta_seconds;
+      camera_data.pitch += delta.y * camera_data.orbit_speed * delta_seconds;
       camera_data.pitch
           = glm::clamp(camera_data.pitch, -glm::half_pi<float>() + 0.01f,
                        glm::half_pi<float>() - 0.01f);  // Clamp pitch to avoid flipping
@@ -29,7 +29,7 @@ namespace gestalt::application {
     // Zoom in and out
     if (movement.scroll != 0.0f) {
       camera_data.distance
-          -= movement.scroll * camera_data.zoom_speed * static_cast<float>(delta_seconds);
+          -= movement.scroll * camera_data.zoom_speed * delta_seconds;
       camera_data.distance
           = glm::clamp(camera_data.distance, camera_data.min_distance, camera_data.max_distance);
     }
@@ -42,9 +42,9 @@ namespace gestalt::application {
       const glm::vec3 up = glm::vec3(view_matrix[0][1], view_matrix[1][1], view_matrix[2][1]);
 
       camera_data.target
-          -= right * delta.x * camera_data.pan_speed * static_cast<float>(delta_seconds);
+          -= right * delta.x * camera_data.pan_speed * delta_seconds;
       camera_data.target
-          += up * delta.y * camera_data.pan_speed * static_cast<float>(delta_seconds);
+          += up * delta.y * camera_data.pan_speed * delta_seconds;
     }
 
     camera_data.position

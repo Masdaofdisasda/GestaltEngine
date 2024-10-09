@@ -44,14 +44,11 @@ namespace gestalt::application {
     JPH::Vec3 movement_direction(0.0f, 0.0f, 0.0f);
     constexpr float movement_speed = 250000.0f;
 
-
-    // Calculate movement direction based on input
     if (movement.forward) movement_direction += jph_forward;
     if (movement.backward) movement_direction -= jph_forward;
     if (movement.left) movement_direction -= jph_right;
     if (movement.right) movement_direction += jph_right;
 
-    // Normalize the accumulated movement direction to prevent faster diagonal movement
     if (movement_direction.LengthSq() > 0.0f) {  // Avoid division by zero
       movement_direction = movement_direction.Normalized();
     }
@@ -67,7 +64,6 @@ namespace gestalt::application {
        player_physics.body->AddForce(jump_strength);
     }
   }
-
 
   void PhysicSystem::update(const float delta_time, const UserInput& movement) const {
 

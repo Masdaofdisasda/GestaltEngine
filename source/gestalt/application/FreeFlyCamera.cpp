@@ -11,7 +11,7 @@
 #include <utility>
 
 namespace gestalt::application {
-  void FreeFlyCamera::update(float64 delta_seconds, const UserInput& movement,
+  void FreeFlyCamera::update(float32 delta_seconds, const UserInput& movement,
                              FreeFlyCameraData& data) {
     auto& camera_data = data;
 
@@ -55,10 +55,10 @@ namespace gestalt::application {
       // decelerate naturally according to the damping value
       camera_data.move_speed
           -= camera_data.move_speed
-             * std::min((1.0f / camera_data.damping) * static_cast<float>(delta_seconds), 1.0f);
+             * std::min((1.0f / camera_data.damping) * delta_seconds, 1.0f);
     } else {
       // acceleration
-      camera_data.move_speed += accel * camera_data.acceleration * static_cast<float>(delta_seconds);
+      camera_data.move_speed += accel * camera_data.acceleration * delta_seconds;
       if (movement.left_control) {
         float maxSpeed = camera_data.max_speed * camera_data.fast_coef;
       } else if (movement.crouch) {
@@ -72,7 +72,7 @@ namespace gestalt::application {
         camera_data.move_speed = glm::normalize(camera_data.move_speed) * maxSpeed;
     }
 
-    camera_data.position += camera_data.move_speed * static_cast<float32>(delta_seconds);
+    camera_data.position += camera_data.move_speed * delta_seconds;
   }
 
 }  // namespace gestalt::application

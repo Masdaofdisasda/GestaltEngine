@@ -151,7 +151,15 @@ namespace gestalt::application {
       repository_->camera_components.add(entity, free_fly_component);
 
       return entity;
-    }
+  }
+
+  Entity ComponentFactory::add_animation_camera(const glm::vec3& position, const glm::vec3& angles,
+                                                Entity entity) const {
+    const auto animation_component = CameraComponent(kPerspective, AnimationCameraData(position, angles));
+    repository_->camera_components.add(entity, animation_component);
+
+    return entity;
+  }
 
   Entity ComponentFactory::add_orbit_camera(const glm::vec3& target, Entity entity) const {
       const auto orbit_component = CameraComponent(

@@ -40,7 +40,8 @@ namespace gestalt::application {
       Entity entityId;
     };
 
-  
+
+  // TODO rethink this
 class NotificationManager {
     public:
       using Callback = std::function<void(const ChangeEvent&)>;
@@ -141,11 +142,12 @@ class NotificationManager {
     };
 
     class CameraSystem final : public SceneSystem, public NonCopyable<CameraSystem> {
-      Entity active_camera_{4};
+      Entity active_camera_{5};  // entity id of the active camera
       float32 aspect_ratio_{1.f};
       float32 near_plane_{0.1f};
       float32 far_plane_{10000.f};
       float32 fov_{70.f};
+      float32 time_{0.0};   
 
     public:
       void prepare() override;

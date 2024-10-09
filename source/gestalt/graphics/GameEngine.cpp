@@ -76,6 +76,10 @@ namespace gestalt {
       while (SDL_PollEvent(&e) != 0) {
         if (e.type == SDL_QUIT) quit_ = true;
 
+        if (e.type == SDL_KEYDOWN) {
+          if (e.key.keysym.scancode == SDL_SCANCODE_F1) window_->capture_mouse();
+          if (e.key.keysym.scancode == SDL_SCANCODE_F2) window_->release_mouse();
+        }
         input_system_.handle_event(e, window_->extent.width, window_->extent.height);
 
         if (e.type == SDL_WINDOWEVENT) {

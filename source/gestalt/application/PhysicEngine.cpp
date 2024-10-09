@@ -13,6 +13,7 @@
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <Jolt/Physics/Collision/Shape/MeshShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
+#include <Jolt/Physics/Collision/ShapeCast.h>
 
 #include <glm/gtx/quaternion.hpp>
 
@@ -260,6 +261,17 @@ namespace gestalt::application {
   void PhysicEngine::set_rotation(const JPH::Body *body, const glm::quat &orientation) const {
     body_interface->SetRotation(body->GetID(), to(orientation), JPH::EActivation::Activate);
   }
+
+  /*
+  void PhysicEngine::casr(const JPH::Body *body, const glm::vec3 &position) const {
+    JPH::RShapeCast shape_cast{};
+    JPH::ShapeCastSettings settings{};
+     JPH::ShapeCastResult result{};
+     JPH::RVec3 start_position = to(position);
+     JPH::CastShapeCollector collector{};
+
+    physics_system->GetNarrowPhaseQueryNoLock().CastShape()
+  }*/
 
   void PhysicEngine::cleanup() const {
     // body_interface->RemoveBody(JPH::BodyID(sphere_id));

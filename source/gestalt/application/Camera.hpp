@@ -15,22 +15,22 @@ namespace gestalt::application {
 
   class FreeFlyCamera final {
   public:
-    static void update(float64 delta_seconds, const UserInput& movement, FreeFlyCameraData& data);
+    static void update(float32 delta_seconds, const UserInput& movement, FreeFlyCameraData& data);
   };
 
   class OrbitCamera final {
   public:
-    static void update(float64 delta_seconds, const UserInput& movement, OrbitCameraData& data);
+    static void update(float32 delta_seconds, const UserInput& movement, OrbitCameraData& data);
   };
 
   class FirstPersonCamera final {
   public:
-    static void update(float64 delta_seconds, const UserInput& movement, FirstPersonCameraData& data);
+    static void update(float32 delta_seconds, const UserInput& movement, FirstPersonCameraData& data);
   };
 
   class MoveToCamera final {
   public:
-    static void update(float64 delta_seconds, const UserInput& movement, AnimationCameraData& data);
+    static void update(float32 delta_seconds, const UserInput& movement, AnimationCameraData& data);
   };
 
 }  // namespace gestalt::application

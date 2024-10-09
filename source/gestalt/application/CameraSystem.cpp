@@ -69,7 +69,22 @@ namespace gestalt::application {
               FirstPersonCamera::update(delta_time, movement, camera_data);
               transform_component.rotation = camera_data.orientation;
             } else if constexpr (std::is_same_v<T, AnimationCameraData>) {
+              float radius = 5.f;
+              float speed = 0.03f;
+              float alpha = time_ * speed;
+              float x = radius * sin(alpha);
+              float z = radius * cos(alpha);
+              camera_data.position = glm::vec3(x,camera_data.position.y,z);
+
+              const glm::vec3 forward_direction
+                  = -normalize(glm::vec3(cos(alpha), 0.0f, -sin(alpha)));
+              float yaw = atan2(forward_direction.x, forward_direction.z);
+
+              camera_data.set_euler_angles(0.0f, -yaw, 0.0f);
               MoveToCamera::update(delta_time, movement, camera_data);
+              transform_component.position = camera_data.position;
+              transform_component.rotation = camera_data.orientation;
+              time_ += delta_time;
             }
           },
           camera_component.camera_data);

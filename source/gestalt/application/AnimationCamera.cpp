@@ -22,23 +22,18 @@ namespace gestalt::application {
     const glm::vec3 d = ClipAngles(anglesCurrent) - ClipAngles(anglesDesired);
     return {ClipAngle(d.x), ClipAngle(d.y), ClipAngle(d.z)};
   }
-  void MoveToCamera::update(float64 delta_seconds, const UserInput& movement,
+  void MoveToCamera::update(float32 delta_seconds, const UserInput& movement, 
                             AnimationCameraData& data) {
     auto& camera_data = data;
-    camera_data.position_current += camera_data.damping_linear * static_cast<float32>(delta_seconds)
-                                    * (camera_data.position_desired - camera_data.position_current);
 
-    // normalization is required to avoid "spinning" around the object 2pi times
-    camera_data.angles_current = ClipAngles(camera_data.angles_current);
-    camera_data.angles_desired = ClipAngles(camera_data.angles_desired);
+    glm::quat unclamped_rotation = camera_data.orientation;
+    float32 pitch = glm::pitch(unclamped_rotation);
+    float32 yaw = glm::yaw(unclamped_rotation);
 
-    // update angles
-    camera_data.angles_current -= AngleDelta(camera_data.angles_current, camera_data.angles_desired)
-                                  * camera_data.damping_euler_angles
-                                  * static_cast<float32>(delta_seconds);
+    if ((std::abs(yaw) >= 0.01 || (std::abs(pitch) <= glm::half_pi<float>())))  // clamp y-rotation
+      camera_data.orientation = unclamped_rotation;
 
-    // normalize new angles
-    camera_data.angles_current = ClipAngles(camera_data.angles_current);
+    camera_data.orientation = normalize(camera_data.orientation);
   }
 
 }  // namespace gestalt::application

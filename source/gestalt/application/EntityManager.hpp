@@ -61,6 +61,9 @@ namespace gestalt::application {
       Entity add_free_fly_camera(const glm::vec3& position, const glm::vec3& direction,
                                  const glm::vec3& up, Entity entity) const;
 
+      Entity add_animation_camera(const glm::vec3& position, const glm::vec3& angles,
+                                  Entity entity) const;
+
       Entity add_orbit_camera(const glm::vec3& target, Entity entity) const;
 
       Entity add_first_person_camera(const glm::vec3& position, Entity entity) const;
