@@ -89,6 +89,14 @@ namespace gestalt::application {
       repository_->physics_components.add(entity, PhysicsComponent(body_type, collider));
     }
 
+  void ComponentFactory::create_animation_component(
+        const Entity entity, std::vector<Keyframe<glm::vec3>>& translation_keyframes,
+        std::vector<Keyframe<glm::quat>>& rotation_keyframes,
+        std::vector<Keyframe<glm::vec3>>& scale_keyframes) const {
+    repository_->animation_components.add(
+        entity, AnimationComponent(translation_keyframes, rotation_keyframes, scale_keyframes));
+    }
+
     Entity ComponentFactory::create_directional_light(const glm::vec3& color,
                                                                const float intensity,
                                                                const glm::vec3& direction,

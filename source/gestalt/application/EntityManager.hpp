@@ -51,6 +51,11 @@ namespace gestalt::application {
       void create_physics_component(Entity entity, BodyType body_type,
                                     const CapsuleCollider& collider) const;
 
+      void create_animation_component(const Entity entity,
+                                      std::vector<Keyframe<glm::vec3>>& translation_keyframes,
+                                      std::vector<Keyframe<glm::quat>>& rotation_keyframes,
+                                      std::vector<Keyframe<glm::vec3>>& scale_keyframes) const;
+
       Entity create_directional_light(const glm::vec3& color, float intensity,
                                       const glm::vec3& direction, Entity parent = 0);
       Entity create_spot_light(const glm::vec3& color, float intensity,
@@ -112,6 +117,7 @@ namespace gestalt::application {
       void import_lights(const fastgltf::Asset& gltf);
       void import_nodes(fastgltf::Asset& gltf) const;
       void load_scene_from_gltf(const std::string& file_path);
+      void import_animations(const fastgltf::Asset& gltf, const size_t node_offset);
     };
 
     /**

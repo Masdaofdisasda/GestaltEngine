@@ -40,6 +40,11 @@ file(GLOB_RECURSE BUFFER
     "${CMAKE_CURRENT_SOURCE_DIR}/Buffer/*.cpp"
 )
 
+file(GLOB_RECURSE ANIMATION
+    "${CMAKE_CURRENT_SOURCE_DIR}/Animation/*.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Animation/*.cpp"
+)
+
 file(GLOB_RECURSE DESCRIPTOR
     "${CMAKE_CURRENT_SOURCE_DIR}/Descriptor/*.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Descriptor/*.cpp"
@@ -50,7 +55,7 @@ file(GLOB_RECURSE INTERFACES
     "${CMAKE_CURRENT_SOURCE_DIR}/Interface/*.cpp"
 )
 
-add_library(${FOUNDATION_MODULE} ${SOURCES} ${COMPONENTS} ${CAMERA} ${MESH} ${LIGHT} ${MATERIAL} ${RESOURCES} ${BUFFER} ${DESCRIPTOR} ${INTERFACES})
+add_library(${FOUNDATION_MODULE} ${SOURCES} ${COMPONENTS} ${CAMERA} ${MESH} ${LIGHT} ${MATERIAL} ${RESOURCES} ${BUFFER} ${ANIMATION} ${DESCRIPTOR} ${INTERFACES})
 
 source_group("Source Files" FILES ${SOURCES})
 source_group("Components" FILES ${COMPONENTS})
@@ -60,6 +65,7 @@ source_group("Light" FILES ${LIGHT})
 source_group("Material" FILES ${MATERIAL})
 source_group("GPU Resources" FILES ${RESOURCES})
 source_group("Buffer" FILES ${BUFFER})
+source_group("Animation" FILES ${ANIMATION})
 source_group("Descriptor" FILES ${DESCRIPTOR})
 source_group("Interface" FILES ${INTERFACES})
 

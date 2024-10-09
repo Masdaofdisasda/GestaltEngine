@@ -4,6 +4,7 @@
 #include <optional>
 #include <unordered_map>
 
+#include "Animation/AnimationComponent.hpp"
 #include "Buffer/LightBuffer.hpp"
 #include "Buffer/MaterialBuffer.hpp"
 #include "Buffer/MeshBuffer.hpp"
@@ -158,6 +159,7 @@ namespace gestalt::foundation {
     ComponentContainer<MeshComponent> mesh_components;
     ComponentContainer<CameraComponent> camera_components;
     ComponentContainer<LightComponent> light_components;
+    ComponentContainer<AnimationComponent> animation_components;
     ComponentContainer<TransformComponent> transform_components;
     ComponentContainer<PhysicsComponent> physics_components;
   };

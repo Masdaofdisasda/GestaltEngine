@@ -9,6 +9,7 @@
 #include <functional>
 
 #include "EntityManager.hpp"
+#include "Animation/InterpolationType.hpp"
 #include "Interface/IResourceManager.hpp"
 #include "Mesh/MeshSurface.hpp"
 
@@ -460,6 +461,8 @@ namespace gestalt::application {
   void AssetLoader::load_scene_from_gltf(const std::string& file_path) {
     fmt::print("Loading GLTF: {}\n", file_path);
 
+    const size_t node_offset = repository_->scene_graph.size();
+
     fastgltf::Asset gltf;
     if (auto asset = parse_gltf(file_path)) {
       gltf = std::move(asset.value());
@@ -480,7 +483,11 @@ namespace gestalt::application {
 
     import_lights(gltf);
 
-    {
+    //TODO import_cameras(gltf);
+
+    import_animations(gltf, node_offset);
+
+    {  // Import physics
       for (const auto& entity : repository_->scene_graph.components() | std::views::keys) {
         if (repository_->mesh_components.get(entity).has_value()) {
           const auto& mesh = repository_->meshes.get(repository_->mesh_components[entity].mesh);
@@ -507,6 +514,89 @@ namespace gestalt::application {
       }
     }
   }
+
+  InterpolationType mapInterpolationType(fastgltf::AnimationInterpolation type) {
+    if (type == fastgltf::AnimationInterpolation::Linear) {
+      return InterpolationType::kLinear;
+    }
+    if (type == fastgltf::AnimationInterpolation::Step) {
+      return InterpolationType::kStep;
+    }
+    if (type == fastgltf::AnimationInterpolation::CubicSpline) {
+      return InterpolationType::kCubic;
+    }
+    return InterpolationType::kLinear;
+  }
+
+  void AssetLoader::import_animations(const fastgltf::Asset& gltf, const size_t node_offset) {
+    fmt::print("Importing animations\n");
+
+    for (const fastgltf::Animation& animation : gltf.animations) {
+      fmt::print("Importing animation: {}\n", animation.name);
+
+      std::vector<Keyframe<glm::vec3>> translation_keyframes;
+      std::vector<Keyframe<glm::quat>> rotation_keyframes;
+      std::vector<Keyframe<glm::vec3>> scale_keyframes;
+
+      for (auto& channel : animation.channels) {
+        auto& sampler = animation.samplers[channel.samplerIndex];
+        Entity entity = channel.nodeIndex.value_or(0) + node_offset;
+        auto& type = channel.path;
+        auto interpolation = mapInterpolationType(sampler.interpolation);
+
+        // Retrieve the input (keyframe times) and output (keyframe values) accessors
+        const fastgltf::Accessor& input_accessor = gltf.accessors[sampler.inputAccessor];
+        const fastgltf::Accessor& output_accessor = gltf.accessors[sampler.outputAccessor];
+
+        // Depending on the target path (translation, rotation, or scale), load the appropriate
+        // keyframe data
+        if (type == fastgltf::AnimationPath::Translation) {
+          // Load the keyframe times (input accessor)
+          translation_keyframes.resize(input_accessor.count);
+
+          fastgltf::iterateAccessorWithIndex<float>(
+              gltf, input_accessor,
+              [&](float time, size_t index) { translation_keyframes[index].time = time; });
+
+          fastgltf::iterateAccessorWithIndex<glm::vec3>(
+              gltf, output_accessor, [&](glm::vec3 translation, size_t index) {
+                translation_keyframes[index].value = translation;
+                translation_keyframes[index].type = interpolation;
+              });
+        }
+        else if (type == fastgltf::AnimationPath::Rotation) {
+          rotation_keyframes.resize(input_accessor.count);
+
+          fastgltf::iterateAccessorWithIndex<float>(
+              gltf, input_accessor,
+              [&](float time, size_t index) { rotation_keyframes[index].time = time; });
+
+          fastgltf::iterateAccessorWithIndex<glm::vec3>(
+              gltf, output_accessor,
+              [&](glm::vec3 rotation, size_t index) {
+                rotation_keyframes[index].value = glm::quat(rotation);
+                rotation_keyframes[index].type = interpolation;
+              });
+        }
+        else if (type == fastgltf::AnimationPath::Scale) {
+          scale_keyframes.resize(input_accessor.count);
+
+          fastgltf::iterateAccessorWithIndex<float>(
+              gltf, input_accessor, [&](float time, size_t index) { scale_keyframes[index].time = time; });
+
+          fastgltf::iterateAccessorWithIndex<glm::vec3>(
+              gltf, output_accessor,
+              [&](glm::vec3 scale, size_t index) {
+                scale_keyframes[index].value = scale;
+                scale_keyframes[index].type = interpolation;
+              });
+        }
+        component_factory_->create_animation_component(entity, translation_keyframes,
+                                                       rotation_keyframes, scale_keyframes);
+      }
+    }
+  }
+
 
   void AssetLoader::import_lights(const fastgltf::Asset& gltf) {
     fmt::print("importing lights\n");
