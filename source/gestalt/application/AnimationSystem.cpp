@@ -87,7 +87,7 @@ namespace gestalt::application {
     // Linearly interpolate the translation between the two keyframes
     const glm::quat interpolated_rotation = glm::mix(start_keyframe.value, end_keyframe.value, t);
 
-    repository_->transform_components[entity].rotation = interpolated_rotation;
+    repository_->transform_components[entity].rotation = glm::normalize(interpolated_rotation);
 
     if (loop && current_time > rotation_keyframes.back().time) {
       current_time = 0.0f;  // Reset for looping

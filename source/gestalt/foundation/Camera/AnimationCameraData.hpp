@@ -11,8 +11,8 @@ namespace gestalt::foundation {
         : position(starting_pos), orientation(starting_orientation) {}
 
     [[nodiscard]] glm::mat4 get_view_matrix() const {
-      const glm::mat4 rotation_matrix = mat4_cast(orientation);
       const glm::mat4 translation_matrix = translate(glm::mat4(1.0f), -position);
+      const glm::mat4 rotation_matrix = mat4_cast(orientation);
 
       return rotation_matrix * translation_matrix;
     }

@@ -72,7 +72,6 @@ namespace gestalt::application {
               camera_data.position = transform_component.position;
               camera_data.orientation = transform_component.rotation;
               MoveToCamera::update(delta_time, movement, camera_data);
-              time_ += delta_time;
             }
           },
           camera_component.camera_data);

@@ -145,7 +145,6 @@ class NotificationManager {
     class CameraSystem final : public SceneSystem, public NonCopyable<CameraSystem> {
       Entity active_camera_{3};  // entity id of the active camera
       float32 aspect_ratio_{1.f};
-      float32 time_{0.0};   
 
     public:
       void set_active_camera(const Entity camera) { active_camera_ = camera; }

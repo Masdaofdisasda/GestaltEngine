@@ -597,8 +597,10 @@ namespace gestalt::application {
           fastgltf::iterateAccessorWithIndex<glm::vec4>(
               gltf, output_accessor,
               [&](glm::vec4 rotation, size_t index) {
-                rotation_keyframes[index].value
-                    = glm::quat(rotation.w, rotation.x, rotation.y, rotation.z);
+                auto test
+                    = glm::conjugate(glm::quat(rotation.w, rotation.x, rotation.y, rotation.z));
+
+                rotation_keyframes[index].value = glm::normalize(test);
                 rotation_keyframes[index].type = interpolation;
               });
         }
