@@ -701,7 +701,7 @@ namespace gestalt::application {
 
         ImGui::Checkbox("Show Bright Pass", &config.hdr.show_bright_pass);
         ImGui::SliderFloat("Exposure", &config.hdr.exposure, 0.1f, 2.0f, "%.3f");
-        ImGui::SliderFloat("Max White", &config.hdr.maxWhite, 0.1f, 2.5f, "%.3f");
+        ImGui::SliderFloat("Max White", &config.hdr.maxWhite, 0.1f, 10.f, "%.3f");
         ImGui::SliderFloat("Bloom Strength", &config.hdr.bloomStrength, 0.0f, 2.f, "%.2f");
         ImGui::ColorPicker4("Lift", &config.hdr.lift[0], ImGuiColorEditFlags_Float);
         ImGui::ColorPicker4("Gamma", &config.hdr.gamma[0], ImGuiColorEditFlags_Float);

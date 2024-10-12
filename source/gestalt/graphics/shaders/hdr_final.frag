@@ -21,10 +21,17 @@ layout(binding = 0) uniform sampler2D texScene;
 layout(binding = 1) uniform sampler2D texBloom;
 layout(binding = 2) uniform sampler2D texLuminance;
 
-// Extended Reinhard tone mapping operator
-vec3 Reinhard2(vec3 x)
-{
-	return (x * (1.0 + x / (params.maxWhite * params.maxWhite))) / (1.0 + x);
+float Reinhard_L_scaled(float a, float Lw, float L_avg) {
+	return (a / L_avg) * Lw;
+}
+
+float Reinhard_Ld(float L_scaled) {
+	return L_scaled / (1.0 + L_scaled);
+}
+
+float Reinhard_Ld(float L_scaled, float L_white) {
+    float extension = (1.0 + L_scaled / (L_white * L_white));
+ 	return (L_scaled * extension) / (1 + L_scaled);
 }
 
 vec3 uncharted2_tonemap_partial(vec3 x)
@@ -100,6 +107,67 @@ vec3 linearToSrgb(vec3 linearColor) {
     return mix(12.92 * linearColor, 1.055 * pow(linearColor, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, linearColor));
 }
 
+vec3 convertYxy2XYZ(vec3 Yxy) {
+    float Y = Yxy.x;
+    float x = Yxy.y;
+    float y = Yxy.z;
+
+    vec3 xyz;
+    if (y > 0.0) {
+        xyz.x = (x * Y) / y;               // X = x * (Y / y)
+        xyz.y = Y;                         // Y remains the same
+        xyz.z = (1.0 - x - y) * (Y / y);   // Z = (1 - x - y) * (Y / y)
+    } else {
+        xyz = vec3(0.0);
+    }
+
+    return xyz;
+}
+vec3 convertXYZ2Yxy(vec3 xyz) {
+    float X = xyz.x;
+    float Y = xyz.y;
+    float Z = xyz.z;
+
+    float sum = X + Y + Z;
+
+    vec3 Yxy;
+    Yxy.x = Y;                            // Luminance Y
+    Yxy.y = (sum > 0.0) ? X / sum : 0.0;  // Chromaticity x
+    Yxy.z = (sum > 0.0) ? Y / sum : 0.0;  // Chromaticity y
+
+    return Yxy;
+}
+
+// Convert RGB to XYZ
+vec3 convertRGB2XYZ(vec3 rgb) {
+    const mat3 RGBtoXYZ = mat3(0.4124564, 0.3575761, 0.1804375,
+                               0.2126729, 0.7151522, 0.0721750,
+                               0.0193339, 0.1191920, 0.9503041);
+
+    return RGBtoXYZ * rgb;
+}
+
+// Convert XYZ to RGB
+vec3 convertXYZ2RGB(vec3 xyz) {
+    const mat3 XYZtoRGB = mat3( 3.2404542, -1.5371385, -0.4985314,
+                               -0.9692660,  1.8760108,  0.0415560,
+                                0.0556434, -0.2040259,  1.0572252);
+
+    return XYZtoRGB * xyz;
+}
+
+// Convert RGB to Yxy
+vec3 convertRGB2Yxy(vec3 rgb) {
+    vec3 xyz = convertRGB2XYZ(rgb);
+    return convertXYZ2Yxy(xyz);
+}
+
+// Convert Yxy to RGB
+vec3 convertYxy2RGB(vec3 Yxy) {
+    vec3 xyz = convertYxy2XYZ(Yxy);
+    return convertXYZ2RGB(xyz);
+}
+
 
 void main() {
     vec3 sceneColor = texture(texScene, uv).rgb;
@@ -118,7 +186,17 @@ void main() {
 
     // Tone mapping
     if (params.toneMappingOption == 0) {
-        sceneColor = Reinhard2(sceneColor);
+    
+        vec3 Yxy = convertRGB2Yxy(sceneColor);
+
+        float Lw = Yxy.x;
+        float a = 0.18;
+        float L_scaled = Reinhard_L_scaled(a, Lw, avgLuminance.r);
+        float L_white = Reinhard_L_scaled(a, params.maxWhite, avgLuminance.r);
+        Yxy.x = Reinhard_Ld(L_scaled, L_white);
+
+        sceneColor = convertYxy2RGB(Yxy);
+
     } else if (params.toneMappingOption == 1) {
         sceneColor = Uncharted2Filmic(sceneColor);
     } else if (params.toneMappingOption == 2) {
