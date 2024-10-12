@@ -515,7 +515,7 @@ namespace gestalt::application {
     }
   }
 
-  InterpolationType mapInterpolationType(fastgltf::AnimationInterpolation type) {
+  InterpolationType MapInterpolationType(fastgltf::AnimationInterpolation type) {
     if (type == fastgltf::AnimationInterpolation::Linear) {
       return InterpolationType::kLinear;
     }
@@ -537,12 +537,13 @@ namespace gestalt::application {
       std::vector<Keyframe<glm::vec3>> translation_keyframes;
       std::vector<Keyframe<glm::quat>> rotation_keyframes;
       std::vector<Keyframe<glm::vec3>> scale_keyframes;
+      Entity entity;
 
       for (auto& channel : animation.channels) {
         auto& sampler = animation.samplers[channel.samplerIndex];
-        Entity entity = channel.nodeIndex.value_or(0) + node_offset;
+        entity = channel.nodeIndex.value_or(0) + node_offset;
         auto& type = channel.path;
-        auto interpolation = mapInterpolationType(sampler.interpolation);
+        auto interpolation = MapInterpolationType(sampler.interpolation);
 
         // Retrieve the input (keyframe times) and output (keyframe values) accessors
         const fastgltf::Accessor& input_accessor = gltf.accessors[sampler.inputAccessor];
@@ -569,11 +570,13 @@ namespace gestalt::application {
 
           fastgltf::iterateAccessorWithIndex<float>(
               gltf, input_accessor,
-              [&](float time, size_t index) { rotation_keyframes[index].time = time; });
+              [&](float time, size_t index) {
+                rotation_keyframes[index].time = time;
+              });
 
-          fastgltf::iterateAccessorWithIndex<glm::vec3>(
+          fastgltf::iterateAccessorWithIndex<glm::vec4>(
               gltf, output_accessor,
-              [&](glm::vec3 rotation, size_t index) {
+              [&](glm::vec4 rotation, size_t index) {
                 rotation_keyframes[index].value = glm::quat(rotation);
                 rotation_keyframes[index].type = interpolation;
               });
@@ -591,9 +594,9 @@ namespace gestalt::application {
                 scale_keyframes[index].type = interpolation;
               });
         }
-        component_factory_->create_animation_component(entity, translation_keyframes,
+       }
+      component_factory_->create_animation_component(entity, translation_keyframes,
                                                        rotation_keyframes, scale_keyframes);
-      }
     }
   }
 

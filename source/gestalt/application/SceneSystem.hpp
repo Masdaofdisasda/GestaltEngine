@@ -170,6 +170,21 @@ class NotificationManager {
       void cleanup() override;
     };
 
+    class AnimationSystem final : public SceneSystem, public NonCopyable<AnimationSystem> {
+      float delta_time_ = 0.0f;
+
+    public:
+      void set_delta_time(float32 delta_time) { delta_time_ = delta_time; }
+
+      void prepare() override;
+      void update_translation(const Entity& entity,
+                              AnimationChannel<glm::vec3>& translation_channel, bool loop) const;
+      void update_rotation(const Entity& entity, AnimationChannel<glm::quat>& rotation_channel,
+                           bool loop) const;
+      void update() override;
+      void cleanup() override;
+    };
+
     class MeshSystem final : public SceneSystem, public NonCopyable<MeshSystem> {
       size_t meshes_ = 0;
       void traverse_scene(Entity entity, const TransformComponent& parent_transform);

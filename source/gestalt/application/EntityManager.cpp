@@ -54,6 +54,9 @@ namespace gestalt::application {
     transform_system_ = std::make_unique<TransformSystem>();
     transform_system_->init(gpu_, resource_manager_, builder, repository_,
                             notification_manager_.get(), frame);
+    animation_system_ = std::make_unique<AnimationSystem>();
+    animation_system_->init(gpu_, resource_manager_, builder, repository_,
+                            notification_manager_.get(), frame);
     mesh_system_ = std::make_unique<MeshSystem>();
     mesh_system_->init(gpu_, resource_manager_, builder, repository_, notification_manager_.get(),
                        frame);
@@ -70,6 +73,7 @@ namespace gestalt::application {
       physics_system_->cleanup();
       mesh_system_->cleanup();
       transform_system_->cleanup();
+      animation_system_->cleanup();
       camera_system_->cleanup();
       light_system_->cleanup();
       material_system_->cleanup();
@@ -105,6 +109,8 @@ namespace gestalt::application {
       camera_system_->update();
       transform_system_->update();
       mesh_system_->update();
+      animation_system_->set_delta_time(delta_time);
+      animation_system_->update();
     }
 
     void EntityManager::request_scene(const std::string& path) { scene_path_ = path; }

@@ -52,9 +52,9 @@ namespace gestalt::application {
                                     const CapsuleCollider& collider) const;
 
       void create_animation_component(const Entity entity,
-                                      std::vector<Keyframe<glm::vec3>>& translation_keyframes,
-                                      std::vector<Keyframe<glm::quat>>& rotation_keyframes,
-                                      std::vector<Keyframe<glm::vec3>>& scale_keyframes) const;
+                                      const std::vector<Keyframe<glm::vec3>>& translation_keyframes,
+                                      const std::vector<Keyframe<glm::quat>>& rotation_keyframes,
+                                      const std::vector<Keyframe<glm::vec3>>& scale_keyframes) const;
 
       Entity create_directional_light(const glm::vec3& color, float intensity,
                                       const glm::vec3& direction, Entity parent = 0);
@@ -136,6 +136,7 @@ namespace gestalt::application {
       std::unique_ptr<SceneSystem> light_system_;
       std::unique_ptr<CameraSystem> camera_system_;
       std::unique_ptr<SceneSystem> transform_system_;
+      std::unique_ptr<AnimationSystem> animation_system_;
       std::unique_ptr<SceneSystem> mesh_system_;
       std::unique_ptr<PhysicSystem> physics_system_;
 

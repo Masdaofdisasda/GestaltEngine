@@ -90,9 +90,9 @@ namespace gestalt::application {
     }
 
   void ComponentFactory::create_animation_component(
-        const Entity entity, std::vector<Keyframe<glm::vec3>>& translation_keyframes,
-        std::vector<Keyframe<glm::quat>>& rotation_keyframes,
-        std::vector<Keyframe<glm::vec3>>& scale_keyframes) const {
+        const Entity entity, const std::vector<Keyframe<glm::vec3>>& translation_keyframes,
+        const std::vector<Keyframe<glm::quat>>& rotation_keyframes,
+        const std::vector<Keyframe<glm::vec3>>& scale_keyframes) const {
     repository_->animation_components.add(
         entity, AnimationComponent(translation_keyframes, rotation_keyframes, scale_keyframes));
     }
