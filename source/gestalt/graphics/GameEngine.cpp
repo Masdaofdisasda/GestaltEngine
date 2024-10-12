@@ -64,6 +64,8 @@ namespace gestalt {
     };
     gui_actions_.set_active_camera
         = [this](const foundation::Entity camera) { scene_manager_->set_active_camera(camera); };
+    gui_actions_.get_active_camera
+        = [this]() -> foundation::Entity { return scene_manager_->get_active_camera(); };
   }
 
   void GameEngine::run() {

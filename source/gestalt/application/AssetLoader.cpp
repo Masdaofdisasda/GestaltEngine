@@ -410,7 +410,24 @@ namespace gestalt::application {
             std::string(node.name), position, orientation, uniform_scale);
 
         if (node.lightIndex.has_value()) {
-          // TODO
+          auto light = gltf.lights.at(node.lightIndex.value());
+
+            if (light.type == fastgltf::LightType::Directional) {
+            glm::vec3 direction = normalize(glm::vec3(0, 0, -1.f) * orientation);
+            component_factory->create_directional_light(
+                  glm::vec3(light.color.at(0), light.color.at(1), light.color.at(2)), light.intensity,
+                direction, entity);
+
+            } else if (light.type == fastgltf::LightType::Point) {
+              float32 range = light.range.value_or(100.f);
+
+              component_factory->create_point_light(
+                  glm::vec3(light.color.at(0), light.color.at(1), light.color.at(2)),
+                  light.intensity, position, range, entity);
+
+            } else if (light.type == fastgltf::LightType::Spot) {
+              // TODO not supported yet
+            }
         }
 
         if (node.cameraIndex.has_value()) {
@@ -505,8 +522,6 @@ namespace gestalt::application {
 
     import_materials(gltf, image_offset);
 
-    import_lights(gltf);
-
     import_animations(gltf, node_offset);
 
     {  // Import physics
@@ -597,10 +612,10 @@ namespace gestalt::application {
           fastgltf::iterateAccessorWithIndex<glm::vec4>(
               gltf, output_accessor,
               [&](glm::vec4 rotation, size_t index) {
-                auto test
-                    = glm::conjugate(glm::quat(rotation.w, rotation.x, rotation.y, rotation.z));
-
-                rotation_keyframes[index].value = glm::normalize(test);
+                // NOTE: ordering of quaternion components is different in GLTF
+                // also the coordinate system is different
+                const auto rotationQuat = glm::quat(rotation.w, rotation.x, rotation.y, rotation.z);
+                rotation_keyframes[index].value = glm::normalize(glm::conjugate(rotationQuat));
                 rotation_keyframes[index].type = interpolation;
               });
         }
@@ -620,29 +635,6 @@ namespace gestalt::application {
        }
       component_factory_->create_animation_component(entity, translation_keyframes,
                                                        rotation_keyframes, scale_keyframes);
-    }
-  }
-
-
-  void AssetLoader::import_lights(const fastgltf::Asset& gltf) {
-    fmt::print("importing lights\n");
-    for (const fastgltf::Light& light : gltf.lights) {
-      if (light.type == fastgltf::LightType::Directional) {
-        component_factory_->create_directional_light(
-            glm::vec3(light.color.at(0), light.color.at(1), light.color.at(2)), light.intensity,
-            glm::vec3(0.f));
-
-      } else if (light.type == fastgltf::LightType::Point) {
-        float range = 100.f;
-        if (light.range.has_value()) range = light.range.value();
-
-        component_factory_->create_point_light(
-            glm::vec3(light.color.at(0), light.color.at(1), light.color.at(2)), light.intensity,
-            glm::vec3(0.f), range);
-
-      } else if (light.type == fastgltf::LightType::Spot) {
-        // TODO;
-      }
     }
   }
 

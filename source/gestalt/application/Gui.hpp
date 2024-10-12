@@ -20,6 +20,7 @@ namespace gestalt::application {
       std::function<RenderConfig&()> get_render_config;
       std::function<std::shared_ptr<TextureHandle>()> get_debug_image;
       std::function<void(Entity)> set_active_camera;
+      std::function<Entity()> get_active_camera;
     };
 
     class Gui: public NonCopyable<Gui> {

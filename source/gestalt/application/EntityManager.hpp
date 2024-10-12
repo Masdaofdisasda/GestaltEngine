@@ -59,12 +59,13 @@ namespace gestalt::application {
                                       const std::vector<Keyframe<glm::vec3>>& scale_keyframes) const;
 
       Entity create_directional_light(const glm::vec3& color, float intensity,
-                                      const glm::vec3& direction, Entity parent = 0);
+                                      const glm::vec3& direction,
+                                      const Entity entity = invalid_entity);
       Entity create_spot_light(const glm::vec3& color, float intensity,
-                               const glm::vec3& direction, const glm::vec3& position,
-                               float innerCone, float outerCone, Entity parent = 0);
+                               const glm::vec3& direction, const glm::vec3& position, float innerCone, float outerCone,
+                               const Entity entity = invalid_entity);
       Entity create_point_light(const glm::vec3& color, float intensity, const glm::vec3& position,
-                                float32 range, Entity parent = 0);
+                                float32 range, const Entity entity = invalid_entity);
       Entity add_free_fly_camera(const glm::vec3& position, const glm::vec3& direction,
                                  const glm::vec3& up, Entity entity,
                                  ProjectionData projection_data
@@ -127,7 +128,6 @@ namespace gestalt::application {
       void init(IResourceManager* resource_manager,
                 ComponentFactory* component_factory,
                 Repository* repository);
-      void import_lights(const fastgltf::Asset& gltf);
       void import_nodes(fastgltf::Asset& gltf) const;
       void load_scene_from_gltf(const std::string& file_path);
       void import_animations(const fastgltf::Asset& gltf, const size_t node_offset);
@@ -173,5 +173,6 @@ namespace gestalt::application {
       uint32 get_root_entity() { return root_entity_; }
       void add_to_root(Entity entity, NodeComponent& node);
       void set_active_camera(Entity camera) const;
+      Entity get_active_camera() const;
     };
 }  // namespace gestalt::application

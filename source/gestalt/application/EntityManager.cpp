@@ -16,9 +16,8 @@ namespace gestalt::application {
     asset_loader_->init(resource_manager_, component_factory_.get(), repository_);
 
     component_factory_->create_directional_light(
-        glm::vec3(1.f, 0.957f, 0.917f), 5.f, glm::vec3(-0.216, 0.941, -0.257), get_root_entity());
-    component_factory_->create_point_light(glm::vec3(1.0f), 5.0f, glm ::vec3(0.0, 6.0, 0.0), 100.f,
-                                           get_root_entity());
+        glm::vec3(1.f, 0.957f, 0.917f), 5.f, glm::vec3(-0.216, 0.941, -0.257));
+    component_factory_->create_point_light(glm::vec3(1.0f), 5.0f, glm ::vec3(0.0, 6.0, 0.0), 100.f);
 
     auto [main_cam, main_cam_node] = component_factory_->create_entity("Editor Camera");
     component_factory_->link_entity_to_parent(main_cam, root_entity_);
@@ -67,6 +66,8 @@ namespace gestalt::application {
   void EntityManager::set_active_camera(const Entity camera) const {
       camera_system_->set_active_camera(camera);
     }
+
+  Entity EntityManager::get_active_camera() const { return camera_system_->get_active_camera(); }
 
     void EntityManager::cleanup() const {
       physics_system_->cleanup();

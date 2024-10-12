@@ -104,11 +104,16 @@ namespace gestalt::application {
     Entity ComponentFactory::create_directional_light(const glm::vec3& color,
                                                                const float intensity,
                                                                const glm::vec3& direction,
-                                                               Entity parent) {
-      auto [entity, node] = create_entity("directional_light");
-      link_entity_to_parent(entity, parent);
+                                                      Entity entity) {
+      if (entity == invalid_entity) {
+        const auto number_of_lights = repository_->light_components.size();
+        auto [new_entity, node]
+            = create_entity("directional_light_" + std::to_string(number_of_lights + 1));
+        entity = new_entity;
+        link_entity_to_parent(entity, root_entity);
+      }
 
-      auto& transform = repository_->transform_components.get(entity).value().get();
+      auto& transform = repository_->transform_components[entity];
       transform.rotation = glm::quat(lookAt(glm::vec3(0), direction, glm::vec3(0, 1, 0)));
 
       const uint32 matrix_id = repository_->light_view_projections.add(glm::mat4(1.0));
@@ -121,11 +126,16 @@ namespace gestalt::application {
 
     Entity ComponentFactory::create_spot_light(
         const glm::vec3& color, const float intensity, const glm::vec3& direction,
-        const glm::vec3& position, const float innerCone, const float outerCone, Entity parent) {
-      auto [entity, node] = create_entity("spot_light");
-      link_entity_to_parent(entity, parent);
-
-      auto& transform = repository_->transform_components.get(entity).value().get();
+                                               const glm::vec3& position, const float innerCone,
+                                               const float outerCone, Entity entity) {
+      if (entity == invalid_entity) {
+        const auto number_of_lights = repository_->light_components.size();
+        auto [new_entity, node]
+            = create_entity("spot_light_" + std::to_string(number_of_lights + 1));
+        entity = new_entity;
+        link_entity_to_parent(entity, root_entity);
+      }
+      auto& transform = repository_->transform_components[entity];
       transform.rotation = glm::quat(lookAt(glm::vec3(0), direction, glm::vec3(0, 1, 0)));
       transform.position = position;
 
@@ -138,11 +148,16 @@ namespace gestalt::application {
 
     Entity ComponentFactory::create_point_light(const glm::vec3& color,
                                                          const float32 intensity,
-                                                         const glm::vec3& position, const float32 range, Entity parent) {
-      auto [entity, node] = create_entity("point_light");
-      link_entity_to_parent(entity, parent);
+                                                         const glm::vec3& position, const float32 range, Entity entity) {
+      if (entity == invalid_entity) {
+        const auto number_of_lights = repository_->light_components.size();
+        auto [new_entity, node]
+            = create_entity("point_light_" + std::to_string(number_of_lights + 1));
+        entity = new_entity;
+        link_entity_to_parent(entity, root_entity);
+      }
 
-      auto& transform = repository_->transform_components.get(entity).value().get();
+      auto& transform = repository_->transform_components[entity];
       transform.position = position;
 
       const uint32 matrix_id = repository_->light_view_projections.add(glm::mat4(1.0));
