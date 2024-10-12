@@ -15,23 +15,34 @@ layout(location = 0) in vec2 texCoord;
 layout (location = 0) out vec4 outFragColor;
 
 
-layout(set = 2, binding = 0) buffer LightViewProj{
-	mat4 viewProj;
-} lightViewProj[256 + 2];
-
-layout(set = 2, binding = 1) buffer DirLight{
+struct DirectionalLight {
 	vec3 color;
 	float intensity;
 	vec3 direction;
 	int viewProjIndex;
-} dirLight[2];
+}; 
 
-layout(set = 2, binding = 2) buffer PointLight{
+struct PointLight {
 	vec3 color;
 	float intensity;
 	vec3 position;
 	float range;
-} pointLight[256];
+}; 
+
+layout(set = 2, binding = 0) readonly buffer LightViewProj
+{
+	mat4 viewProj[];
+};
+
+layout(set = 2, binding = 1) readonly buffer DirectionalLightBuffer
+{
+	DirectionalLight dirLight[];
+};
+
+layout(set = 2, binding = 2) readonly buffer PointLightBuffer
+{
+	PointLight pointLight[];
+};
 
 layout(set = 3, binding = 0) uniform sampler2D gbuffer1;
 layout(set = 3, binding = 1) uniform sampler2D gbuffer2;
@@ -107,7 +118,7 @@ void main() {
 	vec3 viewPos = -normalize(vec3(view[0][2], view[1][2], view[2][2]));
 
     // Transform world position to light space
-	mat4 lightViewProj = lightViewProj[dirLight[0].viewProjIndex].viewProj;
+	mat4 lightViewProj = viewProj[dirLight[0].viewProjIndex];
     vec4 lightSpacePos = biasMat * lightViewProj * vec4(worldPos, 1.0);
 
 	float shadow = 1.0;
@@ -133,26 +144,26 @@ void main() {
 	if (params.shading_mode == 0 || params.shading_mode == 1) {
 		for (int i = 0; i < params.num_dir_lights; ++i) {
 
-		vec3 pointToLight = dirLight[i].direction;
+			vec3 pointToLight = dirLight[i].direction;
 
-        // BSTF
-		vec3 n = materialInfo.n;
-		vec3 v = materialInfo.v;
-        vec3 l = normalize(pointToLight);   // Direction from surface point to light
-        vec3 h = normalize(l + v);          // Direction of the vector between l and v, called halfway vector
-		float NdotL = clamp(dot(n, l), 0.001, 1.0);
-        float NdotV = clamp(dot(n, v), 0.0, 1.0);
-		float NdotH = clamp(dot(n, h), 0.0, 1.0);
-		float LdotH = clamp(dot(l, h), 0.0, 1.0);
-		float VdotH = clamp(dot(v, h), 0.0, 1.0);
+			// BSTF
+			vec3 n = materialInfo.n;
+			vec3 v = materialInfo.v;
+			vec3 l = normalize(pointToLight);   // Direction from surface point to light
+			vec3 h = normalize(l + v);          // Direction of the vector between l and v, called halfway vector
+			float NdotL = clamp(dot(n, l), 0.001, 1.0);
+			float NdotV = clamp(dot(n, v), 0.0, 1.0);
+			float NdotH = clamp(dot(n, h), 0.0, 1.0);
+			float LdotH = clamp(dot(l, h), 0.0, 1.0);
+			float VdotH = clamp(dot(v, h), 0.0, 1.0);
 
-		if (NdotL <= 0.0 && NdotV <= 0.0) { continue; }
+			if (NdotL <= 0.0 && NdotV <= 0.0) { continue; }
 
-        // Calculation of analytical light
-        // https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
-        vec3 intensity = getDirectionalLighIntensity(dirLight[i].color, dirLight[i].intensity);
-        materialInfo.f_diffuse += shadow * intensity * NdotL *  BRDF_lambertian(materialInfo.f0, materialInfo.f90, materialInfo.c_diff, materialInfo.specularWeight, VdotH);
-        materialInfo.f_specular += shadow * intensity * NdotL * BRDF_specularGGX(materialInfo.f0, materialInfo.f90, materialInfo.alphaRoughness, materialInfo.specularWeight, VdotH, NdotL, NdotV, NdotH);
+			// Calculation of analytical light
+			// https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
+			vec3 intensity = getDirectionalLighIntensity(dirLight[i].color, dirLight[i].intensity);
+			materialInfo.f_diffuse += shadow * intensity * NdotL *  BRDF_lambertian(materialInfo.f0, materialInfo.f90, materialInfo.c_diff, materialInfo.specularWeight, VdotH);
+			materialInfo.f_specular += shadow * intensity * NdotL * BRDF_specularGGX(materialInfo.f0, materialInfo.f90, materialInfo.alphaRoughness, materialInfo.specularWeight, VdotH, NdotL, NdotV, NdotH);
 		}
 	}
 
@@ -160,26 +171,26 @@ void main() {
 	if (params.shading_mode == 0 || params.shading_mode == 2) {
 		for (int i = 0; i < params.num_point_lights; ++i) {
 
-		vec3 pointToLight = pointLight[i].position - worldPos;
+			vec3 pointToLight = pointLight[i].position - worldPos;
 
-        // BSTF
-		vec3 n = materialInfo.n;
-		vec3 v = materialInfo.v;
-        vec3 l = normalize(pointToLight);   // Direction from surface point to light
-        vec3 h = normalize(l + v);          // Direction of the vector between l and v, called halfway vector
-		float NdotL = clamp(dot(n, l), 0.001, 1.0);
-        float NdotV = clamp(dot(n, v), 0.0, 1.0);
-		float NdotH = clamp(dot(n, h), 0.0, 1.0);
-		float LdotH = clamp(dot(l, h), 0.0, 1.0);
-		float VdotH = clamp(dot(v, h), 0.0, 1.0);
+			// BSTF
+			vec3 n = materialInfo.n;
+			vec3 v = materialInfo.v;
+			vec3 l = normalize(pointToLight);   // Direction from surface point to light
+			vec3 h = normalize(l + v);          // Direction of the vector between l and v, called halfway vector
+			float NdotL = clamp(dot(n, l), 0.001, 1.0);
+			float NdotV = clamp(dot(n, v), 0.0, 1.0);
+			float NdotH = clamp(dot(n, h), 0.0, 1.0);
+			float LdotH = clamp(dot(l, h), 0.0, 1.0);
+			float VdotH = clamp(dot(v, h), 0.0, 1.0);
 
-		if (NdotL <= 0.0 && NdotV <= 0.0) { continue; }
+			if (NdotL <= 0.0 && NdotV <= 0.0) { continue; }
 
-        // Calculation of analytical light
-        // https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
-        vec3 intensity = getPointLighIntensity(pointLight[i].color, pointLight[i].intensity, pointLight[i].range, pointToLight);
-        materialInfo.f_diffuse += intensity * NdotL *  BRDF_lambertian(materialInfo.f0, materialInfo.f90, materialInfo.c_diff, materialInfo.specularWeight, VdotH);
-        materialInfo.f_specular += intensity * NdotL * BRDF_specularGGX(materialInfo.f0, materialInfo.f90, materialInfo.alphaRoughness, materialInfo.specularWeight, VdotH, NdotL, NdotV, NdotH);
+			// Calculation of analytical light
+			// https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
+			vec3 intensity = getPointLighIntensity(pointLight[i].color, pointLight[i].intensity, pointLight[i].range, pointToLight);
+			materialInfo.f_diffuse += intensity * NdotL *  BRDF_lambertian(materialInfo.f0, materialInfo.f90, materialInfo.c_diff, materialInfo.specularWeight, VdotH);
+			materialInfo.f_specular += intensity * NdotL * BRDF_specularGGX(materialInfo.f0, materialInfo.f90, materialInfo.alphaRoughness, materialInfo.specularWeight, VdotH, NdotL, NdotV, NdotH);
 		}
 	}
 

@@ -439,7 +439,7 @@ namespace gestalt::application {
             const float32 near = perspective.znear;
             const float32 far = perspective.zfar.value_or(10000.f);
             component_factory->add_animation_camera(
-                position, orientation, entity,
+                position, glm::normalize(glm::conjugate(orientation)), entity,
                 PerspectiveProjectionData{fov, aspect_ratio, near, far});
           } else if (std::holds_alternative<fastgltf::Camera::Orthographic>(cam.camera)) {
             const auto& ortho = std::get<fastgltf::Camera::Orthographic>(cam.camera);
@@ -448,7 +448,7 @@ namespace gestalt::application {
             const float32 near = ortho.znear;
             const float32 far = ortho.zfar;
             component_factory->add_animation_camera(
-                position, orientation, entity,
+                position, glm::normalize(glm::conjugate(orientation)), entity,
                 OrthographicProjectionData{xmag, ymag, near, far});
           }
         }

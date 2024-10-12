@@ -133,8 +133,6 @@ class NotificationManager {
       void fill_buffers();
 
       glm::mat4 calculate_sun_view_proj(glm::vec3 direction) const;
-      void update_directional_lights(std::unordered_map<Entity, LightComponent>& lights);
-      void update_point_lights(std::unordered_map<Entity, LightComponent>& lights);
 
     public:
       void prepare() override;

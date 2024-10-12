@@ -41,7 +41,7 @@ namespace gestalt::application {
     vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layout, nullptr);
 
     light_data->view_proj_matrices = resource_manager_->create_buffer(
-        sizeof(glm::mat4) * getMaxLights(),
+        sizeof(glm::mat4) * (getMaxDirectionalLights() + 6 * getMaxPointLights()),
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
         VMA_MEMORY_USAGE_CPU_TO_GPU, "Light Matrix Buffer");
     light_data->dir_light_buffer = resource_manager_->create_buffer(
@@ -60,7 +60,8 @@ namespace gestalt::application {
 
     light_data->descriptor_buffer
         ->write_buffer(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       light_data->view_proj_matrices->address, sizeof(glm::mat4) * getMaxLights())
+                       light_data->view_proj_matrices->address,
+                       sizeof(glm::mat4) * getMaxDirectionalLights())
         .write_buffer(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, light_data->dir_light_buffer->address,
                       sizeof(GpuDirectionalLight) * getMaxDirectionalLights())
         .write_buffer(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, light_data->point_light_buffer->address,
@@ -96,95 +97,71 @@ namespace gestalt::application {
     return lightProjection * lightView;
   }
 
-  bool has_dirty_light(const std::unordered_map<Entity, LightComponent>& lights) {
-    return std::ranges::any_of(lights, [](const std::pair<Entity, LightComponent>& light) {
-      return light.second.is_dirty;
-    });
-  }
+  void LightSystem::update() {
 
-  void LightSystem::update_directional_lights(std::unordered_map<Entity, LightComponent>& lights) {
-    const auto& light_data = repository_->light_buffers;
-
+    repository_->light_view_projections.clear();
     repository_->directional_lights.clear();
-    for (auto& light_source : lights) {
-      auto& [entity, light] = light_source;
-      if (light.type != LightType::kDirectional) {
-        continue;
-      }
+    repository_->point_lights.clear();
 
-      if (auto* dir_light_data = std::get_if<DirectionalLightData>(&light.specific)) {
-        auto& rotation = repository_->transform_components.get(entity).value().get().rotation;
+    for (auto [entity, Light_component] : repository_->light_components.asVector()) {
+      if (Light_component.get().type == LightType::kDirectional) {
+        auto& light = Light_component.get();
+        const auto& rotation = repository_->transform_components[entity].rotation;
+        auto& dir_light_data = std::get<DirectionalLightData>(Light_component.get().specific);
         glm::vec3 direction = normalize(glm::vec3(0, 0, -1.f) * rotation);
 
-        auto& view_proj
-            = repository_->light_view_projections.get(dir_light_data->light_view_projection);
-        view_proj = calculate_sun_view_proj(direction);
+        auto view_proj = calculate_sun_view_proj(direction);
+        repository_->light_view_projections.add(view_proj);
+        dir_light_data.light_view_projection = repository_->light_view_projections.size() - 1;
 
         GpuDirectionalLight dir_light = {};
         dir_light.color = light.base.color;
         dir_light.intensity = light.base.intensity;
         dir_light.direction = direction;
-        dir_light.viewProj = dir_light_data->light_view_projection;
+        dir_light.viewProj = dir_light_data.light_view_projection;
         repository_->directional_lights.add(dir_light);
 
         light.is_dirty = false;
-      }
-    }
+      } else if (Light_component.get().type == LightType::kPoint) {
+        auto& light = Light_component.get();
+        const auto& position = repository_->transform_components[entity].position;
+        const auto& point_light_data = std::get<PointLightData>(light.specific);
 
-    void* mapped_data;
-    VK_CHECK(
-        vmaMapMemory(gpu_->getAllocator(), light_data->dir_light_buffer->allocation, &mapped_data));
-    memcpy(mapped_data, repository_->directional_lights.data().data(),
-           sizeof(GpuDirectionalLight) * repository_->directional_lights.size());
-    vmaUnmapMemory(gpu_->getAllocator(), light_data->dir_light_buffer->allocation);
-  }
-
-  void LightSystem::update_point_lights(std::unordered_map<Entity, LightComponent>& lights) {
-    auto& light_data = repository_->light_buffers;
-
-    repository_->point_lights.clear();
-    for (auto& light_source : lights) {
-      auto& [entity, light] = light_source;
-      if (light.type != LightType::kPoint) {
-        continue;
-      }
-
-      if (auto* point_light_data = std::get_if<PointLightData>(&light.specific)) {
-        const auto& position = repository_->transform_components.get(entity).value().get().position;
+        // TODO Calculate the 6 view matrices for the light
 
         GpuPointLight point_light = {};
         point_light.color = light.base.color;
         point_light.intensity = light.base.intensity;
         point_light.position = position;
-        point_light.range = point_light_data->range;
+        point_light.range = point_light_data.range;
         repository_->point_lights.add(point_light);
 
         light.is_dirty = false;
       }
     }
+    
+    auto& light_data = repository_->light_buffers;
+    
+    void* directional_light_data;
+    VK_CHECK(vmaMapMemory(gpu_->getAllocator(), light_data->dir_light_buffer->allocation,
+                          &directional_light_data));
+    memcpy(directional_light_data, repository_->directional_lights.data().data(),
+           sizeof(GpuDirectionalLight) * repository_->directional_lights.size());
+    vmaUnmapMemory(gpu_->getAllocator(), light_data->dir_light_buffer->allocation);
 
-    void* mapped_data;
+    void* point_light_data;
     VK_CHECK(vmaMapMemory(gpu_->getAllocator(), light_data->point_light_buffer->allocation,
-                          &mapped_data));
-    memcpy(mapped_data, repository_->point_lights.data().data(),
+                          &point_light_data));
+    memcpy(point_light_data, repository_->point_lights.data().data(),
            sizeof(GpuPointLight) * repository_->point_lights.size());
     vmaUnmapMemory(gpu_->getAllocator(), light_data->point_light_buffer->allocation);
-  }
-
-  void LightSystem::update() {
-    auto& light_components = repository_->light_components.components();
-    if (has_dirty_light(light_components)) {
-      update_directional_lights(light_components);
-      update_point_lights(light_components);
-    }
 
     // changes in the scene graph can affect the light view-projection matrices
-    const auto& light_data = repository_->light_buffers;
-    const auto& matrices = repository_->light_view_projections.data();
-    void* mapped_data;
+    void* view_matrix_data;
     VK_CHECK(vmaMapMemory(gpu_->getAllocator(), light_data->view_proj_matrices->allocation,
-                          &mapped_data));
-    memcpy(mapped_data, matrices.data(), sizeof(glm::mat4) * matrices.size());
+                          &view_matrix_data));
+    memcpy(view_matrix_data, repository_->light_view_projections.data().data(),
+           sizeof(glm::mat4) * repository_->light_view_projections.size());
     vmaUnmapMemory(gpu_->getAllocator(), light_data->view_proj_matrices->allocation);
 
     updatable_entities_.clear();
