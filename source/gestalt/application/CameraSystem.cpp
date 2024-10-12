@@ -118,12 +118,13 @@ namespace gestalt::application {
             if constexpr (std::is_same_v<T, PerspectiveProjectionData>) {
               near = projection_data.near;
               far = projection_data.far;
-              return glm::perspective(glm::radians(projection_data.fov), aspect_ratio_,
+              return glm::perspective(projection_data.fov, aspect_ratio_,
                                            projection_data.near, projection_data.far);
             } else if constexpr (std::is_same_v<T, OrthographicProjectionData>) {
               near = projection_data.near;
               far = projection_data.far;
-              return glm::ortho(projection_data.left, projection_data.right, projection_data.bottom,
+              return glm::orthoRH_ZO(projection_data.left, projection_data.right,
+                                     projection_data.bottom,
                                 projection_data.top, projection_data.near, projection_data.far);
             } else {
               return glm::mat4(1.0f);
@@ -135,7 +136,7 @@ namespace gestalt::application {
       glm::mat4 projection_t = transpose(projection);
       camera_component.view_matrix = view_matrix;
       camera_component.projection_matrix = projection;
-      buffers->data[frame].view = view_matrix;  // is the camera object actually needed?
+      buffers->data[frame].view = view_matrix;
       buffers->data[frame].proj = projection;
       buffers->data[frame].inv_view = inverse(view_matrix);
       buffers->data[frame].inv_viewProj = inverse(projection * view_matrix);

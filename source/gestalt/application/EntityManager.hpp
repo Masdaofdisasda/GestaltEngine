@@ -25,6 +25,8 @@ namespace gestalt::application {
 
     struct Vertex;
 
+    constexpr float32 kDefaultFov = 1.22173f;  // 70 degrees
+
     class ComponentFactory : public NonCopyable<ComponentFactory> {
       IResourceManager* resource_manager_ = nullptr;
       Repository* repository_ = nullptr;
@@ -66,20 +68,23 @@ namespace gestalt::application {
       Entity add_free_fly_camera(const glm::vec3& position, const glm::vec3& direction,
                                  const glm::vec3& up, Entity entity,
                                  ProjectionData projection_data
-                                 = PerspectiveProjectionData(70.f, 1.0f, 0.1f, 10000.f)) const;
+                                 = PerspectiveProjectionData(kDefaultFov, 1.0f, 0.1f,
+                                                             10000.f)) const;
 
       Entity add_animation_camera(const glm::vec3& position, const glm::quat& orientation,
                                   Entity entity,
                                   ProjectionData projection_data
-                                  = PerspectiveProjectionData(70.f, 1.0f, 0.1f, 10000.f)) const;
+                                  = PerspectiveProjectionData(kDefaultFov, 1.0f, 0.1f,
+                                                              10000.f)) const;
 
       Entity add_orbit_camera(const glm::vec3& target, Entity entity,
                               ProjectionData projection_data
-                              = PerspectiveProjectionData(70.f, 1.0f, 0.1f, 10000.f)) const;
+                              = PerspectiveProjectionData(kDefaultFov, 1.0f, 0.1f, 10000.f)) const;
 
       Entity add_first_person_camera(const glm::vec3& position, Entity entity,
                                      ProjectionData projection_data
-                                     = PerspectiveProjectionData(70.f, 1.0f, 0.1f, 10000.f)) const;
+                                     = PerspectiveProjectionData(kDefaultFov, 1.0f, 0.1f,
+                                                                 10000.f)) const;
 
       void link_entity_to_parent(Entity child, Entity parent);
     };
@@ -167,5 +172,6 @@ namespace gestalt::application {
       NodeComponent& get_root_node();
       uint32 get_root_entity() { return root_entity_; }
       void add_to_root(Entity entity, NodeComponent& node);
+      void set_active_camera(Entity camera) const;
     };
 }  // namespace gestalt::application

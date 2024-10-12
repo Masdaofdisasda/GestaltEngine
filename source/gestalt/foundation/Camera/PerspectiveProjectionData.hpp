@@ -8,7 +8,7 @@ namespace gestalt::foundation {
     PerspectiveProjectionData(float32 fov, float32 aspect_ratio, float32 near, float32 far)
         : fov(fov), aspect_ratio(aspect_ratio), near(near), far(far) {}
 
-    float32 fov;
+    float32 fov; // in radians
     float32 aspect_ratio;
     float32 near;
     float32 far;

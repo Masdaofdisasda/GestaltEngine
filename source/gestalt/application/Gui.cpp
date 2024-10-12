@@ -266,6 +266,8 @@ namespace gestalt::application {
         }
 
         if (ImGui::BeginMenu("Edit")) {
+          ImGui::MenuItem("Light Editor", nullptr, &show_lights_);
+          ImGui::MenuItem("Camera Editor", nullptr, &show_cameras_);
           if (ImGui::BeginMenu("Guizmo Mode")) {
             if (ImGui::MenuItem("Translate")) {
               guizmo_operation_ = 0;
@@ -306,7 +308,6 @@ namespace gestalt::application {
 
         if (ImGui::BeginMenu("Window")) {
           ImGui::MenuItem("Scene Graph", nullptr, &show_scene_hierarchy_);
-          ImGui::MenuItem("Light View", nullptr, &show_lights_);
           ImGui::MenuItem("Guizmo", nullptr, &show_guizmo_);
 
           if (ImGui::BeginMenu("Settings")) {
@@ -457,6 +458,25 @@ namespace gestalt::application {
       ImGui::End();
     }
 
+    void Gui::cameras() {
+      if (ImGui::Begin("Cameras")) {
+        std::vector<std::pair<Entity, std::reference_wrapper<CameraComponent>>> cameras
+            = repository_->camera_components.asVector();
+
+        static int selectedCameraIndex = 0;
+        if (!cameras.empty()) {
+          ImGui::SliderInt("Select Camera", &selectedCameraIndex, 0, cameras.size() - 1);
+
+          auto& [entity, camera_component] = cameras[selectedCameraIndex];
+
+          show_camera_component(camera_component);
+          ImGui::Separator();
+          if(ImGui::Button("Set as Active Camera")) { actions_.set_active_camera(entity); }
+        }
+      }
+      ImGui::End();
+    }
+
     void Gui::scene_graph() {
       float windowWidth = 300.0f;  // Width of the ImGui window
       uint32_t menuBarHeight = 18;
@@ -501,6 +521,10 @@ namespace gestalt::application {
 
       if (show_lights_) {
         lights();
+      }
+
+      if (show_cameras_) {
+        cameras();
       }
 
       if (show_light_adapt_settings_) {
@@ -987,7 +1011,12 @@ namespace gestalt::application {
             using T = std::decay_t<decltype(projection)>;
             if constexpr (std::is_same_v<T, PerspectiveProjectionData>) {
               ImGui::Text("Perspective Projection:");
-              ImGui::SliderFloat("Field of View", &projection.fov, 30.0f, 120.0f, "%.1f");
+              float fovInDegrees = projection.fov * 180.0f / glm::pi<float>();
+              if (ImGui::SliderFloat("Field of View (Degrees)", &fovInDegrees, 30.0f, 120.0f,
+                                     "%.1f")) {
+                // Convert the FOV back to radians when the user changes the slider value
+                projection.fov = fovInDegrees * (glm::pi<float>() / 180.0f);
+              }
               ImGui::SliderFloat("Near Clip", &projection.near, 0.01f, 10.0f, "%.2f");
               ImGui::SliderFloat("Far Clip", &projection.far, 10.0f, 10000.0f, "%.2f");
             } else if constexpr (std::is_same_v<T, OrthographicProjectionData>) {

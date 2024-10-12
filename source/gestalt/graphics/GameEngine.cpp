@@ -62,6 +62,8 @@ namespace gestalt {
     gui_actions_.get_debug_image = [this]() -> std::shared_ptr<foundation::TextureHandle> {
       return render_pipeline_->get_debug_image();
     };
+    gui_actions_.set_active_camera
+        = [this](const foundation::Entity camera) { scene_manager_->set_active_camera(camera); };
   }
 
   void GameEngine::run() {

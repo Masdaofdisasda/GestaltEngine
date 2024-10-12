@@ -418,7 +418,7 @@ namespace gestalt::application {
           if (std::holds_alternative<fastgltf::Camera::Perspective>(cam.camera)) {
             const auto& perspective = std::get<fastgltf::Camera::Perspective>(cam.camera);
             const float32 aspect_ratio = perspective.aspectRatio.value_or(1.f);
-            const float32 fov = perspective.yfov;
+            const float32 fov = perspective.yfov; // in radians
             const float32 near = perspective.znear;
             const float32 far = perspective.zfar.value_or(10000.f);
             component_factory->add_animation_camera(
@@ -571,10 +571,8 @@ namespace gestalt::application {
         const fastgltf::Accessor& input_accessor = gltf.accessors[sampler.inputAccessor];
         const fastgltf::Accessor& output_accessor = gltf.accessors[sampler.outputAccessor];
 
-        // Depending on the target path (translation, rotation, or scale), load the appropriate
-        // keyframe data
+        // Depending on the target path (translation, rotation, or scale), load the appropriate keyframe data
         if (type == fastgltf::AnimationPath::Translation) {
-          // Load the keyframe times (input accessor)
           translation_keyframes.resize(input_accessor.count);
 
           fastgltf::iterateAccessorWithIndex<float>(
@@ -599,7 +597,8 @@ namespace gestalt::application {
           fastgltf::iterateAccessorWithIndex<glm::vec4>(
               gltf, output_accessor,
               [&](glm::vec4 rotation, size_t index) {
-                rotation_keyframes[index].value = glm::quat(rotation);
+                rotation_keyframes[index].value
+                    = glm::quat(rotation.w, rotation.x, rotation.y, rotation.z);
                 rotation_keyframes[index].type = interpolation;
               });
         }

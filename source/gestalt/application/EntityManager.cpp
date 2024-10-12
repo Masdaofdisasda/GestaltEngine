@@ -64,6 +64,10 @@ namespace gestalt::application {
       asset_loader_->load_scene_from_gltf(path);
     }
 
+  void EntityManager::set_active_camera(const Entity camera) const {
+      camera_system_->set_active_camera(camera);
+    }
+
     void EntityManager::cleanup() const {
       physics_system_->cleanup();
       mesh_system_->cleanup();

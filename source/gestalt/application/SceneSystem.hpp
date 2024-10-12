@@ -148,6 +148,8 @@ class NotificationManager {
       float32 time_{0.0};   
 
     public:
+      void set_active_camera(const Entity camera) { active_camera_ = camera; }
+
       void prepare() override;
       void update_cameras(float delta_time, const UserInput& movement, float aspect);
       void update() override;

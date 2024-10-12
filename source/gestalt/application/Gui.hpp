@@ -19,6 +19,7 @@ namespace gestalt::application {
       std::function<ComponentFactory&()> get_component_factory;
       std::function<RenderConfig&()> get_render_config;
       std::function<std::shared_ptr<TextureHandle>()> get_debug_image;
+      std::function<void(Entity)> set_active_camera;
     };
 
     class Gui: public NonCopyable<Gui> {
@@ -41,9 +42,11 @@ namespace gestalt::application {
       bool show_tone_map_settings = false;
       bool show_guizmo_ = true;
       bool show_lights_ = false;
+      bool show_cameras_ = false;
 
       void menu_bar();
       void lights();
+      void cameras();
       void scene_graph();
       void display_scene_hierarchy(Entity entity);
       void show_transform_component(NodeComponent& node, TransformComponent& transform);
