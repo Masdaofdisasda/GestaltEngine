@@ -1,8 +1,7 @@
 ﻿#pragma once
 #include <glm/gtc/quaternion.hpp>
 
-#include "AnimationChannel.hpp"
-#include "common.hpp"
+#include "Animation/AnimationChannel.hpp"
 
 namespace gestalt::foundation {
 

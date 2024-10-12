@@ -69,21 +69,9 @@ namespace gestalt::application {
               FirstPersonCamera::update(delta_time, movement, camera_data);
               transform_component.rotation = camera_data.orientation;
             } else if constexpr (std::is_same_v<T, AnimationCameraData>) {
-              float radius = 5.f;
-              float speed = 0.03f;
-              float alpha = time_ * speed;
-              float x = radius * sin(alpha);
-              float z = radius * cos(alpha);
-              camera_data.position = glm::vec3(x,camera_data.position.y,z);
-
-              const glm::vec3 forward_direction
-                  = -normalize(glm::vec3(cos(alpha), 0.0f, -sin(alpha)));
-              float yaw = atan2(forward_direction.x, forward_direction.z);
-
-              camera_data.set_euler_angles(0.0f, -yaw, 0.0f);
+              camera_data.position = transform_component.position;
+              camera_data.orientation = transform_component.rotation;
               MoveToCamera::update(delta_time, movement, camera_data);
-              transform_component.position = camera_data.position;
-              transform_component.rotation = camera_data.orientation;
               time_ += delta_time;
             }
           },
@@ -121,24 +109,28 @@ namespace gestalt::application {
             }
           },
           camera_component.camera_data);
-      glm::mat4 projection;
-      if (camera_component.projection == kPerspective) {
-        projection = glm::perspective(glm::radians(fov_), aspect_ratio_, near_plane_, far_plane_);
 
-      // invert the Y direction on projection matrix so that we are more similar
-      // to opengl and gltf axis
+      float32 near = 0.1f;
+      float32 far = 10000.f;
+      glm::mat4 projection = std::visit(
+          [&]<typename ProjectionDataType>(const ProjectionDataType& projection_data) -> glm::mat4 {
+            using T = std::decay_t<ProjectionDataType>;
+            if constexpr (std::is_same_v<T, PerspectiveProjectionData>) {
+              near = projection_data.near;
+              far = projection_data.far;
+              return glm::perspective(glm::radians(projection_data.fov), aspect_ratio_,
+                                           projection_data.near, projection_data.far);
+            } else if constexpr (std::is_same_v<T, OrthographicProjectionData>) {
+              near = projection_data.near;
+              far = projection_data.far;
+              return glm::ortho(projection_data.left, projection_data.right, projection_data.bottom,
+                                projection_data.top, projection_data.near, projection_data.far);
+            } else {
+              return glm::mat4(1.0f);
+            }
+          },
+          camera_component.projection_data);
       projection[1][1] *= -1;
-
-      } else if (camera_component.projection == kOrthographic) {
-        //TODO this is broken
-        float ortho_width = 5.f; 
-        float ortho_height = ortho_width / aspect_ratio_;
-        float left = -ortho_width / 2.0f;
-        float right = ortho_width / 2.0f;
-        float bottom = -ortho_height / 2.0f;
-        float top = ortho_height / 2.0f;
-        projection = glm::ortho(left, right, bottom, top, near_plane_, far_plane_);
-    }
 
       glm::mat4 projection_t = transpose(projection);
       camera_component.view_matrix = view_matrix;
@@ -154,8 +146,8 @@ namespace gestalt::application {
         buffers->data[frame].cullView = view_matrix;
         buffers->data[frame].cullProj = projection;
 
-        buffers->data[frame].znear = near_plane_;
-        buffers->data[frame].zfar = far_plane_;
+        buffers->data[frame].znear = near;
+        buffers->data[frame].zfar = far;
 
         buffers->data[frame].frustum[0] = NormalizePlane(projection_t[3] + projection_t[0]);
         buffers->data[frame].frustum[1] = NormalizePlane(projection_t[3] - projection_t[0]);

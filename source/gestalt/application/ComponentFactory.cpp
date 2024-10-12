@@ -3,6 +3,10 @@
 
 #include <fmt/core.h>
 
+#include "Camera/AnimationCameraData.hpp"
+#include "Camera/AnimationCameraData.hpp"
+#include "Camera/AnimationCameraData.hpp"
+#include "Camera/AnimationCameraData.hpp"
 #include "Components/PhysicsComponent.hpp"
 #include "Mesh/MeshSurface.hpp"
 
@@ -152,35 +156,39 @@ namespace gestalt::application {
     }
 
   Entity ComponentFactory::add_free_fly_camera(const glm::vec3& position,
-                                                    const glm::vec3& direction, const glm::vec3& up, Entity entity) const {
-      const auto free_fly_component = CameraComponent(
-          kPerspective,
+                                                 const glm::vec3& direction, const glm::vec3& up,
+                                                 const Entity entity,
+                                                 const ProjectionData projection_data) const {
+      const auto free_fly_component
+          = CameraComponent(projection_data,
           FreeFlyCameraData(position, direction, up));
       repository_->camera_components.add(entity, free_fly_component);
 
       return entity;
   }
 
-  Entity ComponentFactory::add_animation_camera(const glm::vec3& position, const glm::vec3& angles,
-                                                Entity entity) const {
-    const auto animation_component = CameraComponent(kPerspective, AnimationCameraData(position, angles));
+  Entity ComponentFactory::add_animation_camera(const glm::vec3& position, const glm::quat& orientation, const Entity entity,
+                                                const ProjectionData projection_data) const {
+    const auto animation_component
+        = CameraComponent(projection_data, AnimationCameraData(position, orientation));
     repository_->camera_components.add(entity, animation_component);
 
     return entity;
   }
 
-  Entity ComponentFactory::add_orbit_camera(const glm::vec3& target, Entity entity) const {
-      const auto orbit_component = CameraComponent(
-          kPerspective,
+  Entity ComponentFactory::add_orbit_camera(const glm::vec3& target, const Entity entity,
+                                            const ProjectionData projection_data) const {
+    const auto orbit_component = CameraComponent(projection_data,
           OrbitCameraData(target));
       repository_->camera_components.add(entity, orbit_component);
 
       return entity;
     }
 
-  Entity ComponentFactory::add_first_person_camera(const glm::vec3& position, Entity entity) const {
+  Entity ComponentFactory::add_first_person_camera(const glm::vec3& position, const Entity entity,
+                                                     const ProjectionData projection_data) const {
       const auto first_person_component = CameraComponent(
-          kPerspective,
+          projection_data,
           FirstPersonCameraData(position, glm::vec3(0.f,1.f, 0.f)));
       repository_->camera_components.add(entity, first_person_component);
 

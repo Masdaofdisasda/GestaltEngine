@@ -157,8 +157,8 @@ namespace gestalt::application {
       proj[1][1] *= -1;  // Flip the Y-axis for opengl like system
 
       // Convert glm matrices to arrays for ImGuizmo
-      float* view = value_ptr(viewCam);
-      float* projection = value_ptr(proj);
+      float* view = glm::value_ptr(viewCam);
+      float* projection = glm::value_ptr(proj);
       float model[16];
 
       // Setup for using Gizmo without a separate window
@@ -179,14 +179,14 @@ namespace gestalt::application {
       if (transform_component.has_value()) {
         auto& transform = transform_component.value().get();
 
-        glm::mat4 localTransform = translate(glm::mat4(1.0f), transform.position)
+        glm::mat4 localTransform = glm::translate(glm::mat4(1.0f), transform.position)
                                    * toMat4(transform.rotation)
-                                   * scale(glm::mat4(1.0f), glm::vec3(transform.scale));
+                                   * glm::scale(glm::mat4(1.0f), glm::vec3(transform.scale));
         glm::mat4 parentWorldTransform
-            = translate(glm::mat4(1.0f), transform.parent_position)
+            = glm::translate(glm::mat4(1.0f), transform.parent_position)
               * toMat4(transform.parent_rotation)
-              * scale(glm::mat4(1.0f), glm::vec3(transform.parent_scale));
-        glm::mat4 inverseParentWorldTransform = inverse(parentWorldTransform);
+              * glm::scale(glm::mat4(1.0f), glm::vec3(transform.parent_scale));
+        glm::mat4 inverseParentWorldTransform = glm::inverse(parentWorldTransform);
         glm::mat4 worldTransform = parentWorldTransform * localTransform;
 
         glm::vec3 t = glm::vec3(worldTransform[3]);
@@ -977,25 +977,68 @@ namespace gestalt::application {
         }
 
         // Update rotation quaternion based on user input
-        transform.rotation = glm::quat(radians(glm::vec3(-elevation, azimuth, 0.0f)));
+        transform.rotation = glm::quat(glm::radians(glm::vec3(-elevation, azimuth, 0.0f)));
       }
     }
 
     void Gui::show_camera_component(CameraComponent& camera) {
-      const char* camera_type_items[] = {"Perspective", "Orthographic"};
-      int camera_type_index = static_cast<int>(camera.projection);
-      if (ImGui::Combo("Camera Type", &camera_type_index, camera_type_items,
-                       IM_ARRAYSIZE(camera_type_items))) {
-        camera.projection = static_cast<CameraProjectionType>(camera_type_index);
-      }
+      std::visit(
+          [&](auto&& projection) {
+            using T = std::decay_t<decltype(projection)>;
+            if constexpr (std::is_same_v<T, PerspectiveProjectionData>) {
+              ImGui::Text("Perspective Projection:");
+              ImGui::SliderFloat("Field of View", &projection.fov, 30.0f, 120.0f, "%.1f");
+              ImGui::SliderFloat("Near Clip", &projection.near, 0.01f, 10.0f, "%.2f");
+              ImGui::SliderFloat("Far Clip", &projection.far, 10.0f, 10000.0f, "%.2f");
+            } else if constexpr (std::is_same_v<T, OrthographicProjectionData>) {
+              ImGui::Text("Orthographic Projection:");
+              ImGui::SliderFloat("Left", &projection.left, -100.0f, 100.0f, "%.2f");
+              ImGui::SliderFloat("Right", &projection.right, -100.0f, 100.0f, "%.2f");
+              ImGui::SliderFloat("Bottom", &projection.bottom, -100.0f, 100.0f, "%.2f");
+              ImGui::SliderFloat("Top", &projection.top, -100.0f, 100.0f, "%.2f");
+              ImGui::SliderFloat("Near Clip", &projection.near, 0.01f, 10.0f, "%.2f");
+              ImGui::SliderFloat("Far Clip", &projection.far, 10.0f, 10000.0f, "%.2f");
+            }
+          },
+          camera.projection_data);
+      ImGui::Separator();
+      std::visit(
+          [&](auto&& cam) {
+            using T = std::decay_t<decltype(cam)>;
 
-      // UI for Camera Positioner Type
-      const char* positioner_type_items[] = {"Free Fly", "Orbit", "First Person", "Animation"};
-      int positioner_type_index = static_cast<int>(camera.positioner);
-      if (ImGui::Combo("Positioner Type", &positioner_type_index, positioner_type_items,
-                       IM_ARRAYSIZE(positioner_type_items))) {
-        //camera.positioner = static_cast<CameraPositionerType>(positioner_type_index);
-      }
+            if constexpr (std::is_same_v<T, FreeFlyCameraData>) {
+              ImGui::Text("FreeFly Camera:");
+              ImGui::SliderFloat("Mouse Speed", &cam.mouse_speed, 0.1f, 10.0f, "%.2f");
+              ImGui::SliderFloat("Acceleration", &cam.acceleration, 0.01f, 1.0f, "%.2f");
+              ImGui::SliderFloat("Damping", &cam.damping, 0.1f, 100.0f, "%.2f");
+              ImGui::SliderFloat("Max Speed", &cam.max_speed, 0.01f, 10.0f, "%.2f");
+              ImGui::SliderFloat("Fast Coefficient", &cam.fast_coef, 0.1f, 10.0f, "%.2f");
+              ImGui::SliderFloat("Slow Coefficient", &cam.slow_coef, 0.0001f, 1.0f, "%.4f");
+            } else if constexpr (std::is_same_v<T, FirstPersonCameraData>) {
+              ImGui::Text("FirstPerson Camera:");
+              ImGui::SliderFloat("Mouse Speed", &cam.mouse_speed, 0.1f, 10.0f, "%.2f");
+              ImGui::Text("Up Vector: (%.2f, %.2f, %.2f)", cam.up.x, cam.up.y,
+                          cam.up.z);  // Display Up Vector
+            } else if constexpr (std::is_same_v<T, OrbitCameraData>) {
+              ImGui::Text("Orbit Camera:");
+              ImGui::SliderFloat("Distance", &cam.distance, cam.min_distance, cam.max_distance,
+                                 "%.2f");
+              ImGui::SliderFloat("Yaw", &cam.yaw, -180.0f, 180.0f, "%.2f");
+              ImGui::SliderFloat("Pitch", &cam.pitch, -90.0f, 90.0f, "%.2f");
+              ImGui::SliderFloat("Orbit Speed", &cam.orbit_speed, 0.1f, 10.0f, "%.2f");
+              ImGui::SliderFloat("Zoom Speed", &cam.zoom_speed, 0.01f, 1.0f, "%.2f");
+              ImGui::SliderFloat("Pan Speed", &cam.pan_speed, 0.1f, 100.0f, "%.2f");
+              ImGui::Text("Target: (%.2f, %.2f, %.2f)", cam.target.x, cam.target.y,
+                          cam.target.z);  // Display Target
+            } else if constexpr (std::is_same_v<T, AnimationCameraData>) {
+              ImGui::Text("Animation Camera:");
+              ImGui::Text("Current Position: (%.2f, %.2f, %.2f)", cam.position.x, cam.position.y,
+                          cam.position.z);
+              ImGui::Text("Current Orientation (Quat): (%.2f, %.2f, %.2f, %.2f)", cam.orientation.x,
+                          cam.orientation.y, cam.orientation.z, cam.orientation.w);
+            }
+          },
+          camera.camera_data);
     }
 
     void Gui::show_node_component() {

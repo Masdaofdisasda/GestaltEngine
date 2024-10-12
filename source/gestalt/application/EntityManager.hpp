@@ -64,14 +64,22 @@ namespace gestalt::application {
       Entity create_point_light(const glm::vec3& color, float intensity, const glm::vec3& position,
                                 float32 range, Entity parent = 0);
       Entity add_free_fly_camera(const glm::vec3& position, const glm::vec3& direction,
-                                 const glm::vec3& up, Entity entity) const;
+                                 const glm::vec3& up, Entity entity,
+                                 ProjectionData projection_data
+                                 = PerspectiveProjectionData(70.f, 1.0f, 0.1f, 10000.f)) const;
 
-      Entity add_animation_camera(const glm::vec3& position, const glm::vec3& angles,
-                                  Entity entity) const;
+      Entity add_animation_camera(const glm::vec3& position, const glm::quat& orientation,
+                                  Entity entity,
+                                  ProjectionData projection_data
+                                  = PerspectiveProjectionData(70.f, 1.0f, 0.1f, 10000.f)) const;
 
-      Entity add_orbit_camera(const glm::vec3& target, Entity entity) const;
+      Entity add_orbit_camera(const glm::vec3& target, Entity entity,
+                              ProjectionData projection_data
+                              = PerspectiveProjectionData(70.f, 1.0f, 0.1f, 10000.f)) const;
 
-      Entity add_first_person_camera(const glm::vec3& position, Entity entity) const;
+      Entity add_first_person_camera(const glm::vec3& position, Entity entity,
+                                     ProjectionData projection_data
+                                     = PerspectiveProjectionData(70.f, 1.0f, 0.1f, 10000.f)) const;
 
       void link_entity_to_parent(Entity child, Entity parent);
     };

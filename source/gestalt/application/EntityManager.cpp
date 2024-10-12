@@ -32,11 +32,6 @@ namespace gestalt::application {
     repository_->transform_components[player].position = glm::vec3(0, 20.f, 0);
     component_factory_->create_physics_component(player, DYNAMIC, CapsuleCollider{.9f, 1.8f});
 
-    auto [animation_cam, animation_cam_node]
-        = component_factory_->create_entity("Animation Camera");
-    component_factory_->link_entity_to_parent(animation_cam, root_entity_);
-    component_factory_->add_animation_camera(glm::vec3(0.f,2.f,5.f), glm::vec3(0.f,0.f,0.f), animation_cam);
-
       auto [floor, floor_node] = component_factory_->create_entity("Floor");
       component_factory_->link_entity_to_parent(floor, root_entity_);
       component_factory_->create_physics_component(floor, STATIC,

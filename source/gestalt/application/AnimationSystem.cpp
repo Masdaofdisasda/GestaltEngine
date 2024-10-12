@@ -1,6 +1,4 @@
 ﻿#include "SceneSystem.hpp"
-#include "Animation/AnimationComponent.hpp"
-#include "Animation/AnimationComponent.hpp"
 
 namespace gestalt::application {
 
@@ -87,7 +85,7 @@ namespace gestalt::application {
         = (current_time - start_keyframe.time) / (end_keyframe.time - start_keyframe.time);
 
     // Linearly interpolate the translation between the two keyframes
-    const glm::quat interpolated_rotation = mix(start_keyframe.value, end_keyframe.value, t);
+    const glm::quat interpolated_rotation = glm::mix(start_keyframe.value, end_keyframe.value, t);
 
     repository_->transform_components[entity].rotation = interpolated_rotation;
 

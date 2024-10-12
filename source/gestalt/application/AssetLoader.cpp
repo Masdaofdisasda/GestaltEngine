@@ -1,4 +1,5 @@
-﻿#include <stb_image.h>
+﻿#include <iso646.h>
+#include <stb_image.h>
 
 #include <fastgltf/core.hpp>
 #include <fastgltf/glm_element_traits.hpp>
@@ -412,6 +413,29 @@ namespace gestalt::application {
           // TODO
         }
 
+        if (node.cameraIndex.has_value()) {
+          fastgltf::Camera cam = gltf.cameras.at(node.cameraIndex.value());
+          if (std::holds_alternative<fastgltf::Camera::Perspective>(cam.camera)) {
+            const auto& perspective = std::get<fastgltf::Camera::Perspective>(cam.camera);
+            const float32 aspect_ratio = perspective.aspectRatio.value_or(1.f);
+            const float32 fov = perspective.yfov;
+            const float32 near = perspective.znear;
+            const float32 far = perspective.zfar.value_or(10000.f);
+            component_factory->add_animation_camera(
+                position, orientation, entity,
+                PerspectiveProjectionData{fov, aspect_ratio, near, far});
+          } else if (std::holds_alternative<fastgltf::Camera::Orthographic>(cam.camera)) {
+            const auto& ortho = std::get<fastgltf::Camera::Orthographic>(cam.camera);
+            const float32 xmag = ortho.xmag;
+            const float32 ymag = ortho.ymag;
+            const float32 near = ortho.znear;
+            const float32 far = ortho.zfar;
+            component_factory->add_animation_camera(
+                position, orientation, entity,
+                OrthographicProjectionData{xmag, ymag, near, far});
+          }
+        }
+
         if (node.meshIndex.has_value()) {
           component_factory->add_mesh_component(entity, mesh_offset + *node.meshIndex);
         }
@@ -482,8 +506,6 @@ namespace gestalt::application {
     import_materials(gltf, image_offset);
 
     import_lights(gltf);
-
-    //TODO import_cameras(gltf);
 
     import_animations(gltf, node_offset);
 

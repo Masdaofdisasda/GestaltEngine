@@ -4,11 +4,11 @@
 #include <optional>
 #include <unordered_map>
 
-#include "Animation/AnimationComponent.hpp"
 #include "Buffer/LightBuffer.hpp"
 #include "Buffer/MaterialBuffer.hpp"
 #include "Buffer/MeshBuffer.hpp"
 #include "Buffer/PerFrameDataBuffer.hpp"
+#include "Components/AnimationComponent.hpp"
 #include "Components/CameraComponent.hpp"
 #include "Components/Entity.hpp"
 #include "Components/LightComponent.hpp"
