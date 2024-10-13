@@ -7,12 +7,39 @@
 layout(location = 0) in vec3 TexCoords;
 layout(location = 0) out vec4 FragColor;
 
-layout(set = 1, binding = 1) buffer DirLight{
+struct ViewProjData {
+	mat4 view;
+    mat4 proj;
+}; 
+
+struct DirectionalLight {
 	vec3 color;
 	float intensity;
 	vec3 direction;
 	int viewProjIndex;
-} dirLight[2];
+}; 
+
+struct PointLight {
+	vec3 color;
+	float intensity;
+	vec3 position;
+	float range;
+}; 
+
+layout(set = 1, binding = 0) readonly buffer LightViewProj
+{
+	ViewProjData viewProjData[];
+};
+
+layout(set = 1, binding = 1) readonly buffer DirectionalLightBuffer
+{
+	DirectionalLight dirLight[];
+};
+
+layout(set = 1, binding = 2) readonly buffer PointLightBuffer
+{
+	PointLight pointLight[];
+};
 
 layout( push_constant ) uniform constants
 {

@@ -1,0 +1,144 @@
+#version 460
+
+#extension GL_GOOGLE_include_directive : require
+#extension GL_EXT_mesh_shader  : require
+#extension GL_ARB_shader_draw_parameters : require
+#extension GL_EXT_shader_16bit_storage : require
+#extension GL_EXT_shader_8bit_storage: require
+#extension GL_EXT_shader_explicit_arithmetic_types: require
+#extension GL_EXT_shader_explicit_arithmetic_types_float16: require
+
+#include "per_frame_structs.glsl"
+#include "meshlet_structs.glsl"
+#include "math.glsl"
+
+layout(local_size_x = MESH_WGSIZE, local_size_y = 1, local_size_z = 1) in;
+layout(triangles, max_vertices = MESH_MAXVTX, max_primitives = MESH_MAXTRI) out;
+
+taskPayloadSharedEXT MeshTaskPayload payload;
+
+layout( push_constant ) uniform constants
+{
+    int cullFlags;
+	float pyramidWidth, pyramidHeight; // depth pyramid size in texels
+	int clusterOcclusionEnabled;
+} PushConstants;
+
+struct ViewProjData {
+	mat4 view;
+    mat4 proj;
+}; 
+
+struct DirectionalLight {
+	vec3 color;
+	float intensity;
+	vec3 direction;
+	int viewProjIndex;
+}; 
+
+struct PointLight {
+	vec3 color;
+	float intensity;
+	vec3 position;
+	float range;
+}; 
+
+layout(set = 1, binding = 0) readonly buffer LightViewProj
+{
+	ViewProjData viewProjData[];
+};
+
+layout(set = 1, binding = 1) readonly buffer DirectionalLightBuffer
+{
+	DirectionalLight dirLight[];
+};
+
+layout(set = 1, binding = 2) readonly buffer PointLightBuffer
+{
+	PointLight pointLight[];
+};
+
+layout(set = 2, binding = 0) readonly buffer VertexPositionBuffer{ 
+	VertexPosition vertex_positions[];
+};
+
+layout(set = 2, binding = 1) readonly buffer VertexDataBuffer{ 
+	VertexData vertex_data[];
+};
+
+layout(set = 2, binding = 2) readonly buffer Meshlets
+{
+    Meshlet meshlets[];
+};
+
+layout(set = 2, binding = 3) readonly buffer MeshletVertexBuffer
+{
+    int meshletVertices[];
+};
+
+layout(set = 2, binding = 4) readonly buffer MeshletIndexBuffer
+{
+    uint8_t meshletIndices[];
+};
+
+layout(set = 2, binding = 6) readonly buffer Draws
+{
+    MeshDraw draws[];
+};
+
+void main()
+{
+    uint ti = gl_LocalInvocationIndex;
+    uint mi = payload.meshletIndices[gl_WorkGroupID.x]; // Retrieve meshlet index from payload
+
+    MeshDraw meshDraw = draws[payload.drawId];
+
+    uint vertexCount = uint(meshlets[mi].vertexCount); // Number of vertices in the meshlet
+    uint triangleCount = uint(meshlets[mi].triangleCount); // Number of triangles in the meshlet
+    
+    // Set the number of vertices and triangles for the meshlet
+    SetMeshOutputsEXT(vertexCount, triangleCount);
+
+    uint vertexOffset = meshlets[mi].vertexOffset;
+    uint indexOffset = meshlets[mi].indexOffset;
+    
+    // Process each vertex in the meshlet
+    for (uint i = ti; i < vertexCount; )
+    {
+        uint vi = meshletVertices[vertexOffset + i] + meshDraw.vertexOffset;
+
+        VertexPosition v = vertex_positions[vi];
+        VertexData data = vertex_data[vi];
+
+        DirectionalLight light = dirLight[0];
+        mat4 lightView = viewProjData[light.viewProjIndex].view;
+        mat4 lightProj = viewProjData[light.viewProjIndex].proj;
+
+        vec3 position = transform(v.position, meshDraw.position, meshDraw.scale, meshDraw.orientation);
+        vec4 clip = lightProj * lightView * vec4(position, 1.0);
+        gl_MeshVerticesEXT[i].gl_Position = clip;
+
+	#if MESH_MAXVTX <= MESH_WGSIZE
+		break;
+	#else
+		i += MESH_WGSIZE;
+	#endif
+    }
+    
+    // Process each triangle in the meshlet
+    for (uint i = ti; i < triangleCount; )
+    {
+        //uint offset = indexOffset * 4 + i * 3;
+        uint offset = indexOffset + i * 3;
+        uint a = uint(meshletIndices[offset]), b = uint(meshletIndices[offset + 1]), c = uint(meshletIndices[offset + 2]);
+
+        gl_PrimitiveTriangleIndicesEXT[i] = uvec3(a, b, c);
+
+        
+	#if MESH_MAXTRI <= MESH_WGSIZE
+		break;
+	#else
+		i += MESH_WGSIZE;
+	#endif
+    }
+}

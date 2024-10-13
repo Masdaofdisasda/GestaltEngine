@@ -14,6 +14,10 @@ layout(location = 0) in vec2 texCoord;
 
 layout (location = 0) out vec4 outFragColor;
 
+struct ViewProjData {
+	mat4 view;
+    mat4 proj;
+}; 
 
 struct DirectionalLight {
 	vec3 color;
@@ -31,7 +35,7 @@ struct PointLight {
 
 layout(set = 2, binding = 0) readonly buffer LightViewProj
 {
-	mat4 viewProj[];
+	ViewProjData viewProjData[];
 };
 
 layout(set = 2, binding = 1) readonly buffer DirectionalLightBuffer
@@ -118,7 +122,9 @@ void main() {
 	vec3 viewPos = -normalize(vec3(view[0][2], view[1][2], view[2][2]));
 
     // Transform world position to light space
-	mat4 lightViewProj = viewProj[dirLight[0].viewProjIndex];
+	mat4 lightView = viewProjData[dirLight[0].viewProjIndex].view;
+	mat4 lightProj = viewProjData[dirLight[0].viewProjIndex].proj;
+	mat4 lightViewProj = lightProj * lightView;
     vec4 lightSpacePos = biasMat * lightViewProj * vec4(worldPos, 1.0);
 
 	float shadow = 1.0;

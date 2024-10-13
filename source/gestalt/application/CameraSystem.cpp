@@ -77,7 +77,7 @@ namespace gestalt::application {
           camera_component.camera_data);
     }
 
-    glm::vec4 NormalizePlane(glm::vec4 p) { return p / length(glm::vec3(p)); }
+    inline glm::vec4 NormalizePlane(glm::vec4 p) { return p / length(glm::vec3(p)); }
 
   
     glm::mat4 PerspectiveProjection(float fovY, float aspectWbyH, float zNear) {
@@ -110,7 +110,7 @@ namespace gestalt::application {
           camera_component.camera_data);
 
       float32 near = 0.1f;
-      float32 far = 10000.f;
+      float32 far = 1000.f;
       glm::mat4 projection = std::visit(
           [&]<typename ProjectionDataType>(const ProjectionDataType& projection_data) -> glm::mat4 {
             using T = std::decay_t<ProjectionDataType>;
@@ -156,6 +156,35 @@ namespace gestalt::application {
         buffers->data[frame].frustum[4] = NormalizePlane(projection_t[3] + projection_t[2]);
         buffers->data[frame].frustum[5] = NormalizePlane(projection_t[3] - projection_t[2]);
       }
+
+      if (false) {
+        const glm::mat4 view_matrix = repository_->light_view_projections.get(0).view;
+        glm::mat4 projection = repository_->light_view_projections.get(0).proj;
+
+        glm::mat4 projection_t = transpose(projection);
+        camera_component.view_matrix = view_matrix;
+        camera_component.projection_matrix = projection;
+        buffers->data[frame].view = view_matrix;
+        buffers->data[frame].proj = projection;
+        buffers->data[frame].inv_view = inverse(view_matrix);
+        buffers->data[frame].inv_viewProj = inverse(projection * view_matrix);
+        buffers->data[frame].P00 = projection_t[0][0];
+        buffers->data[frame].P11 = projection_t[1][1];
+
+        buffers->data[frame].cullView = view_matrix;
+        buffers->data[frame].cullProj = projection;
+
+        buffers->data[frame].znear = near;
+        buffers->data[frame].zfar = far;
+
+        buffers->data[frame].frustum[0] = NormalizePlane(projection_t[3] + projection_t[0]);
+        buffers->data[frame].frustum[1] = NormalizePlane(projection_t[3] - projection_t[0]);
+        buffers->data[frame].frustum[2] = NormalizePlane(projection_t[3] + projection_t[1]);
+        buffers->data[frame].frustum[3] = NormalizePlane(projection_t[3] - projection_t[1]);
+        buffers->data[frame].frustum[4] = NormalizePlane(projection_t[3] + projection_t[2]);
+        buffers->data[frame].frustum[5] = NormalizePlane(projection_t[3] - projection_t[2]);
+      }
+
       void* mapped_data;
       const VmaAllocation allocation = buffers->uniform_buffers[frame]->allocation;
       VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation, &mapped_data));

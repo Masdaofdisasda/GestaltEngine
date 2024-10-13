@@ -4,12 +4,26 @@
 #include "VulkanTypes.hpp"
 
 namespace gestalt::graphics {
-    class DirectionalDepthPass final : public RenderPass {
+    class DrawCullDirectionalDepthPass final : public RenderPass {
+      public:
+      void prepare() override;
+      void destroy() override;
+      void execute(VkCommandBuffer cmd) override;
+      std::string get_name() const override { return "Draw Cull Direction Depth Pass"; }
+    };
+    class TaskSubmitDirectionalDepthPass final : public RenderPass {
+      public:
+      void prepare() override;
+      void destroy() override;
+      void execute(VkCommandBuffer cmd) override;
+      std::string get_name() const override { return "Task Submit Direction Depth Pass"; }
+    };
+    class MeshletDirectionalDepthPass final : public RenderPass {
     public:
       void prepare() override;
       void destroy() override;
       void execute(VkCommandBuffer cmd) override;
-      std::string get_name() const override { return "Direction Depth Pass"; }
+      std::string get_name() const override { return "Meshlet Direction Depth Pass"; }
     };
     class DrawCullPass final : public RenderPass {
       public:

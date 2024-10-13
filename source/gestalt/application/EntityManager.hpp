@@ -70,22 +70,22 @@ namespace gestalt::application {
                                  const glm::vec3& up, Entity entity,
                                  ProjectionData projection_data
                                  = PerspectiveProjectionData(kDefaultFov, 1.0f, 0.1f,
-                                                             10000.f)) const;
+                                                             1000.f)) const;
 
       Entity add_animation_camera(const glm::vec3& position, const glm::quat& orientation,
                                   Entity entity,
                                   ProjectionData projection_data
                                   = PerspectiveProjectionData(kDefaultFov, 1.0f, 0.1f,
-                                                              10000.f)) const;
+                                                              1000.f)) const;
 
       Entity add_orbit_camera(const glm::vec3& target, Entity entity,
                               ProjectionData projection_data
-                              = PerspectiveProjectionData(kDefaultFov, 1.0f, 0.1f, 10000.f)) const;
+                              = PerspectiveProjectionData(kDefaultFov, 1.0f, 0.1f, 1000.f)) const;
 
       Entity add_first_person_camera(const glm::vec3& position, Entity entity,
                                      ProjectionData projection_data
                                      = PerspectiveProjectionData(kDefaultFov, 1.0f, 0.1f,
-                                                                 10000.f)) const;
+                                                                 1000.f)) const;
 
       void link_entity_to_parent(Entity child, Entity parent);
     };

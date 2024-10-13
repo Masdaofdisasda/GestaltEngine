@@ -23,6 +23,7 @@
 #include "Mesh/Meshlet.hpp"
 #include "Resources/GpuDirectionalLight.hpp"
 #include "Resources/GpuPointLight.hpp"
+#include "Resources/GpuProjViewData.hpp"
 #include "Resources/GpuVertexData.hpp"
 #include "Resources/GpuVertexPosition.hpp"
 #include "Resources/TextureHandle.hpp"
@@ -139,7 +140,7 @@ namespace gestalt::foundation {
     GpuDataContainer<Meshlet> meshlets;
     GpuDataContainer<uint32> meshlet_vertices;
     GpuDataContainer<uint8> meshlet_triangles;
-    GpuDataContainer<glm::mat4> light_view_projections;
+    GpuDataContainer<GpuProjViewData> light_view_projections;
     GpuDataContainer<GpuDirectionalLight> directional_lights;
     GpuDataContainer<GpuPointLight> point_lights;
     GpuDataContainer<TextureHandle> textures;

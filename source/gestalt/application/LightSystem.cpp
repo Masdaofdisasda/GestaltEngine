@@ -1,11 +1,16 @@
-﻿#include "SceneSystem.hpp"
+﻿#include "FrameProvider.hpp"
+#include "SceneSystem.hpp"
 
 #include "VulkanCheck.hpp"
+#include "Camera/AnimationCameraData.hpp"
 #include "Interface/IDescriptorLayoutBuilder.hpp"
 #include "Interface/IGpu.hpp"
 #include "Interface/IResourceManager.hpp"
+#include "Resources/GpuProjViewData.hpp"
 
 namespace gestalt::application {
+
+  inline size_t GetMaxViewProjMatrices() { return getMaxPointLights() * 6 + getMaxDirectionalLights(); }
 
   void LightSystem::prepare() {
 
@@ -27,12 +32,17 @@ namespace gestalt::application {
     const auto descriptor_layout
         = descriptor_layout_builder_
               ->add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                            VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, false,
-                            getMaxLights())
-              .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
-                           false, getMaxDirectionalLights())
-              .add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT,
-                           false, getMaxPointLights())
+                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT
+                                | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT
+                                | VK_SHADER_STAGE_FRAGMENT_BIT)
+              .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT
+                               | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT
+                               | VK_SHADER_STAGE_FRAGMENT_BIT)
+              .add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT
+                               | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT
+                               | VK_SHADER_STAGE_FRAGMENT_BIT)
               .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
 
 
@@ -40,8 +50,9 @@ namespace gestalt::application {
         descriptor_layout, 3, 0);
     vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layout, nullptr);
 
+    // for each directional light we need a view and a projection matrix
     light_data->view_proj_matrices = resource_manager_->create_buffer(
-        sizeof(glm::mat4) * (getMaxDirectionalLights() + 6 * getMaxPointLights()),
+        sizeof(GpuProjViewData) * GetMaxViewProjMatrices(),
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
         VMA_MEMORY_USAGE_CPU_TO_GPU, "Light Matrix Buffer");
     light_data->dir_light_buffer = resource_manager_->create_buffer(
@@ -61,7 +72,7 @@ namespace gestalt::application {
     light_data->descriptor_buffer
         ->write_buffer(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                        light_data->view_proj_matrices->address,
-                       sizeof(glm::mat4) * getMaxDirectionalLights())
+                       sizeof(GpuProjViewData) * GetMaxViewProjMatrices())
         .write_buffer(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, light_data->dir_light_buffer->address,
                       sizeof(GpuDirectionalLight) * getMaxDirectionalLights())
         .write_buffer(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, light_data->point_light_buffer->address,
@@ -69,32 +80,70 @@ namespace gestalt::application {
         .update();
   }
 
-  glm::mat4 LightSystem::calculate_sun_view_proj(const glm::vec3 direction) const {
+  glm::mat4 LightSystem::calculate_directional_light_view_matrix(const glm::vec3 direction) const {
     auto& [min, max, is_dirty] = repository_->scene_graph.get(root_entity).value().get().bounds;
 
-    glm::vec3 center = (min + max) * 0.5f;
+    const glm::vec3 center = (min + max) * 0.5f;
     glm::vec3 size = max - min;
-    float radius = length(size) * 0.5f;
-    glm::vec3 lightPosition = center + direction * radius;
+    size = glm::max(size, glm::vec3(1.f));
+    const float radius = length(size) * 0.5f;
 
-    // Calculate the tight orthographic frustum
-    float halfWidth = radius;       // Width of the frustum
-    float halfHeight = radius;      // Height of the frustum
-    float nearPlane = 0.1f;         // Near plane distance
-    float farPlane = radius * 2.f;  // Far plane distance
+    const glm::vec3 lightDirection = glm::normalize(-direction);
+    const glm::vec3 lightPosition
+        = center - lightDirection * radius;       // Position the light behind the scene
 
-    // Calculate the view matrix for the light
-    glm::mat4 lightView = lookAt(lightPosition, center, glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::vec3 up = glm::vec3(0.f, 1.f, 0.f);
+    if (dot(up, direction) < 0.0001f) {
+      up = glm::vec3(0.f, 0.f, 1.f);
+    }
+
+    return glm::lookAt(lightPosition, center, up);
+  }
+
+  glm::mat4 LightSystem::calculate_directional_light_proj_matrix(glm::mat4 light_view) const {
+    glm::mat4 inv_cam = repository_->per_frame_data_buffers.get()
+                            ->data.at(frame_->get_current_frame_index())
+                            .inv_viewProj;
+    const glm::vec4 ndcCorners[8] = {
+      {-1, -1, 0, 1},
+      {1, -1, 0, 1},
+      {1, 1, 0, 1},
+      {-1, 1, 0, 1},
+      {-1, -1, 1, 1},
+      {1, -1, 1, 1},
+      {1, 1, 1, 1},
+      {-1, 1, 1, 1}};
+
+    glm::vec3 worldCorners[8];
+    for (int i = 0; i < 8; ++i) {
+      glm::vec4 worldPos = inv_cam * ndcCorners[i];
+      worldCorners[i] = glm::vec3(worldPos) / worldPos.w;  // Perspective divide
+    }
+
+    glm::mat4 light_view_inv = glm::inverse(light_view);
+    glm::vec3 lightSpaceCorners[8];
+    for (int i = 0; i < 8; ++i) {
+      lightSpaceCorners[i] = glm::vec3(light_view_inv * glm::vec4(worldCorners[i], 1.0f));
+    }
+
+    glm::vec3 minCorner = glm::vec3(std::numeric_limits<float>::max());
+    glm::vec3 maxCorner = glm::vec3(std::numeric_limits<float>::lowest());
+
+    for (int i = 0; i < 8; ++i) {
+      minCorner = glm::min(minCorner, lightSpaceCorners[i]);
+      maxCorner = glm::max(maxCorner, lightSpaceCorners[i]);
+    }
 
     // Calculate the projection matrix for the light
-    glm::mat4 lightProjection
-        = glm::orthoRH_ZO(-halfWidth, halfWidth, -halfHeight, halfHeight, nearPlane, farPlane);
+    return glm::orthoRH_ZO(minCorner.x, maxCorner.x,  // Left, right
+                                                 minCorner.y, maxCorner.y,  // Bottom, top
+                                                 minCorner.z, maxCorner.z   // Near, far
+           );
+
     /*
     const glm::vec3 ndc_test = lightProjection * lightView * glm::vec4(center, 1.0f);
     assert(ndc_test.x  >= 0 && ndc_test.x <= 1 && ndc_test.y >= 0 && ndc_test.y <= 1 && ndc_test.z
     >= 0 && ndc_test.z <= 1);*/
-
-    return lightProjection * lightView;
   }
 
   void LightSystem::update() {
@@ -110,9 +159,10 @@ namespace gestalt::application {
         auto& dir_light_data = std::get<DirectionalLightData>(Light_component.get().specific);
         glm::vec3 direction = normalize(glm::vec3(0, 0, -1.f) * rotation);
 
-        auto view_proj = calculate_sun_view_proj(direction);
-        repository_->light_view_projections.add(view_proj);
-        dir_light_data.light_view_projection = repository_->light_view_projections.size() - 1;
+        dir_light_data.light_view_projection = repository_->light_view_projections.size();
+        auto view = calculate_directional_light_view_matrix(direction);
+        auto proj = calculate_directional_light_proj_matrix(view);
+        repository_->light_view_projections.add({view, proj});
 
         GpuDirectionalLight dir_light = {};
         dir_light.color = light.base.color;
@@ -161,7 +211,7 @@ namespace gestalt::application {
     VK_CHECK(vmaMapMemory(gpu_->getAllocator(), light_data->view_proj_matrices->allocation,
                           &view_matrix_data));
     memcpy(view_matrix_data, repository_->light_view_projections.data().data(),
-           sizeof(glm::mat4) * repository_->light_view_projections.size());
+           sizeof(GpuProjViewData) * repository_->light_view_projections.size());
     vmaUnmapMemory(gpu_->getAllocator(), light_data->view_proj_matrices->allocation);
 
     updatable_entities_.clear();

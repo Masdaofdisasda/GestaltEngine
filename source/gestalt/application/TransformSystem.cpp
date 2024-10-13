@@ -94,26 +94,6 @@ namespace gestalt::application {
     }
 
     const TransformComponent model_transform = parent_transform * local_transform;
-    // Decompose model_matrix into translation (T) and 3x3 rotation matrix (M)
-    glm::vec3 T = model_transform.position;             // Translation vector
-    glm::mat3 M = glm::mat3(model_transform.rotation);  // Rotation matrix
-    M = transpose(M);  // Otherwise the AABB will be rotated in the wrong direction
-
-    AABB transformedAABB = {T, T};  // Start with a zero-volume AABB at T
-
-    // Applying Arvo's method to adjust AABB based on rotation and translation
-    // NOTE: does not work for non-uniform scaling
-    for (int i = 0; i < 3; ++i) {
-      for (int j = 0; j < 3; ++j) {
-        float a = M[i][j] * min[j];
-        float b = M[i][j] * max[j];
-        transformedAABB.min[i] += a < b ? a : b;
-        transformedAABB.max[i] += a < b ? b : a;
-      }
-    }
-    min = transformedAABB.min;
-    max = transformedAABB.max;
-
     for (const auto& child : node.children) {
       update_aabb(child, model_transform);
       const auto& child_aabb = repository_->scene_graph.get(child).value().get().bounds;
@@ -125,6 +105,28 @@ namespace gestalt::application {
       max.y = std::max(max.y, child_aabb.max.y);
       max.z = std::max(max.z, child_aabb.max.z);
     }
+
+    // Decompose model_matrix into translation (T) and 3x3 rotation matrix (M)
+    glm::vec3 T = model_transform.position;             // Translation vector
+    glm::vec3 S = glm::vec3(model_transform.scale);                // Scale vector
+    glm::mat3 M = glm::mat3(model_transform.rotation);  // Rotation matrix
+    M = transpose(M);  // Otherwise the AABB will be rotated in the wrong direction
+
+    AABB transformedAABB = {T, T};  // Start with a zero-volume AABB at T
+
+    // Applying Arvo's method to adjust AABB based on rotation and translation
+    // NOTE: does not work for non-uniform scaling
+    for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 3; ++j) {
+        float a = M[i][j] * S[j] * min[j];
+        float b = M[i][j] * S[j] * max[j];
+        transformedAABB.min[i] += a < b ? a : b;
+        transformedAABB.max[i] += a < b ? b : a;
+      }
+    }
+    min = transformedAABB.min;
+    max = transformedAABB.max;
+
 
     node.bounds = aabb;
     node.bounds.is_dirty = false;

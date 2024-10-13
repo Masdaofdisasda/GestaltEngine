@@ -32,14 +32,11 @@ namespace gestalt::graphics {
             .build(gpu_->getDevice()));
     descriptor_layouts_.emplace_back(
         DescriptorLayoutBuilder()
-            .add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                         VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, false,
-                         getMaxLights())
-            .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
-                         getMaxDirectionalLights())
-            .add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
-                         getMaxPointLights())
-            .build(gpu_->getDevice()));
+              .add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                            VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT)
+              .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
+              .add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
+              .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT));
     descriptor_layouts_.emplace_back(
         DescriptorLayoutBuilder()
             .add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -99,7 +96,7 @@ namespace gestalt::graphics {
 
     if (descriptor_buffers_.at(frame) == nullptr) {
       descriptor_buffers_.at(frame)
-          = resource_manager_->create_descriptor_buffer(descriptor_layouts_.at(1), 5, 0);
+          = resource_manager_->create_descriptor_buffer(descriptor_layouts_.at(3), 5, 0);
       auto image_info0 = VkDescriptorImageInfo{post_process_sampler,
                                                gbuffer_1->imageView, gbuffer_1->getLayout()};
       auto image_info1 = VkDescriptorImageInfo{post_process_sampler,

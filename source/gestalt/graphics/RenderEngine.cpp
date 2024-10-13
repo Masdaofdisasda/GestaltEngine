@@ -33,8 +33,10 @@ namespace gestalt::graphics {
 
     resource_registry_->init(gpu_, repository_);
 
-    render_passes_.push_back(std::make_shared<DirectionalDepthPass>());
-    // render_passes_.push_back(std::make_shared<DeferredPass>());
+    render_passes_.push_back(std::make_shared<DrawCullDirectionalDepthPass>());
+    render_passes_.push_back(std::make_shared<TaskSubmitDirectionalDepthPass>());
+    render_passes_.push_back(std::make_shared<MeshletDirectionalDepthPass>());
+
     render_passes_.push_back(std::make_shared<DrawCullPass>());
     render_passes_.push_back(std::make_shared<TaskSubmitPass>());
     render_passes_.push_back(std::make_unique<MeshletPass>());

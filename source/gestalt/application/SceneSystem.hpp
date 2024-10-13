@@ -132,7 +132,9 @@ class NotificationManager {
       void create_buffers();
       void fill_buffers();
 
-      glm::mat4 calculate_sun_view_proj(glm::vec3 direction) const;
+      glm::mat4 calculate_directional_light_view_matrix(glm::vec3 direction) const;
+
+      glm::mat4 calculate_directional_light_proj_matrix(glm::mat4 light_view) const;
 
     public:
       void prepare() override;

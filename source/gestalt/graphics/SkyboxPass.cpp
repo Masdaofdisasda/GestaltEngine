@@ -33,12 +33,11 @@ namespace gestalt::graphics {
     descriptor_layouts_.emplace_back(
         DescriptorLayoutBuilder()
             .add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                         VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, false,
-                         getMaxLights())
-            .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
-                         getMaxDirectionalLights())
-            .add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, false,
-                         getMaxPointLights())
+                          VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT
+                              | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT
+                              | VK_SHADER_STAGE_FRAGMENT_BIT)
+            .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
+            .add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
             .build(gpu_->getDevice()));
 
     create_pipeline_layout();

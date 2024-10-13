@@ -9,7 +9,7 @@
 namespace gestalt::foundation {
 
     inline struct MeshletPushConstants {
-      int cullFlags{0};
+      int cullFlags{1};
       float32 pyramidWidth, pyramidHeight;  // depth pyramid size in texels
       int32 clusterOcclusionEnabled;
     } meshlet_push_constants;

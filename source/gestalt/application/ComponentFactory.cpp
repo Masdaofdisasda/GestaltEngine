@@ -116,7 +116,8 @@ namespace gestalt::application {
       auto& transform = repository_->transform_components[entity];
       transform.rotation = glm::quat(lookAt(glm::vec3(0), direction, glm::vec3(0, 1, 0)));
 
-      const uint32 matrix_id = repository_->light_view_projections.add(glm::mat4(1.0));
+      const uint32 matrix_id
+          = repository_->light_view_projections.add({glm::mat4(1.0), glm::mat4(1.0)});
       const LightComponent light(color, intensity, matrix_id);
 
       repository_->light_components.add(entity, light);
@@ -160,9 +161,10 @@ namespace gestalt::application {
       auto& transform = repository_->transform_components[entity];
       transform.position = position;
 
-      const uint32 matrix_id = repository_->light_view_projections.add(glm::mat4(1.0));
+      const uint32 matrix_id
+          = repository_->light_view_projections.add({glm::mat4(1.0), glm::mat4(1.0)});
       for (int i = 0; i < 5; i++) {
-        repository_->light_view_projections.add(glm::mat4(1.0));
+        repository_->light_view_projections.add({glm::mat4(1.0), glm::mat4(1.0)});
       }
       const LightComponent light(color, intensity, range, matrix_id);
 
