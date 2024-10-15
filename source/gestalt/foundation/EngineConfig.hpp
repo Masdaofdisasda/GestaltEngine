@@ -25,6 +25,7 @@ namespace gestalt::foundation {
   constexpr uint32 kDefaultResolutionHeight = 900;
 
   constexpr bool kUseValidationLayers = false;
+  constexpr bool kUseVsync = false;
 
   struct Config {
     uint32 maxDirectionalLights = kDefaultMaxDirectionalLights;

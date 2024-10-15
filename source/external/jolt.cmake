@@ -6,7 +6,12 @@ option(USE_STATIC_MSVC_RUNTIME_LIBRARY "Use static MSVC runtime library" OFF)
 set(DOUBLE_PRECISION OFF)
 
 # When turning this option on, the library will be compiled with debug symbols
-set(GENERATE_DEBUG_SYMBOLS ON)
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(GENERATE_DEBUG_SYMBOLS ON)
+else()
+    set(GENERATE_DEBUG_SYMBOLS OFF)
+endif()
+
 
 # When turning this option on, the library will be compiled in such a way to attempt to keep the simulation deterministic across platforms
 set(CROSS_PLATFORM_DETERMINISTIC OFF)
@@ -36,11 +41,11 @@ CPMAddPackage(
   SOURCE_SUBDIR Build
 OPTIONS
     "DOUBLE_PRECISION OFF"
-    "GENERATE_DEBUG_SYMBOLS ON"
+    "GENERATE_DEBUG_SYMBOLS ${GENERATE_DEBUG_SYMBOLS}"
     "OVERRIDE_CXX_FLAGS OFF"
     "CROSS_PLATFORM_DETERMINISTIC OFF"
-    "INTERPROCEDURAL_OPTIMIZATION ON"
-    "OBJECT_LAYER_BITS 16"
+    "INTERPROCEDURAL_OPTIMIZATION ${INTERPROCEDURAL_OPTIMIZATION}"
+    "OBJECT_LAYER_BITS ${OBJECT_LAYER_BITS}"
     "USE_SSE4_1 ${USE_SSE4_1}"
     "USE_SSE4_2 ${USE_SSE4_2}"
     "USE_AVX ${USE_AVX}"
@@ -54,21 +59,24 @@ OPTIONS
     "DEBUG_RENDERER_IN_DISTRIBUTION OFF"
     "PROFILER_IN_DEBUG_AND_RELEASE OFF"
     "PROFILER_IN_DISTRIBUTION OFF"
+	"ENABLE_ALL_WARNINGS OFF"
 )
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Set MSVC-specific flags
 if (MSVC)
-    # Set runtime library
+    # Set MSVC runtime library for Debug and Release configurations
     if (USE_STATIC_MSVC_RUNTIME_LIBRARY)
+        # Use static runtime libraries: /MT and /MTd
         set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
     else()
+        # Use dynamic runtime libraries: /MD and /MDd
         set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
     endif()
 endif()
+
 
 if (INTERPROCEDURAL_OPTIMIZATION)
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
