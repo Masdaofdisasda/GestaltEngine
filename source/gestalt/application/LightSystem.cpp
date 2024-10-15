@@ -100,11 +100,9 @@ namespace gestalt::application {
     return glm::lookAt(lightPosition, center, up);
   }
 
-  glm::mat4 LightSystem::calculate_directional_light_proj_matrix(glm::mat4 light_view) const {
-    glm::mat4 inv_cam = repository_->per_frame_data_buffers.get()
-                            ->data.at(frame_->get_current_frame_index())
-                            .inv_viewProj;
-    const glm::vec4 ndcCorners[8] = {
+  glm::mat4 LightSystem::calculate_directional_light_proj_matrix(const glm::mat4& light_view) const {
+
+    const glm::vec4 ndc_corners[8] = {
       {-1, -1, 0, 1},
       {1, -1, 0, 1},
       {1, 1, 0, 1},
@@ -114,31 +112,57 @@ namespace gestalt::application {
       {1, 1, 1, 1},
       {-1, 1, 1, 1}};
 
-    glm::vec3 worldCorners[8];
+    // Compute the corners of the camera frustum in world space
+    // TODO uses last frames inv_viewProj, should be updated to use the current frame
+    glm::mat4 inv_cam = repository_->per_frame_data_buffers.get()
+                            ->data.at(frame_->get_current_frame_index())
+                            .inv_viewProj;
+    glm::vec3 world_corners[8];
     for (int i = 0; i < 8; ++i) {
-      glm::vec4 worldPos = inv_cam * ndcCorners[i];
-      worldCorners[i] = glm::vec3(worldPos) / worldPos.w;  // Perspective divide
+      glm::vec4 world_pos = inv_cam * ndc_corners[i];
+      world_corners[i] = glm::vec3(world_pos) / world_pos.w;
     }
 
+    // extend the frustum to include the scene bounds
+    // this ensures that the shadow map covers the entire scene, even occluders that are outside the
+    // view frustum
+    auto& [scene_min, scene_max, dirty] = repository_->scene_graph.get(root_entity).value().get().bounds;
+    glm::vec3 extended_min = glm::vec3(std::numeric_limits<float>::max());
+    glm::vec3 extended_max = glm::vec3(std::numeric_limits<float>::lowest());
+
+    for (auto world_corner : world_corners) {
+      extended_min = glm::min(extended_min, world_corner);
+      extended_max = glm::max(extended_max, world_corner);
+    }
+
+    extended_min = glm::min(extended_min, scene_min);
+    extended_max = glm::max(extended_max, scene_max);
+
+    // transform the corners to light space
     glm::mat4 light_view_inv = glm::inverse(light_view);
-    glm::vec3 lightSpaceCorners[8];
-    for (int i = 0; i < 8; ++i) {
-      lightSpaceCorners[i] = glm::vec3(light_view_inv * glm::vec4(worldCorners[i], 1.0f));
+
+    glm::vec3 light_space_min_corner = glm::vec3(std::numeric_limits<float>::max());
+    glm::vec3 light_space_max_corner = glm::vec3(std::numeric_limits<float>::lowest());
+
+    for (glm::vec3 world_corners[8] = {
+             extended_min,                                              // Bottom-left-near
+             glm::vec3(extended_max.x, extended_min.y, extended_min.z), // Bottom-right-near
+             glm::vec3(extended_min.x, extended_max.y, extended_min.z), // Top-left-near
+             glm::vec3(extended_max.x, extended_max.y, extended_min.z), // Top-right-near
+             glm::vec3(extended_min.x, extended_min.y, extended_max.z), // Bottom-left-far
+             glm::vec3(extended_max.x, extended_min.y, extended_max.z), // Bottom-right-far
+             glm::vec3(extended_min.x, extended_max.y, extended_max.z), // Top-left-far
+             extended_max                                               // Top-right-far
+         }; auto world_corner : world_corners) {
+      glm::vec4 light_pos = light_view_inv * glm::vec4(world_corner, 1.0);
+      light_space_min_corner = glm::min(light_space_min_corner, glm::vec3(light_pos));
+      light_space_max_corner = glm::max(light_space_max_corner, glm::vec3(light_pos));
     }
 
-    glm::vec3 minCorner = glm::vec3(std::numeric_limits<float>::max());
-    glm::vec3 maxCorner = glm::vec3(std::numeric_limits<float>::lowest());
-
-    for (int i = 0; i < 8; ++i) {
-      minCorner = glm::min(minCorner, lightSpaceCorners[i]);
-      maxCorner = glm::max(maxCorner, lightSpaceCorners[i]);
-    }
-
-    // Calculate the projection matrix for the light
-    return glm::orthoRH_ZO(minCorner.x, maxCorner.x,  // Left, right
-                                                 minCorner.y, maxCorner.y,  // Bottom, top
-                                                 minCorner.z, maxCorner.z   // Near, far
-           );
+    return glm::orthoRH_ZO(light_space_min_corner.x, light_space_max_corner.x,  // Left, right
+                           light_space_min_corner.y, light_space_max_corner.y,  // Bottom, top
+                           light_space_min_corner.z, light_space_max_corner.z   // Near, far
+    );
 
     /*
     const glm::vec3 ndc_test = lightProjection * lightView * glm::vec4(center, 1.0f);

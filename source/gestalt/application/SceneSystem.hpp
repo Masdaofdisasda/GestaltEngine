@@ -134,7 +134,7 @@ class NotificationManager {
 
       glm::mat4 calculate_directional_light_view_matrix(glm::vec3 direction) const;
 
-      glm::mat4 calculate_directional_light_proj_matrix(glm::mat4 light_view) const;
+      glm::mat4 calculate_directional_light_proj_matrix(const glm::mat4& light_view) const;
 
     public:
       void prepare() override;

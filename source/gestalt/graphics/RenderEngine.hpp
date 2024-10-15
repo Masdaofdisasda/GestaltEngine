@@ -125,7 +125,7 @@ namespace gestalt::graphics {
         ImageAttachment final_color{.image = std::make_shared<TextureHandle>(TextureType::kColor)};
         ImageAttachment scene_depth{.image = std::make_shared<TextureHandle>(TextureType::kDepth)};
         ImageAttachment shadow_map{.image = std::make_shared<TextureHandle>(TextureType::kDepth),
-                                   .extent = {2048, 2048}};
+                                   .extent = {2048 * 4, 2048 * 4}};
         ImageAttachment gbuffer1{.image = std::make_shared<TextureHandle>(TextureType::kColor)};
         ImageAttachment gbuffer2{.image = std::make_shared<TextureHandle>(TextureType::kColor)};
         ImageAttachment gbuffer3{.image = std::make_shared<TextureHandle>(TextureType::kColor)};
