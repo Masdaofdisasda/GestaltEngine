@@ -1,0 +1,8 @@
+{
+    "applicationName": "Gestalt Engine",
+    "useFullscreen": false,
+    "useValidationLayers": false,
+    "useVsync": false,
+    "windowedHeight": 900,
+    "windowedWidth": 1300
+}

@@ -1,59 +1,24 @@
 #pragma once
-#include <queue>
+#include <memory>
+#include <optional>
+#include <vector>
 
+#include "BasicResourceLoader.hpp"
+#include "common.hpp"
 #include "VulkanTypes.hpp"
-#include "vk_descriptors.hpp"
-#include "Repository.hpp"
 #include "Interface/IResourceManager.hpp"
-
+#include "Utils/vk_descriptors.hpp"
 
 namespace gestalt::foundation {
+  struct AllocatedBuffer;
+  struct DescriptorBuffer;
+  class Repository;
   class IGpu;
 }
 
 namespace gestalt::graphics {
 
-    class PoorMansResourceLoader {
-      struct ImageTask {
-        AllocatedBuffer stagingBuffer;
-        std::shared_ptr<TextureHandle> image;
-        unsigned char* dataCopy;
-        VkDeviceSize imageSize;
-        VkExtent3D imageExtent;
-        bool mipmap;
-      };
-
-      struct CubemapTask {
-        AllocatedBuffer stagingBuffer;
-        std::shared_ptr<TextureHandle> image;
-        unsigned char* dataCopy;
-        VkDeviceSize totalCubemapSizeBytes;
-        VkDeviceSize faceSizeBytes;
-        VkExtent3D imageExtent;
-      };
-
-      IGpu* gpu_ = nullptr;
-      VkCommandPool transferCommandPool = {};
-      VkCommandBuffer cmd = {};
-      VkFence flushFence = {};
-      std::queue<ImageTask> tasks_;
-      std::queue<CubemapTask> cubemap_tasks_;
-      size_t max_tasks_per_batch_ = 5;
-
-    public:
-      void init(IGpu* gpu);
-      void cleanup();
-
-      void addImageTask(TextureHandle image, void* imageData, VkDeviceSize imageSize,
-                        VkExtent3D imageExtent, bool mipmap);
-      void execute_task(ImageTask& task);
-      void execute_cubemap_task(CubemapTask& task);
-      void addCubemapTask(TextureHandle image, void* imageData, VkExtent3D imageExtent);
-      void add_stagging_buffer(size_t size, AllocatedBuffer& staging_buffer);
-      void flush();
-    };
-
-    class ResourceManager final : public IResourceManager, public NonCopyable<ResourceManager> {
+    class ResourceManager final : public foundation::IResourceManager, public NonCopyable<ResourceManager> {
 
       IGpu* gpu_ = nullptr;
       Repository* repository_ = nullptr;
@@ -61,15 +26,17 @@ namespace gestalt::graphics {
       void load_and_create_cubemap(const std::string& file_path, TextureHandle& cubemap);
 
     public:
-      PoorMansResourceLoader resource_loader_;
+      std::unique_ptr<DescriptorWriter> descriptor_writer_;
 
-      DescriptorWriter writer;
+      std::unique_ptr<BasicResourceLoader> resource_loader_;
 
       void init(IGpu* gpu, Repository* repository) override;
 
       void cleanup() override;
 
       void flush_loader() override;
+      void SetDebugName(const std::string& name, VkObjectType type, VkDevice device,
+                               uint64_t handle) const override;
 
       std::shared_ptr<AllocatedBuffer> create_buffer(size_t allocSize, VkBufferUsageFlags usage,
                                                      VmaMemoryUsage memoryUsage,
@@ -83,12 +50,14 @@ namespace gestalt::graphics {
 
       TextureHandle create_image(void* data, VkExtent3D size, VkFormat format,
                                  VkImageUsageFlags usage, bool mipmapped = false) override;
+      void create_3D_image(const std::shared_ptr<TextureHandle>& image, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, const std::string& name) const;
       TextureHandle create_cubemap(void* imageData, VkExtent3D size, VkFormat format,
                                    VkImageUsageFlags usage, bool mipmapped = false) override;
       std::optional<TextureHandle> load_image(const std::string& filepath) override;
       void load_and_process_cubemap(const std::string& file_path) override;
       TextureHandle create_cubemap_from_HDR(std::vector<float>& image_data, int h, int w) override;
       void create_frame_buffer(const std::shared_ptr<TextureHandle>& image,
+                               const std::string& name,
                                VkFormat format = VK_FORMAT_UNDEFINED) const override;
       TextureHandle create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
                                  bool mipmapped = false, bool cubemap = false) override;

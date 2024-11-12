@@ -30,6 +30,8 @@ namespace gestalt::foundation {
 
       bool enable_ssao{true};
       int ssao_quality{1};
+      float32 ssao_radius{5.f};
+      float32 depthThreshold{0.1f};
       struct SsaoParams {
         bool show_ssao_only = false;
         float scale = 0.75f;
@@ -46,21 +48,21 @@ namespace gestalt::foundation {
       struct HdrParams {
         float exposure{1.f};
         float maxWhite{1.35f};
-        float bloomStrength{0.04f};
+        float bloomStrength{0.01f};
         float padding{1.f};
         glm::vec4 lift{0.f};
         glm::vec4 gamma{1.f};
         glm::vec4 gain{1.f};
         bool show_bright_pass = false;
-        int toneMappingOption{2};
+        int toneMappingOption{4};
       } hdr{};
 
       struct LightAdaptationParams {
-        float adaptation_speed_dark2light{.01f};
-        float adaptation_speed_light2dark{.02f};
+        float adaptation_speed_dark2light{1.f};
+        float adaptation_speed_light2dark{10.f};
         float delta_time{0.16f};
-        float min_luminance{0.0115f};
-        float max_luminance{10.0f};
+        float min_luminance{0.001f};
+        float max_luminance{10000.f};
       } light_adaptation{};
 
       struct LightingParams {
@@ -72,6 +74,31 @@ namespace gestalt::foundation {
         int shadow_mode{0};
         int ibl_mode{0};
       } lighting{};
+
+      struct VolumetricLightingParams {
+        glm::vec2 halton_xy{0.f, 0.f};  // no jitter
+        float32 temporal_reprojection_jitter_scale{0.f};
+        float32 density_modifier{1.f};
+
+        float32 noise_scale{0.1f};
+        uint32 noise_type{0};
+
+        float32 volumetric_noise_position_multiplier{1.f};
+        float32 volumetric_noise_speed_multiplier{1.f};
+        float32 height_fog_density{0.3f};
+        float32 height_fog_falloff{0.7f};
+
+        glm::vec3 box_position{0.f};
+        float32 box_fog_density{0.f};
+
+        int32 enable_spatial_filter{1};
+
+        glm::vec3 box_size{10.f};
+        float32 scattering_factor{0.05f};
+        float32 phase_anisotropy{2.f};
+        uint32 phase_type{3};
+      } volumetric_lighting;
+
 
       struct GridParams {
         float majorLineWidth = 0.065f;

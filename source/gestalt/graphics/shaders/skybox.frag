@@ -77,8 +77,10 @@ void main() {
     vec3 betaMTheta = params.betaM * miePhase(cosTheta, 0.76); // Assuming g=0.76
 
     // Here, we simplify the atmospheric scattering equations for real-time purposes
-    float intensity = dirLight[0].intensity * 1e6;
-    vec3 L = dirLight[0].color * intensity * (betaRTheta + betaMTheta);
+    
+    vec3 L_i = dirLight[0].color * 1e6;
+
+    vec3 L = L_i * (betaRTheta + betaMTheta);
     
     vec3 L_multiscatter = L * 0.5; // This is a simplification
  

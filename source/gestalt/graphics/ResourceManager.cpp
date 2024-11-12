@@ -1,18 +1,16 @@
 #include "ResourceManager.hpp"
 
-#include "vk_images.hpp"
-#include "vk_initializers.hpp"
-
 #include <stb_image.h>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 
-#include <fastgltf/core.hpp>
-#include <fastgltf/glm_element_traits.hpp>
+#include <filesystem>
 
-#include "CubemapUtils.hpp"
+#include "BasicResourceLoader.hpp"
 #include "VulkanCheck.hpp"
+#include "vk_initializers.hpp"
 #include "Interface/IGpu.hpp"
+#include "Utils/CubemapUtils.hpp"
 
 
 namespace gestalt::graphics {
@@ -21,17 +19,19 @@ namespace gestalt::graphics {
                                Repository* repository) {
       gpu_ = gpu;
       repository_ = repository;
-      resource_loader_.init(gpu);
+      resource_loader_ = std::make_unique<BasicResourceLoader>();
+      resource_loader_->init(gpu);
       generate_samplers();
     }
 
     void ResourceManager::cleanup() {
-      resource_loader_.cleanup();
+      resource_loader_->cleanup();
     }
 
-    void ResourceManager::flush_loader() { resource_loader_.flush(); }
+    void ResourceManager::flush_loader() { resource_loader_->flush(); }
 
-  void SetDebugName(std::string name, VkObjectType type, VkDevice device, uint64_t handle) {
+  void ResourceManager::SetDebugName(const std::string& name, const VkObjectType type, const VkDevice device,
+                                     const uint64_t handle) const {
       if (name.empty()) {
         return;
       }
@@ -286,9 +286,57 @@ namespace gestalt::graphics {
           size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
           mipmapped);
       const size_t data_size = static_cast<size_t>(size.depth * size.width * size.height) * 4;
-      resource_loader_.addImageTask(new_image, data, data_size, size, mipmapped);
+      resource_loader_->addImageTask(new_image, data, data_size, size, mipmapped);
 
       return new_image;
+    }
+
+  void ResourceManager::create_3D_image(const std::shared_ptr<TextureHandle>& image,
+                                        const VkExtent3D size, const VkFormat format,
+                                        const VkImageUsageFlags usage, const std::string& name) const {
+      image->setFormat(format);
+    image->imageExtent = size;
+
+      VkImageCreateInfo imageCreateInfo{};
+      imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+      imageCreateInfo.imageType = VK_IMAGE_TYPE_3D;
+      imageCreateInfo.format = format;               
+      imageCreateInfo.extent = size;
+      imageCreateInfo.mipLevels = 1;
+      imageCreateInfo.arrayLayers = 1;
+      imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+      imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;  // Use optimal tiling for GPU access
+      imageCreateInfo.usage
+          = usage | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+      imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+      imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; 
+
+      
+      // always allocate images on dedicated GPU memory
+      VmaAllocationCreateInfo allocinfo = {};
+      allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+      allocinfo.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+      // allocate and create the image
+      VK_CHECK(vmaCreateImage(gpu_->getAllocator(), &imageCreateInfo, &allocinfo, &image->image,
+                              &image->allocation, nullptr));
+      SetDebugName(name, VK_OBJECT_TYPE_IMAGE, gpu_->getDevice(),
+                   reinterpret_cast<uint64_t>(image->image));
+
+      VkImageViewCreateInfo viewCreateInfo{};
+      viewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+      viewCreateInfo.image = image->image;
+      viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_3D;      
+      viewCreateInfo.format = format;                   // Same format as the image
+      viewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+      viewCreateInfo.subresourceRange.baseMipLevel = 0;
+      viewCreateInfo.subresourceRange.levelCount = 1;
+      viewCreateInfo.subresourceRange.baseArrayLayer = 0;
+      viewCreateInfo.subresourceRange.layerCount = 1;
+
+       VK_CHECK(vkCreateImageView(gpu_->getDevice(), &viewCreateInfo, nullptr, &image->imageView));
+
+
     }
 
     TextureHandle ResourceManager::create_cubemap(void* imageData, VkExtent3D size,
@@ -300,7 +348,7 @@ namespace gestalt::graphics {
           size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
           mipmapped, true);
 
-      resource_loader_.addCubemapTask(new_image, imageData, size);
+      resource_loader_->addCubemapTask(new_image, imageData, size);
       return new_image;
     }
 
@@ -337,239 +385,6 @@ namespace gestalt::graphics {
         *img32++ = *img24++;
         *img32++ = 1.0f;
       }
-    }
-
-    void PoorMansResourceLoader::init(IGpu* gpu) {
-	  gpu_ = gpu;
-      VkCommandPoolCreateInfo poolInfo = {};
-      poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-      poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-      poolInfo.queueFamilyIndex = gpu_->getGraphicsQueueFamily();
-
-      VK_CHECK(vkCreateCommandPool(gpu_->getDevice(), &poolInfo, nullptr, &transferCommandPool));
-
-      VkCommandBufferAllocateInfo allocInfo = {};
-      allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-      allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-      allocInfo.commandPool = transferCommandPool;
-      allocInfo.commandBufferCount = 1;
-
-      VK_CHECK(vkAllocateCommandBuffers(gpu_->getDevice(), &allocInfo, &cmd));
-
-      VkFenceCreateInfo fenceInfo = {};
-      fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-      VK_CHECK(vkCreateFence(gpu_->getDevice(), &fenceInfo, nullptr, &flushFence));
-    }
-
-    void PoorMansResourceLoader::addImageTask(TextureHandle image, void* imageData,
-                                              VkDeviceSize imageSize, VkExtent3D imageExtent, bool mipmap) {
-
-      ImageTask task;
-      task.image = std::make_shared<TextureHandle>(image);
-      task.dataCopy = new unsigned char[imageSize];
-      memcpy(task.dataCopy, imageData, imageSize);
-      task.imageSize = imageSize;
-      task.imageExtent = imageExtent;
-      task.mipmap = mipmap;
-      task.stagingBuffer = {};
-
-      tasks_.push(task);
-    }
-
-    void PoorMansResourceLoader::execute_task(ImageTask& task) {
-
-      add_stagging_buffer(task.imageSize, task.stagingBuffer);
-
-      void* data;
-      VK_CHECK(vmaMapMemory(gpu_->getAllocator(), task.stagingBuffer.allocation, &data));
-      memcpy(data, task.dataCopy, task.imageSize);
-      vmaUnmapMemory(gpu_->getAllocator(), task.stagingBuffer.allocation);
-
-      vkutil::TransitionImage(task.image)
-          .to(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
-          .withSource(VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0)
-          .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
-          .andSubmitTo(cmd);
-
-      VkBufferImageCopy copyRegion = {};
-      copyRegion.bufferOffset = 0;
-      copyRegion.bufferRowLength = 0;
-      copyRegion.bufferImageHeight = 0;
-
-      copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-      copyRegion.imageSubresource.mipLevel = 0;
-      copyRegion.imageSubresource.baseArrayLayer = 0;
-      copyRegion.imageSubresource.layerCount = 1;
-      copyRegion.imageExtent = task.imageExtent;
-
-      // copy the buffer into the image
-      vkCmdCopyBufferToImage(cmd, task.stagingBuffer.buffer, task.image->image,
-                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
-
-      if (task.mipmap) {
-        vkutil::generate_mipmaps(cmd, task.image);
-      }
-
-      vkutil::TransitionImage(task.image)
-          .to(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-          .withSource(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
-          .withDestination(VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT)
-          .andSubmitTo(cmd);
-    }
-
-    void PoorMansResourceLoader::execute_cubemap_task(CubemapTask & task) {
-
-      add_stagging_buffer(task.totalCubemapSizeBytes, task.stagingBuffer);
-
-      // Copy each face data into the buffer
-      void* data;
-      VK_CHECK(vmaMapMemory(gpu_->getAllocator(), task.stagingBuffer.allocation, &data));
-      memcpy(data, task.dataCopy, task.totalCubemapSizeBytes);
-      vmaUnmapMemory(gpu_->getAllocator(), task.stagingBuffer.allocation);
-
-      vkutil::TransitionImage(task.image)
-          .to(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
-          .withSource(VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0)
-          .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
-          .andSubmitTo(cmd);
-
-      // Copy each face from the buffer to the image
-      for (int i = 0; i < 6; ++i) {
-        VkBufferImageCopy copyRegion = {};
-        copyRegion.bufferOffset = task.faceSizeBytes * i;
-        copyRegion.bufferRowLength = 0;
-        copyRegion.bufferImageHeight = 0;
-
-        copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        copyRegion.imageSubresource.mipLevel = 0;
-        copyRegion.imageSubresource.baseArrayLayer = i;  // Specify the face index
-        copyRegion.imageSubresource.layerCount = 1;
-        copyRegion.imageExtent = task.imageExtent;
-
-        vkCmdCopyBufferToImage(cmd, task.stagingBuffer.buffer, task.image->image,
-                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
-      }
-
-      if (false) {
-        // vkutil::generate_mipmaps( TODO
-        // cmd, new_image.image,
-        // VkExtent2D{new_image.imageExtent.width, new_image.imageExtent.height});
-      } else {
-        vkutil::TransitionImage(task.image)
-            .to(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-            .withSource(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
-            .withDestination(VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT)
-            .andSubmitTo(cmd);
-      }
-    }
-
-    void PoorMansResourceLoader::addCubemapTask(TextureHandle image, void* imageData,
-                                                VkExtent3D imageExtent) {
-      size_t faceWidth = imageExtent.width;
-      size_t faceHeight = imageExtent.height;
-      size_t numChannels = 4;  // Assuming RGBA
-      size_t bytesPerFloat = sizeof(float);
-
-      size_t faceSizeBytes = faceWidth * faceHeight * numChannels * bytesPerFloat;
-      size_t totalCubemapSizeBytes = faceSizeBytes * 6;
-
-      CubemapTask task;
-      task.image = std::make_shared<TextureHandle>(image);
-      task.dataCopy = new unsigned char[totalCubemapSizeBytes];
-      memcpy(task.dataCopy, imageData, totalCubemapSizeBytes);
-      task.totalCubemapSizeBytes = totalCubemapSizeBytes;
-      task.faceSizeBytes = faceSizeBytes;
-      task.imageExtent = imageExtent;
-      task.stagingBuffer = {};
-
-      cubemap_tasks_.push(task);
-    }
-
-    void PoorMansResourceLoader::add_stagging_buffer(size_t size, AllocatedBuffer& staging_buffer) {
-
-        // allocate buffer
-      VkBufferCreateInfo bufferInfo = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-      bufferInfo.pNext = nullptr;
-      bufferInfo.size = size;
-
-      bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-
-      VmaAllocationCreateInfo vmaallocInfo = {};
-      vmaallocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
-      vmaallocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-
-      // allocate the buffer
-      VK_CHECK(vmaCreateBuffer(gpu_->getAllocator(), &bufferInfo, &vmaallocInfo, &staging_buffer.buffer,
-                               &staging_buffer.allocation, &staging_buffer.info));
-    }
-
-    void PoorMansResourceLoader::flush() {
-      if (tasks_.empty() && cubemap_tasks_.empty()) {
-        return;
-      }
-
-      VkCommandBufferBeginInfo beginInfo = {};
-      beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-      beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-      VK_CHECK(vkBeginCommandBuffer(cmd, &beginInfo));
-
-      size_t tasksProcessed = 0;
-      std::queue<ImageTask> tasksDone;
-      std::queue<CubemapTask> cubemapTasksDone;
-      while (!tasks_.empty() && tasksProcessed < max_tasks_per_batch_) {
-        ImageTask& task = tasks_.front();
-        execute_task(task);  // Execute the task
-        tasksDone.push(task);
-        tasks_.pop();
-        tasksProcessed++;
-      }
-
-      while (!cubemap_tasks_.empty() && tasksProcessed < max_tasks_per_batch_) {
-        CubemapTask& task = cubemap_tasks_.front();
-        execute_cubemap_task(task);  // Execute the cubemap task
-        cubemapTasksDone.push(task);
-        cubemap_tasks_.pop();
-        tasksProcessed++;
-      }
-
-      VK_CHECK(vkEndCommandBuffer(cmd));
-
-      VkCommandBufferSubmitInfo commandBufferSubmitInfo = {};
-      commandBufferSubmitInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
-      commandBufferSubmitInfo.commandBuffer = cmd;
-
-      VkSubmitInfo2 submitInfo2 = {};
-      submitInfo2.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-      submitInfo2.commandBufferInfoCount = 1;
-      submitInfo2.pCommandBufferInfos = &commandBufferSubmitInfo;
-
-      VK_CHECK(vkQueueSubmit2(gpu_->getGraphicsQueue(), 1, &submitInfo2, flushFence));
-      VK_CHECK(vkWaitForFences(gpu_->getDevice(), 1, &flushFence, VK_TRUE, UINT64_MAX));
-      VK_CHECK(vkResetFences(gpu_->getDevice(), 1, &flushFence));
-      VK_CHECK(vkResetCommandBuffer(cmd, 0));
-
-      while (!tasksDone.empty()) {
-        ImageTask& task = tasksDone.front();
-        auto& stagingBuffer = task.stagingBuffer;
-        vmaDestroyBuffer(gpu_->getAllocator(), stagingBuffer.buffer, stagingBuffer.allocation);
-
-        delete[] task.dataCopy;
-        tasksDone.pop();
-      }
-      while (!cubemapTasksDone.empty()) {
-        CubemapTask& task = cubemapTasksDone.front();
-        auto& stagingBuffer = task.stagingBuffer;
-        vmaDestroyBuffer(gpu_->getAllocator(), stagingBuffer.buffer, stagingBuffer.allocation);
-
-        delete[] task.dataCopy;
-        cubemapTasksDone.pop();
-      }
-    }
-
-    void PoorMansResourceLoader::cleanup() {
-      vkFreeCommandBuffers(gpu_->getDevice(), transferCommandPool, 1, &cmd);
-	  vkDestroyCommandPool(gpu_->getDevice(), transferCommandPool, nullptr);
-	  vkDestroyFence(gpu_->getDevice(), flushFence, nullptr);
     }
 
     void ResourceManager::load_and_create_cubemap(const std::string& file_path,
@@ -661,7 +476,7 @@ namespace gestalt::graphics {
 
       Ibl_buffers->bdrf_lut = load_image("../../assets/bdrf_lut.png").value();
 
-      resource_loader_.flush();
+      resource_loader_->flush();
       vkDeviceWaitIdle(gpu_->getDevice());
 
      Ibl_buffers->descriptor_buffer->
@@ -691,7 +506,8 @@ namespace gestalt::graphics {
                             VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT, false);
     }
 
-    void ResourceManager::create_frame_buffer(const std::shared_ptr<TextureHandle>& image, VkFormat format) const {
+    void ResourceManager::create_frame_buffer(const std::shared_ptr<TextureHandle>& image,
+                                              const std::string& name, VkFormat format) const {
       assert(image->getType() == TextureType::kColor || image->getType() == TextureType::kDepth);
 
       VkImageUsageFlags usageFlags = 0;
@@ -701,6 +517,11 @@ namespace gestalt::graphics {
         if (format == VK_FORMAT_UNDEFINED) {
           format = VK_FORMAT_R16G16B16A16_SFLOAT;
         }
+        if (format == VK_FORMAT_R16G16B16_SFLOAT) {
+          fmt::println("Warning: Using R16G16B16_SFLOAT format for color attachment. Switching to VK_FORMAT_R16G16B16A16_SFLOAT for better compatibility.");
+          format = VK_FORMAT_R16G16B16A16_SFLOAT;
+        }
+
         usageFlags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
         usageFlags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
         usageFlags |= VK_IMAGE_USAGE_STORAGE_BIT;
@@ -730,6 +551,8 @@ namespace gestalt::graphics {
 
       VK_CHECK(vmaCreateImage(gpu_->getAllocator(), &img_info, &img_allocinfo, &image->image,
                               &image->allocation, nullptr));
+      SetDebugName(name, VK_OBJECT_TYPE_IMAGE, gpu_->getDevice(),
+                   reinterpret_cast<uint64_t>(image->image));
 
       // Build an image view for the image to use for rendering
       VkImageViewCreateInfo view_info

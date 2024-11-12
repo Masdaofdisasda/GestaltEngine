@@ -16,7 +16,10 @@ if(NOT EXISTS ${CMAKE_BINARY_DIR}/cmake/CPM.cmake)
 endif()
 include(${CMAKE_BINARY_DIR}/cmake/CPM.cmake)
 
+set(CMAKE_CONFIGURATION_TYPES "Debug;Release;Distribution" CACHE STRING "Supported build types" FORCE)
+
 include(source/external/format.cmake)
+include(source/external/nlohmann.cmake)
 include(source/external/stb.cmake)
 include(source/external/glm.cmake)
 include(source/external/vma.cmake)
@@ -34,12 +37,18 @@ include(source/external/jolt.cmake)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+set(CMAKE_CXX_FLAGS_DISTRIBUTION "${CMAKE_CXX_FLAGS_RELEASE}")
+set(CMAKE_C_FLAGS_DISTRIBUTION "${CMAKE_C_FLAGS_RELEASE}")
+set(CMAKE_EXE_LINKER_FLAGS_DISTRIBUTION "${CMAKE_EXE_LINKER_FLAGS_RELEASE}")
+set(CMAKE_SHARED_LINKER_FLAGS_DISTRIBUTION "${CMAKE_SHARED_LINKER_FLAGS_RELEASE}")
+
 if(MSVC)
   add_compile_options(/experimental:module /std:c++latest)
 endif()
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_SOURCE_DIR}/bin/debug")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/bin/release")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DISTRIBUTION "${CMAKE_SOURCE_DIR}/bin/distribution")
 
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${APPLICATION_NAME})
 
@@ -55,5 +64,5 @@ set_target_properties(
   ${APPLICATION_NAME}
   PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY
-    "$<$<CONFIG:Debug>:${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG}>$<$<CONFIG:Release>:${CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE}>"
+    "$<$<CONFIG:Debug>:${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG}>$<$<CONFIG:Release>:${CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE}>$<$<CONFIG:Distribution>:${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DISTRIBUTION}>"
 )

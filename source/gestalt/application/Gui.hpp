@@ -3,8 +3,9 @@
 #include <functional>
 
 #include "RenderConfig.hpp"
-#include "EntityManager.hpp"
+#include "ECS/ECSManager.hpp"
 #include "Window.hpp"
+#include <SDL_events.h>
 
 namespace gestalt::application {
     enum class action {
@@ -15,7 +16,7 @@ namespace gestalt::application {
 
     struct GuiCapabilities {
       std::function<void()> exit;
-      std::function<void(std::string)> load_gltf;
+      std::function<void(const std::filesystem::path&)> load_gltf;
       std::function<ComponentFactory&()> get_component_factory;
       std::function<RenderConfig&()> get_render_config;
       std::function<std::shared_ptr<TextureHandle>()> get_debug_image;

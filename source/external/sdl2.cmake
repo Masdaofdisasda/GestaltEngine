@@ -16,6 +16,8 @@ add_custom_target(
 
 add_dependencies(SDL2-static sdl_copy_headers_in_build_dir)
 target_include_directories(SDL2-static INTERFACE "${CMAKE_BINARY_DIR}/SDLHeaders")
+# Define SDL_MAIN_HANDLED globally for SDL2-static
+target_compile_definitions(SDL2-static INTERFACE SDL_MAIN_HANDLED)
 
 set(SDL2_INCLUDE_DIR ${SDL2_SOURCE_DIR}/include)
 include_directories(${SDL2_INCLUDE_DIR})

@@ -1,0 +1,166 @@
+#version 450
+
+#extension GL_GOOGLE_include_directive : require
+// set 0
+#include "per_frame_structs.glsl"
+
+const int kernel_size = 32;
+const vec3 kernel[32] = vec3[](
+    vec3(0.135, 0.216, 0.685), vec3(0.547, 0.312, 0.263),
+    vec3(-0.216, -0.416, 0.145), vec3(-0.312, 0.245, 0.547),
+    vec3(0.685, -0.135, 0.216), vec3(0.263, -0.547, -0.312),
+    vec3(-0.145, 0.216, -0.416), vec3(-0.547, 0.135, -0.216),
+    vec3(0.216, 0.416, 0.145), vec3(0.312, -0.245, -0.547),
+    vec3(-0.685, 0.135, -0.216), vec3(-0.263, 0.547, 0.312),
+    vec3(0.145, -0.216, 0.416), vec3(0.547, -0.135, 0.216),
+    vec3(-0.216, -0.416, -0.145), vec3(-0.312, 0.245, -0.547),
+    vec3(0.685, -0.135, 0.216), vec3(-0.263, 0.547, -0.312),
+    vec3(-0.145, 0.216, 0.416), vec3(-0.547, -0.135, 0.216),
+    vec3(0.216, -0.416, 0.145), vec3(0.312, 0.245, 0.547),
+    vec3(-0.685, 0.135, -0.216), vec3(-0.263, -0.547, 0.312),
+    vec3(0.145, 0.216, -0.416), vec3(0.547, -0.135, -0.216),
+    vec3(-0.216, 0.416, 0.145), vec3(-0.312, -0.245, -0.547),
+    vec3(0.685, -0.135, 0.216), vec3(-0.263, 0.547, -0.312),
+    vec3(-0.145, 0.216, 0.416), vec3(-0.547, 0.135, -0.216)
+);
+
+const vec3 offsets[8] = vec3[8] 
+(
+	vec3(-0.5, -0.5, -0.5),
+	vec3( 0.5, -0.5, -0.5),
+	vec3(-0.5,  0.5, -0.5),
+	vec3( 0.5,  0.5, -0.5),
+	vec3(-0.5, -0.5,  0.5),
+	vec3( 0.5, -0.5,  0.5),
+	vec3(-0.5,  0.5,  0.5),
+	vec3( 0.5,  0.5,  0.5)
+);
+
+layout( push_constant ) uniform constants
+{
+    bool show_ssao_only;
+	float scale;
+	float bias;
+	float zNear;
+	float zFar;
+	float radius;
+	float attScale;
+	float distScale;
+} params;
+
+layout(set = 1, binding = 0) uniform sampler2D texDepth;
+layout(set = 1, binding = 1) uniform sampler2D texNormal;
+layout(set = 1, binding = 2) uniform sampler2D texNoise;
+layout(set = 1, binding = 3, r16f)  uniform image2D texAoOut;
+
+layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+// https://johnwhite3d.blogspot.com/2017/10/signed-octahedron-normal-encoding.html
+vec3 SignedOctDecode(vec3 n) {
+
+    // Perform the reverse octahedral transformation
+    vec3 OutN;
+    OutN.x = (n.x - n.y);
+    OutN.y = (n.x + n.y) - 1.0;
+
+    // Retrieve the sign of the z component
+    OutN.z = n.z * 2.0 - 1.0;
+
+    // Reconstruct the z component
+    OutN.z = OutN.z * (1.0 - abs(OutN.x) - abs(OutN.y));
+
+    OutN = normalize(OutN);
+
+    return OutN;
+}
+
+#if 0
+// does not work yet, maybe consider implementing gtao
+void main() {
+    ivec2 imgSize = imageSize(texAoOut);
+    ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
+
+    if (pixelCoord.x >= imgSize.x || pixelCoord.y >= imgSize.y)
+        return;
+
+    vec2 uv = vec2(pixelCoord) / vec2(imgSize);
+
+    // Get depth and normal
+    float depth = texture(texDepth, uv).r;
+	vec3 normal = SignedOctDecode(texture(texNormal, uv).rgb);
+
+    // Reconstruct position in view space
+    vec4 coord = vec4(uv * 2.0 - 1.0, depth, 1.0);
+    coord = inverse(proj) * coord;
+    coord /= coord.w;
+    vec3 position = coord.xyz;
+
+    vec3 up = abs(normal.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+    vec3 tangent = normalize(cross(up, normal));
+    vec3 bitangent = cross(normal, tangent);
+    mat3 TBN = mat3(tangent, bitangent, normal);
+
+    // Accumulate occlusion
+    float occlusion = 0.0;
+    for (int i = 0; i < kernel_size; ++i) {
+        vec3 sample_direction = TBN * kernel[i];
+        sample_direction = position + sample_direction * params.radius;
+
+        // Project sample position back to screen space
+        vec4 offset = proj * vec4(sample_direction, 1.0);
+        offset /= offset.w;
+        vec2 sampleUv = offset.xy * 0.5 + 0.5;
+
+        float sampleDepth = texture(texDepth, sampleUv).r;
+
+        // Reconstruct sample depth
+        float sampleLinearDepth = (2.0 * params.zNear * params.zFar) / (params.zFar + params.zNear - sampleDepth * (params.zFar - params.zNear));
+   
+
+        float rangeCheck = smoothstep(0.0, 1.0, params.radius / abs(position.z - sampleLinearDepth));
+        occlusion += (sampleLinearDepth >= sample_direction.z + params.bias ? 1.0 : 0.0) * rangeCheck;
+    }
+
+    occlusion = 1.0 - (occlusion / float(kernel_size));
+
+	imageStore(texAoOut, ivec2(gl_GlobalInvocationID.xy), vec4(occlusion));
+
+}
+#else
+void main()
+{	
+    vec2 uv = vec2(gl_GlobalInvocationID.xy) / imageSize(texAoOut);
+
+	const float radius    = params.radius;
+	const float attScale  = params.attScale;
+	const float distScale = params.distScale;
+    
+	const float zFarMulzNear   = params.zFar * params.zNear;
+	const float zFarMinuszNear = params.zFar - params.zNear;
+    
+	float size = 1.0 / float(textureSize(texDepth, 0 ).x);
+
+	// get Z in eye space
+	float Z     = zFarMulzNear / ( texture( texDepth, uv ).x * zFarMinuszNear - params.zFar );
+	float att   = 0.0;
+	vec3  plane = 2.0 * texture( texNoise, uv * size / 4.0 ).xyz - vec3( 1.0 );
+  
+	for ( int i = 0; i < 8; i++ )
+	{
+		vec3  rSample = reflect( offsets[i], plane );
+		float zSample = texture( texDepth, uv + radius*rSample.xy / Z ).x;
+
+		zSample = zFarMulzNear / ( zSample * zFarMinuszNear - params.zFar );
+        
+		float dist = max( zSample - Z, 0.0 ) / distScale;
+		float occl = 15.0 * max( dist * (2.0 - dist), 0.0 );
+        
+		att += 1.0 / ( 1.0 + occl * occl );
+	}
+    
+	att = clamp( att * att / 64.0 + 0.45, 0.0, 1.0 ) * attScale;
+
+	imageStore( texAoOut, ivec2(gl_GlobalInvocationID.xy), att.rrrr );
+}
+#endif
+

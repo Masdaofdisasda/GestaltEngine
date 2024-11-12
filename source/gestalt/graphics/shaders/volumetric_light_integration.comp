@@ -1,0 +1,67 @@
+#version 450
+
+#extension GL_GOOGLE_include_directive: require
+
+#include "volumetric_light_util.glsl"
+
+layout(push_constant) uniform constants
+{
+    uvec3 froxel_dimensions;
+    int current_frame;
+
+    float noise_scale;
+    uint noise_type;
+    float froxel_near;
+    float froxel_far;
+} PushConstants;
+
+layout (local_size_x = FROXEL_DISPATCH_X, local_size_y = FROXEL_DISPATCH_Y, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler3D light_scattering_texture;
+layout(set = 0, binding = 1) writeonly uniform image3D integrated_light_scattering_texture;
+
+void main() {
+
+    ivec3 froxel_coord = ivec3(gl_GlobalInvocationID.xyz);
+
+    vec3 integrated_scattering = vec3(0,0,0);
+    float integrated_transmittance = 1.0f;
+
+    float current_z = 0;
+
+    vec3 rcp_froxel_dim = 1.0f / PushConstants.froxel_dimensions.xyz;
+
+    for ( int z = 0; z < PushConstants.froxel_dimensions.z; ++z ) {
+
+        froxel_coord.z = z;
+
+        float jittering = 0;//generate_noise(froxel_coord.xy * 1.0f, current_frame, integration_noise_scale);
+        float next_z = slice_to_exponential_depth_jittered( PushConstants.froxel_near, PushConstants.froxel_far, jittering, z + 1, int(PushConstants.froxel_dimensions.z) );
+
+        const float z_step = abs(next_z - current_z);
+        current_z = next_z;
+
+        // Following equations from Physically Based Sky, Atmosphere and Cloud Rendering by Hillaire
+        const vec4 sampled_scattering_extinction = texture(light_scattering_texture, froxel_coord * rcp_froxel_dim);
+        const vec3 sampled_scattering = sampled_scattering_extinction.xyz;
+        const float sampled_extinction = sampled_scattering_extinction.w;
+        const float clamped_extinction = max(sampled_extinction, 0.00001f);
+
+        const float transmittance = exp(-sampled_extinction * z_step);
+
+        const vec3 scattering = (sampled_scattering - (sampled_scattering * transmittance)) / clamped_extinction;
+
+        integrated_scattering += scattering * integrated_transmittance;
+        integrated_transmittance *= transmittance;
+
+        vec3 stored_scattering = integrated_scattering;
+
+        /*
+        if ( enable_volumetric_fog_opacity_anti_aliasing() ) {
+            const float opacity = max( 1 - integrated_transmittance, 0.00000001f );
+            stored_scattering = integrated_scattering / opacity;
+        }*/
+
+        imageStore( integrated_light_scattering_texture, froxel_coord.xyz, vec4(stored_scattering, integrated_transmittance) );
+    }
+}

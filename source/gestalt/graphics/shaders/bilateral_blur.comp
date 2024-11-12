@@ -1,0 +1,49 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(binding = 0) uniform sampler2D ssaoInput;
+layout(binding = 1) uniform sampler2D depthTexture;
+layout(binding = 2) writeonly uniform image2D blurredSSAO;
+
+layout(push_constant) uniform BlurPushConstants {
+    float blurRadius;
+    float depthThreshold;
+} pc;
+
+void main() {
+    ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 imgSize = imageSize(blurredSSAO);
+
+    if (pixelCoord.x >= imgSize.x || pixelCoord.y >= imgSize.y)
+        return;
+
+    vec2 uv = vec2(pixelCoord) / vec2(imgSize);
+
+    float centerDepth = texture(depthTexture, uv).r;
+    float centerAO = texture(ssaoInput, uv).r;
+    float totalWeight = 0.0;
+    float blurredAO = 0.0;
+
+    for (int x = -int(pc.blurRadius); x <= int(pc.blurRadius); ++x) {
+        for (int y = -int(pc.blurRadius); y <= int(pc.blurRadius); ++y) {
+            ivec2 offset = pixelCoord + ivec2(x, y);
+            vec2 offsetCoords = uv + vec2(x, y) / vec2(imgSize);
+
+            float sampleDepth = texture(depthTexture, offsetCoords).r;
+            float sampleAO = texture(ssaoInput, offsetCoords).r;
+
+            float spatialWeight = exp(-0.5 * (x * x + y * y));
+            float depthWeight = exp(-abs(centerDepth - sampleDepth) / pc.depthThreshold);
+            float weight = spatialWeight * depthWeight;
+
+            blurredAO += sampleAO * weight;
+            totalWeight += weight;
+        }
+    }
+
+    blurredAO /= totalWeight;
+    imageStore(blurredSSAO, pixelCoord, vec4(vec3(blurredAO), 1.0));
+
+    //imageStore(blurredSSAO, pixelCoord, vec4(vec3(pixelCoord, 1.0), 1.0));
+}

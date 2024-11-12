@@ -15,6 +15,7 @@
 #include <glm/gtc/random.hpp>
 
 #include "vk_initializers.hpp"
+#include "ECS/ComponentFactory.hpp"
 #include "Interface/IDescriptorLayoutBuilder.hpp"
 #include "Interface/IGpu.hpp"
 #include "Mesh/MeshSurface.hpp"
@@ -233,11 +234,12 @@ namespace gestalt::application {
       if (ImGuiFileDialog::Instance()->Display("ChooseGLTF")) {
         // Check if user confirmed the selection
         if (ImGuiFileDialog::Instance()->IsOk()) {
-          std::string filePathName = ImGuiFileDialog::Instance()->GetFilePathName();
-          std::string filePath = ImGuiFileDialog::Instance()->GetCurrentPath();
+          std::filesystem::path filePathName = ImGuiFileDialog::Instance()->GetFilePathName();
+          std::filesystem::path filePath = ImGuiFileDialog::Instance()->GetCurrentPath();
 
-          fmt::print("Importing File: {}\n", filePathName);
-          actions_.load_gltf(filePathName);
+          fmt::print("Importing File: {}\n",
+                     filePathName.string());  // Convert path to string for printing
+          actions_.load_gltf(filePathName);   // Pass filePathName directly as a filesystem path
         }
 
         // Close the dialog after retrieval
@@ -570,7 +572,7 @@ namespace gestalt::application {
         ImGui::SliderFloat("Min Luminance", &config.light_adaptation.min_luminance, 0.0001f, 1.0f,
                            "Min: %.4f", ImGuiSliderFlags_Logarithmic);
 
-        ImGui::SliderFloat("Max Luminance", &config.light_adaptation.max_luminance, 1.0f, 100.0f,
+        ImGui::SliderFloat("Max Luminance", &config.light_adaptation.max_luminance, 1.0f, 100000.0f,
                            "Max: %.4f", ImGuiSliderFlags_Logarithmic);
       }
       ImGui::End();
@@ -671,10 +673,76 @@ namespace gestalt::application {
           config.lighting.debug_mode = current_debug_mode;
         }
 
+         if (ImGui::CollapsingHeader("Volumetric Lighting Settings")) {
+          auto& params = config.volumetric_lighting;
+          // Halton XY (usually small jitter values, range [-1.0, 1.0])
+          ImGui::SliderFloat2("Halton XY", &params.halton_xy.x, -1.0f, 1.0f, "%.2f");
+
+          // Temporal Reprojection Jitter Scale (sensible values between 0 and 1)
+          ImGui::SliderFloat("Jitter Scale", &params.temporal_reprojection_jitter_scale, 0.0f, 1.0f,
+                             "%.2f");
+
+          // Density Modifier (controls overall fog density, typical range [0.1, 5.0])
+          ImGui::SliderFloat("Density Modifier", &params.density_modifier, 0.1f, 5.0f, "%.2f");
+
+          // Noise Scale (scales noise for fog, typical range [0.1, 10.0])
+          ImGui::SliderFloat("Noise Scale", &params.noise_scale, 0.1f, 10.0f, "%.2f");
+
+          ImGui::Combo("Noise Type", (int*)&params.noise_type,
+                       "Blue Noise\0Interleaved Noise\0");
+
+          // Volumetric Noise Position Multiplier (range [0.1, 10.0] for controlling noise
+          // tiling/position)
+          ImGui::SliderFloat("Noise Position Multiplier",
+                             &params.volumetric_noise_position_multiplier, 0.1f, 10.0f, "%.2f");
+
+          // Volumetric Noise Speed Multiplier (range [0.0, 10.0] for noise animation speed)
+          ImGui::SliderFloat("Noise Speed Multiplier", &params.volumetric_noise_speed_multiplier,
+                             0.0f, 10.0f, "%.2f");
+
+          // Height Fog Density (controls fog density along the Y-axis, range [0.0, 1.0])
+          ImGui::SliderFloat("Height Fog Density", &params.height_fog_density, 0.0f, 1.0f, "%.3f",
+                             ImGuiSliderFlags_Logarithmic);
+
+          // Height Fog Falloff (range [0.1, 10.0] for how quickly fog density falls off with
+          // height)
+          ImGui::SliderFloat("Height Fog Falloff", &params.height_fog_falloff, 0.f, 2.0f, "%.2f",
+                             ImGuiSliderFlags_Logarithmic);
+
+          // Box Position (world-space position of the fog box, wide range)
+          ImGui::SliderFloat3("Box Position", &params.box_position.x, -100.0f, 100.0f, "%.2f");
+
+          // Box Fog Density (density of the fog within the box, range [0.0, 1.0])
+          ImGui::SliderFloat("Box Fog Density", &params.box_fog_density, 0.0f, 1.0f, "%.3f");
+
+          // Box Size (size of the fog box in world-space units, typical range [1.0, 100.0])
+          ImGui::SliderFloat3("Box Size", &params.box_size.x, 1.0f, 100.0f, "%.2f");
+
+           ImGui::SliderInt("Enable Spatial Filtering", &params.enable_spatial_filter, 0, 1);
+
+          // Scattering Factor (how much light scatters in the fog, range [0.0, 1.0])
+          ImGui::SliderFloat("Scattering Factor", &params.scattering_factor, 0.0f, 1.0f, "%.2f");
+
+           if (params.phase_type == 3) {
+            // Droplet Size (controls the size of the droplets, range [5.0, 50.0])
+             ImGui::SliderFloat("Droplet Size", &params.phase_anisotropy, 0.01f, 50.0f, "%.3f",
+                                ImGuiSliderFlags_Logarithmic);
+           } else {
+             // Phase Anisotropy (controls forward/backward scattering, range [-1.0, 1.0])
+             ImGui::SliderFloat("Phase Anisotropy", &params.phase_anisotropy, -1.0f, 1.0f, "%.3f");
+           }
+
+          ImGui::Combo("Phase Type", (int*)&params.phase_type, "Henyey-Greenstein\0Cornette-Shanks\0Shlick\0Henyey-Greenstein + Draine\0");
+        }
+
         if (ImGui::CollapsingHeader("SSAO Settings")) {
           ImGui::Checkbox("Enable SSAO", &config.enable_ssao);
           ImGui::SliderInt("SSAO Quality", &config.ssao_quality, 1, 4);
           ImGui::Checkbox("Show SSAO", &config.ssao.show_ssao_only);
+
+          ImGui::SliderFloat("Blur Radius", &config.ssao_radius, 0.0f, 10.0f, "%.3f");
+          ImGui::SliderFloat("Blur Depth Threshold", &config.depthThreshold, 0.0f, 10.0f, "%.3f");
+
           ImGui::SliderFloat("Scale", &config.ssao.scale, 0.0f, 10.0f, "%.3f");
           ImGui::SliderFloat("Bias", &config.ssao.bias, 0.0f, 1.0f, "%.3f");
           ImGui::SliderFloat("Radius", &config.ssao.radius, 0.0f, .5f, "%.2f");
@@ -690,9 +758,9 @@ namespace gestalt::application {
 
       if (ImGui::CollapsingHeader("HDR Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Checkbox("Enable HDR", &config.enable_hdr);
-        ImGui::SliderInt("Bloom Quality", &config.bloom_quality, 1, 9);
+        ImGui::SliderInt("Bloom Quality", &config.bloom_quality, 1, 3);
         const char* toneMappingOptions[]
-            = {"Reinhard Extended", "Uncharted 2", "ACES approximation", "ACES fitted"};
+            = {"Reinhard Extended", "Uncharted 2", "ACES approximation", "ACES fitted", "AGX"};
         int currentOption = config.hdr.toneMappingOption;
         if (ImGui::Combo("Tone Mapping Option", &currentOption, toneMappingOptions,
                          IM_ARRAYSIZE(toneMappingOptions))) {
@@ -702,7 +770,8 @@ namespace gestalt::application {
         ImGui::Checkbox("Show Bright Pass", &config.hdr.show_bright_pass);
         ImGui::SliderFloat("Exposure", &config.hdr.exposure, 0.1f, 2.0f, "%.3f");
         ImGui::SliderFloat("Max White", &config.hdr.maxWhite, 0.1f, 10.f, "%.3f");
-        ImGui::SliderFloat("Bloom Strength", &config.hdr.bloomStrength, 0.0f, 2.f, "%.2f");
+        ImGui::SliderFloat("Bloom Strength", &config.hdr.bloomStrength, 0.0f, 1.f, "%.4f",
+                           ImGuiSliderFlags_Logarithmic);
         ImGui::ColorPicker4("Lift", &config.hdr.lift[0], ImGuiColorEditFlags_Float);
         ImGui::ColorPicker4("Gamma", &config.hdr.gamma[0], ImGuiColorEditFlags_Float);
         ImGui::ColorPicker4("Gain", &config.hdr.gain[0], ImGuiColorEditFlags_Float);
@@ -970,7 +1039,7 @@ namespace gestalt::application {
       if (ImGui::ColorPicker3("Color", &light.base.color.x, ImGuiColorEditFlags_Float)) {
         light.is_dirty = true;
       }
-      if (ImGui::SliderFloat("Intensity", &light.base.intensity, 0.0f, 100.0f, "%.3f",
+      if (ImGui::SliderFloat("Intensity", &light.base.intensity, 0.0f, 150000.0f, "%.3f",
                              ImGuiSliderFlags_Logarithmic)) {
         light.is_dirty = true;
       }
@@ -1019,7 +1088,8 @@ namespace gestalt::application {
                 projection.fov = fovInDegrees * (glm::pi<float>() / 180.0f);
               }
               ImGui::SliderFloat("Near Clip", &projection.near, 0.01f, 10.0f, "%.2f");
-              ImGui::SliderFloat("Far Clip", &projection.far, 10.0f, 10000.0f, "%.2f");
+              ImGui::SliderFloat("Far Clip", &projection.far, 10.0f, 10000.0f, "%.2f",
+                                 ImGuiSliderFlags_Logarithmic);
             } else if constexpr (std::is_same_v<T, OrthographicProjectionData>) {
               ImGui::Text("Orthographic Projection:");
               ImGui::SliderFloat("Left", &projection.left, -100.0f, 100.0f, "%.2f");
@@ -1027,7 +1097,8 @@ namespace gestalt::application {
               ImGui::SliderFloat("Bottom", &projection.bottom, -100.0f, 100.0f, "%.2f");
               ImGui::SliderFloat("Top", &projection.top, -100.0f, 100.0f, "%.2f");
               ImGui::SliderFloat("Near Clip", &projection.near, 0.01f, 10.0f, "%.2f");
-              ImGui::SliderFloat("Far Clip", &projection.far, 10.0f, 10000.0f, "%.2f");
+              ImGui::SliderFloat("Far Clip", &projection.far, 10.0f, 10000.0f, "%.2f",
+                                 ImGuiSliderFlags_Logarithmic);
             }
           },
           camera.projection_data);

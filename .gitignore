@@ -33,6 +33,7 @@
 
 /build
 /project
+/bin/config.json
 /bin/shaders
 /bin/release/*.pdb
 /bin/debug/*.pdb

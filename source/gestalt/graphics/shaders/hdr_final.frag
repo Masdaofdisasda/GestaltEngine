@@ -89,6 +89,30 @@ vec3 ACESAproximation(vec3 x) {
     return clamp((x*(a*x+b))/(x*(c*x+d)+e), 0.0, 1.0);
 }
 
+// https://github.com/bWFuanVzYWth/AgX/blob/main/agx.glsl
+vec3 agx_curve3(vec3 v){
+    vec3 mask = step(v, vec3(0.0));
+    vec3 a = (0.013247155) + (0.007716549 - 0.013247155) * mask;
+    vec3 b = (3.0 / 1.0) + (13.0 / 4.0 - 3.0 / 1.0) * mask;
+    vec3 c = (-1.0 / 3.0) + (-4.0 / 13.0 + 1.0 / 3.0) * mask;
+    return 0.5 + 0.12121212 * v * pow(1.0 + a * pow(abs(v), b), c);
+}
+
+vec3 agx_tonemapping(vec3 /*Linear BT.709*/ci) {
+    const mat3 agx_mat = mat3(0.84247905, 0.04232824, 0.04237565, 0.07843360, 0.87846863, 0.07843360, 0.07922374, 0.07916613, 0.87914300);
+    const mat3 agx_mat_inv = mat3(1.19687903, -0.05289685, -0.05297164, -0.09802088, 1.15190315, -0.09804345, -0.09902974, -0.09896117, 1.15107369);
+
+    // Input transform (inset)
+    ci = agx_mat * ci;
+
+    // Apply sigmoid function
+    vec3 co = agx_curve3(log2(ci));
+
+    // Inverse input transform (outset)
+    co = agx_mat_inv * co;
+
+    return /*Linear BT.709*/co;
+}
 
 vec3 ApplyLiftGammaGain(vec3 color, vec3 lift, vec3 gamma, vec3 gain) {
     // Apply lift (shadows)
@@ -172,16 +196,22 @@ vec3 convertYxy2RGB(vec3 Yxy) {
 void main() {
     vec3 sceneColor = texture(texScene, uv).rgb;
     vec3 bloomColor = texture(texBloom, uv).rgb;
-	vec3 avgLuminance = max(texture(texLuminance, vec2(0.5, 0.5)).rrr, vec3(0.0000001));
+    float avgLuminance = max(texture(texLuminance, vec2(0.5, 0.5)).r, 0.0000001);
 
-    vec3 exposureAdjustment = 1.0 / avgLuminance;
-    sceneColor *= exposureAdjustment * params.exposure;
+    float keyValue = 0.18; // Middle gray value
+    float exposure = keyValue / avgLuminance * params.exposure;
+
+    sceneColor *= exposure;
 
     if (params.showBloom) {
         sceneColor = bloomColor;
     } else {
-        bloomColor *= avgLuminance;
-		sceneColor = mix(sceneColor, bloomColor, params.bloomStrength); //todo upsample bloom
+
+    // todo Upsample bloom if necessary
+    vec3 upsampledBloom = bloomColor;
+    upsampledBloom *= params.bloomStrength;
+    sceneColor += upsampledBloom;
+
 	}
 
     // Tone mapping
@@ -203,6 +233,8 @@ void main() {
         sceneColor = ACESAproximation(sceneColor); 
     } else if (params.toneMappingOption == 3) {
         sceneColor = ACES_fitted(sceneColor); 
+    } else if (params.toneMappingOption == 4) {
+        sceneColor = agx_tonemapping(sceneColor); 
     }
 
     // Color grading

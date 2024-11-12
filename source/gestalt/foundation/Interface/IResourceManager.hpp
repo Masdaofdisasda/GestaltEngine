@@ -1,4 +1,6 @@
 ﻿#pragma once
+#include <Resources/AllocatedBuffer.hpp>
+#include <Repository.hpp>
 
 namespace gestalt::foundation {
   class IGpu;
@@ -37,11 +39,16 @@ namespace gestalt::foundation {
     virtual void load_and_process_cubemap(const std::string& file_path) = 0;
     virtual TextureHandle create_cubemap_from_HDR(std::vector<float>& image_data, int h, int w) = 0;
     virtual void create_frame_buffer(const std::shared_ptr<TextureHandle>& image,
+                                     const std::string& name,
                                      VkFormat format = VK_FORMAT_UNDEFINED) const
         = 0;
     virtual TextureHandle create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage,
                                        bool mipmapped = false, bool cubemap = false)
         = 0;
     virtual void destroy_image(const TextureHandle& img) = 0;
+
+    virtual void SetDebugName(const std::string& name, VkObjectType type, VkDevice device,
+                               uint64_t handle) const
+        = 0;
   };
 }  // namespace gestalt

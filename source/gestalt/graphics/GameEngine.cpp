@@ -25,8 +25,8 @@ namespace gestalt {
     assert(engine == nullptr);
     engine = this;
 
-    // todo load from file
-    foundation::Config config{};
+    foundation::EngineConfiguration::getInstance().loadFromFile();
+    auto config = foundation::EngineConfiguration::getInstance().getConfig();
     config.useValidationLayers = true;
     foundation::EngineConfiguration::getInstance().setConfig(config);
 
@@ -53,7 +53,7 @@ namespace gestalt {
   void GameEngine::register_gui_actions() {
     gui_actions_.exit = [this]() { quit_ = true; };
     gui_actions_.load_gltf
-        = [this](const std::string& path) { scene_manager_->request_scene(path); };
+        = [this](const std::filesystem::path& file_path) { scene_manager_->request_scene(file_path); };
     gui_actions_.get_component_factory = [this]() -> application::ComponentFactory& {
       return scene_manager_->get_component_factory();
     };

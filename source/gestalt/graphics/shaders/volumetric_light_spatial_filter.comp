@@ -1,0 +1,54 @@
+#version 450
+
+#extension GL_GOOGLE_include_directive: require
+
+#include "volumetric_light_util.glsl"
+
+layout(push_constant) uniform constants
+{
+    uvec3 froxel_dimensions;
+    int use_spatial_filtering;
+} PushConstants;
+
+layout(binding = 0) uniform sampler3D light_scattering_texture;
+layout(binding = 1) writeonly uniform image3D froxel_data_texture; 
+
+layout (local_size_x = FROXEL_DISPATCH_X, local_size_y = FROXEL_DISPATCH_Y, local_size_z = FROXEL_DISPATCH_Z) in;
+
+#define SIGMA_FILTER 5.0
+#define RADIUS 2
+
+float gaussian(float radius, float sigma) {
+    const float v = radius / sigma;
+    return exp(-(v*v));
+}
+
+void main() {
+
+    ivec3 froxel_coord = ivec3(gl_GlobalInvocationID.xyz);
+    vec3 rcp_froxel_dim = 1.0f / PushConstants.froxel_dimensions.xyz;
+
+    vec4 scattering_extinction = texture(light_scattering_texture, froxel_coord * rcp_froxel_dim);
+    if ( PushConstants.use_spatial_filtering == 1 ) {
+        
+        float accumulated_weight = 0;
+        vec4 accumulated_scattering_extinction = vec4(0);
+
+        for (int i = -RADIUS; i <= RADIUS; ++i ) {
+            for (int j = -RADIUS; j <= RADIUS; ++j ) {
+                ivec3 coord = froxel_coord + ivec3(i, j, 0);
+                // if inside
+                if (all(greaterThanEqual(coord, ivec3(0))) && all(lessThanEqual(coord, ivec3(PushConstants.froxel_dimensions.xyz)))) {
+                    const float weight = gaussian(length(ivec2(i, j)), SIGMA_FILTER);
+                    const vec4 sampled_value = texture(light_scattering_texture, coord * rcp_froxel_dim);
+                    accumulated_scattering_extinction.rgba += sampled_value.rgba * weight;
+                    accumulated_weight += weight;
+                }
+            }
+        }
+
+        scattering_extinction = accumulated_scattering_extinction / accumulated_weight;
+    }
+
+    imageStore( froxel_data_texture, froxel_coord.xyz, scattering_extinction );
+}

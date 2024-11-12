@@ -1,0 +1,152 @@
+#version 450
+
+#extension GL_GOOGLE_include_directive: require
+
+#include "per_frame_structs.glsl"
+#include "pbr.glsl"
+#include "volumetric_light_util.glsl"
+#include "shadow_mapping.glsl"
+
+layout(push_constant) uniform constants
+{
+    vec2 halton_xy;
+    float temporal_reprojection_jitter_scale;
+    float density_modifier;
+
+    uvec3 froxel_dimensions;
+    int current_frame;
+
+    float noise_scale;
+    uint noise_type;
+    float froxel_near;
+    float froxel_far;
+
+    mat4 froxel_inverse_view_projection;
+
+    float scattering_factor;
+    float phase_anisotropy;
+    uint phase_type;
+    int num_point_lights;
+} PushConstants;
+
+layout (local_size_x = FROXEL_DISPATCH_X, local_size_y = FROXEL_DISPATCH_Y, local_size_z = FROXEL_DISPATCH_Z) in;
+
+layout(set = 1, binding = 0) uniform sampler2D blue_noise;
+layout(set = 1, binding = 1) uniform sampler3D froxel_data_texture;
+layout(set = 1, binding = 2) uniform sampler2D shadowMap;
+layout(set = 1, binding = 3) writeonly uniform image3D light_scattering_texture;
+
+
+struct ViewProjData {
+	mat4 view;
+    mat4 proj;
+}; 
+
+struct DirectionalLight {
+	vec3 color;
+	float intensity;
+	vec3 direction;
+	int viewProjIndex;
+}; 
+
+struct PointLight {
+	vec3 color;
+	float intensity;
+	vec3 position;
+	float range;
+}; 
+
+layout(set = 2, binding = 0) readonly buffer LightViewProj
+{
+	ViewProjData viewProjData[];
+};
+
+layout(set = 2, binding = 1) readonly buffer DirectionalLightBuffer
+{
+	DirectionalLight dirLight[];
+};
+
+layout(set = 2, binding = 2) readonly buffer PointLightBuffer
+{
+	PointLight pointLight[];
+};
+
+
+const mat4 biasMat = mat4( 
+	0.5, 0.0, 0.0, 0.0,
+	0.0, 0.5, 0.0, 0.0,
+	0.0, 0.0, 1.0, 0.0,
+	0.5, 0.5, 0.0, 1.0 );
+
+void main() {
+
+    ivec3 froxel_coord = ivec3(gl_GlobalInvocationID.xyz);
+
+    // Check coordinates boundaries
+    vec3 world_position = world_from_froxel(
+        froxel_coord,
+        PushConstants.halton_xy,
+        PushConstants.temporal_reprojection_jitter_scale,
+        PushConstants.froxel_dimensions,
+        PushConstants.current_frame,
+        PushConstants.noise_scale,
+        PushConstants.noise_type,
+        blue_noise,
+        PushConstants.froxel_near,
+        PushConstants.froxel_far,
+        PushConstants.froxel_inverse_view_projection
+    );
+
+    vec3 rcp_froxel_dim = 1.0f / PushConstants.froxel_dimensions.xyz;
+    vec3 fog_data_uvw = froxel_coord * rcp_froxel_dim;
+    vec4 scattering_extinction = texture(froxel_data_texture, fog_data_uvw);
+
+    float extinction = scattering_extinction.a;
+    vec3 lighting = vec3(0.0);
+    
+	vec3 camera_position = -normalize(vec3(view[0][2], view[1][2], view[2][2]));
+
+    if ( extinction >= 0.01f ) {
+        vec3 V = normalize(camera_position.xyz - world_position);
+
+        // TODO : Add point lights & support second directional light
+        DirectionalLight direction_light = dirLight[0];
+                
+	    mat4 lightView = viewProjData[direction_light.viewProjIndex].view;
+	    mat4 lightProj = viewProjData[direction_light.viewProjIndex].proj;
+	    mat4 lightViewProj = lightProj * lightView;
+        vec4 lightSpacePos = biasMat * lightViewProj * vec4(world_position, 1.0);
+
+	    float shadow = 1.0;
+		float bias = 0.00001f;
+		shadow = shadowFactor(lightSpacePos, shadowMap, bias).r;
+        
+		vec3 pointToLight = direction_light.direction;
+		vec3 L = normalize(pointToLight);
+       
+        // Convert illuminance to radiance
+        const float luminousEfficacy = 93.0; // lm/W
+        float L_e = direction_light.intensity / (PI * luminousEfficacy);
+        vec3 L_i = direction_light.color * L_e;
+
+        lighting += L_i * shadow * phase_function(V, -L, PushConstants.phase_anisotropy, PushConstants.phase_type);
+
+        for (int i = 0; i < PushConstants.num_point_lights; ++i) {
+            if (length(pointLight[i].position - world_position) > pointLight[i].range) {
+				continue;
+			}
+            
+			vec3 pointToLight = pointLight[i].position - world_position;
+			vec3 L = normalize(pointToLight); 
+
+			// https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
+			vec3 intensity = getPointLighIntensity(pointLight[i].color, pointLight[i].intensity, pointLight[i].range, pointToLight);
+            lighting += intensity * phase_function(V, -L, PushConstants.phase_anisotropy, PushConstants.phase_type);
+		}
+
+    }    
+
+    vec3 scattering = scattering_extinction.rgb * lighting;
+
+    imageStore( light_scattering_texture, ivec3(froxel_coord.xyz), vec4(scattering, extinction) );
+}

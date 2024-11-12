@@ -1,13 +1,14 @@
 ﻿#pragma once
 
 #include "Gpu.hpp"
+#include "Window.hpp"
 #include "Gui.hpp"
 #include "InputSystem.hpp"
-#include "RenderEngine.hpp"
-#include "EntityManager.hpp"
+#include "Render Engine/RenderEngine.hpp"
+#include "ECS/ECSManager.hpp"
 #include "FrameProvider.hpp"
 #include "TmeTrackingService.hpp"
-#include "Window.hpp"
+#include "Utils/vk_descriptors.hpp"
 
 namespace gestalt {
   class GameEngine {
@@ -26,8 +27,8 @@ namespace gestalt {
 
     std::unique_ptr<graphics::RenderEngine> render_pipeline_
         = std::make_unique<graphics::RenderEngine>();
-    std::unique_ptr<application::EntityManager> scene_manager_
-        = std::make_unique<application::EntityManager>();
+    std::unique_ptr<application::ECSManager> scene_manager_
+        = std::make_unique<application::ECSManager>();
     std::unique_ptr<foundation::Repository> repository_
         = std::make_unique<foundation::Repository>();
 

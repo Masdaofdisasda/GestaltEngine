@@ -4,7 +4,7 @@
 
 #include "VulkanCheck.hpp"
 
-#include "EngineConfig.hpp"
+#include "EngineConfiguration.hpp"
 #include "vk_initializers.hpp"
 
 namespace gestalt::graphics {

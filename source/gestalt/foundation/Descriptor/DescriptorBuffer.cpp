@@ -24,6 +24,8 @@ namespace gestalt::foundation {
         descriptor_info.data.pStorageBuffer = &addr_info;
       } else if (descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
         descriptor_info.data.pCombinedImageSampler = &img_info;
+      } else if (descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) {
+        descriptor_info.data.pStorageImage = &img_info;
       } else {
         assert(false && "Invalid descriptor type");
       }

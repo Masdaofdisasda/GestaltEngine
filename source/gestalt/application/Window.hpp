@@ -1,16 +1,15 @@
 #pragma once
 
-#define SDL_MAIN_HANDLED
-#include <SDL.h>
-
 #include "common.hpp"
 #include "VulkanTypes.hpp"
+
+struct SDL_Window;
 
 namespace gestalt::application {
 
     class Window : public NonCopyable<Window> {
     public:
-      SDL_Window* handle{nullptr};
+      SDL_Window* handle;
       VkExtent2D extent{1920, 1080};
 
       void init();

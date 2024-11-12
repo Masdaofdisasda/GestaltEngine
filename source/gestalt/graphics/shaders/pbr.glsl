@@ -66,7 +66,7 @@ struct MaterialInfo
 
 const float M_PI = 3.141592653589793;
 
-vec3 getIBLRadianceGGX(MaterialInfo materialInfo)
+vec3 getIBLRadianceGGX(MaterialInfo materialInfo, sampler2D texBdrfLut, samplerCube texEnvMap)
 {
     float lod = 0; //roughness * float(u_MipCount - 1); Todo
 	float intensity = 0.007;
@@ -87,7 +87,7 @@ vec3 getIBLRadianceGGX(MaterialInfo materialInfo)
 }
 
 // specularWeight is introduced with KHR_materials_specular
-vec3 getIBLRadianceLambertian(MaterialInfo materialInfo)
+vec3 getIBLRadianceLambertian(MaterialInfo materialInfo, sampler2D texBdrfLut, samplerCube texEnvMapIrradiance)
 {
     vec2 brdfSamplePoint = clamp(vec2(materialInfo.NdotV, materialInfo.perceptualRoughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
     vec2 f_ab = texture(texBdrfLut, brdfSamplePoint).rg;

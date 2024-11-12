@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "BufferCollection.hpp"
-#include "EngineConfig.hpp"
+#include "EngineConfiguration.hpp"
 #include "PerFrameData.hpp"
 #include "common.hpp"
 #include "Descriptor/DescriptorBuffer.hpp"

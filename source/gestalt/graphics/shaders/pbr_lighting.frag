@@ -9,6 +9,7 @@
 #include "input_structures.glsl"
 #include "pbr.glsl"
 #include "shadow_mapping.glsl"
+#include "volumetric_light_util.glsl"
 
 layout(location = 0) in vec2 texCoord;
 
@@ -53,6 +54,8 @@ layout(set = 3, binding = 1) uniform sampler2D gbuffer2;
 layout(set = 3, binding = 2) uniform sampler2D gbuffer3;
 layout(set = 3, binding = 3) uniform sampler2D depthBuffer;
 layout(set = 3, binding = 4) uniform sampler2D shadowMap;
+layout(set = 3, binding = 5) uniform sampler3D integrated_light_scattering_texture;
+layout(set = 3, binding = 6) uniform sampler2D texAo;
 
 layout( push_constant ) uniform constants
 {	
@@ -104,6 +107,7 @@ void main() {
 	vec4 albedoMetal = texture(gbuffer1, UV);
 	vec4 normalRough = texture(gbuffer2, UV);
 	vec4 emissiveOcclusion  = texture(gbuffer3, UV);
+	float ssao = texture(texAo, UV).r;
 
 	vec4 Kd = vec4(albedoMetal.rgb, 1.0);
 
@@ -138,37 +142,51 @@ void main() {
 
 	// Calculate lighting contribution from image based lighting source (IBL)
 	if (params.ibl_mode == 0) {
-		materialInfo.f_diffuse_ibl += getIBLRadianceLambertian(materialInfo);
-		materialInfo.f_specular_ibl += getIBLRadianceGGX(materialInfo);
+		materialInfo.f_diffuse_ibl += getIBLRadianceLambertian(materialInfo, texBdrfLut, texEnvMapIrradiance);
+		materialInfo.f_specular_ibl += getIBLRadianceGGX(materialInfo, texBdrfLut, texEnvMap);
 	} else if (params.ibl_mode == 1) {
-		materialInfo.f_diffuse_ibl += getIBLRadianceLambertian(materialInfo);
+		materialInfo.f_diffuse_ibl += getIBLRadianceLambertian(materialInfo, texBdrfLut, texEnvMapIrradiance);
 	} else if (params.ibl_mode == 2) {
-		materialInfo.f_specular_ibl += getIBLRadianceGGX(materialInfo);
+		materialInfo.f_specular_ibl += getIBLRadianceGGX(materialInfo, texBdrfLut, texEnvMap);
 	}
 
 	// directional light contribution
 	if (params.shading_mode == 0 || params.shading_mode == 1) {
 		for (int i = 0; i < params.num_dir_lights; ++i) {
 
-			vec3 pointToLight = dirLight[i].direction;
+			vec3 D = normalize(dirLight[i].direction);
 
 			// BSTF
 			vec3 n = materialInfo.n;
 			vec3 v = materialInfo.v;
-			vec3 l = normalize(pointToLight);   // Direction from surface point to light
-			vec3 h = normalize(l + v);          // Direction of the vector between l and v, called halfway vector
-			float NdotL = clamp(dot(n, l), 0.001, 1.0);
+			
+			// https://seblagarde.wordpress.com/wp-content/uploads/2015/07/course_notes_moving_frostbite_to_pbr_v32.pdf
+			float sunAngularRadius = 0.0046;
+			float r = sin(sunAngularRadius); // Disk radius
+			float d = cos(sunAngularRadius); // Distance to disk
+
+			// Compute the reflection vector
+			vec3 R = reflect(-v, n);
+
+			// Adjusted light direction for specular lighting
+			float DdotR = dot(D, R);
+			vec3 S = R - DdotR * D;
+			vec3 L = DdotR < d ? normalize(d * D + normalize(S) * r) : R;
+
+			vec3 h = normalize(L + v);          // Direction of the vector between l and v, called halfway vector
+			float NdotL = clamp(dot(n, L), 0.001, 1.0);
 			float NdotV = clamp(dot(n, v), 0.0, 1.0);
 			float NdotH = clamp(dot(n, h), 0.0, 1.0);
-			float LdotH = clamp(dot(l, h), 0.0, 1.0);
+			float LdotH = clamp(dot(L, h), 0.0, 1.0);
 			float VdotH = clamp(dot(v, h), 0.0, 1.0);
+			float NdotD = clamp(dot(n, D), 0.0, 1.0);
 
 			if (NdotL <= 0.0 && NdotV <= 0.0) { continue; }
 
-			// Calculation of analytical light
-			// https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
-			vec3 intensity = getDirectionalLighIntensity(dirLight[i].color, dirLight[i].intensity);
-			materialInfo.f_diffuse += shadow * intensity * NdotL *  BRDF_lambertian(materialInfo.f0, materialInfo.f90, materialInfo.c_diff, materialInfo.specularWeight, VdotH);
+			float illuminance = dirLight[i].intensity * NdotD;
+
+			vec3 intensity = getDirectionalLighIntensity(dirLight[i].color, illuminance);
+			materialInfo.f_diffuse += shadow * intensity * NdotD *  BRDF_lambertian(materialInfo.f0, materialInfo.f90, materialInfo.c_diff, materialInfo.specularWeight, VdotH);
 			materialInfo.f_specular += shadow * intensity * NdotL * BRDF_specularGGX(materialInfo.f0, materialInfo.f90, materialInfo.alphaRoughness, materialInfo.specularWeight, VdotH, NdotL, NdotV, NdotH);
 		}
 	}
@@ -202,11 +220,14 @@ void main() {
 
 	materialInfo.f_emissive = Ke.rgb;
 
-	float ao = MeR.r;
+	float ao = MeR.r + ssao;
 	vec3 diffuse = materialInfo.f_diffuse + materialInfo.f_diffuse_ibl * ao;
 	vec3 specular = materialInfo.f_specular + materialInfo.f_specular_ibl * ao * shadow;
 
 	vec3 color = materialInfo.f_emissive + diffuse + specular;
+
+	vec2 uv_inv = vec2(UV.x, 1.0 - UV.y); // TODO : fog volume is somehow flipped
+	color = apply_volumetric_fog( uv_inv, depth, color, znear, zfar, integrated_light_scattering_texture );
 
 	if (params.debugMode == 0) {
 		outFragColor = vec4(color, 1.0);
@@ -219,7 +240,7 @@ void main() {
 	} else if (params.debugMode == 4) {
 		outFragColor = vec4(MeR.rgb, 1.0);
 	} else if (params.debugMode == 5) {
-		outFragColor = vec4(MeR.rrr, 1.0);
+		outFragColor = vec4(ao.rrr, 1.0);
 	} else if (params.debugMode == 6) {
 		outFragColor = vec4(0.0, MeR.g, 0.0, 1.0);
 	} else if (params.debugMode == 7) {

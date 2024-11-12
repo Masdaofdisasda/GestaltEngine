@@ -25,7 +25,9 @@ void main()
    float currentLum = texture(currentLuminance, vec2(0.5, 0.5)).x;
    float adaptedLum = texture(adaptedLuminance, vec2(0.5, 0.5)).x;
 
-   float tau = (currentLum < adaptedLum) ? params.adaptation_speed_light2dark : params.adaptation_speed_dark2light;
+   float adaptationTime = (currentLum < adaptedLum) ? params.adaptation_speed_light2dark : params.adaptation_speed_dark2light;
+    float tau = 1.0 / adaptationTime;
+
 
    //https://google.github.io/filament/Filament.html#imagingpipeline/physicallybasedcamera/adaptation
    float newAdaptation = adaptedLum + (currentLum - adaptedLum) * (1.0 - exp(-params.delta_time * tau));
@@ -34,3 +36,4 @@ void main()
 
    outColor = newAdaptation;
 }
+
