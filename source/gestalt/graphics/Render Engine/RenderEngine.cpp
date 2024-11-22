@@ -10,6 +10,7 @@
 #include "Repository.hpp"
 #include <VkBootstrap.h>
 
+#include "FrameGraph.hpp"
 #include "VulkanCheck.hpp"
 
 #include "FrameProvider.hpp"
@@ -23,6 +24,50 @@ namespace gestalt::graphics {
   void RenderEngine::init(IGpu* gpu, Window* window,
                             ResourceManager* resource_manager,
                             Repository* repository, Gui* imgui_gui, FrameProvider* frame) {
+    {
+      fg::FrameGraph frame_graph;
+
+      // Image resources
+      fg::ImageResource shadow_map("shadow_map");
+      fg::ImageResource g_buffer_1("g_buffer1");
+      fg::ImageResource g_buffer_2("g_buffer2");
+      fg::ImageResource g_buffer_3("g_buffer3");
+      fg::ImageResource g_buffer_depth("g_buffer_depth");
+      fg::ImageResource scene_lit("scene_lit");
+      fg::ImageResource scene_final("scene_final");
+      frame_graph.addEdge(shadow_map);
+      frame_graph.addEdge(g_buffer_1);
+      frame_graph.addEdge(g_buffer_2);
+      frame_graph.addEdge(g_buffer_3);
+      frame_graph.addEdge(g_buffer_depth);
+      frame_graph.addEdge(scene_lit);
+      frame_graph.addEdge(scene_final);
+
+      // Buffer resources
+      fg::BufferResource geometry_buffer("geometry_buffer");
+      fg::BufferResource material_buffer("material_buffer");
+      fg::BufferResource light_buffer("light_buffer");
+      frame_graph.addEdge(geometry_buffer);
+      frame_graph.addEdge(material_buffer);
+      frame_graph.addEdge(light_buffer);
+
+      // Shader Passes
+      fg::ShadowMapPass shadow_pass(shadow_map, geometry_buffer);
+      fg::GeometryPass geometry_pass(
+          g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth);
+      fg::LightingPass lighting_pass(
+          scene_lit, g_buffer_1, g_buffer_2, g_buffer_3,
+          g_buffer_depth, material_buffer, light_buffer);
+      fg::ToneMapPass tone_map_pass(scene_final, scene_lit);
+      frame_graph.addNode(shadow_pass);
+      frame_graph.addNode(geometry_pass);
+      frame_graph.addNode(lighting_pass);
+      frame_graph.addNode(tone_map_pass);
+
+      frame_graph.compile();
+      frame_graph.execute();
+    }
+
     gpu_ = gpu;
     window_ = window;
     resource_manager_ = resource_manager;
