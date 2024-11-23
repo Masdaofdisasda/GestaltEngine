@@ -25,20 +25,20 @@ namespace gestalt::graphics {
                             ResourceManager* resource_manager,
                             Repository* repository, Gui* imgui_gui, FrameProvider* frame) {
     {
-      auto frame_graph = std::make_unique<fg::FrameGraph>();
+      const auto frame_graph = std::make_unique<fg::FrameGraph>();
 
       // Image resources
-      auto shadow_map = frame_graph->addEdge(fg::ImageResource("shadow_map"));
-      auto g_buffer_1 = frame_graph->addEdge(fg::ImageResource("g_buffer1"));
-      auto g_buffer_2 = frame_graph->addEdge(fg::ImageResource("g_buffer2"));
-      auto g_buffer_3 = frame_graph->addEdge(fg::ImageResource("g_buffer3"));
-      auto g_buffer_depth = frame_graph->addEdge(fg::ImageResource("g_buffer_depth"));
-      auto scene_lit = frame_graph->addEdge(fg::ImageResource("scene_lit"));
-      auto scene_final = frame_graph->addEdge(fg::ImageResource("scene_final"));
+      auto shadow_map = frame_graph->add_resource(fg::ImageResource("shadow_map"));
+      auto g_buffer_1 = frame_graph->add_resource(fg::ImageResource("g_buffer1"));
+      auto g_buffer_2 = frame_graph->add_resource(fg::ImageResource("g_buffer2"));
+      auto g_buffer_3 = frame_graph->add_resource(fg::ImageResource("g_buffer3"));
+      auto g_buffer_depth = frame_graph->add_resource(fg::ImageResource("g_buffer_depth"));
+      auto scene_lit = frame_graph->add_resource(fg::ImageResource("scene_lit"));
+      auto scene_final = frame_graph->add_resource(fg::ImageResource("scene_final"));
 
-      auto geometry_buffer = frame_graph->addEdge(fg::BufferResource("geometry_buffer"));
-      auto material_buffer = frame_graph->addEdge(fg::BufferResource("material_buffer"));
-      auto light_buffer = frame_graph->addEdge(fg::BufferResource("light_buffer"));
+      auto geometry_buffer = frame_graph->add_resource(fg::BufferResource("geometry_buffer"));
+      auto material_buffer = frame_graph->add_resource(fg::BufferResource("material_buffer"));
+      auto light_buffer = frame_graph->add_resource(fg::BufferResource("light_buffer"));
 
       // Shader Passes
       std::shared_ptr<fg::RenderPass> resource_init_pass
@@ -50,11 +50,11 @@ namespace gestalt::graphics {
           scene_lit, g_buffer_1, g_buffer_2, g_buffer_3,
           g_buffer_depth, shadow_map, material_buffer, light_buffer);
       std::shared_ptr<fg::RenderPass> tone_map_pass = std::make_shared<fg::ToneMapPass>(scene_final, scene_lit);
-      frame_graph->addNode(std::move(resource_init_pass));
-      frame_graph->addNode(std::move(shadow_pass));
-      frame_graph->addNode(std::move(geometry_pass));
-      frame_graph->addNode(std::move(lighting_pass));
-      frame_graph->addNode(std::move(tone_map_pass));
+      frame_graph->add_render_pass(std::move(resource_init_pass));
+      frame_graph->add_render_pass(std::move(shadow_pass));
+      frame_graph->add_render_pass(std::move(geometry_pass));
+      frame_graph->add_render_pass(std::move(lighting_pass));
+      frame_graph->add_render_pass(std::move(tone_map_pass));
       
       frame_graph->compile();
       frame_graph->execute();

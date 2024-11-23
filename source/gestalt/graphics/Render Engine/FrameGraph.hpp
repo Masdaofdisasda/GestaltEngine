@@ -232,27 +232,27 @@ namespace gestalt::graphics::fg {
     }
   };
 
-  struct PassNode;
+  struct FrameGraphNode;
 
-  struct ResourceEdge {
+  struct FrameGraphEdge {
     std::shared_ptr<Resource> resource;
-    std::vector<std::shared_ptr<PassNode>> edges_in;
-    std::vector<std::shared_ptr<PassNode>> edges_out;
+    std::vector<std::shared_ptr<FrameGraphNode>> nodes_from;
+    std::vector<std::shared_ptr<FrameGraphNode>> nodes_to;
 
-    explicit ResourceEdge(Resource&& resource) : resource(std::make_shared<Resource>(std::move(resource))) {}
+    explicit FrameGraphEdge(Resource&& resource) : resource(std::make_shared<Resource>(std::move(resource))) {}
   };
 
-  struct PassNode {
-    std::shared_ptr<RenderPass> pass;
-    std::vector<std::shared_ptr<ResourceEdge>> edges_in;
-    std::vector<std::shared_ptr<ResourceEdge>> edges_out;
+  struct FrameGraphNode {
+    std::shared_ptr<RenderPass> render_pass;
+    std::vector<std::shared_ptr<FrameGraphEdge>> edges_in;
+    std::vector<std::shared_ptr<FrameGraphEdge>> edges_out;
 
-    explicit PassNode(std::shared_ptr<RenderPass>&& pass) : pass(std::move(pass)) {}
+    explicit FrameGraphNode(std::shared_ptr<RenderPass>&& render_pass) : render_pass(std::move(render_pass)) {}
 
-    std::vector<std::shared_ptr<PassNode>> get_neighbors() const {
-      std::vector<std::shared_ptr<PassNode>> neighbors;
+    std::vector<std::shared_ptr<FrameGraphNode>> get_neighbors() const {
+      std::vector<std::shared_ptr<FrameGraphNode>> neighbors;
       for (const auto& edge : edges_out) {
-        for (const auto& neighbor : edge->edges_out) {
+        for (const auto& neighbor : edge->nodes_to) {
           neighbors.push_back(neighbor);
         }
       }
@@ -296,69 +296,23 @@ namespace gestalt::graphics::fg {
   };
 
   class FrameGraph : public NonCopyable<FrameGraph> {
-    std::vector<std::shared_ptr<PassNode>> nodes_;
-    std::unordered_map<uint32, std::shared_ptr<ResourceEdge>> edges_;
+    std::vector<std::shared_ptr<FrameGraphNode>> nodes_;
+    std::unordered_map<uint32, std::shared_ptr<FrameGraphEdge>> edges_;
 
-    std::vector<std::shared_ptr<PassNode>> sorted_nodes_;
+    std::vector<std::shared_ptr<FrameGraphNode>> sorted_nodes_;
 
     std::unique_ptr<DescriptorManger> descriptor_manger_;
     std::unique_ptr<SynchronizationManager> synchronization_manager_;
     std::unique_ptr<ResourceRegistry> resource_registry_;
 
-  public:
-    FrameGraph() {
-      nodes_.reserve(25);
-      descriptor_manger_ = std::make_unique<DescriptorManger>();
-      synchronization_manager_ = std::make_unique<SynchronizationManager>();
-      resource_registry_ = std::make_unique<ResourceRegistry>();
-    }
-
-    void addNode(std::shared_ptr<RenderPass>&& pass) {
-      nodes_.push_back(std::make_shared<PassNode>(std::move(pass)));
-    }
-
-    // todo add to regsitry, create resource and return handle
-    std::shared_ptr<Resource> addEdge(ImageResource&& resource) {
-      auto& handle = resource.handle;
-      resource.handle = edges_.size();
-      edges_.insert({handle, std::make_shared<ResourceEdge>(std::move(resource))});
-      return edges_.at(handle)->resource;
-    }
-
-    std::shared_ptr<Resource> addEdge(BufferResource&& resource) {
-      auto& handle = resource.handle;
-      resource.handle = edges_.size();
-      edges_.insert({handle, std::make_shared<ResourceEdge>(std::move(resource))});
-      return edges_.at(handle)->resource;
-    }
-
-    void compile() {
-      fmt::print("Compiling FrameGraph\n");
-      for (auto& node : nodes_) {
-        for (const auto& read_resource : node->pass->get_resources(ResourceUsage::READ)) {
-          auto& edge = edges_.at(read_resource->handle);
-          edge->edges_out.push_back(node);
-          node->edges_in.push_back(edge);
-        }
-        for (const auto& write_resource : node->pass->get_resources(ResourceUsage::WRITE)) {
-          auto& edge = edges_.at(write_resource->handle);
-          edge->edges_in.push_back(node);
-          node->edges_out.push_back(edge);
-        }
-      }
-
-      print_graph();
-      topological_sort();
-    }
-
     void print_graph() const {
       for (const auto& node : nodes_) {
-        fmt::println("Node: {}", node->pass->name);
-        fmt::println("In Edges:");
+        fmt::println("Node: {}", node->render_pass->name);
+        fmt::println("needs:");
         for (const auto& edge : node->edges_in) {
           fmt::println("\t{}", edge->resource->name);
         }
-        fmt::println("Out Edges:");
+        fmt::println("updates:");
         for (const auto& edge : node->edges_out) {
           fmt::println("\t{}", edge->resource->name);
         }
@@ -366,19 +320,19 @@ namespace gestalt::graphics::fg {
     }
 
     void topological_sort() {
-      std::unordered_map<std::shared_ptr<PassNode>, uint32_t> in_degree;
+      std::unordered_map<std::shared_ptr<FrameGraphNode>, uint32_t> in_degree;
       for (auto& node : nodes_) {
         in_degree[node] = static_cast<uint32>(node->edges_in.size());
       }
 
-      std::queue<std::shared_ptr<PassNode>> nodes_without_dependencies;
+      std::queue<std::shared_ptr<FrameGraphNode>> nodes_without_dependencies;
       for (const auto& node : nodes_) {
         if (in_degree[node] == 0) {
           nodes_without_dependencies.push(node);
         }
       }
 
-      std::vector<std::shared_ptr<PassNode>> sorted_nodes;
+      std::vector<std::shared_ptr<FrameGraphNode>> sorted_nodes;
 
       while (!nodes_without_dependencies.empty()) {
         auto current_node = nodes_without_dependencies.front();
@@ -401,8 +355,54 @@ namespace gestalt::graphics::fg {
 
       fmt::print("Sorted Nodes:\n");
       for (const auto& node : sorted_nodes_) {
-        fmt::println("{}", node->pass->name);
+        fmt::println("{}", node->render_pass->name);
       }
+    }
+
+  public:
+    FrameGraph() {
+      nodes_.reserve(25);
+      descriptor_manger_ = std::make_unique<DescriptorManger>();
+      synchronization_manager_ = std::make_unique<SynchronizationManager>();
+      resource_registry_ = std::make_unique<ResourceRegistry>();
+    }
+
+    void add_render_pass(std::shared_ptr<RenderPass>&& pass) {
+      nodes_.push_back(std::make_shared<FrameGraphNode>(std::move(pass)));
+    }
+
+    // todo add to regsitry, create resource and return handle
+    std::shared_ptr<Resource> add_resource(ImageResource&& resource) {
+      auto& handle = resource.handle;
+      resource.handle = edges_.size();
+      edges_.insert({handle, std::make_shared<FrameGraphEdge>(std::move(resource))});
+      return edges_.at(handle)->resource;
+    }
+
+    std::shared_ptr<Resource> add_resource(BufferResource&& resource) {
+      auto& handle = resource.handle;
+      resource.handle = edges_.size();
+      edges_.insert({handle, std::make_shared<FrameGraphEdge>(std::move(resource))});
+      return edges_.at(handle)->resource;
+    }
+
+    void compile() {
+      fmt::print("Compiling FrameGraph\n");
+      for (auto& node : nodes_) {
+        for (const auto& read_resource : node->render_pass->get_resources(ResourceUsage::READ)) {
+          auto& edge = edges_.at(read_resource->handle);
+          edge->nodes_to.push_back(node);
+          node->edges_in.push_back(edge);
+        }
+        for (const auto& write_resource : node->render_pass->get_resources(ResourceUsage::WRITE)) {
+          auto& edge = edges_.at(write_resource->handle);
+          edge->nodes_from.push_back(node);
+          node->edges_out.push_back(edge);
+        }
+      }
+
+      print_graph();
+      topological_sort();
     }
 
     void execute() {
@@ -414,7 +414,7 @@ namespace gestalt::graphics::fg {
 
       for (const auto& node : sorted_nodes_) {
         CommandBuffer cmd;
-        node->pass->execute(cmd);
+        node->render_pass->execute(cmd);
       }
     }
   };
