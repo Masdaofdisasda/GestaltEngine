@@ -1,14 +1,16 @@
 ﻿#pragma once
 #include <array>
+#include <iostream>
 #include <memory>
-#include <set>
 #include <unordered_map>
 #include <vector>
 
 #include "common.hpp"
+#include "fmt/core.h"
 
 namespace gestalt::graphics::fg {
 
+  //TODO split into template and instance
   struct Resource {
     uint32 handle = -1;
     std::string name;
@@ -30,7 +32,7 @@ namespace gestalt::graphics::fg {
   };
 
   struct Resources {
-    std::vector<Resource*> resources;
+    std::vector<std::shared_ptr<Resource>> resources;
     PushDescriptor push_descriptor;
   };
 
@@ -41,51 +43,49 @@ namespace gestalt::graphics::fg {
   };
 
   struct ShaderComponent {
-    virtual void execute(CommandBuffer cmd) = 0;
     virtual ~ShaderComponent() = default;
   };
 
+  // helper functions for graphics shader pipeline
   struct GraphicsShaderComponent : ShaderComponent {
-    void execute(CommandBuffer cmd) override;
-    // bind resources to descriptor sets
-    // bind pipeline to command buffer
-    // draw
+
   };
 
+  // helper functions for compute shader pipeline
   struct ComputeShaderComponent : ShaderComponent {
-    void execute(CommandBuffer cmd) override;
-    // bind resources to descriptor sets
-    // bind pipeline to command buffer
-    // dispatch
+
   };
 
   enum class ResourceUsage { READ, WRITE };
 
   struct ResourceComponent {
-    void addResource(Resource& resource, ResourceUsage usage) {
+    void addResource(const std::shared_ptr<Resource>& resource, ResourceUsage usage) {
       if (usage == ResourceUsage::READ) {
-        read_resources.resources.push_back(&resource);
+        read_resources.resources.push_back(resource);
       } else if (usage == ResourceUsage::WRITE) {
-        write_resources.resources.push_back(&resource);
+        write_resources.resources.push_back(resource);
       }
     }
 
-    std::vector<Resource*> get_resources(ResourceUsage usage) {
+    std::vector<std::shared_ptr<Resource>> get_resources(ResourceUsage usage) {
       if (usage == ResourceUsage::READ) {
         return read_resources.resources;
-      } else if (usage == ResourceUsage::WRITE) {
+      }
+      if (usage == ResourceUsage::WRITE) {
         return write_resources.resources;
       }
+      return {};
     }
+
   private:
     Resources read_resources;
     Resources write_resources;
   };
 
   struct RenderPass {
-    virtual void compile() = 0;  // Pure virtual method for pipeline creation
-    virtual std::vector<Resource*> get_resources(ResourceUsage usage) = 0;
-    virtual void execute(CommandBuffer cmd) = 0;  // Pure virtual method for execution
+    virtual void compile() = 0;
+    virtual std::vector<std::shared_ptr<Resource>> get_resources(ResourceUsage usage) = 0;
+    virtual void execute(CommandBuffer cmd) = 0;
     virtual ~RenderPass() = default;
     std::string name;
   };
@@ -94,13 +94,14 @@ namespace gestalt::graphics::fg {
     ComputeShaderComponent shader_component;
     ResourceComponent resource_component;
 
-    ShadowMapPass(Resource& shadow_map, Resource& geometry_buffer) {
-      resource_component.addResource(shadow_map, ResourceUsage::WRITE);
+    ShadowMapPass(const std::shared_ptr<Resource>& shadow_map,
+                  const std::shared_ptr<Resource>& geometry_buffer) {
       resource_component.addResource(geometry_buffer, ResourceUsage::READ);
+      resource_component.addResource(shadow_map, ResourceUsage::WRITE);
       name = "ShadowMapPass";
     }
 
-    std::vector<Resource*> get_resources(ResourceUsage usage) override {
+    std::vector<std::shared_ptr<Resource>> get_resources(ResourceUsage usage) override {
       return resource_component.get_resources(usage);
     }
 
@@ -108,19 +109,26 @@ namespace gestalt::graphics::fg {
       // Specific pipeline layout and pipeline creation for compute
     }
 
-    void execute(CommandBuffer cmd) override { shader_component.execute(cmd); }
+    void execute(CommandBuffer cmd) override {
+      // draw
+    }
   };
 
   struct GeometryPass : RenderPass {
     GraphicsShaderComponent shader_component;
     ResourceComponent resource_component;
 
-    std::vector<Resource*> get_resources(ResourceUsage usage) override {
+    std::vector<std::shared_ptr<Resource>> get_resources(ResourceUsage usage) override {
       return resource_component.get_resources(usage);
     }
 
-    GeometryPass(Resource& g_buffer_1, Resource& g_buffer_2, Resource& g_buffer_3,
-                 Resource& g_buffer_depth) {
+    GeometryPass(const std::shared_ptr<Resource>& g_buffer_1,
+                 const std::shared_ptr<Resource>& g_buffer_2,
+                 const std::shared_ptr<Resource>& g_buffer_3,
+                 const std::shared_ptr<Resource>& g_buffer_depth,
+                 const std::shared_ptr<Resource>& geometry_buffer
+    ) {
+      resource_component.addResource(geometry_buffer, ResourceUsage::READ);
       resource_component.addResource(g_buffer_1, ResourceUsage::WRITE);
       resource_component.addResource(g_buffer_2, ResourceUsage::WRITE);
       resource_component.addResource(g_buffer_3, ResourceUsage::WRITE);
@@ -132,27 +140,35 @@ namespace gestalt::graphics::fg {
       // Specific pipeline layout and pipeline creation for graphics
     }
 
-    void execute(CommandBuffer cmd) override { shader_component.execute(cmd); }
+    void execute(CommandBuffer cmd) override{
+        // draw
+    }
   };
 
   struct LightingPass : RenderPass {
     ComputeShaderComponent shader_component;
     ResourceComponent resource_component;
 
-    LightingPass(Resource& scene_lit, Resource& g_buffer_1, Resource& g_buffer_2,
-                 Resource& g_buffer_3, Resource& g_buffer_depth, Resource& material_buffer,
-                 Resource& light_buffer) {
+    LightingPass(const std::shared_ptr<Resource>& scene_lit,
+                 const std::shared_ptr<Resource>& g_buffer_1,
+                 const std::shared_ptr<Resource>& g_buffer_2,
+                 const std::shared_ptr<Resource>& g_buffer_3,
+                 const std::shared_ptr<Resource>& g_buffer_depth,
+                 const std::shared_ptr<Resource>& shadow_map,
+                 const std::shared_ptr<Resource>& material_buffer,
+                 const std::shared_ptr<Resource>& light_buffer) {
       resource_component.addResource(scene_lit, ResourceUsage::WRITE);
       resource_component.addResource(g_buffer_1, ResourceUsage::READ);
       resource_component.addResource(g_buffer_2, ResourceUsage::READ);
       resource_component.addResource(g_buffer_3, ResourceUsage::READ);
       resource_component.addResource(g_buffer_depth, ResourceUsage::READ);
+      resource_component.addResource(shadow_map, ResourceUsage::READ);
       resource_component.addResource(material_buffer, ResourceUsage::READ);
       resource_component.addResource(light_buffer, ResourceUsage::READ);
       name = "LightingPass";
     }
 
-    std::vector<Resource*> get_resources(ResourceUsage usage) override {
+    std::vector<std::shared_ptr<Resource>> get_resources(ResourceUsage usage) override {
       return resource_component.get_resources(usage);
     }
 
@@ -160,20 +176,22 @@ namespace gestalt::graphics::fg {
       // Specific pipeline layout and pipeline creation for compute
     }
 
-    void execute(CommandBuffer cmd) override { shader_component.execute(cmd); }
+    void execute(CommandBuffer cmd) override {
+      // draw
+    }
   };
 
   struct ToneMapPass : RenderPass {
     ComputeShaderComponent shader_component;
     ResourceComponent resource_component;
 
-    ToneMapPass(Resource& scene_final, Resource& scene_lit) {
-      resource_component.addResource(scene_final, ResourceUsage::READ);
-      resource_component.addResource(scene_lit, ResourceUsage::WRITE);
+    ToneMapPass(const std::shared_ptr<Resource>& scene_final, const std::shared_ptr<Resource>& scene_lit) {
+      resource_component.addResource(scene_lit, ResourceUsage::READ);
+      resource_component.addResource(scene_final, ResourceUsage::WRITE);
       name = "ToneMapPass";
     }
 
-    std::vector<Resource*> get_resources(ResourceUsage usage) override {
+    std::vector<std::shared_ptr<Resource>> get_resources(ResourceUsage usage) override {
       return resource_component.get_resources(usage);
     }
 
@@ -181,35 +199,66 @@ namespace gestalt::graphics::fg {
       // Specific pipeline layout and pipeline creation for compute
     }
 
-    void execute(CommandBuffer cmd) override { shader_component.execute(cmd); }
+    void execute(CommandBuffer cmd) override {
+      // draw
+    }
+  };
+
+  struct ResourceInitializerPass : RenderPass {
+    ComputeShaderComponent shader_component;
+    ResourceComponent resource_component;
+
+    ResourceInitializerPass(
+        const std::shared_ptr<Resource>& geometry_buffer, 
+        const std::shared_ptr<Resource>& material_buffer, 
+        const std::shared_ptr<Resource>& light_buffer
+        ) {
+      resource_component.addResource(geometry_buffer, ResourceUsage::WRITE);
+      resource_component.addResource(material_buffer, ResourceUsage::WRITE);
+      resource_component.addResource(light_buffer, ResourceUsage::WRITE);
+      name = "ResourceInitializerPass";
+    }
+
+    std::vector<std::shared_ptr<Resource>> get_resources(ResourceUsage usage) override {
+      return resource_component.get_resources(usage);
+    }
+
+    void compile() override {
+      // does nothing
+    }
+
+    void execute(CommandBuffer cmd) override {
+      // does nothing
+    }
   };
 
   struct PassNode;
 
   struct ResourceEdge {
-    Resource* resource;
-    std::vector<PassNode*> edges_in;
-    std::vector<PassNode*> edges_out;
+    std::shared_ptr<Resource> resource;
+    std::vector<std::shared_ptr<PassNode>> edges_in;
+    std::vector<std::shared_ptr<PassNode>> edges_out;
 
-    ResourceEdge(Resource* resource) : resource(resource) {}
+    explicit ResourceEdge(Resource&& resource) : resource(std::make_shared<Resource>(std::move(resource))) {}
   };
 
   struct PassNode {
-    RenderPass* pass;
-    std::vector<ResourceEdge*> edges_in;
-    std::vector<ResourceEdge*> edges_out;
+    std::shared_ptr<RenderPass> pass;
+    std::vector<std::shared_ptr<ResourceEdge>> edges_in;
+    std::vector<std::shared_ptr<ResourceEdge>> edges_out;
 
-    explicit PassNode(RenderPass& pass) : pass(&pass) {}
+    explicit PassNode(std::shared_ptr<RenderPass>&& pass) : pass(std::move(pass)) {}
 
-    bool operator==(const PassNode& other) const { return pass == other.pass; }
-
-    std::set<PassNode> getAdj() {
-      std::set<PassNode> adj;
-      for (auto e : edges_out) {
-        adj.insert(e->edges_out.begin(), e->edges_out.end());
+    std::vector<std::shared_ptr<PassNode>> get_neighbors() const {
+      std::vector<std::shared_ptr<PassNode>> neighbors;
+      for (const auto& edge : edges_out) {
+        for (const auto& neighbor : edge->edges_out) {
+          neighbors.push_back(neighbor);
+        }
       }
-      return adj;
+      return neighbors;
     }
+
   };
 
   struct DescriptorSetLayout {
@@ -247,9 +296,10 @@ namespace gestalt::graphics::fg {
   };
 
   class FrameGraph : public NonCopyable<FrameGraph> {
-    std::vector<PassNode> nodes_;
-    std::unordered_map<uint32, ResourceEdge> edges_;
-    std::unordered_map<PassNode, std::set<PassNode>> adj_;
+    std::vector<std::shared_ptr<PassNode>> nodes_;
+    std::unordered_map<uint32, std::shared_ptr<ResourceEdge>> edges_;
+
+    std::vector<std::shared_ptr<PassNode>> sorted_nodes_;
 
     std::unique_ptr<DescriptorManger> descriptor_manger_;
     std::unique_ptr<SynchronizationManager> synchronization_manager_;
@@ -263,66 +313,96 @@ namespace gestalt::graphics::fg {
       resource_registry_ = std::make_unique<ResourceRegistry>();
     }
 
-    void addNode(RenderPass& pass) { nodes_.emplace_back(pass); }
+    void addNode(std::shared_ptr<RenderPass>&& pass) {
+      nodes_.push_back(std::make_shared<PassNode>(std::move(pass)));
+    }
 
-    void addEdge(Resource& resource) { edges_.insert({resource.handle, {&resource}}); }
-    void addEdge(ImageResource& resource) { edges_.insert({resource.handle, {&resource}}); }
-    void addEdge(BufferResource& resource) { edges_.insert({resource.handle, {&resource}}); }
+    // todo add to regsitry, create resource and return handle
+    std::shared_ptr<Resource> addEdge(ImageResource&& resource) {
+      auto& handle = resource.handle;
+      resource.handle = edges_.size();
+      edges_.insert({handle, std::make_shared<ResourceEdge>(std::move(resource))});
+      return edges_.at(handle)->resource;
+    }
+
+    std::shared_ptr<Resource> addEdge(BufferResource&& resource) {
+      auto& handle = resource.handle;
+      resource.handle = edges_.size();
+      edges_.insert({handle, std::make_shared<ResourceEdge>(std::move(resource))});
+      return edges_.at(handle)->resource;
+    }
 
     void compile() {
+      fmt::print("Compiling FrameGraph\n");
       for (auto& node : nodes_) {
-        for (const auto read_resource : node.pass->get_resources(ResourceUsage::READ)) {
+        for (const auto& read_resource : node->pass->get_resources(ResourceUsage::READ)) {
           auto& edge = edges_.at(read_resource->handle);
-          edge.edges_out.push_back(&node);
-          node.edges_in.push_back(&edge);
+          edge->edges_out.push_back(node);
+          node->edges_in.push_back(edge);
         }
-        for (const auto write_resource : node.pass->get_resources(ResourceUsage::WRITE)) {
+        for (const auto& write_resource : node->pass->get_resources(ResourceUsage::WRITE)) {
           auto& edge = edges_.at(write_resource->handle);
-          edge.edges_in.push_back(&node);
-          node.edges_out.push_back(&edge);
+          edge->edges_in.push_back(node);
+          node->edges_out.push_back(edge);
         }
       }
 
-      for (auto& node : nodes_) {
-        adj_.insert({node, node.getAdj()});
+      print_graph();
+      topological_sort();
+    }
+
+    void print_graph() const {
+      for (const auto& node : nodes_) {
+        fmt::println("Node: {}", node->pass->name);
+        fmt::println("In Edges:");
+        for (const auto& edge : node->edges_in) {
+          fmt::println("\t{}", edge->resource->name);
+        }
+        fmt::println("Out Edges:");
+        for (const auto& edge : node->edges_out) {
+          fmt::println("\t{}", edge->resource->name);
+        }
       }
     }
 
-    std::vector<PassNode> topological_sort() {
-      std::unordered_map<PassNode, uint32> in_degree;
+    void topological_sort() {
+      std::unordered_map<std::shared_ptr<PassNode>, uint32_t> in_degree;
       for (auto& node : nodes_) {
-        in_degree.insert({node, node.edges_in.size()});
+        in_degree[node] = static_cast<uint32>(node->edges_in.size());
       }
 
-      std::queue<PassNode> zero_in_degree;
-      for (auto& node : nodes_) {
-        if (in_degree.at(node) == 0) {
-          zero_in_degree.push(node);
+      std::queue<std::shared_ptr<PassNode>> nodes_without_dependencies;
+      for (const auto& node : nodes_) {
+        if (in_degree[node] == 0) {
+          nodes_without_dependencies.push(node);
         }
       }
 
-      std::vector<PassNode> sorted;
+      std::vector<std::shared_ptr<PassNode>> sorted_nodes;
 
-      while (!zero_in_degree.empty()) {
-        auto current = zero_in_degree.front();
-        zero_in_degree.pop();
-        sorted.push_back(current);
+      while (!nodes_without_dependencies.empty()) {
+        auto current_node = nodes_without_dependencies.front();
+        nodes_without_dependencies.pop();
+        sorted_nodes.push_back(current_node);
 
-        for (auto& edge : current.edges_out) {
-          for (auto& neighbor : edge->edges_out) {
-            in_degree.at(*neighbor) -= 1;
-            if (in_degree.at(*neighbor) == 0) {
-              zero_in_degree.push(*neighbor);
-            }
+        for (const auto& neighbor : current_node->get_neighbors()) {
+          in_degree[neighbor] -= 1;
+          if (in_degree[neighbor] == 0) {
+            nodes_without_dependencies.push(neighbor);
           }
         }
       }
 
-      if (sorted.size() != nodes_.size()) {
+      if (sorted_nodes.size() != nodes_.size()) {
         assert(!"Cycle detected in the graph! Topological sorting is not possible.");
       }
 
-      return sorted;
+      sorted_nodes_ = std::move(sorted_nodes);
+
+      fmt::print("Sorted Nodes:\n");
+      for (const auto& node : sorted_nodes_) {
+        fmt::println("{}", node->pass->name);
+      }
     }
 
     void execute() {
@@ -331,21 +411,12 @@ namespace gestalt::graphics::fg {
       // bind resources to descriptor sets
       // sync resources
       // pass_node.pass.execute(pass_node.inputs...)
+
+      for (const auto& node : sorted_nodes_) {
+        CommandBuffer cmd;
+        node->pass->execute(cmd);
+      }
     }
   };
 
 }  // namespace gestalt::graphics::fg
-
-#ifndef FRAMEGRAPH_HASH_DEFINED
-#  define FRAMEGRAPH_HASH_DEFINED
-
-namespace std {
-  template <> struct hash<gestalt::graphics::fg::PassNode> {
-    size_t operator()(const gestalt::graphics::fg::PassNode& node) const noexcept {
-      return std::hash<gestalt::graphics::fg::RenderPass*>()(
-          node.pass);  // Hash the RenderPass pointer
-    }
-  };
-}  // namespace std
-
-#endif  // FRAMEGRAPH_HASH_DEFINED

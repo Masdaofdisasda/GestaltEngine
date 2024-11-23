@@ -25,47 +25,39 @@ namespace gestalt::graphics {
                             ResourceManager* resource_manager,
                             Repository* repository, Gui* imgui_gui, FrameProvider* frame) {
     {
-      fg::FrameGraph frame_graph;
+      auto frame_graph = std::make_unique<fg::FrameGraph>();
 
       // Image resources
-      fg::ImageResource shadow_map("shadow_map");
-      fg::ImageResource g_buffer_1("g_buffer1");
-      fg::ImageResource g_buffer_2("g_buffer2");
-      fg::ImageResource g_buffer_3("g_buffer3");
-      fg::ImageResource g_buffer_depth("g_buffer_depth");
-      fg::ImageResource scene_lit("scene_lit");
-      fg::ImageResource scene_final("scene_final");
-      frame_graph.addEdge(shadow_map);
-      frame_graph.addEdge(g_buffer_1);
-      frame_graph.addEdge(g_buffer_2);
-      frame_graph.addEdge(g_buffer_3);
-      frame_graph.addEdge(g_buffer_depth);
-      frame_graph.addEdge(scene_lit);
-      frame_graph.addEdge(scene_final);
+      auto shadow_map = frame_graph->addEdge(fg::ImageResource("shadow_map"));
+      auto g_buffer_1 = frame_graph->addEdge(fg::ImageResource("g_buffer1"));
+      auto g_buffer_2 = frame_graph->addEdge(fg::ImageResource("g_buffer2"));
+      auto g_buffer_3 = frame_graph->addEdge(fg::ImageResource("g_buffer3"));
+      auto g_buffer_depth = frame_graph->addEdge(fg::ImageResource("g_buffer_depth"));
+      auto scene_lit = frame_graph->addEdge(fg::ImageResource("scene_lit"));
+      auto scene_final = frame_graph->addEdge(fg::ImageResource("scene_final"));
 
-      // Buffer resources
-      fg::BufferResource geometry_buffer("geometry_buffer");
-      fg::BufferResource material_buffer("material_buffer");
-      fg::BufferResource light_buffer("light_buffer");
-      frame_graph.addEdge(geometry_buffer);
-      frame_graph.addEdge(material_buffer);
-      frame_graph.addEdge(light_buffer);
+      auto geometry_buffer = frame_graph->addEdge(fg::BufferResource("geometry_buffer"));
+      auto material_buffer = frame_graph->addEdge(fg::BufferResource("material_buffer"));
+      auto light_buffer = frame_graph->addEdge(fg::BufferResource("light_buffer"));
 
       // Shader Passes
-      fg::ShadowMapPass shadow_pass(shadow_map, geometry_buffer);
-      fg::GeometryPass geometry_pass(
-          g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth);
-      fg::LightingPass lighting_pass(
+      std::shared_ptr<fg::RenderPass> resource_init_pass
+          = std::make_shared<fg::ResourceInitializerPass>(geometry_buffer, material_buffer, light_buffer);
+      std::shared_ptr<fg::RenderPass> shadow_pass = std::make_shared<fg::ShadowMapPass>(shadow_map, geometry_buffer);
+      std::shared_ptr<fg::RenderPass> geometry_pass = std::make_shared<fg::GeometryPass>(
+          g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth, geometry_buffer);
+      std::shared_ptr<fg::RenderPass> lighting_pass = std::make_shared<fg::LightingPass>(
           scene_lit, g_buffer_1, g_buffer_2, g_buffer_3,
-          g_buffer_depth, material_buffer, light_buffer);
-      fg::ToneMapPass tone_map_pass(scene_final, scene_lit);
-      frame_graph.addNode(shadow_pass);
-      frame_graph.addNode(geometry_pass);
-      frame_graph.addNode(lighting_pass);
-      frame_graph.addNode(tone_map_pass);
-
-      frame_graph.compile();
-      frame_graph.execute();
+          g_buffer_depth, shadow_map, material_buffer, light_buffer);
+      std::shared_ptr<fg::RenderPass> tone_map_pass = std::make_shared<fg::ToneMapPass>(scene_final, scene_lit);
+      frame_graph->addNode(std::move(resource_init_pass));
+      frame_graph->addNode(std::move(shadow_pass));
+      frame_graph->addNode(std::move(geometry_pass));
+      frame_graph->addNode(std::move(lighting_pass));
+      frame_graph->addNode(std::move(tone_map_pass));
+      
+      frame_graph->compile();
+      frame_graph->execute();
     }
 
     gpu_ = gpu;
