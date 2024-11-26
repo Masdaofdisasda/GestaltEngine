@@ -27,35 +27,56 @@ namespace gestalt::graphics {
     {
       const auto frame_graph = std::make_unique<fg::FrameGraph>();
 
-      // Image resources
-      auto shadow_map = frame_graph->add_resource(fg::ImageResource("shadow_map"));
-      auto g_buffer_1 = frame_graph->add_resource(fg::ImageResource("g_buffer1"));
-      auto g_buffer_2 = frame_graph->add_resource(fg::ImageResource("g_buffer2"));
-      auto g_buffer_3 = frame_graph->add_resource(fg::ImageResource("g_buffer3"));
-      auto g_buffer_depth = frame_graph->add_resource(fg::ImageResource("g_buffer_depth"));
-      auto scene_lit = frame_graph->add_resource(fg::ImageResource("scene_lit"));
-      auto scene_final = frame_graph->add_resource(fg::ImageResource("scene_final"));
+      auto shadow_map
+          = frame_graph->add_resource(fg::ImageResourceTemplate("shadow_map")
+                                          .set_image_type(TextureType::kDepth, VK_FORMAT_D32_SFLOAT)
+                                          .set_image_size(2048 * 4, 2048 * 4)
+                                          .build());
+      auto g_buffer_1 = frame_graph->add_resource(fg::ImageResourceTemplate("g_buffer1"));
+      auto g_buffer_2 = frame_graph->add_resource(fg::ImageResourceTemplate("g_buffer2"));
+      auto g_buffer_3 = frame_graph->add_resource(fg::ImageResourceTemplate("g_buffer3"));
+      auto g_buffer_depth
+          = frame_graph->add_resource(fg::ImageResourceTemplate("g_buffer_depth")
+                                          .set_image_type(TextureType::kDepth, VK_FORMAT_D32_SFLOAT)
+                                          .build());
+      auto scene_lit = frame_graph->add_resource(fg::ImageResourceTemplate("scene_lit"));
+      auto scene_final = frame_graph->add_resource(fg::ImageResourceTemplate("scene_final"));
+      auto rotation_texture = frame_graph->add_resource(
+          fg::ImageResourceTemplate("rotation_texture")
+              .set_initial_value(std::filesystem::current_path() / "../../assets/rot_texture.bmp")
+              .build(),
+          fg::CreationType::EXTERNAL);
+      auto occlusion_texture
+          = frame_graph->add_resource(fg::ImageResourceTemplate("occlusion_texture")
+                                          .set_image_type(TextureType::kColor, VK_FORMAT_R16_SFLOAT)
+                                          .set_image_size(0.5f)
+                                          .build());
 
-      auto geometry_buffer = frame_graph->add_resource(fg::BufferResource("geometry_buffer"));
-      auto material_buffer = frame_graph->add_resource(fg::BufferResource("material_buffer"));
-      auto light_buffer = frame_graph->add_resource(fg::BufferResource("light_buffer"));
+      auto geometry_buffer = frame_graph->add_resource(
+          fg::BufferResourceTemplate("geometry_buffer"), fg::CreationType::EXTERNAL);
+      auto material_buffer = frame_graph->add_resource(
+          fg::BufferResourceTemplate("material_buffer"), fg::CreationType::EXTERNAL);
+      auto light_buffer = frame_graph->add_resource(fg::BufferResourceTemplate("light_buffer"),
+                                                    fg::CreationType::EXTERNAL);
 
       // Shader Passes
-      std::shared_ptr<fg::RenderPass> resource_init_pass
-          = std::make_shared<fg::ResourceInitializerPass>(geometry_buffer, material_buffer, light_buffer);
-      std::shared_ptr<fg::RenderPass> shadow_pass = std::make_shared<fg::ShadowMapPass>(shadow_map, geometry_buffer);
+      std::shared_ptr<fg::RenderPass> shadow_pass
+          = std::make_shared<fg::ShadowMapPass>(shadow_map, geometry_buffer);
       std::shared_ptr<fg::RenderPass> geometry_pass = std::make_shared<fg::GeometryPass>(
           g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth, geometry_buffer);
       std::shared_ptr<fg::RenderPass> lighting_pass = std::make_shared<fg::LightingPass>(
-          scene_lit, g_buffer_1, g_buffer_2, g_buffer_3,
-          g_buffer_depth, shadow_map, material_buffer, light_buffer);
-      std::shared_ptr<fg::RenderPass> tone_map_pass = std::make_shared<fg::ToneMapPass>(scene_final, scene_lit);
-      frame_graph->add_render_pass(std::move(resource_init_pass));
+          scene_lit, g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth, shadow_map,
+          material_buffer, light_buffer);
+      std::shared_ptr<fg::RenderPass> tone_map_pass
+          = std::make_shared<fg::ToneMapPass>(scene_final, scene_lit);
+      std::shared_ptr<fg::RenderPass> ssao_pass = std::make_shared<fg::SsaoPass>(
+          scene_lit, g_buffer_depth, rotation_texture, occlusion_texture);
       frame_graph->add_render_pass(std::move(shadow_pass));
       frame_graph->add_render_pass(std::move(geometry_pass));
       frame_graph->add_render_pass(std::move(lighting_pass));
       frame_graph->add_render_pass(std::move(tone_map_pass));
-      
+      frame_graph->add_render_pass(std::move(ssao_pass));
+
       frame_graph->compile();
       frame_graph->execute();
     }
