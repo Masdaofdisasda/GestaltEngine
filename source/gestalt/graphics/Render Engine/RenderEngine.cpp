@@ -15,6 +15,7 @@
 
 #include "FrameProvider.hpp"
 #include "RenderPassBase.hpp"
+#include "ResourceFactory.hpp"
 #include "ResourceManager.hpp"
 #include "Utils/vk_images.hpp"
 #include "vk_initializers.hpp"
@@ -25,7 +26,8 @@ namespace gestalt::graphics {
                             ResourceManager* resource_manager,
                             Repository* repository, Gui* imgui_gui, FrameProvider* frame) {
     {
-      const auto frame_graph = std::make_unique<fg::FrameGraph>();
+      const auto resource_factory = std::make_unique<ResourceFactory>(gpu);
+      const auto frame_graph = std::make_unique<fg::FrameGraph>(resource_factory.get());
 
       auto shadow_map
           = frame_graph->add_resource(fg::ImageResourceTemplate("shadow_map")
