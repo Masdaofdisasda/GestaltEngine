@@ -3,23 +3,30 @@
 #include "ResourceFactory.hpp"
 
 namespace gestalt::graphics::fg {
-  std::shared_ptr<Resource> ResourceRegistry::add(ImageResourceTemplate&& resource_template) {
+  std::shared_ptr<Resource> ResourceRegistry::add_template(ImageResourceTemplate&& image_template) {
+    const auto image = resource_factory_->create_image(std::move(image_template));
 
-    auto image = resource_factory_->create_image(resource_template);
-
-    //std::shared_ptr<Resource> image = std::make_shared<ImageResource>(std::move(resource));
-    image->handle = static_cast<uint32>(resource_map_.size());
-    resource_map_.insert({image->handle, image});
-    return image;
+    image->resource_handle = reinterpret_cast<uint64>(image->allocated_image.image_handle);
+    
+    return add_resource(image);
   }
 
-  std::shared_ptr<Resource> ResourceRegistry::add(BufferResourceTemplate&& resource) {
-    // create buffer
+  std::shared_ptr<Resource> ResourceRegistry::add_template(BufferResourceTemplate&& buffer_template) {
+    const auto buffer = resource_factory_->create_buffer(std::move(buffer_template));
 
-    std::shared_ptr<Resource> image = std::make_shared<BufferResource>(std::move(resource));
-    image->handle = static_cast<uint32>(resource_map_.size());
-    resource_map_.insert({image->handle, image});
-    return image;
+    buffer->resource_handle = reinterpret_cast<uint64>(buffer->allocated_buffer.buffer_handle);
+    
+    return add_resource(buffer);
+  }
+
+  std::shared_ptr<Resource> ResourceRegistry::add_resource(std::shared_ptr<ImageResource> image_resource) {
+    resource_map_.insert({image_resource->resource_handle, image_resource});
+    return image_resource;
+  }
+
+  std::shared_ptr<Resource> ResourceRegistry::add_resource(std::shared_ptr<BufferResource> buffer_resource) {
+    resource_map_.insert({buffer_resource->resource_handle, buffer_resource});
+    return buffer_resource;
   }
 
   void FrameGraph::print_graph() const {
@@ -94,12 +101,12 @@ namespace gestalt::graphics::fg {
   void FrameGraph::compile() {
     for (auto& node : nodes_) {
       for (const auto& read_resource : node->render_pass->get_resources(ResourceUsage::READ)) {
-        auto& edge = edges_.at(read_resource->handle);
+        auto& edge = edges_.at(read_resource->resource_handle);
         edge->nodes_to.push_back(node);
         node->edges_in.push_back(edge);
       }
       for (const auto& write_resource : node->render_pass->get_resources(ResourceUsage::WRITE)) {
-        auto& edge = edges_.at(write_resource->handle);
+        auto& edge = edges_.at(write_resource->resource_handle);
         edge->nodes_from.push_back(node);
         node->edges_out.push_back(edge);
       }

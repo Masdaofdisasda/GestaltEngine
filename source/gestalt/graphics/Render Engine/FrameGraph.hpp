@@ -280,15 +280,19 @@ namespace gestalt::graphics::fg {
   };
 
   class ResourceRegistry {
-    std::unordered_map<uint32, std::shared_ptr<Resource>> resource_map_;
+    std::unordered_map<uint64, std::shared_ptr<Resource>> resource_map_;
     ResourceFactory* resource_factory_ = nullptr;
 
   public:
     explicit ResourceRegistry(ResourceFactory* resource_factory) : resource_factory_(resource_factory) {}
 
-    std::shared_ptr<Resource> add(ImageResourceTemplate&& resource_template);
+    std::shared_ptr<Resource> add_template(ImageResourceTemplate&& image_template);
 
-    std::shared_ptr<Resource> add(BufferResourceTemplate&& resource);
+    std::shared_ptr<Resource> add_template(BufferResourceTemplate&& buffer_template);
+
+    std::shared_ptr<Resource> add_resource(std::shared_ptr<ImageResource> image_resource);
+
+    std::shared_ptr<Resource> add_resource(std::shared_ptr<BufferResource> buffer_resource);
 
     std::shared_ptr<Resource> get_resource(const uint32 handle) { return resource_map_.at(handle); }
   };
@@ -317,9 +321,18 @@ namespace gestalt::graphics::fg {
     auto add_resource(ResourceTemplateType&& resource_template,
                       CreationType creation_type = CreationType::INTERNAL) {
       auto resource
-          = resource_registry_->add(std::forward<ResourceTemplateType>(resource_template));
-      edges_.insert({resource->handle, std::make_shared<FrameGraphEdge>(std::move(resource),
+          = resource_registry_->add_template(std::forward<ResourceTemplateType>(resource_template));
+      edges_.insert({resource->resource_handle, std::make_shared<FrameGraphEdge>(std::move(resource),
                                                                         creation_type)});
+      return resource;
+    }
+
+    template <typename ResourceInstanceType>
+    auto add_resource(std::shared_ptr<ResourceInstanceType> resource_instance,
+                      CreationType creation_type = CreationType::EXTERNAL) {
+      auto resource = resource_registry_->add_resource(resource_instance);
+      edges_.insert({resource->resource_handle,
+                     std::make_shared<FrameGraphEdge>(std::move(resource), creation_type)});
       return resource;
     }
 

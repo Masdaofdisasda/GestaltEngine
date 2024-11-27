@@ -91,33 +91,55 @@ namespace gestalt::graphics::fg {
 
   };
 
-
-  struct BufferResourceTemplate : ResourceTemplate {
+    struct BufferResourceTemplate final : ResourceTemplate {
     VkDeviceSize size;
     VkBufferUsageFlags usage;
     VmaMemoryUsage memory_usage;
 
-    BufferResourceTemplate(std::string name)
-        : ResourceTemplate(std::move(name)) {}
+    BufferResourceTemplate(std::string name, const VkDeviceSize size,
+                           const VkBufferUsageFlags usage, const VmaMemoryUsage memory_usage)
+        : ResourceTemplate(std::move(name)), size(size), usage(usage), memory_usage(memory_usage) {}
   };
 
   //TODO split into template and instance
   struct Resource {
-    uint32 handle = -1;
+    uint64 resource_handle = -1;
     ResourceTemplate resource_template;
-    explicit Resource(ResourceTemplate&& resource_template) : resource_template(resource_template) {}
+    explicit Resource(ResourceTemplate&& resource_template) : resource_template(std::move(resource_template)) {}
     [[nodiscard]] std::string_view name() const { return resource_template.name; }
   };
 
-  struct ImageResource : Resource {
-    using Resource::Resource; // Inherit constructor
+  struct AllocatedImage {
+    VkImage image_handle = VK_NULL_HANDLE;
+    VkImageView image_view = VK_NULL_HANDLE;
+    VmaAllocation allocation = VK_NULL_HANDLE;
+  };
 
-    //std::shared_ptr<TextureHandle> image;
+  struct ImageResource : Resource {
+    ImageResource(ImageResourceTemplate&& image_template, const AllocatedImage& allocated_image,
+                  const VkExtent3D extent)
+        : Resource(std::move(image_template)), allocated_image(allocated_image), extent(extent) {}
+
+    AllocatedImage allocated_image;
+    VkExtent3D extent;
+    VkImageLayout current_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+  };
+
+  struct AllocatedBuffer {
+    VkBuffer buffer_handle = VK_NULL_HANDLE;
+    VmaAllocation allocation = VK_NULL_HANDLE;
+    VmaAllocationInfo info;
+    VkDeviceAddress address;
   };
 
   struct BufferResource : Resource {
-    using Resource::Resource; // Inherit constructor
-    //std::shared_ptr<AllocatedBuffer> buffer;
+    BufferResource(BufferResourceTemplate&& buffer_template,
+                   const AllocatedBuffer& allocated_buffer)
+        : Resource(std::move(buffer_template)), allocated_buffer(allocated_buffer) {}
+
+    AllocatedBuffer allocated_buffer; 
+    VkAccessFlags2 current_access = 0;        // Current access flags
+    VkPipelineStageFlags2 current_stage = 0;  // Current pipeline stage
   };
 
 
