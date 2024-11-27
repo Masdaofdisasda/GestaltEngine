@@ -1,9 +1,10 @@
 ﻿#include "Render Engine/FrameGraph.hpp"
 
-#include "ResourceFactory.hpp"
+#include <common.hpp>
+#include "ResourceAllocator.hpp"
 
 namespace gestalt::graphics::fg {
-  std::shared_ptr<Resource> ResourceRegistry::add_template(ImageResourceTemplate&& image_template) {
+  std::shared_ptr<ResourceInstance> ResourceRegistry::add_template(ImageTemplate&& image_template) {
     const auto image = resource_factory_->create_image(std::move(image_template));
 
     image->resource_handle = reinterpret_cast<uint64>(image->allocated_image.image_handle);
@@ -11,7 +12,7 @@ namespace gestalt::graphics::fg {
     return add_resource(image);
   }
 
-  std::shared_ptr<Resource> ResourceRegistry::add_template(BufferResourceTemplate&& buffer_template) {
+  std::shared_ptr<ResourceInstance> ResourceRegistry::add_template(BufferTemplate&& buffer_template) {
     const auto buffer = resource_factory_->create_buffer(std::move(buffer_template));
 
     buffer->resource_handle = reinterpret_cast<uint64>(buffer->allocated_buffer.buffer_handle);
@@ -19,12 +20,12 @@ namespace gestalt::graphics::fg {
     return add_resource(buffer);
   }
 
-  std::shared_ptr<Resource> ResourceRegistry::add_resource(std::shared_ptr<ImageResource> image_resource) {
+  std::shared_ptr<ResourceInstance> ResourceRegistry::add_resource(std::shared_ptr<ImageInstance> image_resource) {
     resource_map_.insert({image_resource->resource_handle, image_resource});
     return image_resource;
   }
 
-  std::shared_ptr<Resource> ResourceRegistry::add_resource(std::shared_ptr<BufferResource> buffer_resource) {
+  std::shared_ptr<ResourceInstance> ResourceRegistry::add_resource(std::shared_ptr<BufferInstance> buffer_resource) {
     resource_map_.insert({buffer_resource->resource_handle, buffer_resource});
     return buffer_resource;
   }
@@ -87,7 +88,7 @@ namespace gestalt::graphics::fg {
     }
   }
 
-  FrameGraph::FrameGraph(ResourceFactory* resource_factory) {
+  FrameGraph::FrameGraph(ResourceAllocator* resource_factory) {
     nodes_.reserve(25);
     descriptor_manger_ = std::make_unique<DescriptorManger>();
     synchronization_manager_ = std::make_unique<SynchronizationManager>();

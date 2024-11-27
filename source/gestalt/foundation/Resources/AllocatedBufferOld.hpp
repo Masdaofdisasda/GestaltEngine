@@ -5,7 +5,7 @@
 
 namespace gestalt::foundation {
 
-  struct AllocatedBuffer {
+  struct AllocatedBufferOld {
     VkBuffer buffer;
     VmaAllocation allocation;
     VmaAllocationInfo info;

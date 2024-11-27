@@ -1,4 +1,4 @@
-#include "ResourceFactory.hpp"
+#include "ResourceAllocator.hpp"
 
 #include <stb_image.h>
 
@@ -7,10 +7,9 @@
 #include "EngineConfiguration.hpp"
 #include "VulkanCheck.hpp"
 #include "vk_initializers.hpp"
-#include "Render Engine/FrameGraphTypes.hpp"
 
 namespace gestalt::graphics {
-  void ResourceFactory::set_debug_name(const std::string_view name, const VkObjectType type,
+  void ResourceAllocator::set_debug_name(const std::string_view name, const VkObjectType type,
                                        const uint64 handle) const {
     assert(!name.empty());
 
@@ -48,7 +47,7 @@ namespace gestalt::graphics {
     return 0;
   }
 
-  std::shared_ptr<fg::ImageResource> ResourceFactory::create_image(fg::ImageResourceTemplate&& image_template) {
+  std::shared_ptr<ImageInstance> ResourceAllocator::create_image(ImageTemplate&& image_template) {
     assert(image_template.format != VK_FORMAT_UNDEFINED && "Image format must be specified.");
 
     const VkImageUsageFlags usage_flags = get_usage_flags(image_template.type);
@@ -68,29 +67,29 @@ namespace gestalt::graphics {
         // todo : copy image data to image
       });
 
-      return std::make_unique<fg::ImageResource>(std::move(image_template), allocated_image,
+      return std::make_unique<ImageInstance>(std::move(image_template), allocated_image,
                                                  image_info.get_extent());
     }
 
     const auto image_size = image_template.image_size;
     VkExtent3D extent = {};
-    if (std::holds_alternative<fg::RelativeImageSize>(image_size)) {
-      const auto scale = std::get<fg::RelativeImageSize>(image_size).scale;
+    if (std::holds_alternative<RelativeImageSize>(image_size)) {
+      const auto scale = std::get<RelativeImageSize>(image_size).scale;
       extent = {static_cast<uint32>(getWindowedWidth() * scale),
                 static_cast<uint32>(getWindowedHeight() * scale), 1};
-    } else if (std::holds_alternative<fg::AbsoluteImageSize>(image_size)) {
-      extent  = std::get<fg::AbsoluteImageSize>(image_size).extent;
+    } else if (std::holds_alternative<AbsoluteImageSize>(image_size)) {
+      extent  = std::get<AbsoluteImageSize>(image_size).extent;
     } else {
       assert(false && "Invalid image size type.");
     }
-    if (image_template.image_type == fg::ImageType::kImage2D) {
+    if (image_template.image_type == ImageType::kImage2D) {
       extent.depth = 1;
     }
 
     auto allocated_image
         = allocate_image(image_template.name, image_template.format, usage_flags, extent, aspect_flags);
 
-    return std::make_unique<fg::ImageResource>(std::move(image_template), allocated_image, extent);
+    return std::make_unique<ImageInstance>(std::move(image_template), allocated_image, extent);
   }
 
   ImageInfo::ImageInfo(const std::filesystem::path& path) {
@@ -113,7 +112,7 @@ namespace gestalt::graphics {
     }
   }
 
-  fg::AllocatedImage ResourceFactory::allocate_image(const std::string_view name, const VkFormat format,
+  AllocatedImage ResourceAllocator::allocate_image(const std::string_view name, const VkFormat format,
                                                      const VkImageUsageFlags usage_flags, const VkExtent3D extent, const VkImageAspectFlags aspect_flags) const {
     const VkImageCreateInfo img_info = vkinit::image_create_info(format, usage_flags, extent);
 
@@ -122,7 +121,7 @@ namespace gestalt::graphics {
       .requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     };
 
-    fg::AllocatedImage image;
+    AllocatedImage image;
     VK_CHECK(vmaCreateImage(gpu_->getAllocator(), &img_info, &allocation_info, &image.image_handle,
                             &image.allocation, nullptr));
     set_debug_name(name, VK_OBJECT_TYPE_IMAGE,
@@ -135,7 +134,7 @@ namespace gestalt::graphics {
     return image;
   }
 
-  fg::AllocatedBuffer ResourceFactory::allocate_buffer(const std::string_view name, const VkDeviceSize size,
+  AllocatedBuffer ResourceAllocator::allocate_buffer(const std::string_view name, const VkDeviceSize size,
                                                        VkBufferUsageFlags usage_flags,
                                                        const VmaMemoryUsage memory_usage) const {
     usage_flags |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
@@ -151,7 +150,7 @@ namespace gestalt::graphics {
         .usage = memory_usage,
     };
 
-    fg::AllocatedBuffer buffer;
+    AllocatedBuffer buffer;
     VK_CHECK(vmaCreateBuffer(gpu_->getAllocator(), &buffer_info, &allocation_info,
                              &buffer.buffer_handle, &buffer.allocation, &buffer.info));
     set_debug_name(name, VK_OBJECT_TYPE_BUFFER, reinterpret_cast<uint64_t>(buffer.buffer_handle));
@@ -163,12 +162,12 @@ namespace gestalt::graphics {
     return buffer;
   }
 
-  std::shared_ptr<fg::BufferResource> ResourceFactory::create_buffer(
-      fg::BufferResourceTemplate&& buffer_template) const {
+  std::shared_ptr<BufferInstance> ResourceAllocator::create_buffer(
+      BufferTemplate&& buffer_template) const {
 
       auto allocated_buffer = allocate_buffer(buffer_template.name, buffer_template.size, buffer_template.usage,
                             buffer_template.memory_usage);
 
-    return std::make_shared<fg::BufferResource>(std::move(buffer_template), allocated_buffer);
+    return std::make_shared<BufferInstance>(std::move(buffer_template), allocated_buffer);
   }
 }  // namespace gestalt

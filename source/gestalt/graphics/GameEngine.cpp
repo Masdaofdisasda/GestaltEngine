@@ -35,11 +35,14 @@ namespace gestalt {
     gpu_->init(window_.get());
 
     resource_manager_->init(gpu_.get(), repository_.get());
+    resource_allocator_
+        = std::make_unique<graphics::ResourceAllocator>(gpu_.get());
 
-    scene_manager_->init(gpu_.get(), resource_manager_.get(),
+    scene_manager_->init(gpu_.get(), resource_manager_.get(), resource_allocator_.get(),
                          descriptor_layout_builder_.get(), repository_.get(), frame_provider_.get());
 
-    render_pipeline_->init(gpu_.get(), window_.get(), resource_manager_.get(), repository_.get(),
+    render_pipeline_->init(gpu_.get(), window_.get(), resource_manager_.get(),
+                           resource_allocator_.get(), repository_.get(),
                            imgui_.get(), frame_provider_.get());
 
     register_gui_actions();
@@ -59,7 +62,7 @@ namespace gestalt {
     };
     gui_actions_.get_render_config
         = [this]() -> graphics::RenderConfig& { return render_pipeline_->get_config(); };
-    gui_actions_.get_debug_image = [this]() -> std::shared_ptr<foundation::TextureHandle> {
+    gui_actions_.get_debug_image = [this]() -> std::shared_ptr<foundation::TextureHandleOld> {
       return render_pipeline_->get_debug_image();
     };
     gui_actions_.set_active_camera

@@ -26,7 +26,7 @@
 #include "Resources/GpuProjViewData.hpp"
 #include "Resources/GpuVertexData.hpp"
 #include "Resources/GpuVertexPosition.hpp"
-#include "Resources/TextureHandle.hpp"
+#include "Resources/TextureHandleOld.hpp"
 
 namespace gestalt::foundation {
 
@@ -115,18 +115,18 @@ namespace gestalt::foundation {
   public:
 
     struct default_material {
-      TextureHandle color_image;
+      TextureHandleOld color_image;
       VkSampler color_sampler;
-      TextureHandle metallic_roughness_image;
+      TextureHandleOld metallic_roughness_image;
        VkSampler metallic_roughness_sampler;
-      TextureHandle normal_image;
+      TextureHandleOld normal_image;
       VkSampler normal_sampler;
-      TextureHandle emissive_image;
+      TextureHandleOld emissive_image;
       VkSampler emissive_sampler;
-      TextureHandle occlusion_image;
+      TextureHandleOld occlusion_image;
       VkSampler occlusion_sampler;
 
-      TextureHandle error_checkerboard_image;
+      TextureHandleOld error_checkerboard_image;
     } default_material_ = {};
 
     std::unique_ptr<MaterialBuffers> material_buffers = std::make_unique<MaterialBuffers>();
@@ -143,7 +143,7 @@ namespace gestalt::foundation {
     GpuDataContainer<GpuProjViewData> light_view_projections;
     GpuDataContainer<GpuDirectionalLight> directional_lights;
     GpuDataContainer<GpuPointLight> point_lights;
-    GpuDataContainer<TextureHandle> textures;
+    GpuDataContainer<TextureHandleOld> textures;
     GpuDataContainer<Material> materials;
     GpuDataContainer<Mesh> meshes;
     GpuDataContainer<MeshDraw> mesh_draws;

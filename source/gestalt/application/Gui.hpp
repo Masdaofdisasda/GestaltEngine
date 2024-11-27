@@ -19,7 +19,7 @@ namespace gestalt::application {
       std::function<void(const std::filesystem::path&)> load_gltf;
       std::function<ComponentFactory&()> get_component_factory;
       std::function<RenderConfig&()> get_render_config;
-      std::function<std::shared_ptr<TextureHandle>()> get_debug_image;
+      std::function<std::shared_ptr<TextureHandleOld>()> get_debug_image;
       std::function<void(Entity)> set_active_camera;
       std::function<Entity()> get_active_camera;
     };
@@ -76,7 +76,7 @@ namespace gestalt::application {
 
       void cleanup();
 
-      void draw(VkCommandBuffer cmd, const std::shared_ptr<TextureHandle>& swapchain);
+      void draw(VkCommandBuffer cmd, const std::shared_ptr<TextureHandleOld>& swapchain);
 
       void update(const SDL_Event& e);
 

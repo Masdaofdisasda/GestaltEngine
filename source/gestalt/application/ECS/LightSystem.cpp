@@ -6,6 +6,7 @@
 #include "Camera/AnimationCameraData.hpp"
 #include "Interface/IDescriptorLayoutBuilder.hpp"
 #include "Interface/IGpu.hpp"
+#include "Interface/IResourceAllocator.hpp"
 #include "Interface/IResourceManager.hpp"
 #include "Resources/GpuProjViewData.hpp"
 
@@ -56,6 +57,12 @@ namespace gestalt::application {
         sizeof(GpuPointLight) * getMaxPointLights(),
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
         VMA_MEMORY_USAGE_CPU_TO_GPU, "Point Light Buffer");
+
+    BufferTemplate buffer_template(
+        "Light Buffer", sizeof(GpuDirectionalLight) * getMaxDirectionalLights(),
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        VMA_MEMORY_USAGE_CPU_TO_GPU);
+    light_data->light_buffer = resource_allocator_->create_buffer(std::move(buffer_template));
 
   }
 

@@ -202,9 +202,9 @@ namespace gestalt::application {
     return std::nullopt;
   }
 
-  std::optional<TextureHandle> AssetLoader::load_image(fastgltf::Asset& asset,
+  std::optional<TextureHandleOld> AssetLoader::load_image(fastgltf::Asset& asset,
                                                        fastgltf::Image& image) const {
-    TextureHandle newImage = {};
+    TextureHandleOld newImage = {};
     int width = 0, height = 0, nr_channels = 0;
 
     const std::function<void(unsigned char*)> create_image = [&](unsigned char* data) {
@@ -270,7 +270,7 @@ namespace gestalt::application {
   void AssetLoader::import_textures(fastgltf::Asset& gltf) const {
     fmt::print("importing textures\n");
     for (fastgltf::Image& image : gltf.images) {
-      std::optional<TextureHandle> img = load_image(gltf, image);
+      std::optional<TextureHandleOld> img = load_image(gltf, image);
 
       if (img.has_value()) {
         size_t image_id = repository_->textures.add(img.value());
@@ -293,7 +293,7 @@ namespace gestalt::application {
     return material_id;
   }
 
-  TextureHandle AssetLoader::get_textures(const fastgltf::Asset& gltf, const size_t& texture_index,
+  TextureHandleOld AssetLoader::get_textures(const fastgltf::Asset& gltf, const size_t& texture_index,
                                           const size_t& image_offset) const {
     const size_t image_index = gltf.textures[texture_index].imageIndex.value();
     const size_t sampler_index = gltf.textures[texture_index].samplerIndex.value();

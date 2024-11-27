@@ -21,6 +21,7 @@ namespace gestalt::foundation {
 }
 
 namespace gestalt::graphics {
+  class ResourceAllocator;
   class VkSwapchain;
   class ResourceManager;
 
@@ -28,6 +29,7 @@ namespace gestalt::graphics {
     IGpu* gpu_ = nullptr;
     Window* window_ = nullptr;
       ResourceManager* resource_manager_ = nullptr;
+    ResourceAllocator* resource_allocator_ = nullptr;
       Repository* repository_ = nullptr;
       Gui* imgui_ = nullptr;
       FrameProvider* frame_ = nullptr;
@@ -38,7 +40,7 @@ namespace gestalt::graphics {
 
       std::vector<std::shared_ptr<RenderPassBase>> render_passes_;
 
-      std::shared_ptr<TextureHandle> debug_texture_;
+      std::shared_ptr<TextureHandleOld> debug_texture_;
 
       bool resize_requested_{false};
       uint32 swapchain_image_index_{0};
@@ -54,6 +56,7 @@ namespace gestalt::graphics {
 
     public:
       void init(IGpu* gpu, Window* window, ResourceManager* resource_manager,
+                ResourceAllocator* resource_allocator,
                 Repository* repository, Gui* imgui_gui, FrameProvider* frame);
       void execute_passes();
 
@@ -61,7 +64,7 @@ namespace gestalt::graphics {
 
       RenderConfig& get_config() const { return resource_registry_->config_; }
       VkFormat get_swapchain_format() const { return swapchain_->swapchain_image_format; }
-      std::shared_ptr<TextureHandle> get_debug_image() const { return debug_texture_; }
+      std::shared_ptr<TextureHandleOld> get_debug_image() const { return debug_texture_; }
     };
 
 }  // namespace gestalt

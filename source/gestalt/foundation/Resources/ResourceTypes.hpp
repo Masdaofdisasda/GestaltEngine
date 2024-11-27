@@ -9,7 +9,7 @@
 #include "VulkanTypes.hpp"
 #include <Resources/TextureType.hpp>
 
-namespace gestalt::graphics::fg {
+namespace gestalt::foundation {
 
   struct ResourceTemplate {
     std::string name;
@@ -41,7 +41,7 @@ namespace gestalt::graphics::fg {
     }
   };
 
-  struct ImageResourceTemplate final : ResourceTemplate {
+  struct ImageTemplate final : ResourceTemplate {
     ImageType image_type = ImageType::kImage2D;
     TextureType type = TextureType::kColor;
     std::variant<VkClearValue, std::filesystem::path> initial_value
@@ -50,62 +50,62 @@ namespace gestalt::graphics::fg {
     VkFormat format = VK_FORMAT_R16G16B16A16_SFLOAT;
 
     // Constructor with name and optional customization
-    explicit ImageResourceTemplate(std::string name) : ResourceTemplate(std::move(name)) {}
+    explicit ImageTemplate(std::string name) : ResourceTemplate(std::move(name)) {}
 
     // Fluent setters for customization
-    ImageResourceTemplate& set_image_type(const TextureType texture_type, const VkFormat format) {
+    ImageTemplate& set_image_type(const TextureType texture_type, const VkFormat format) {
       this->type = texture_type;
       this->format = format;
       return *this;
     }
 
-    ImageResourceTemplate& set_initial_value(const VkClearColorValue& clear_value) {
+    ImageTemplate& set_initial_value(const VkClearColorValue& clear_value) {
       assert(type == TextureType::kColor && "Clear color only supported for color images.");
       this->initial_value = VkClearValue({.color = clear_value});
       return *this;
     }
 
-    ImageResourceTemplate& set_initial_value(const VkClearDepthStencilValue& clear_value) {
+    ImageTemplate& set_initial_value(const VkClearDepthStencilValue& clear_value) {
       assert(type == TextureType::kDepth && "Clear depth only supported for depth images.");
       this->initial_value = VkClearValue({.depthStencil = clear_value});
       return *this;
     }
 
-    ImageResourceTemplate& set_initial_value(const std::filesystem::path& path) {
+    ImageTemplate& set_initial_value(const std::filesystem::path& path) {
       assert(type == TextureType::kColor && "path only supported for color images.");
       this->initial_value = path;
       return *this;
     }
 
-    ImageResourceTemplate& set_image_size(const float32& relative_size) {
+    ImageTemplate& set_image_size(const float32& relative_size) {
       this->image_size = RelativeImageSize(relative_size);
       return *this;
     }
 
-    ImageResourceTemplate& set_image_size(const uint32 width, const uint32 height, const uint32 depth = 0) {
+    ImageTemplate& set_image_size(const uint32 width, const uint32 height, const uint32 depth = 0) {
       this->image_size = AbsoluteImageSize(width, height, depth);
       return *this;
     }
 
-    ImageResourceTemplate build() { return *this; }
+    ImageTemplate build() { return *this; }
 
   };
 
-    struct BufferResourceTemplate final : ResourceTemplate {
+    struct BufferTemplate final : ResourceTemplate {
     VkDeviceSize size;
     VkBufferUsageFlags usage;
     VmaMemoryUsage memory_usage;
 
-    BufferResourceTemplate(std::string name, const VkDeviceSize size,
+    BufferTemplate(std::string name, const VkDeviceSize size,
                            const VkBufferUsageFlags usage, const VmaMemoryUsage memory_usage)
         : ResourceTemplate(std::move(name)), size(size), usage(usage), memory_usage(memory_usage) {}
   };
 
   //TODO split into template and instance
-  struct Resource {
+  struct ResourceInstance {
     uint64 resource_handle = -1;
     ResourceTemplate resource_template;
-    explicit Resource(ResourceTemplate&& resource_template) : resource_template(std::move(resource_template)) {}
+    explicit ResourceInstance(ResourceTemplate&& resource_template) : resource_template(std::move(resource_template)) {}
     [[nodiscard]] std::string_view name() const { return resource_template.name; }
   };
 
@@ -115,10 +115,10 @@ namespace gestalt::graphics::fg {
     VmaAllocation allocation = VK_NULL_HANDLE;
   };
 
-  struct ImageResource : Resource {
-    ImageResource(ImageResourceTemplate&& image_template, const AllocatedImage& allocated_image,
+  struct ImageInstance : ResourceInstance {
+    ImageInstance(ImageTemplate&& image_template, const AllocatedImage& allocated_image,
                   const VkExtent3D extent)
-        : Resource(std::move(image_template)), allocated_image(allocated_image), extent(extent) {}
+        : ResourceInstance(std::move(image_template)), allocated_image(allocated_image), extent(extent) {}
 
     AllocatedImage allocated_image;
     VkExtent3D extent;
@@ -132,10 +132,10 @@ namespace gestalt::graphics::fg {
     VkDeviceAddress address;
   };
 
-  struct BufferResource : Resource {
-    BufferResource(BufferResourceTemplate&& buffer_template,
+  struct BufferInstance : ResourceInstance {
+    BufferInstance(BufferTemplate&& buffer_template,
                    const AllocatedBuffer& allocated_buffer)
-        : Resource(std::move(buffer_template)), allocated_buffer(allocated_buffer) {}
+        : ResourceInstance(std::move(buffer_template)), allocated_buffer(allocated_buffer) {}
 
     AllocatedBuffer allocated_buffer; 
     VkAccessFlags2 current_access = 0;        // Current access flags

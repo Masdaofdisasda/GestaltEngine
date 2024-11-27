@@ -134,7 +134,7 @@ namespace gestalt::application {
       }
     }
 
-    void Gui::draw(VkCommandBuffer cmd, const std::shared_ptr<TextureHandle>& swapchain) {
+    void Gui::draw(VkCommandBuffer cmd, const std::shared_ptr<TextureHandleOld>& swapchain) {
       VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(
           swapchain->imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
       VkRenderingInfo renderInfo

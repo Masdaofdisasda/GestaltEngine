@@ -8,7 +8,7 @@
 #include <vma/vk_mem_alloc.h>
 #include <cmath>
 namespace gestalt::graphics {
-  vkutil::TransitionBuffer::TransitionBuffer(const std::shared_ptr<foundation::AllocatedBuffer>& buffer) {
+  vkutil::TransitionBuffer::TransitionBuffer(const std::shared_ptr<foundation::AllocatedBufferOld>& buffer) {
     buffer_ = buffer;
 
     bufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
@@ -79,7 +79,7 @@ namespace gestalt::graphics {
     buffer_->currentStage = bufferBarrier.dstStageMask;    // Update current stage
   }
 
-  vkutil::TransitionImage::TransitionImage(const std::shared_ptr<foundation::TextureHandle>& image) {
+  vkutil::TransitionImage::TransitionImage(const std::shared_ptr<foundation::TextureHandleOld>& image) {
     image_ = image;
 
     imageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
@@ -285,7 +285,7 @@ namespace gestalt::graphics {
     vkCmdBlitImage2(cmd, &blitInfo);
   }
 
-  void vkutil::generate_mipmaps(VkCommandBuffer cmd, std::shared_ptr<foundation::TextureHandle>& handle) {
+  void vkutil::generate_mipmaps(VkCommandBuffer cmd, std::shared_ptr<foundation::TextureHandleOld>& handle) {
     VkExtent2D imageSize = {handle->imageExtent.width, handle->imageExtent.height};
     int mipLevels = int(std::floor(
                         std::log2(std::max(handle->imageExtent.width, handle->imageExtent.height))))

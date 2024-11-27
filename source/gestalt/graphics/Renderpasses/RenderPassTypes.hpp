@@ -48,7 +48,7 @@ namespace gestalt::graphics {
     };
 
     class VolumetricLightingInjectionPass final : public RenderPassBase {
-      TextureHandle blue_noise_;
+      TextureHandleOld blue_noise_;
       std::array<std::shared_ptr<DescriptorBuffer>, getFramesInFlight()> descriptor_buffers_;
     public:
       void prepare() override;
@@ -58,7 +58,7 @@ namespace gestalt::graphics {
     };
 
     class VolumetricLightingScatteringPass final : public RenderPassBase {
-      TextureHandle blue_noise_;
+      TextureHandleOld blue_noise_;
       std::array<std::shared_ptr<DescriptorBuffer>, getFramesInFlight()> descriptor_buffers_;
     public:
       void prepare() override;
@@ -146,7 +146,7 @@ namespace gestalt::graphics {
     };
 
     class SsaoPass final : public RenderPassBase {
-      TextureHandle rotation_texture_;
+      TextureHandleOld rotation_texture_;
       std::array<std::shared_ptr<DescriptorBuffer>, getFramesInFlight()> descriptor_buffers_;
 
     public:

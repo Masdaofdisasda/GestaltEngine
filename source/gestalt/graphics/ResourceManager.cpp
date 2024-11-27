@@ -43,7 +43,7 @@ namespace gestalt::graphics {
       vkSetDebugUtilsObjectNameEXT(device, &nameInfo);
     }
 
-    std::shared_ptr<AllocatedBuffer> ResourceManager::create_buffer(size_t allocSize,
+    std::shared_ptr<AllocatedBufferOld> ResourceManager::create_buffer(size_t allocSize,
                                                                     VkBufferUsageFlags usage,
                                                                     VmaMemoryUsage memoryUsage,
                                                                     std::string name)
@@ -58,7 +58,7 @@ namespace gestalt::graphics {
       vmaallocInfo.usage = memoryUsage;
       vmaallocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
-      AllocatedBuffer new_buffer;
+      AllocatedBufferOld new_buffer;
       new_buffer.usage = usage;
       new_buffer.memory_usage = memoryUsage;
 
@@ -71,7 +71,7 @@ namespace gestalt::graphics {
       new_buffer.address
           = vkGetBufferDeviceAddress(gpu_->getDevice(), &device_address_info);
 
-      return std::make_shared<AllocatedBuffer>(new_buffer);
+      return std::make_shared<AllocatedBufferOld>(new_buffer);
     }
 
     // https://github.com/KhronosGroup/Vulkan-Samples/tree/main/samples/extensions/descriptor_buffer_basic
@@ -128,7 +128,7 @@ namespace gestalt::graphics {
       return std::make_shared<DescriptorBuffer>(descriptor_buffer);
     }
 
-    void ResourceManager::destroy_buffer(const std::shared_ptr<AllocatedBuffer> buffer) {
+    void ResourceManager::destroy_buffer(const std::shared_ptr<AllocatedBufferOld> buffer) {
       vmaDestroyBuffer(gpu_->getAllocator(), buffer->buffer, buffer->allocation);
     }
     void ResourceManager::destroy_descriptor_buffer(const std::shared_ptr<DescriptorBuffer> buffer) const {
@@ -199,11 +199,11 @@ namespace gestalt::graphics {
 
     }
 
-    TextureHandle ResourceManager::create_image(VkExtent3D size, VkFormat format,
+    TextureHandleOld ResourceManager::create_image(VkExtent3D size, VkFormat format,
                                                  VkImageUsageFlags usage, bool mipmapped,
                                                  bool cubemap) {
 
-      TextureHandle newImage{cubemap ? TextureType::kCubeMap : TextureType::kColor};
+      TextureHandleOld newImage{cubemap ? TextureType::kCubeMap : TextureType::kColor};
       newImage.setFormat(format);
       newImage.imageExtent = size;
 
@@ -279,10 +279,10 @@ namespace gestalt::graphics {
       return newImage;
     }
 
-    TextureHandle ResourceManager::create_image(void* data, VkExtent3D size, VkFormat format,
+    TextureHandleOld ResourceManager::create_image(void* data, VkExtent3D size, VkFormat format,
                                                  VkImageUsageFlags usage, bool mipmapped) {
 
-      TextureHandle new_image = create_image(
+      TextureHandleOld new_image = create_image(
           size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
           mipmapped);
       const size_t data_size = static_cast<size_t>(size.depth * size.width * size.height) * 4;
@@ -291,7 +291,7 @@ namespace gestalt::graphics {
       return new_image;
     }
 
-  void ResourceManager::create_3D_image(const std::shared_ptr<TextureHandle>& image,
+  void ResourceManager::create_3D_image(const std::shared_ptr<TextureHandleOld>& image,
                                         const VkExtent3D size, const VkFormat format,
                                         const VkImageUsageFlags usage, const std::string& name) const {
       image->setFormat(format);
@@ -339,12 +339,12 @@ namespace gestalt::graphics {
 
     }
 
-    TextureHandle ResourceManager::create_cubemap(void* imageData, VkExtent3D size,
+    TextureHandleOld ResourceManager::create_cubemap(void* imageData, VkExtent3D size,
                                                    VkFormat format, VkImageUsageFlags usage,
                                                    bool mipmapped) {
 
       // Create the image with VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT flag for cubemaps
-      TextureHandle new_image = create_image(
+      TextureHandleOld new_image = create_image(
           size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
           mipmapped, true);
 
@@ -352,8 +352,8 @@ namespace gestalt::graphics {
       return new_image;
     }
 
-    std::optional<TextureHandle> ResourceManager::load_image(const std::string& filepath) {
-      TextureHandle new_image;
+    std::optional<TextureHandleOld> ResourceManager::load_image(const std::string& filepath) {
+      TextureHandleOld new_image;
 
       int width, height, nrChannels;
       unsigned char* data = stbi_load(filepath.c_str(), &width, &height, &nrChannels, 4);
@@ -388,7 +388,7 @@ namespace gestalt::graphics {
     }
 
     void ResourceManager::load_and_create_cubemap(const std::string& file_path,
-                                                  TextureHandle& cubemap) {
+                                                  TextureHandleOld& cubemap) {
       int w, h, comp;
       float* img = stbi_loadf(file_path.c_str(), &w, &h, &comp, 3);
       if (!img) {
@@ -494,7 +494,7 @@ namespace gestalt::graphics {
                 .update();
     }
 
-    TextureHandle ResourceManager::create_cubemap_from_HDR(std::vector<float>& image_data, int h,
+    TextureHandleOld ResourceManager::create_cubemap_from_HDR(std::vector<float>& image_data, int h,
                                                             int w) {
       Bitmap in(w, h, 4, eBitmapFormat_Float, image_data.data());
       Bitmap out_bitmap = convertEquirectangularMapToVerticalCross(in);
@@ -506,7 +506,7 @@ namespace gestalt::graphics {
                             VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT, false);
     }
 
-    void ResourceManager::create_frame_buffer(const std::shared_ptr<TextureHandle>& image,
+    void ResourceManager::create_frame_buffer(const std::shared_ptr<TextureHandleOld>& image,
                                               const std::string& name, VkFormat format) const {
       assert(image->getType() == TextureType::kColor || image->getType() == TextureType::kDepth);
 
@@ -561,7 +561,7 @@ namespace gestalt::graphics {
     }
 
 
-    void ResourceManager::destroy_image(const TextureHandle& img) {
+    void ResourceManager::destroy_image(const TextureHandleOld& img) {
       vkDestroyImageView(gpu_->getDevice(), img.imageView, nullptr);
       vmaDestroyImage(gpu_->getAllocator(), img.image, img.allocation);
     }

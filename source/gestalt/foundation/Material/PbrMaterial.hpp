@@ -2,7 +2,7 @@
 
 #include "common.hpp"
 #include "VulkanTypes.hpp"
-#include "Resources/TextureHandle.hpp"
+#include "Resources/TextureHandleOld.hpp"
 #include "MaterialFlags.hpp"
 
 namespace gestalt::foundation {
@@ -28,15 +28,15 @@ namespace gestalt::foundation {
       } constants;
 
       struct PbrTextures {
-        TextureHandle albedo_image;
+        TextureHandleOld albedo_image;
         VkSampler albedo_sampler;
-        TextureHandle metal_rough_image;
+        TextureHandleOld metal_rough_image;
         VkSampler metal_rough_sampler;
-        TextureHandle normal_image;
+        TextureHandleOld normal_image;
         VkSampler normal_sampler;
-        TextureHandle emissive_image;
+        TextureHandleOld emissive_image;
         VkSampler emissive_sampler;
-        TextureHandle occlusion_image;
+        TextureHandleOld occlusion_image;
         VkSampler occlusion_sampler;
       } textures;
     };

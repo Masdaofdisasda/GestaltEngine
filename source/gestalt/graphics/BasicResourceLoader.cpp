@@ -28,11 +28,11 @@ namespace gestalt::graphics {
     VK_CHECK(vkCreateFence(gpu_->getDevice(), &fenceInfo, nullptr, &flushFence));
   }
 
-  void BasicResourceLoader::addImageTask(TextureHandle image, void* imageData,
+  void BasicResourceLoader::addImageTask(TextureHandleOld image, void* imageData,
                                             VkDeviceSize imageSize, VkExtent3D imageExtent,
                                             bool mipmap) {
     ImageTask task;
-    task.image = std::make_shared<TextureHandle>(image);
+    task.image = std::make_shared<TextureHandleOld>(image);
     task.dataCopy = new unsigned char[imageSize];
     memcpy(task.dataCopy, imageData, imageSize);
     task.imageSize = imageSize;
@@ -128,7 +128,7 @@ namespace gestalt::graphics {
     }
   }
 
-  void BasicResourceLoader::addCubemapTask(TextureHandle image, void* imageData,
+  void BasicResourceLoader::addCubemapTask(TextureHandleOld image, void* imageData,
                                               VkExtent3D imageExtent) {
     size_t faceWidth = imageExtent.width;
     size_t faceHeight = imageExtent.height;
@@ -139,7 +139,7 @@ namespace gestalt::graphics {
     size_t totalCubemapSizeBytes = faceSizeBytes * 6;
 
     CubemapTask task;
-    task.image = std::make_shared<TextureHandle>(image);
+    task.image = std::make_shared<TextureHandleOld>(image);
     task.dataCopy = new unsigned char[totalCubemapSizeBytes];
     memcpy(task.dataCopy, imageData, totalCubemapSizeBytes);
     task.totalCubemapSizeBytes = totalCubemapSizeBytes;
@@ -150,7 +150,7 @@ namespace gestalt::graphics {
     cubemap_tasks_.push(task);
   }
 
-  void BasicResourceLoader::add_stagging_buffer(size_t size, AllocatedBuffer& staging_buffer) {
+  void BasicResourceLoader::add_stagging_buffer(size_t size, AllocatedBufferOld& staging_buffer) {
     // allocate buffer
     VkBufferCreateInfo bufferInfo = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
     bufferInfo.pNext = nullptr;

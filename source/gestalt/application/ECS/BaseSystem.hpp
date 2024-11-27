@@ -4,6 +4,7 @@
 
 
 namespace gestalt::foundation {
+  class IResourceAllocator;
   struct UserInput;
   class IResourceManager;
   class IDescriptorLayoutBuilder;
@@ -20,13 +21,14 @@ namespace gestalt::application {
 
     class BaseSystem {
     public:
-      void init(IGpu* gpu,
-                IResourceManager* resource_manager,
+      void init(IGpu* gpu, IResourceManager* resource_manager,
+                IResourceAllocator* resource_allocator,
                 IDescriptorLayoutBuilder* builder,
                 Repository* repository,
                 FrameProvider* frame) {
         gpu_ = gpu;
         resource_manager_ = resource_manager;
+        resource_allocator_ = resource_allocator;
         descriptor_layout_builder_ = builder;
         repository_ = repository;
         frame_ = frame; 
@@ -43,6 +45,7 @@ namespace gestalt::application {
 
       IGpu* gpu_ = nullptr;
       IResourceManager* resource_manager_ = nullptr;
+      IResourceAllocator* resource_allocator_ = nullptr;
       IDescriptorLayoutBuilder* descriptor_layout_builder_ = nullptr;
       Repository* repository_ = nullptr;
       FrameProvider* frame_ = nullptr;

@@ -7,6 +7,7 @@
 #include "Render Engine/RenderEngine.hpp"
 #include "ECS/ECSManager.hpp"
 #include "FrameProvider.hpp"
+#include "ResourceAllocator.hpp"
 #include "TmeTrackingService.hpp"
 #include "Utils/vk_descriptors.hpp"
 
@@ -41,6 +42,7 @@ namespace gestalt {
     application::InputSystem input_system_;
     std::unique_ptr<graphics::ResourceManager> resource_manager_
         = std::make_unique<graphics::ResourceManager>();
+    std::unique_ptr<graphics::ResourceAllocator> resource_allocator_;
     std::unique_ptr<foundation::IDescriptorLayoutBuilder> descriptor_layout_builder_
         = std::make_unique<graphics::DescriptorLayoutBuilder>();
     std::unique_ptr<foundation::IDescriptorWriter> writer_

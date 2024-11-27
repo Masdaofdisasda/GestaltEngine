@@ -8,16 +8,18 @@
 #include "MeshSystem.hpp"
 #include "PhysicSystem.hpp"
 #include "TransformSystem.hpp"
+#include "Interface/IResourceAllocator.hpp"
 #include "Interface/IResourceManager.hpp"
 #include "Resource Loading/AssetLoader.hpp"
 
 namespace gestalt::application {
 
-    void ECSManager::init(IGpu* gpu, IResourceManager* resource_manager,
+    void ECSManager::init(IGpu* gpu, IResourceManager* resource_manager, IResourceAllocator* resource_allocator,
                            IDescriptorLayoutBuilder* builder, Repository* repository,
                            FrameProvider* frame) {
     gpu_ = gpu;
     resource_manager_ = resource_manager;
+    resource_allocator_ = resource_allocator;
     repository_ = repository;
 
       asset_loader_ = std::make_unique<AssetLoader>();
@@ -49,22 +51,24 @@ namespace gestalt::application {
                                                    BoxCollider{glm::vec3(1000.f, 0.1f, 1000.f)});
 
     material_system_ = std::make_unique<MaterialSystem>();
-    material_system_->init(gpu_, resource_manager_, builder, repository_,frame);
+    material_system_->init(gpu_, resource_manager_, resource_allocator, builder, repository_,frame);
     light_system_ = std::make_unique<LightSystem>();
-    light_system_->init(gpu_, resource_manager_, builder, repository_,
+    light_system_->init(gpu_, resource_manager_, resource_allocator, builder, repository_,
                         frame);
     camera_system_ = std::make_unique<CameraSystem>();
-    camera_system_->init(gpu_, resource_manager_, builder, repository_,
+    camera_system_->init(gpu_, resource_manager_, resource_allocator, builder, repository_,
                          frame);
     transform_system_ = std::make_unique<TransformSystem>();
-    transform_system_->init(gpu_, resource_manager_, builder, repository_,frame);
+    transform_system_->init(gpu_, resource_manager_, resource_allocator, builder, repository_,
+                            frame);
     animation_system_ = std::make_unique<AnimationSystem>();
-    animation_system_->init(gpu_, resource_manager_, builder, repository_,frame);
+    animation_system_->init(gpu_, resource_manager_, resource_allocator, builder, repository_,
+                            frame);
     mesh_system_ = std::make_unique<MeshSystem>();
-    mesh_system_->init(gpu_, resource_manager_, builder, repository_,
+    mesh_system_->init(gpu_, resource_manager_, resource_allocator, builder, repository_,
                        frame);
     physics_system_ = std::make_unique<PhysicSystem>();
-    physics_system_->init(gpu_, resource_manager_, builder, repository_, frame);
+    physics_system_->init(gpu_, resource_manager_, resource_allocator, builder, repository_, frame);
   }
 
   void ECSManager::set_active_camera(const Entity camera) const {

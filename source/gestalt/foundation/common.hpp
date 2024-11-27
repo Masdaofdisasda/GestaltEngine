@@ -34,7 +34,7 @@ namespace gestalt {
 
   namespace foundation {
     enum class TextureType;
-    class TextureHandle;
+    class TextureHandleOld;
   }  // namespace foundation
 
   namespace application {

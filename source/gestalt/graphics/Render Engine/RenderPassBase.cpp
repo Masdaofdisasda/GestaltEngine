@@ -83,7 +83,7 @@ namespace gestalt::graphics {
         // only write and depth attachments are considered
         if (attachment.usage == ImageUsageType::kWrite
             || attachment.usage == ImageUsageType::kDepthStencilRead) {
-          std::shared_ptr<TextureHandle>& image = attachment.attachment.image;
+          std::shared_ptr<TextureHandleOld>& image = attachment.attachment.image;
 
           // if the image is a color attachment
           if (image->getType() == TextureType::kColor) {
@@ -232,7 +232,7 @@ namespace gestalt::graphics {
       for (auto& attachment : dependencies_.image_attachments) {
         if (attachment.usage == ImageUsageType::kWrite
             || attachment.usage == ImageUsageType::kDepthStencilRead) {
-          std::shared_ptr<TextureHandle>& image = attachment.attachment.image;
+          std::shared_ptr<TextureHandleOld>& image = attachment.attachment.image;
 
           if (image->getType() == TextureType::kColor) {
             color_formats.push_back(image->getFormat());

@@ -4,6 +4,7 @@
 #include "Interface/IDescriptorLayoutBuilder.hpp"
 #include "Interface/IGpu.hpp"
 #include "Interface/IResourceManager.hpp"
+#include "Interface/IResourceAllocator.hpp"
 
 #include <ranges>
 
@@ -51,9 +52,17 @@ namespace gestalt::application {
         sizeof(PbrMaterial::PbrConstants) * getMaxMaterials(),
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
         VMA_MEMORY_USAGE_CPU_TO_GPU, "Material Data Buffer");
+
+    //TODO
+    BufferTemplate buffer_template(
+        "Material Buffer", sizeof(PbrMaterial::PbrConstants) * getMaxMaterials(),
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        VMA_MEMORY_USAGE_CPU_TO_GPU);
+    mat_buffers->material_buffer = resource_allocator_->create_buffer(std::move(buffer_template));
   }
 
   void MaterialSystem::create_default_material() {
+
 
     auto& default_mat = repository_->default_material_;
 

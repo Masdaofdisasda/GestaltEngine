@@ -6,7 +6,7 @@
 
 namespace gestalt::foundation {
 
-  class TextureHandle {
+  class TextureHandleOld {
     VkFormat imageFormat = VK_FORMAT_UNDEFINED;
     TextureType type;
     VkImageLayout currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -17,7 +17,7 @@ namespace gestalt::foundation {
     VmaAllocation allocation = VK_NULL_HANDLE;
     VkExtent3D imageExtent = {};
 
-    TextureHandle(const TextureType type = TextureType::kColor) : type(type) {}
+    TextureHandleOld(const TextureType type = TextureType::kColor) : type(type) {}
 
     VkExtent2D getExtent2D() const { return {imageExtent.width, imageExtent.height}; }
     void setLayout(VkImageLayout layout) { currentLayout = layout; }

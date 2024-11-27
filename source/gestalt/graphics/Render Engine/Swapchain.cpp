@@ -3,7 +3,7 @@
 #include <VkBootstrap.h>
 #include <EngineConfiguration.hpp>
 #include <Interface/IGpu.hpp>
-#include "Resources/TextureHandle.hpp"
+#include "Resources/TextureHandleOld.hpp"
 
 namespace gestalt::graphics {
   void VkSwapchain::init(IGpu* gpu, const VkExtent3D& extent) {
@@ -41,13 +41,13 @@ namespace gestalt::graphics {
     swapchain = vkbSwapchain.swapchain;
 
     for (const auto& _swapchainImage : vkbSwapchain.get_images().value()) {
-      TextureHandle handle{};
+      TextureHandleOld handle{};
       handle.image = _swapchainImage;
       handle.setFormat(swapchain_image_format);
       handle.setLayout(VK_IMAGE_LAYOUT_UNDEFINED);
       handle.imageExtent = {swapchain_extent.width, swapchain_extent.height, 1};
 
-      swapchain_images.push_back(std::make_shared<TextureHandle>(handle));
+      swapchain_images.push_back(std::make_shared<TextureHandleOld>(handle));
     }
 
     const auto views = vkbSwapchain.get_image_views().value();

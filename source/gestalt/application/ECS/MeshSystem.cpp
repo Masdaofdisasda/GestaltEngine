@@ -8,6 +8,7 @@
 #include "Interface/IDescriptorLayoutBuilder.hpp"
 #include "Interface/IGpu.hpp"
 #include "Interface/IResourceManager.hpp"
+#include "Interface/IResourceAllocator.hpp"
 #include "Mesh/MeshSurface.hpp"
 #include "Mesh/MeshTaskCommand.hpp"
 
@@ -225,6 +226,14 @@ namespace gestalt::application {
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
               | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
           VMA_MEMORY_USAGE_GPU_ONLY, "Drawcount Buffer");
+
+      
+    // TODO
+      BufferTemplate buffer_template(
+          "Geometry Buffer", kMaxDrawCountBufferSize,
+          VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+          VMA_MEMORY_USAGE_CPU_TO_GPU);
+      mesh_buffers->geometry_buffer = resource_allocator_->create_buffer(std::move(buffer_template));
     }
   }
 

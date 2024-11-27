@@ -36,7 +36,7 @@ namespace gestalt::graphics {
 
     struct ImageAttachment {
       std::string name;
-      std::shared_ptr<TextureHandle> image;
+      std::shared_ptr<TextureHandleOld> image;
       float32 scale{1.0f};
       VkExtent3D extent{0, 0, 0};
       VkFormat format{VK_FORMAT_UNDEFINED};

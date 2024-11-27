@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <queue>
@@ -7,18 +8,11 @@
 #include "common.hpp"
 #include "VulkanTypes.hpp"
 #include "Interface/IGpu.hpp"
-#include "Render Engine/FrameGraphTypes.hpp"
-
-namespace gestalt::graphics::fg {
-  struct BufferResource;
-  struct BufferResourceTemplate;
-  struct ImageResource;
-  struct ImageResourceTemplate;
-}
+#include "Interface/IResourceAllocator.hpp"
+#include "Resources/ResourceTypes.hpp"
 
 namespace gestalt::graphics {
 
-  
   struct ImageInfo {
     int width, height;
     int channels;
@@ -89,26 +83,26 @@ namespace gestalt::graphics {
     std::condition_variable condition_;
   };
 
-  class ResourceFactory final : public NonCopyable<ResourceFactory> {
+  class ResourceAllocator final : public IResourceAllocator, NonCopyable<ResourceAllocator> {
 
       IGpu* gpu_ = nullptr;
     TaskQueue task_queue_{};
 
-    fg::AllocatedImage allocate_image(std::string_view name, VkFormat format,
+    AllocatedImage allocate_image(std::string_view name, VkFormat format,
                                       VkImageUsageFlags usage_flags, VkExtent3D extent,
                                       VkImageAspectFlags aspect_flags) const;
-      fg::AllocatedBuffer allocate_buffer(std::string_view name, VkDeviceSize size,
+      AllocatedBuffer allocate_buffer(std::string_view name, VkDeviceSize size,
                                           VkBufferUsageFlags usage_flags,
                                           VmaMemoryUsage memory_usage) const;
 
     public:
-      explicit ResourceFactory(IGpu* gpu) : gpu_(gpu) {}
+      explicit ResourceAllocator(IGpu* gpu) : gpu_(gpu) {}
 
       void set_debug_name(std::string_view name, VkObjectType type,
-                          uint64 handle) const;
-      std::shared_ptr<fg::ImageResource> create_image(fg::ImageResourceTemplate&& image_template);
+                          uint64 handle) const override;
+      std::shared_ptr<ImageInstance> create_image(ImageTemplate&& image_template) override;
 
-    std::shared_ptr<fg::BufferResource> create_buffer(
-          fg::BufferResourceTemplate&& buffer_template) const;
+    std::shared_ptr<BufferInstance> create_buffer(
+          BufferTemplate&& buffer_template) const override;
     };
 }  // namespace gestalt
