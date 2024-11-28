@@ -99,7 +99,7 @@ namespace gestalt::graphics::fg {
     nodes_.push_back(std::make_shared<FrameGraphNode>(std::move(pass)));
   }
 
-  void FrameGraph::compile(IGpu* gpu) {
+  void FrameGraph::compile() {
     for (auto& node : nodes_) {
       fmt::println("Compiling Render Pass: {}", node->render_pass->name);
       for (const auto& read_resource : node->render_pass->get_resources(ResourceUsage::READ)) {
@@ -112,7 +112,7 @@ namespace gestalt::graphics::fg {
         edge->nodes_from.push_back(node);
         node->edges_out.push_back(edge);
       }
-      node->render_pass->compile(gpu);
+      node->render_pass->compile();
     }
 
     print_graph();

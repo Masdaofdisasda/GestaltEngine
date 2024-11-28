@@ -25,6 +25,21 @@ namespace gestalt::graphics {
   void RenderEngine::init(IGpu* gpu, Window* window,
                             ResourceManager* resource_manager, ResourceAllocator* resource_allocator,
                             Repository* repository, Gui* imgui_gui, FrameProvider* frame) {
+
+    gpu_ = gpu;
+    window_ = window;
+    resource_manager_ = resource_manager;
+    resource_allocator_ = resource_allocator;
+    repository_ = repository;
+    imgui_ = imgui_gui;
+    frame_ = frame;
+
+    swapchain_ = std::make_unique<VkSwapchain>();
+    swapchain_->init(gpu_, {window_->extent.width, window_->extent.height, 1});
+
+    resource_registry_ = std::make_unique<ResourceRegistry>();
+    resource_registry_->init(gpu_, repository_);
+
     {
       const auto frame_graph = std::make_unique<fg::FrameGraph>(resource_allocator);
 
@@ -61,20 +76,19 @@ namespace gestalt::graphics {
                                                     fg::CreationType::EXTERNAL);
       // Shader Passes
       auto draw_cull_directional_depth_pass
-          = std::make_shared<fg::DrawCullDirectionalDepthPass>(shadow_map, geometry_buffer);
+          = std::make_shared<fg::DrawCullDirectionalDepthPass>(shadow_map, geometry_buffer, gpu_);
       auto task_submit_directional_depth_pass
-          = std::make_shared<fg::TaskSubmitDirectionalDepthPass>(shadow_map, geometry_buffer);
+          = std::make_shared<fg::TaskSubmitDirectionalDepthPass>(shadow_map, geometry_buffer, gpu_);
       auto meshlet_directional_depth_pass
-          = std::make_shared<fg::MeshletDirectionalDepthPass>(shadow_map, geometry_buffer);
+          = std::make_shared<fg::MeshletDirectionalDepthPass>(shadow_map, geometry_buffer, gpu_);
 
-      auto geometry_pass = std::make_shared<fg::GeometryPass>(g_buffer_1, g_buffer_2, g_buffer_3,
-                                                              g_buffer_depth, geometry_buffer);
+      auto geometry_pass = std::make_shared<fg::GeometryPass>(g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth, geometry_buffer, gpu_);
       auto lighting_pass = std::make_shared<fg::LightingPass>(
           scene_lit, g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth, shadow_map,
-          material_buffer, light_buffer);
-      auto tone_map_pass = std::make_shared<fg::ToneMapPass>(scene_final, scene_lit);
+          material_buffer, light_buffer, gpu_);
+      auto tone_map_pass = std::make_shared<fg::ToneMapPass>(scene_final, scene_lit, gpu_);
       auto ssao_pass = std::make_shared<fg::SsaoPass>(scene_lit, g_buffer_depth, rotation_texture,
-                                                      occlusion_texture);
+                                                      occlusion_texture, gpu_);
 
       frame_graph->add_render_pass(std::move(draw_cull_directional_depth_pass));
       frame_graph->add_render_pass(std::move(task_submit_directional_depth_pass));
@@ -84,27 +98,13 @@ namespace gestalt::graphics {
       frame_graph->add_render_pass(std::move(tone_map_pass));
       frame_graph->add_render_pass(std::move(ssao_pass));
 
-      frame_graph->compile(gpu);
+      frame_graph->compile();
 
       // TODO
       const VkCommandBuffer command_buffer = nullptr;
       const fg::CommandBuffer cmd{command_buffer};
       frame_graph->execute(cmd);
     }
-
-    gpu_ = gpu;
-    window_ = window;
-    resource_manager_ = resource_manager;
-    resource_allocator_ = resource_allocator;
-    repository_ = repository;
-    imgui_ = imgui_gui;
-    frame_ = frame;
-
-    swapchain_ = std::make_unique<VkSwapchain>();
-    swapchain_->init(gpu_, {window_->extent.width, window_->extent.height, 1});
-
-    resource_registry_ = std::make_unique<ResourceRegistry>();
-    resource_registry_->init(gpu_, repository_);
 
     render_passes_.push_back(std::make_shared<DrawCullDirectionalDepthPass>());
     render_passes_.push_back(std::make_shared<TaskSubmitDirectionalDepthPass>());

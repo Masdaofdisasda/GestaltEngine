@@ -20,7 +20,6 @@ namespace gestalt::graphics {
 namespace gestalt::graphics::fg {
 
   struct PushDescriptor {
-
     PushDescriptor(const uint32_t size, const VkShaderStageFlags stage_flags) {
       push_constant_range.size = size;
       push_constant_range.offset = 0;
@@ -36,7 +35,6 @@ namespace gestalt::graphics::fg {
     VkPushConstantRange get_push_constant_range() const { return push_constant_range; }
 
   private:
-
     VkPushConstantRange push_constant_range = {.size = 0};
   };
 
@@ -46,6 +44,7 @@ namespace gestalt::graphics::fg {
 
   class CommandBuffer {
     VkCommandBuffer cmd;
+
   public:
     explicit CommandBuffer(const VkCommandBuffer cmd) : cmd(cmd) {}
 
@@ -137,43 +136,61 @@ namespace gestalt::graphics::fg {
     }
   };
 
-
-  class ShaderComponent {
+  class PipelineUtil : NonCopyable<PipelineUtil> {
+    IGpu* gpu_ = nullptr;
 
     std::unordered_map<uint32, std::unordered_map<uint32, VkDescriptorSetLayoutBinding>>
         set_bindings_;
     VkPipelineLayout pipeline_layout_ = nullptr;
     VkPipeline pipeline_ = nullptr;
+    std::unordered_map<uint32, VkDescriptorSetLayout> descriptor_set_layouts_;
+    std::unordered_map<VkShaderStageFlagBits, VkPipelineShaderStageCreateInfo> shader_stages_;
+    std::unordered_map<VkShaderStageFlagBits, VkShaderModule> shader_modules_;
 
   public:
-    virtual ~ShaderComponent() = default;
+    explicit PipelineUtil(IGpu* gpu) : gpu_(gpu) {}
 
-    VkPipelineLayout get_pipeline_layout() const { return pipeline_layout_; }
+    ~PipelineUtil() = default;
+
+    void create_compute() {
+      assert(shader_stages_.contains(VK_SHADER_STAGE_COMPUTE_BIT) && "No compute shader added");
+
+      const VkComputePipelineCreateInfo pipeline_info = {
+          .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+          .pNext = nullptr,
+          .flags = VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT,
+          .stage = shader_stages_.at(VK_SHADER_STAGE_COMPUTE_BIT),
+          .layout = pipeline_layout_,
+      };
+
+      VK_CHECK(vkCreateComputePipelines(gpu_->getDevice(), VK_NULL_HANDLE, 1, &pipeline_info,
+                                        nullptr, &pipeline_));
+
+      for (const auto& shader_module : shader_modules_ | std::views::values) {
+        vkDestroyShaderModule(gpu_->getDevice(), shader_module, nullptr);
+      }
+    }
 
     void set_pipeline(const VkPipeline pipeline) { pipeline_ = pipeline; }
 
-  protected:
-    std::unordered_map<uint32, VkDescriptorSetLayout> descriptor_set_layouts;
-
-    std::vector<VkPipelineShaderStageCreateInfo> shader_stages;
-
-    VkShaderModule get_shader(const std::string&& source_file, const IGpu* gpu) {
+    void add_shader(const std::string&& source_file, VkShaderStageFlagBits shader_stage) {
       const std::string& shader_path = "../shaders/" + source_file;
 
       VkShaderModule shader_module;
-      vkutil::load_shader_module(shader_path.c_str(), gpu->getDevice(), &shader_module);
+      vkutil::load_shader_module(shader_path.c_str(), gpu_->getDevice(), &shader_module);
+      shader_modules_.emplace(shader_stage, shader_module);
 
-      return shader_module;
+      vkinit::pipeline_shader_stage_create_info(shader_stage, shader_module);
+      shader_stages_.emplace(
+          shader_stage, vkinit::pipeline_shader_stage_create_info(shader_stage, shader_module));
     }
 
     void create_descriptor_layout(
-        const IGpu* gpu,
         std::unordered_map<uint32, std::unordered_map<uint32, VkDescriptorSetLayoutBinding>>&&
             sets) {
       this->set_bindings_ = std::move(sets);
 
       for (const auto& [set_index, bindings] : set_bindings_) {
-
         std::vector<VkDescriptorSetLayoutBinding> binding_vector;
         binding_vector.reserve(bindings.size());
         for (const auto& binding : bindings | std::views::values) {
@@ -188,16 +205,15 @@ namespace gestalt::graphics::fg {
                .pBindings = binding_vector.data()};
 
         VkDescriptorSetLayout set;
-        VK_CHECK(vkCreateDescriptorSetLayout(gpu->getDevice(), &info, nullptr, &set));
-        descriptor_set_layouts.emplace(set_index, set);
-
+        VK_CHECK(vkCreateDescriptorSetLayout(gpu_->getDevice(), &info, nullptr, &set));
+        descriptor_set_layouts_.emplace(set_index, set);
       }
-
     }
 
-      void create_pipeline_layout(const IGpu* gpu, const std::string_view pipeline_name, const VkPushConstantRange push_constant_range) {
+    void create_pipeline_layout(const std::string_view pipeline_name,
+                                const VkPushConstantRange push_constant_range) {
       std::vector<VkDescriptorSetLayout> descriptor_set_layouts_vector;
-      for (const auto& layout : descriptor_set_layouts | std::views::values) {
+      for (const auto& layout : descriptor_set_layouts_ | std::views::values) {
         descriptor_set_layouts_vector.push_back(layout);
       }
 
@@ -214,111 +230,96 @@ namespace gestalt::graphics::fg {
       }
 
       VkPipelineLayout pipeline_layout;
-      VK_CHECK(vkCreatePipelineLayout(gpu->getDevice(), &pipeline_layout_create_info, nullptr,
+      VK_CHECK(vkCreatePipelineLayout(gpu_->getDevice(), &pipeline_layout_create_info, nullptr,
                                       &pipeline_layout));
       pipeline_layout_ = pipeline_layout;
 
-      gpu->set_debug_name(pipeline_name, VK_OBJECT_TYPE_PIPELINE_LAYOUT,
-                          reinterpret_cast<uint64_t>(pipeline_layout_));
+      gpu_->set_debug_name(pipeline_name, VK_OBJECT_TYPE_PIPELINE_LAYOUT,
+                           reinterpret_cast<uint64_t>(pipeline_layout_));
     }
-
   };
 
-  struct GraphicsShaderComponent : ShaderComponent {
-    VkPipelineInputAssemblyStateCreateInfo _inputAssembly{
+  class GraphicsPipeline {
+    PipelineUtil util_;
+
+    VkPipelineInputAssemblyStateCreateInfo input_assembly_{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
-    VkPipelineRasterizationStateCreateInfo _rasterizer{
+    VkPipelineRasterizationStateCreateInfo rasterizer_{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
-    std::vector<VkPipelineColorBlendAttachmentState> _colorBlendAttachments;
-    VkPipelineMultisampleStateCreateInfo _multisampling{
+    std::vector<VkPipelineColorBlendAttachmentState> color_blend_attachments_;
+    VkPipelineMultisampleStateCreateInfo multisampling_{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
     VkPipelineLayout _pipelineLayout{};
-    VkPipelineDepthStencilStateCreateInfo _depthStencil{
+    VkPipelineDepthStencilStateCreateInfo depth_stencil_{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
-    VkPipelineRenderingCreateInfo _renderInfo{.sType
-                                              = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
-    std::vector<VkFormat> _colorAttachmentformats;
-    std::vector<VkDynamicState> _dynamicStates;
+    VkPipelineRenderingCreateInfo render_info_{.sType
+                                               = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
+    std::vector<VkFormat> color_attachmentformats_;
+    std::vector<VkDynamicState> dynamic_states_;
 
-    GraphicsShaderComponent& set_descriptor_set(
-        const IGpu* gpu,
+  public:
+    explicit GraphicsPipeline(IGpu* gpu) : util_(gpu) {}
+
+    GraphicsPipeline& set_descriptor_set(
         std::unordered_map<uint32, std::unordered_map<uint32, VkDescriptorSetLayoutBinding>>&&
             sets) {
-      create_descriptor_layout(gpu, std::move(sets));
+      util_.create_descriptor_layout(std::move(sets));
       return *this;
     }
 
-    GraphicsShaderComponent& set_vertex_shading(const std::string&& vertex_source,const std::string&& fragment_source, const IGpu* gpu) {
-      shader_stages.clear();
-
-      const auto vertex_shader = get_shader(std::move(vertex_source), gpu);
-      const auto fragment_shader = get_shader(std::move(fragment_source), gpu);
-
-      shader_stages.push_back(
-          vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, vertex_shader));
-      shader_stages.push_back(
-          vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, fragment_shader));
-      return *this;
-    }
-
-    GraphicsShaderComponent& set_mesh_task_shading(const std::string&& task_source,
-                                                   const std::string&& mesh_source,
-                                                   const std::string&& fragment_source,
-                                                   const IGpu* gpu) {
-      shader_stages.clear();
-
-      const auto task_shader = get_shader(std::move(task_source), gpu);
-      const auto mesh_shader = get_shader(std::move(mesh_source), gpu);
-      const auto fragment_shader = get_shader(std::move(fragment_source), gpu);
-
-      shader_stages.push_back(
-          vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_TASK_BIT_EXT, task_shader));
-
-      shader_stages.push_back(
-          vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_MESH_BIT_EXT, mesh_shader));
-
-      shader_stages.push_back(
-          vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, fragment_shader));
-       
-      return *this;
-    }
-
-    GraphicsShaderComponent& set_input_topology(const VkPrimitiveTopology topology) {
-      _inputAssembly.topology = topology;
-      _inputAssembly.primitiveRestartEnable = VK_FALSE;
+    GraphicsPipeline& set_vertex_shading(const std::string&& vertex_source,
+                                         const std::string&& fragment_source) {
+      util_.add_shader(std::move(vertex_source), VK_SHADER_STAGE_VERTEX_BIT);
+      util_.add_shader(std::move(fragment_source), VK_SHADER_STAGE_FRAGMENT_BIT);
 
       return *this;
     }
 
-    GraphicsShaderComponent& set_polygon_mode(const VkPolygonMode mode) {
-      _rasterizer.polygonMode = mode;
-      _rasterizer.lineWidth = 1.f;
+    GraphicsPipeline& set_mesh_task_shading(const std::string&& task_source,
+                                            const std::string&& mesh_source,
+                                            const std::string&& fragment_source, const IGpu* gpu) {
+      util_.add_shader(std::move(task_source), VK_SHADER_STAGE_TASK_BIT_EXT);
+      util_.add_shader(std::move(mesh_source), VK_SHADER_STAGE_MESH_BIT_EXT);
+      util_.add_shader(std::move(fragment_source), VK_SHADER_STAGE_FRAGMENT_BIT);
 
       return *this;
     }
 
-    GraphicsShaderComponent& set_cull_mode(const VkCullModeFlags cull_mode,
-                                           const VkFrontFace front_face) {
-      _rasterizer.cullMode = cull_mode;
-      _rasterizer.frontFace = front_face;
+    GraphicsPipeline& set_input_topology(const VkPrimitiveTopology topology) {
+      input_assembly_.topology = topology;
+      input_assembly_.primitiveRestartEnable = VK_FALSE;
 
       return *this;
     }
 
-    GraphicsShaderComponent& set_multisampling_none() {
-      _multisampling.sampleShadingEnable = VK_FALSE;
+    GraphicsPipeline& set_polygon_mode(const VkPolygonMode mode) {
+      rasterizer_.polygonMode = mode;
+      rasterizer_.lineWidth = 1.f;
+
+      return *this;
+    }
+
+    GraphicsPipeline& set_cull_mode(const VkCullModeFlags cull_mode, const VkFrontFace front_face) {
+      rasterizer_.cullMode = cull_mode;
+      rasterizer_.frontFace = front_face;
+
+      return *this;
+    }
+
+    GraphicsPipeline& set_multisampling_none() {
+      multisampling_.sampleShadingEnable = VK_FALSE;
       // multisampling defaulted to no multisampling (1 sample per pixel)
-      _multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-      _multisampling.minSampleShading = 1.0f;
-      _multisampling.pSampleMask = nullptr;
+      multisampling_.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+      multisampling_.minSampleShading = 1.0f;
+      multisampling_.pSampleMask = nullptr;
       // no alpha to coverage either
-      _multisampling.alphaToCoverageEnable = VK_FALSE;
-      _multisampling.alphaToOneEnable = VK_FALSE;
+      multisampling_.alphaToCoverageEnable = VK_FALSE;
+      multisampling_.alphaToOneEnable = VK_FALSE;
 
       return *this;
     }
 
-    GraphicsShaderComponent& disable_blending(uint32_t count) {
+    GraphicsPipeline& disable_blending(uint32_t count) {
       constexpr VkPipelineColorBlendAttachmentState attachment = {
           .blendEnable = VK_FALSE,
           .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
@@ -326,13 +327,13 @@ namespace gestalt::graphics::fg {
       };
 
       for (uint32_t i = 0; i < count; i++) {
-        _colorBlendAttachments.push_back(attachment);
+        color_blend_attachments_.push_back(attachment);
       }
 
       return *this;
     }
 
-    GraphicsShaderComponent& enable_blending_additive() {
+    GraphicsPipeline& enable_blending_additive() {
       constexpr VkPipelineColorBlendAttachmentState attachment = {
           .blendEnable = VK_TRUE,
           .srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
@@ -345,13 +346,13 @@ namespace gestalt::graphics::fg {
                             | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
       };
 
-      _colorBlendAttachments.clear();
-      _colorBlendAttachments.push_back(attachment);
+      color_blend_attachments_.clear();
+      color_blend_attachments_.push_back(attachment);
 
       return *this;
     }
 
-    GraphicsShaderComponent& enable_blending_alphablend() {
+    GraphicsPipeline& enable_blending_alphablend() {
       constexpr VkPipelineColorBlendAttachmentState attachment = {
           .blendEnable = VK_TRUE,
           .srcColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
@@ -364,141 +365,110 @@ namespace gestalt::graphics::fg {
                             | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
       };
 
-      _colorBlendAttachments.clear();
-      _colorBlendAttachments.push_back(attachment);
+      color_blend_attachments_.clear();
+      color_blend_attachments_.push_back(attachment);
 
       return *this;
     }
 
-    GraphicsShaderComponent& set_color_attachment_format(VkFormat format) {
-      _colorAttachmentformats.emplace_back(format);
+    GraphicsPipeline& set_color_attachment_format(VkFormat format) {
+      color_attachmentformats_.emplace_back(format);
 
       return *this;
     }
 
-    GraphicsShaderComponent& set_color_attachment_formats(
-        const std::vector<VkFormat>& formats) {
-      _colorAttachmentformats.insert(_colorAttachmentformats.end(), formats.begin(), formats.end());
+    GraphicsPipeline& set_color_attachment_formats(const std::vector<VkFormat>& formats) {
+      color_attachmentformats_.insert(color_attachmentformats_.end(), formats.begin(),
+                                      formats.end());
 
       return *this;
     }
 
-    GraphicsShaderComponent& set_depth_format(const VkFormat format) {
-      _renderInfo.depthAttachmentFormat = format;
+    GraphicsPipeline& set_depth_format(const VkFormat format) {
+      render_info_.depthAttachmentFormat = format;
 
       return *this;
     }
 
-    GraphicsShaderComponent& disable_depthtest() {
-      _depthStencil.depthTestEnable = VK_FALSE;
-      _depthStencil.depthWriteEnable = VK_FALSE;
-      _depthStencil.depthCompareOp = VK_COMPARE_OP_NEVER;
-      _depthStencil.depthBoundsTestEnable = VK_FALSE;
-      _depthStencil.stencilTestEnable = VK_FALSE;
-      _depthStencil.front = {};
-      _depthStencil.back = {};
-      _depthStencil.minDepthBounds = 0.f;
-      _depthStencil.maxDepthBounds = 1.f;
+    GraphicsPipeline& disable_depthtest() {
+      depth_stencil_.depthTestEnable = VK_FALSE;
+      depth_stencil_.depthWriteEnable = VK_FALSE;
+      depth_stencil_.depthCompareOp = VK_COMPARE_OP_NEVER;
+      depth_stencil_.depthBoundsTestEnable = VK_FALSE;
+      depth_stencil_.stencilTestEnable = VK_FALSE;
+      depth_stencil_.front = {};
+      depth_stencil_.back = {};
+      depth_stencil_.minDepthBounds = 0.f;
+      depth_stencil_.maxDepthBounds = 1.f;
 
       return *this;
     }
 
-    GraphicsShaderComponent& enable_depthtest(const bool depth_write_enable, const VkCompareOp op) {
-      _depthStencil.depthTestEnable = VK_TRUE;
-      _depthStencil.depthWriteEnable = depth_write_enable;
-      _depthStencil.depthCompareOp = op;
-      _depthStencil.depthBoundsTestEnable = VK_FALSE;
-      _depthStencil.stencilTestEnable = VK_FALSE;
-      _depthStencil.front = {};
-      _depthStencil.back = {};
-      _depthStencil.minDepthBounds = 0.f;
-      _depthStencil.maxDepthBounds = 1.f;
+    GraphicsPipeline& enable_depthtest(const bool depth_write_enable, const VkCompareOp op) {
+      depth_stencil_.depthTestEnable = VK_TRUE;
+      depth_stencil_.depthWriteEnable = depth_write_enable;
+      depth_stencil_.depthCompareOp = op;
+      depth_stencil_.depthBoundsTestEnable = VK_FALSE;
+      depth_stencil_.stencilTestEnable = VK_FALSE;
+      depth_stencil_.front = {};
+      depth_stencil_.back = {};
+      depth_stencil_.minDepthBounds = 0.f;
+      depth_stencil_.maxDepthBounds = 1.f;
 
       return *this;
     }
 
-    GraphicsShaderComponent& enable_dynamic_depth_bias() {
-      _dynamicStates.push_back(VK_DYNAMIC_STATE_DEPTH_BIAS);
+    GraphicsPipeline& enable_dynamic_depth_bias() {
+      dynamic_states_.push_back(VK_DYNAMIC_STATE_DEPTH_BIAS);
 
       return *this;
     }
 
-    GraphicsShaderComponent& set_pipeline_layout(const VkPipelineLayout layout) {
+    GraphicsPipeline& set_pipeline_layout(const VkPipelineLayout layout) {
       _pipelineLayout = layout;
 
       return *this;
     }
 
-    GraphicsShaderComponent& set_pipeline_layout(const IGpu* gpu,
-                                                 const std::string_view pipeline_name,
-                                                 const VkPushConstantRange push_constant_range) {
-      create_pipeline_layout(gpu, pipeline_name, push_constant_range);
+    GraphicsPipeline& set_pipeline_layout(const std::string_view pipeline_name,
+                                          const VkPushConstantRange push_constant_range) {
+      util_.create_pipeline_layout(pipeline_name, push_constant_range);
       return *this;
     }
-
   };
 
-  struct ComputeShaderComponent : ShaderComponent {
+  class ComputePipeline {
+    PipelineUtil util_;
 
-    std::vector<VkShaderModule> shader_modules;
+  public:
+    explicit ComputePipeline(IGpu* gpu) : util_(gpu) {}
 
-    ComputeShaderComponent& add_descriptor_set_layout(
-        const IGpu* gpu,
+    ComputePipeline& add_descriptor_set_layout(
         std::unordered_map<uint32, std::unordered_map<uint32, VkDescriptorSetLayoutBinding>>&&
             sets) {
-      create_descriptor_layout(gpu, std::move(sets));
+      util_.create_descriptor_layout(std::move(sets));
       return *this;
     }
 
-    ComputeShaderComponent& add_compute_shader(const std::string&& compute_source,
-                                               const IGpu* gpu) {
-      shader_stages.clear();
-      const auto compute_shader = get_shader(std::move(compute_source), gpu);
-      shader_modules.push_back(compute_shader);
-      shader_stages.push_back(
-          vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_COMPUTE_BIT, compute_shader));
+    ComputePipeline& add_compute_shader(const std::string&& compute_source) {
+      util_.add_shader(std::move(compute_source), VK_SHADER_STAGE_COMPUTE_BIT);
       return *this;
     }
 
-    ComputeShaderComponent& add_pipeline_layout(const IGpu* gpu,
-                                                const std::string_view pipeline_name,
-                                                VkPushConstantRange push_constant_range) {
-      create_pipeline_layout(gpu, pipeline_name, push_constant_range);
+    ComputePipeline& add_pipeline_layout(const std::string_view pipeline_name,
+                                         VkPushConstantRange push_constant_range) {
+      util_.create_pipeline_layout(pipeline_name, push_constant_range);
       return *this;
     }
 
-    void create_compute_pipeline(const IGpu* gpu) {
-      if (shader_stages.size() != 1) {
-        assert(!"Invalid shader stages for compute pipeline");
-      }
-
-      if (shader_stages[0].stage != VK_SHADER_STAGE_COMPUTE_BIT) {
-        assert(!"Invalid shader stages for compute pipeline");
-      }
-
-      const VkComputePipelineCreateInfo pipeline_info = {
-      .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-      .pNext = nullptr,
-      .flags = VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT,
-      .stage = shader_stages[0],
-      .layout = get_pipeline_layout(),
-      };
-
-      VkPipeline pipeline;
-      VK_CHECK(vkCreateComputePipelines(gpu->getDevice(), VK_NULL_HANDLE, 1, &pipeline_info, nullptr,
-                                        &pipeline));
-      set_pipeline(pipeline);
-
-      for (const auto& shader_module : shader_modules) {
-        vkDestroyShaderModule(gpu->getDevice(), shader_module, nullptr);
-      }
-    }
+    void create_compute_pipeline() { util_.create_compute(); }
   };
 
   enum class ResourceUsage { READ, WRITE };
 
   struct ResourceComponent {
-    void add_resource(const std::shared_ptr<ResourceInstance>& resource, const ResourceUsage usage) {
+    void add_resource(const std::shared_ptr<ResourceInstance>& resource,
+                      const ResourceUsage usage) {
       if (usage == ResourceUsage::READ) {
         read_resources.resources.push_back(resource);
       } else if (usage == ResourceUsage::WRITE) {
@@ -531,7 +501,7 @@ namespace gestalt::graphics::fg {
   };
 
   struct RenderPass {
-    virtual void compile(IGpu* gpu) = 0;
+    virtual void compile() = 0;
     virtual std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) = 0;
     virtual void execute(CommandBuffer cmd) = 0;
     virtual ~RenderPass() = default;
@@ -543,11 +513,13 @@ namespace gestalt::graphics::fg {
     struct alignas(16) DrawCullDepthConstants {
       int32 draw_count;
     };
-    ComputeShaderComponent shader_component;
+    ComputePipeline compute_pipeline;
     ResourceComponent resource_component;
 
     DrawCullDirectionalDepthPass(const std::shared_ptr<ResourceInstance>& shadow_map,
-                                 const std::shared_ptr<ResourceInstance>& geometry_buffer) {
+                                 const std::shared_ptr<ResourceInstance>& geometry_buffer,
+                                 IGpu* gpu)
+        : compute_pipeline(gpu) {
       resource_component.add_resource(geometry_buffer, ResourceUsage::READ);
       resource_component.add_resource(shadow_map, ResourceUsage::WRITE);
       resource_component.add_push_constant(sizeof(DrawCullDepthConstants),
@@ -560,10 +532,9 @@ namespace gestalt::graphics::fg {
       return resource_component.get_resources(usage);
     }
 
-    void compile(IGpu* gpu) override {
-      shader_component
-          .add_descriptor_set_layout(gpu,
-                                     DescriptorLayoutBuilder()
+    void compile() override {
+      compute_pipeline
+          .add_descriptor_set_layout(DescriptorLayoutBuilder()
                                          .set(0, DescriptorSetLayoutBuilder()
                                                      .binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                                                               VK_SHADER_STAGE_COMPUTE_BIT)
@@ -587,9 +558,9 @@ namespace gestalt::graphics::fg {
                                                               VK_SHADER_STAGE_COMPUTE_BIT)
                                                      .get())
                                          .get())
-          .add_compute_shader("draw_cull_depth.comp.spv", gpu)
-          .add_pipeline_layout(gpu, name, resource_component.get_push_constant_range())
-          .create_compute_pipeline(gpu);
+          .add_compute_shader("draw_cull_depth.comp.spv")
+          .add_pipeline_layout(name, resource_component.get_push_constant_range())
+          .create_compute_pipeline();
     }
 
     void execute(CommandBuffer cmd) override {
@@ -598,11 +569,13 @@ namespace gestalt::graphics::fg {
   };
 
   struct TaskSubmitDirectionalDepthPass : RenderPass {
-    ComputeShaderComponent shader_component;
+    ComputePipeline compute_pipeline;
     ResourceComponent resource_component;
 
     TaskSubmitDirectionalDepthPass(const std::shared_ptr<ResourceInstance>& shadow_map,
-                  const std::shared_ptr<ResourceInstance>& geometry_buffer) {
+                                   const std::shared_ptr<ResourceInstance>& geometry_buffer,
+                                   IGpu* gpu)
+        : compute_pipeline(gpu) {
       resource_component.add_resource(geometry_buffer, ResourceUsage::READ);
       resource_component.add_resource(shadow_map, ResourceUsage::WRITE);
       name = "Shadow Map Pass";
@@ -612,7 +585,7 @@ namespace gestalt::graphics::fg {
       return resource_component.get_resources(usage);
     }
 
-    void compile(IGpu* gpu) override {
+    void compile() override {
       // Specific pipeline layout and pipeline creation for compute
     }
 
@@ -621,11 +594,12 @@ namespace gestalt::graphics::fg {
     }
   };
   struct MeshletDirectionalDepthPass : RenderPass {
-    ComputeShaderComponent shader_component;
+    ComputePipeline compute_pipeline;
     ResourceComponent resource_component;
 
     MeshletDirectionalDepthPass(const std::shared_ptr<ResourceInstance>& shadow_map,
-                  const std::shared_ptr<ResourceInstance>& geometry_buffer) {
+                                const std::shared_ptr<ResourceInstance>& geometry_buffer, IGpu* gpu)
+        : compute_pipeline(gpu) {
       resource_component.add_resource(geometry_buffer, ResourceUsage::READ);
       resource_component.add_resource(shadow_map, ResourceUsage::WRITE);
       name = "Shadow Map Pass";
@@ -635,7 +609,7 @@ namespace gestalt::graphics::fg {
       return resource_component.get_resources(usage);
     }
 
-    void compile(IGpu* gpu) override {
+    void compile() override {
       // Specific pipeline layout and pipeline creation for compute
     }
 
@@ -645,7 +619,7 @@ namespace gestalt::graphics::fg {
   };
 
   struct GeometryPass : RenderPass {
-    GraphicsShaderComponent shader_component;
+    GraphicsPipeline graphics_pipeline;
     ResourceComponent resource_component;
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
@@ -656,8 +630,8 @@ namespace gestalt::graphics::fg {
                  const std::shared_ptr<ResourceInstance>& g_buffer_2,
                  const std::shared_ptr<ResourceInstance>& g_buffer_3,
                  const std::shared_ptr<ResourceInstance>& g_buffer_depth,
-                 const std::shared_ptr<ResourceInstance>& geometry_buffer
-    ) {
+                 const std::shared_ptr<ResourceInstance>& geometry_buffer, IGpu* gpu)
+        : graphics_pipeline(gpu) {
       resource_component.add_resource(geometry_buffer, ResourceUsage::READ);
       resource_component.add_resource(g_buffer_1, ResourceUsage::WRITE);
       resource_component.add_resource(g_buffer_2, ResourceUsage::WRITE);
@@ -666,17 +640,17 @@ namespace gestalt::graphics::fg {
       name = "Geometry Pass";
     }
 
-    void compile(IGpu* gpu) override {
+    void compile() override {
       // Specific pipeline layout and pipeline creation for graphics
     }
 
-    void execute(CommandBuffer cmd) override{
-        // draw
+    void execute(CommandBuffer cmd) override {
+      // draw
     }
   };
 
   struct LightingPass : RenderPass {
-    ComputeShaderComponent shader_component;
+    ComputePipeline compute_pipeline;
     ResourceComponent resource_component;
 
     LightingPass(const std::shared_ptr<ResourceInstance>& scene_lit,
@@ -686,7 +660,8 @@ namespace gestalt::graphics::fg {
                  const std::shared_ptr<ResourceInstance>& g_buffer_depth,
                  const std::shared_ptr<ResourceInstance>& shadow_map,
                  const std::shared_ptr<ResourceInstance>& material_buffer,
-                 const std::shared_ptr<ResourceInstance>& light_buffer) {
+                 const std::shared_ptr<ResourceInstance>& light_buffer, IGpu* gpu)
+        : compute_pipeline(gpu) {
       resource_component.add_resource(scene_lit, ResourceUsage::WRITE);
       resource_component.add_resource(g_buffer_1, ResourceUsage::READ);
       resource_component.add_resource(g_buffer_2, ResourceUsage::READ);
@@ -702,7 +677,7 @@ namespace gestalt::graphics::fg {
       return resource_component.get_resources(usage);
     }
 
-    void compile(IGpu* gpu) override {
+    void compile() override {
       // Specific pipeline layout and pipeline creation for compute
     }
 
@@ -712,13 +687,14 @@ namespace gestalt::graphics::fg {
   };
 
   struct SsaoPass : RenderPass {
-    ComputeShaderComponent shader_component;
+    ComputePipeline compute_pipeline;
     ResourceComponent resource_component;
 
     SsaoPass(const std::shared_ptr<ResourceInstance>& g_buffer_depth,
              const std::shared_ptr<ResourceInstance>& g_buffer_2,
              const std::shared_ptr<ResourceInstance>& rotation_texture,
-             const std::shared_ptr<ResourceInstance>& occlusion) {
+             const std::shared_ptr<ResourceInstance>& occlusion, IGpu* gpu)
+        : compute_pipeline(gpu) {
       resource_component.add_resource(g_buffer_depth, ResourceUsage::READ);
       resource_component.add_resource(g_buffer_2, ResourceUsage::READ);
       resource_component.add_resource(rotation_texture, ResourceUsage::READ);
@@ -730,7 +706,7 @@ namespace gestalt::graphics::fg {
       return resource_component.get_resources(usage);
     }
 
-    void compile(IGpu* gpu) override {
+    void compile() override {
       // Specific pipeline layout and pipeline creation for compute
     }
 
@@ -740,10 +716,12 @@ namespace gestalt::graphics::fg {
   };
 
   struct ToneMapPass : RenderPass {
-    ComputeShaderComponent shader_component;
+    ComputePipeline compute_pipeline;
     ResourceComponent resource_component;
 
-    ToneMapPass(const std::shared_ptr<ResourceInstance>& scene_final, const std::shared_ptr<ResourceInstance>& scene_lit) {
+    ToneMapPass(const std::shared_ptr<ResourceInstance>& scene_final,
+                const std::shared_ptr<ResourceInstance>& scene_lit, IGpu* gpu)
+        : compute_pipeline(gpu) {
       resource_component.add_resource(scene_lit, ResourceUsage::READ);
       resource_component.add_resource(scene_final, ResourceUsage::WRITE);
       name = "Tone Map Pass";
@@ -753,7 +731,7 @@ namespace gestalt::graphics::fg {
       return resource_component.get_resources(usage);
     }
 
-    void compile(IGpu* gpu) override {
+    void compile() override {
       // Specific pipeline layout and pipeline creation for compute
     }
 
@@ -776,7 +754,8 @@ namespace gestalt::graphics::fg {
     std::vector<std::shared_ptr<FrameGraphNode>> nodes_to;
     CreationType creation_type;
 
-    explicit FrameGraphEdge(const std::shared_ptr<ResourceInstance>& resource, const CreationType creation_type)
+    explicit FrameGraphEdge(const std::shared_ptr<ResourceInstance>& resource,
+                            const CreationType creation_type)
         : resource(resource), creation_type(creation_type) {}
   };
 
@@ -785,7 +764,8 @@ namespace gestalt::graphics::fg {
     std::vector<std::shared_ptr<FrameGraphEdge>> edges_in;
     std::vector<std::shared_ptr<FrameGraphEdge>> edges_out;
 
-    explicit FrameGraphNode(std::shared_ptr<RenderPass>&& render_pass) : render_pass(std::move(render_pass)) {}
+    explicit FrameGraphNode(std::shared_ptr<RenderPass>&& render_pass)
+        : render_pass(std::move(render_pass)) {}
 
     [[nodiscard]] std::vector<std::shared_ptr<FrameGraphNode>> get_successors() const {
       std::vector<std::shared_ptr<FrameGraphNode>> neighbors;
@@ -796,7 +776,6 @@ namespace gestalt::graphics::fg {
       }
       return neighbors;
     }
-
   };
 
   struct DescriptorSetLayout {
@@ -826,7 +805,8 @@ namespace gestalt::graphics::fg {
     ResourceAllocator* resource_factory_ = nullptr;
 
   public:
-    explicit ResourceRegistry(ResourceAllocator* resource_factory) : resource_factory_(resource_factory) {}
+    explicit ResourceRegistry(ResourceAllocator* resource_factory)
+        : resource_factory_(resource_factory) {}
 
     std::shared_ptr<ResourceInstance> add_template(ImageTemplate&& image_template);
 
@@ -836,7 +816,9 @@ namespace gestalt::graphics::fg {
 
     std::shared_ptr<ResourceInstance> add_resource(std::shared_ptr<BufferInstance> buffer_resource);
 
-    std::shared_ptr<ResourceInstance> get_resource(const uint32 handle) { return resource_map_.at(handle); }
+    std::shared_ptr<ResourceInstance> get_resource(const uint32 handle) {
+      return resource_map_.at(handle);
+    }
   };
 
   class FrameGraph : public NonCopyable<FrameGraph> {
@@ -851,7 +833,6 @@ namespace gestalt::graphics::fg {
 
     void print_graph() const;
 
-
     void topological_sort();
 
   public:
@@ -864,8 +845,8 @@ namespace gestalt::graphics::fg {
                       CreationType creation_type = CreationType::INTERNAL) {
       auto resource
           = resource_registry_->add_template(std::forward<ResourceTemplateType>(resource_template));
-      edges_.insert({resource->resource_handle, std::make_shared<FrameGraphEdge>(std::move(resource),
-                                                                        creation_type)});
+      edges_.insert({resource->resource_handle,
+                     std::make_shared<FrameGraphEdge>(std::move(resource), creation_type)});
       return resource;
     }
 
@@ -878,7 +859,7 @@ namespace gestalt::graphics::fg {
       return resource;
     }
 
-    void compile(IGpu* gpu);
+    void compile();
 
     void execute(CommandBuffer cmd);
   };
