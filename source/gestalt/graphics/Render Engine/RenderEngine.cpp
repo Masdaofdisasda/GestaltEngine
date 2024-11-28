@@ -52,34 +52,44 @@ namespace gestalt::graphics {
                                           .set_image_type(TextureType::kColor, VK_FORMAT_R16_SFLOAT)
                                           .set_image_size(0.5f)
                                           .build());
-      
-      auto geometry_buffer = frame_graph->add_resource(repository->mesh_buffers->geometry_buffer, fg::CreationType::EXTERNAL);
-      auto material_buffer = frame_graph->add_resource(repository->material_buffers->material_buffer,
+
+      auto geometry_buffer = frame_graph->add_resource(repository->mesh_buffers->geometry_buffer,
                                                        fg::CreationType::EXTERNAL);
+      auto material_buffer = frame_graph->add_resource(
+          repository->material_buffers->material_buffer, fg::CreationType::EXTERNAL);
       auto light_buffer = frame_graph->add_resource(repository->light_buffers->light_buffer,
                                                     fg::CreationType::EXTERNAL);
       // Shader Passes
-      auto shadow_pass
-          = std::make_shared<fg::ShadowMapPass>(shadow_map, geometry_buffer);
-      auto geometry_pass = std::make_shared<fg::GeometryPass>(
-          g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth, geometry_buffer);
-      std::shared_ptr<fg::RenderPass> lighting_pass = std::make_shared<fg::LightingPass>(
+      auto draw_cull_directional_depth_pass
+          = std::make_shared<fg::DrawCullDirectionalDepthPass>(shadow_map, geometry_buffer);
+      auto task_submit_directional_depth_pass
+          = std::make_shared<fg::TaskSubmitDirectionalDepthPass>(shadow_map, geometry_buffer);
+      auto meshlet_directional_depth_pass
+          = std::make_shared<fg::MeshletDirectionalDepthPass>(shadow_map, geometry_buffer);
+
+      auto geometry_pass = std::make_shared<fg::GeometryPass>(g_buffer_1, g_buffer_2, g_buffer_3,
+                                                              g_buffer_depth, geometry_buffer);
+      auto lighting_pass = std::make_shared<fg::LightingPass>(
           scene_lit, g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth, shadow_map,
           material_buffer, light_buffer);
-      std::shared_ptr<fg::RenderPass> tone_map_pass
-          = std::make_shared<fg::ToneMapPass>(scene_final, scene_lit);
-      std::shared_ptr<fg::RenderPass> ssao_pass = std::make_shared<fg::SsaoPass>(
-          scene_lit, g_buffer_depth, rotation_texture, occlusion_texture);
+      auto tone_map_pass = std::make_shared<fg::ToneMapPass>(scene_final, scene_lit);
+      auto ssao_pass = std::make_shared<fg::SsaoPass>(scene_lit, g_buffer_depth, rotation_texture,
+                                                      occlusion_texture);
 
-      frame_graph->add_render_pass(std::move(shadow_pass));
+      frame_graph->add_render_pass(std::move(draw_cull_directional_depth_pass));
+      frame_graph->add_render_pass(std::move(task_submit_directional_depth_pass));
+      frame_graph->add_render_pass(std::move(meshlet_directional_depth_pass));
       frame_graph->add_render_pass(std::move(geometry_pass));
       frame_graph->add_render_pass(std::move(lighting_pass));
       frame_graph->add_render_pass(std::move(tone_map_pass));
       frame_graph->add_render_pass(std::move(ssao_pass));
 
-      frame_graph->compile();
-      frame_graph->execute();
-                                                    
+      frame_graph->compile(gpu);
+
+      // TODO
+      const VkCommandBuffer command_buffer = nullptr;
+      const fg::CommandBuffer cmd{command_buffer};
+      frame_graph->execute(cmd);
     }
 
     gpu_ = gpu;

@@ -103,7 +103,7 @@ namespace gestalt::foundation {
 
   //TODO split into template and instance
   struct ResourceInstance {
-    uint64 resource_handle = -1;
+    uint64 resource_handle = -1; // todo refactor to return instance handles
     ResourceTemplate resource_template;
     explicit ResourceInstance(ResourceTemplate&& resource_template) : resource_template(std::move(resource_template)) {}
     [[nodiscard]] std::string_view name() const { return resource_template.name; }

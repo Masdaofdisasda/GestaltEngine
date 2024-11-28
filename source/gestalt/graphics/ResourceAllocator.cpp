@@ -9,17 +9,6 @@
 #include "vk_initializers.hpp"
 
 namespace gestalt::graphics {
-  void ResourceAllocator::set_debug_name(const std::string_view name, const VkObjectType type,
-                                       const uint64 handle) const {
-    assert(!name.empty());
-
-    VkDebugUtilsObjectNameInfoEXT name_info = {};
-    name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-    name_info.objectType = type;
-    name_info.objectHandle = handle;
-    name_info.pObjectName = name.data();
-    vkSetDebugUtilsObjectNameEXT(gpu_->getDevice(), &name_info);
-  }
 
   VkImageUsageFlags get_usage_flags(const TextureType type) {
     VkImageUsageFlags usage_flags = 0;
@@ -124,7 +113,7 @@ namespace gestalt::graphics {
     AllocatedImage image;
     VK_CHECK(vmaCreateImage(gpu_->getAllocator(), &img_info, &allocation_info, &image.image_handle,
                             &image.allocation, nullptr));
-    set_debug_name(name, VK_OBJECT_TYPE_IMAGE,
+    gpu_->set_debug_name(name, VK_OBJECT_TYPE_IMAGE,
                    reinterpret_cast<uint64_t>(image.image_handle));
 
     const VkImageViewCreateInfo view_info
@@ -153,7 +142,8 @@ namespace gestalt::graphics {
     AllocatedBuffer buffer;
     VK_CHECK(vmaCreateBuffer(gpu_->getAllocator(), &buffer_info, &allocation_info,
                              &buffer.buffer_handle, &buffer.allocation, &buffer.info));
-    set_debug_name(name, VK_OBJECT_TYPE_BUFFER, reinterpret_cast<uint64_t>(buffer.buffer_handle));
+    gpu_->set_debug_name(name, VK_OBJECT_TYPE_BUFFER,
+                         reinterpret_cast<uint64_t>(buffer.buffer_handle));
 
     const VkBufferDeviceAddressInfo device_address_info
         = {.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = buffer.buffer_handle};

@@ -88,18 +88,16 @@ namespace gestalt::graphics {
       IGpu* gpu_ = nullptr;
     TaskQueue task_queue_{};
 
-    AllocatedImage allocate_image(std::string_view name, VkFormat format,
-                                      VkImageUsageFlags usage_flags, VkExtent3D extent,
-                                      VkImageAspectFlags aspect_flags) const;
-      AllocatedBuffer allocate_buffer(std::string_view name, VkDeviceSize size,
-                                          VkBufferUsageFlags usage_flags,
-                                          VmaMemoryUsage memory_usage) const;
+      [[nodiscard]] AllocatedImage allocate_image(std::string_view name, VkFormat format,
+                                                  VkImageUsageFlags usage_flags, VkExtent3D extent,
+                                                  VkImageAspectFlags aspect_flags) const;
+      [[nodiscard]] AllocatedBuffer allocate_buffer(std::string_view name, VkDeviceSize size,
+                                                    VkBufferUsageFlags usage_flags,
+                                                    VmaMemoryUsage memory_usage) const;
 
     public:
       explicit ResourceAllocator(IGpu* gpu) : gpu_(gpu) {}
 
-      void set_debug_name(std::string_view name, VkObjectType type,
-                          uint64 handle) const override;
       std::shared_ptr<ImageInstance> create_image(ImageTemplate&& image_template) override;
 
     std::shared_ptr<BufferInstance> create_buffer(

@@ -8,7 +8,6 @@ namespace gestalt::foundation {
   public:
     virtual ~IResourceAllocator() = default;
 
-      virtual void set_debug_name(std::string_view name, VkObjectType type, uint64 handle) const = 0;
     virtual std::shared_ptr<ImageInstance> create_image(ImageTemplate&& image_template) = 0;
 
     virtual std::shared_ptr<BufferInstance> create_buffer(BufferTemplate&& buffer_template) const

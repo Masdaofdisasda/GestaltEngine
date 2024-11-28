@@ -99,8 +99,9 @@ namespace gestalt::graphics::fg {
     nodes_.push_back(std::make_shared<FrameGraphNode>(std::move(pass)));
   }
 
-  void FrameGraph::compile() {
+  void FrameGraph::compile(IGpu* gpu) {
     for (auto& node : nodes_) {
+      fmt::println("Compiling Render Pass: {}", node->render_pass->name);
       for (const auto& read_resource : node->render_pass->get_resources(ResourceUsage::READ)) {
         auto& edge = edges_.at(read_resource->resource_handle);
         edge->nodes_to.push_back(node);
@@ -111,13 +112,14 @@ namespace gestalt::graphics::fg {
         edge->nodes_from.push_back(node);
         node->edges_out.push_back(edge);
       }
+      node->render_pass->compile(gpu);
     }
 
     print_graph();
     topological_sort();
   }
 
-  void FrameGraph::execute() {
+  void FrameGraph::execute(CommandBuffer cmd) {
     // run each render pass in order and synchronize resources
     // for (auto& pass_node : pass_nodes_) {
     // bind resources to descriptor sets
@@ -125,7 +127,6 @@ namespace gestalt::graphics::fg {
     // pass_node.pass.execute(pass_node.inputs...)
 
     for (const auto& node : sorted_nodes_) {
-      CommandBuffer cmd;
       node->render_pass->execute(cmd);
     }
   }
