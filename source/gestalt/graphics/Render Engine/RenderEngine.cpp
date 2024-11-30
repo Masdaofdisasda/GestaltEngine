@@ -68,21 +68,41 @@ namespace gestalt::graphics {
                                           .set_image_size(0.5f)
                                           .build());
 
-      auto geometry_buffer = frame_graph->add_resource(repository->mesh_buffers->geometry_buffer,
-                                                       fg::CreationType::EXTERNAL);
+      auto index_buffer = frame_graph->add_resource(repository->mesh_buffers->geometry_buffer,
+                                                    fg::CreationType::EXTERNAL);
+      auto vertex_position_buffer = frame_graph->add_resource(
+          repository->mesh_buffers->geometry_buffer, fg::CreationType::EXTERNAL);
+      auto vertex_data_buffer = frame_graph->add_resource(repository->mesh_buffers->geometry_buffer,
+                                                          fg::CreationType::EXTERNAL);
+
+      auto meshlet_buffer = frame_graph->add_resource(repository->mesh_buffers->geometry_buffer,
+                                                      fg::CreationType::EXTERNAL);
+      auto meshlet_vertices = frame_graph->add_resource(repository->mesh_buffers->geometry_buffer,
+                                                        fg::CreationType::EXTERNAL);
+      auto meshlet_triangles = frame_graph->add_resource(repository->mesh_buffers->geometry_buffer,
+                                                         fg::CreationType::EXTERNAL);
+      auto meshlet_task_commands_buffer = frame_graph->add_resource(
+          repository->mesh_buffers->geometry_buffer, fg::CreationType::EXTERNAL);
+      auto mesh_draw_buffer = frame_graph->add_resource(repository->mesh_buffers->geometry_buffer,
+                                                        fg::CreationType::EXTERNAL);
+      auto draw_count_buffer = frame_graph->add_resource(repository->mesh_buffers->geometry_buffer,
+                                                         fg::CreationType::EXTERNAL);
+
       auto material_buffer = frame_graph->add_resource(
           repository->material_buffers->material_buffer, fg::CreationType::EXTERNAL);
       auto light_buffer = frame_graph->add_resource(repository->light_buffers->light_buffer,
                                                     fg::CreationType::EXTERNAL);
       // Shader Passes
-      auto draw_cull_directional_depth_pass
-          = std::make_shared<fg::DrawCullDirectionalDepthPass>(shadow_map, geometry_buffer, gpu_);
+      auto draw_cull_directional_depth_pass = std::make_shared<fg::DrawCullDirectionalDepthPass>(
+          meshlet_task_commands_buffer, mesh_draw_buffer, draw_count_buffer, gpu_);
       auto task_submit_directional_depth_pass
-          = std::make_shared<fg::TaskSubmitDirectionalDepthPass>(shadow_map, geometry_buffer, gpu_);
-      auto meshlet_directional_depth_pass
-          = std::make_shared<fg::MeshletDirectionalDepthPass>(shadow_map, geometry_buffer, gpu_);
+          = std::make_shared<fg::TaskSubmitDirectionalDepthPass>(meshlet_task_commands_buffer, draw_count_buffer,
+                                                                 gpu_);
+      auto meshlet_directional_depth_pass = std::make_shared<fg::MeshletDirectionalDepthPass>(
+          shadow_map, vertex_position_buffer, gpu_);
 
-      auto geometry_pass = std::make_shared<fg::GeometryPass>(g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth, geometry_buffer, gpu_);
+      auto geometry_pass = std::make_shared<fg::GeometryPass>(
+          g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth, vertex_position_buffer, gpu_);
       auto lighting_pass = std::make_shared<fg::LightingPass>(
           scene_lit, g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth, shadow_map,
           material_buffer, light_buffer, gpu_);

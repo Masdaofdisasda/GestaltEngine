@@ -131,6 +131,11 @@ namespace gestalt::graphics {
     device_properties2.pNext = &descriptorBufferProperties;
     vkGetPhysicalDeviceProperties2(chosen_gpu, &device_properties2);
 
+    set_debug_name("Main Device", VK_OBJECT_TYPE_DEVICE,
+                         reinterpret_cast<uint64_t>(device));
+    set_debug_name(physicalDevice.name, VK_OBJECT_TYPE_PHYSICAL_DEVICE,
+                         reinterpret_cast<uint64_t>(chosen_gpu));
+
     // get a Graphics queue
     auto graphics_queue_ret = vkbDevice.get_queue(vkb::QueueType::graphics);
 
@@ -140,6 +145,9 @@ namespace gestalt::graphics {
     }
     graphics_queue = graphics_queue_ret.value();
     graphics_queue_family = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
+
+    set_debug_name("Graphics Queue", VK_OBJECT_TYPE_QUEUE,
+                         reinterpret_cast<uint64_t>(graphics_queue));
 
     // initialize the memory allocator
     VmaAllocatorCreateInfo allocatorInfo = {};
