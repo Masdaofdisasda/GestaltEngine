@@ -26,7 +26,16 @@ namespace gestalt::foundation {
       draw_count_buffer;  // number of draws
 
   
-    std::shared_ptr<BufferInstance> geometry_buffer;
+    std::shared_ptr<BufferInstance> index_buffer_instance;
+  std::shared_ptr<BufferInstance> vertex_position_buffer_instance;
+    std::shared_ptr<BufferInstance> vertex_data_buffer_instance;
+
+  std::shared_ptr<BufferInstance> meshlet_buffer_instance;
+    std::shared_ptr<BufferInstance> meshlet_vertices_instance;
+  std::shared_ptr<BufferInstance> meshlet_triangles_instance;
+    std::shared_ptr<BufferInstance> meshlet_task_commands_buffer_instance;
+  std::shared_ptr<BufferInstance> mesh_draw_buffer_instance;
+    std::shared_ptr<BufferInstance> draw_count_buffer_instance;
 
 
   std::array<std::shared_ptr<DescriptorBuffer>, getFramesInFlight()> descriptor_buffers;

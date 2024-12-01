@@ -15,7 +15,9 @@ namespace gestalt::foundation {
   std::shared_ptr<AllocatedBufferOld> point_light_buffer;
   std::shared_ptr<AllocatedBufferOld> view_proj_matrices;
 
-    std::shared_ptr<BufferInstance> light_buffer;
+    std::shared_ptr<BufferInstance> dir_light_buffer_instance;
+  std::shared_ptr<BufferInstance> point_light_buffer_instance;
+    std::shared_ptr<BufferInstance> view_proj_matrices_instance;
 
   std::shared_ptr<DescriptorBuffer> descriptor_buffer;
 

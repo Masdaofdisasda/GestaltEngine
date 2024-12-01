@@ -13,6 +13,7 @@
 #include "Cameras/OrbitCamera.hpp"
 #include "Interface/IDescriptorLayoutBuilder.hpp"
 #include "Interface/IGpu.hpp"
+#include "Interface/IResourceAllocator.hpp"
 #include "Interface/IResourceManager.hpp"
 
 namespace gestalt::application {
@@ -35,6 +36,7 @@ namespace gestalt::application {
           sizeof(PerFrameData),
           VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
           VMA_MEMORY_USAGE_CPU_TO_GPU, "perFrameBuffer");
+
       per_frame_data_buffers->descriptor_buffers[i]
           = resource_manager_->create_descriptor_buffer(descriptor_layout, 1, 0);
 
@@ -49,6 +51,12 @@ namespace gestalt::application {
                          sizeof(PerFrameData))
           .update();
     }
+
+    per_frame_data_buffers->uniform_buffers_instance
+        = resource_allocator_->create_buffer(BufferTemplate(
+            "per Frame Buffer", sizeof(PerFrameData),
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+            VMA_MEMORY_USAGE_CPU_TO_GPU));
 
     vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layout, nullptr);
   }

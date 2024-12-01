@@ -2,6 +2,7 @@
 #include <memory>
 #include <vector>
 
+#include "FrameGraph.hpp"
 #include "RenderPassBase.hpp"
 #include "ResourceRegistry.hpp"
 #include "Swapchain.hpp"
@@ -21,6 +22,7 @@ namespace gestalt::foundation {
 }
 
 namespace gestalt::graphics {
+
   class ResourceAllocator;
   class VkSwapchain;
   class ResourceManager;
@@ -39,6 +41,8 @@ namespace gestalt::graphics {
       std::unique_ptr<VkSwapchain> swapchain_;
 
       std::vector<std::shared_ptr<RenderPassBase>> render_passes_;
+
+    std::unique_ptr<fg::FrameGraph> frame_graph_;
 
       std::shared_ptr<TextureHandleOld> debug_texture_;
 

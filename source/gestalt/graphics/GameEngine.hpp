@@ -26,8 +26,7 @@ namespace gestalt {
     std::unique_ptr<application::Window> window_ = std::make_unique<application::Window>();
     std::unique_ptr<graphics::Gpu> gpu_ = std::make_unique<graphics::Gpu>();
 
-    std::unique_ptr<graphics::RenderEngine> render_pipeline_
-        = std::make_unique<graphics::RenderEngine>();
+    std::unique_ptr<graphics::RenderEngine> render_pipeline_;
     std::unique_ptr<application::ECSManager> scene_manager_
         = std::make_unique<application::ECSManager>();
     std::unique_ptr<foundation::Repository> repository_

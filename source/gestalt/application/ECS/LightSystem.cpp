@@ -58,11 +58,21 @@ namespace gestalt::application {
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
         VMA_MEMORY_USAGE_CPU_TO_GPU, "Point Light Buffer");
 
-    BufferTemplate buffer_template(
-        "Light Buffer", sizeof(GpuDirectionalLight) * getMaxDirectionalLights(),
-        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VMA_MEMORY_USAGE_CPU_TO_GPU);
-    light_data->light_buffer = resource_allocator_->create_buffer(std::move(buffer_template));
+    light_data->dir_light_buffer_instance
+        = resource_allocator_->create_buffer(std::move(BufferTemplate(
+            "Directional Light Buffer", sizeof(GpuDirectionalLight) * getMaxDirectionalLights(),
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+            VMA_MEMORY_USAGE_CPU_TO_GPU)));
+    light_data->point_light_buffer_instance
+        = resource_allocator_->create_buffer(std::move(BufferTemplate(
+            "Point Light Buffer", sizeof(GpuPointLight) * getMaxPointLights(),
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+            VMA_MEMORY_USAGE_CPU_TO_GPU)));
+    light_data->view_proj_matrices_instance
+        = resource_allocator_->create_buffer(std::move(BufferTemplate(
+            "Point Light Buffer", sizeof(GpuProjViewData) * GetMaxViewProjMatrices(),
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+            VMA_MEMORY_USAGE_CPU_TO_GPU)));
 
   }
 

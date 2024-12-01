@@ -17,6 +17,8 @@ namespace gestalt::foundation {
     bool freezeCullCamera = false;
     std::array<std::shared_ptr<AllocatedBufferOld>, getFramesInFlight()> uniform_buffers;
 
+    std::shared_ptr<BufferInstance> uniform_buffers_instance;
+
     std::array<std::shared_ptr<DescriptorBuffer>, getFramesInFlight()> descriptor_buffers;
 
     std::vector<std::shared_ptr<AllocatedBufferOld>> get_buffers(int16 frame_index) const override {

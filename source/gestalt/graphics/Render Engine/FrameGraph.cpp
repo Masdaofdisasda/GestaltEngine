@@ -4,30 +4,32 @@
 #include "ResourceAllocator.hpp"
 
 namespace gestalt::graphics::fg {
-  std::shared_ptr<ResourceInstance> ResourceRegistry::add_template(ImageTemplate&& image_template) {
+  std::shared_ptr<ImageInstance> ResourceRegistry::add_template(ImageTemplate&& image_template) {
     const auto image = resource_factory_->create_image(std::move(image_template));
-
-    image->resource_handle = reinterpret_cast<uint64>(image->allocated_image.image_handle);
     
     return add_resource(image);
   }
 
-  std::shared_ptr<ResourceInstance> ResourceRegistry::add_template(BufferTemplate&& buffer_template) {
+  std::shared_ptr<BufferInstance> ResourceRegistry::add_template(BufferTemplate&& buffer_template) {
     const auto buffer = resource_factory_->create_buffer(std::move(buffer_template));
-
-    buffer->resource_handle = reinterpret_cast<uint64>(buffer->allocated_buffer.buffer_handle);
     
     return add_resource(buffer);
   }
 
-  std::shared_ptr<ResourceInstance> ResourceRegistry::add_resource(std::shared_ptr<ImageInstance> image_resource) {
-    resource_map_.insert({image_resource->resource_handle, image_resource});
-    return image_resource;
-  }
+  template <typename ResourceInstanceType>
+  std::shared_ptr<ResourceInstanceType> ResourceRegistry::add_resource(
+      std::shared_ptr<ResourceInstanceType> resource_instance) {
+    assert(resource_instance != nullptr && "Resource instance cannot be null!");
+    resource_instance->resource_handle = reinterpret_cast<uint64>(resource_instance.get());
 
-  std::shared_ptr<ResourceInstance> ResourceRegistry::add_resource(std::shared_ptr<BufferInstance> buffer_resource) {
-    resource_map_.insert({buffer_resource->resource_handle, buffer_resource});
-    return buffer_resource;
+    resource_map_.insert({resource_instance->resource_handle, resource_instance});
+
+    auto it = resource_map_.find(resource_instance->resource_handle);
+    if (it == resource_map_.end()) {
+      throw std::runtime_error("Failed to insert resource into registry!");
+    }
+
+    return std::static_pointer_cast<ResourceInstanceType>(it->second);
   }
 
   void FrameGraph::print_graph() const {
@@ -88,11 +90,11 @@ namespace gestalt::graphics::fg {
     }
   }
 
-  FrameGraph::FrameGraph(ResourceAllocator* resource_factory) {
+  FrameGraph::FrameGraph(ResourceAllocator* resource_allocator) {
     nodes_.reserve(25);
     descriptor_manger_ = std::make_unique<DescriptorManger>();
     synchronization_manager_ = std::make_unique<SynchronizationManager>();
-    resource_registry_ = std::make_unique<ResourceRegistry>(resource_factory);
+    resource_registry_ = std::make_unique<ResourceRegistry>(resource_allocator);
   }
 
   void FrameGraph::add_render_pass(std::shared_ptr<RenderPass>&& pass) {

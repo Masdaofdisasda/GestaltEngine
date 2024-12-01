@@ -487,8 +487,6 @@ namespace gestalt::graphics::fg {
 
     };
 
-
-
   class CreationStageGuard {
       enum class CreationStage {
         kDescriptorLayout,
@@ -706,16 +704,18 @@ namespace gestalt::graphics::fg {
     ComputePipeline compute_pipeline;
     ResourceComponent resource_component;
 
-    DrawCullDirectionalDepthPass(const std::shared_ptr<ResourceInstance>& task_commands,
-                                 const std::shared_ptr<ResourceInstance>& draws,
-                                 const std::shared_ptr<ResourceInstance>& command_count,
+    DrawCullDirectionalDepthPass(const std::shared_ptr<BufferInstance>& camera_buffer,
+                                 const std::shared_ptr<BufferInstance>& task_commands,
+                                 const std::shared_ptr<BufferInstance>& draws,
+                                 const std::shared_ptr<BufferInstance>& command_count,
                                  IGpu* gpu)
         : compute_pipeline(gpu) {
-      resource_component.add_resource(draws, ResourceUsage::READ, {BindingType::DESCRIPTOR, 0, 0});
+      resource_component.add_resource(camera_buffer, ResourceUsage::READ, {BindingType::DESCRIPTOR, 0, 0});
+      resource_component.add_resource(draws, ResourceUsage::READ, {BindingType::DESCRIPTOR, 1, 6});
       resource_component.add_resource(task_commands, ResourceUsage::WRITE,
-                                      {BindingType::DESCRIPTOR, 0, 1});
+                                      {BindingType::DESCRIPTOR, 1, 5});
       resource_component.add_resource(command_count, ResourceUsage::WRITE,
-                                      {BindingType::DESCRIPTOR, 0, 2});
+                                      {BindingType::DESCRIPTOR, 1, 7});
       resource_component.add_push_constant(sizeof(DrawCullDepthConstants),
                                            VK_SHADER_STAGE_COMPUTE_BIT);
       name = "Draw Cull Directional Depth Pass";
@@ -734,16 +734,6 @@ namespace gestalt::graphics::fg {
                                                               VK_SHADER_STAGE_COMPUTE_BIT)
                                                      .get())
                                          .set(1, DescriptorSetLayoutBuilder()
-                                                     .binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                                              VK_SHADER_STAGE_COMPUTE_BIT)
-                                                     .binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                                              VK_SHADER_STAGE_COMPUTE_BIT)
-                                                     .binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                                              VK_SHADER_STAGE_COMPUTE_BIT)
-                                                     .binding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                                              VK_SHADER_STAGE_COMPUTE_BIT)
-                                                     .binding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                                              VK_SHADER_STAGE_COMPUTE_BIT)
                                                      .binding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                                               VK_SHADER_STAGE_COMPUTE_BIT)
                                                      .binding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
@@ -766,16 +756,16 @@ namespace gestalt::graphics::fg {
     ComputePipeline compute_pipeline;
     ResourceComponent resource_component;
 
-    TaskSubmitDirectionalDepthPass(const std::shared_ptr<ResourceInstance>& task_commands,
-                                   const std::shared_ptr<ResourceInstance>& command_count,
+    TaskSubmitDirectionalDepthPass(const std::shared_ptr<BufferInstance>& task_commands,
+                                   const std::shared_ptr<BufferInstance>& command_count,
                                    IGpu* gpu)
         : compute_pipeline(gpu) {
       resource_component.add_resource(task_commands, ResourceUsage::READ,
-                                      {BindingType::DESCRIPTOR, 0, 0});
+                                      {BindingType::DESCRIPTOR, 0, 5});
       resource_component.add_resource(task_commands, ResourceUsage::WRITE,
-                                      {BindingType::DESCRIPTOR, 0, 0});
+                                      {BindingType::DESCRIPTOR, 0, 5});
       resource_component.add_resource(command_count, ResourceUsage::WRITE,
-                                      {BindingType::DESCRIPTOR, 0, 0});
+                                      {BindingType::DESCRIPTOR, 0, 7});
       name = "Task Submit Directional Depth Pass";
     }
 
@@ -787,19 +777,7 @@ namespace gestalt::graphics::fg {
       compute_pipeline
           .add_descriptor_set_layout(DescriptorLayoutBuilder()
                                          .set(0, DescriptorSetLayoutBuilder()
-                                                     .binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                                                              VK_SHADER_STAGE_COMPUTE_BIT)
-                                                     .binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                                              VK_SHADER_STAGE_COMPUTE_BIT)
-                                                     .binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                                              VK_SHADER_STAGE_COMPUTE_BIT)
-                                                     .binding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                                              VK_SHADER_STAGE_COMPUTE_BIT)
-                                                     .binding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                                              VK_SHADER_STAGE_COMPUTE_BIT)
                                                      .binding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                                              VK_SHADER_STAGE_COMPUTE_BIT)
-                                                     .binding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                                               VK_SHADER_STAGE_COMPUTE_BIT)
                                                      .binding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                                               VK_SHADER_STAGE_COMPUTE_BIT)
@@ -816,30 +794,58 @@ namespace gestalt::graphics::fg {
   };
   struct MeshletDirectionalDepthPass : RenderPass {
     GraphicsPipeline graphics_pipeline;
-    ResourceComponent resource_component;
+    ResourceComponent resources;
 
-    MeshletDirectionalDepthPass(const std::shared_ptr<ResourceInstance>& shadow_map,
-                                const std::shared_ptr<ResourceInstance>& geometry_buffer, IGpu* gpu)
+    MeshletDirectionalDepthPass(const std::shared_ptr<BufferInstance>& camera_buffer,
+                                const std::shared_ptr<BufferInstance>& light_matrices,
+                                const std::shared_ptr<BufferInstance>& directional_light,
+                                const std::shared_ptr<BufferInstance>& point_light,
+                                const std::shared_ptr<BufferInstance>& vertex_positions,
+                                const std::shared_ptr<BufferInstance>& vertex_data,
+                                const std::shared_ptr<BufferInstance>& meshlet,
+                                const std::shared_ptr<BufferInstance>& meshlet_vertices,
+                                const std::shared_ptr<BufferInstance>& meshlet_indices,
+                                const std::shared_ptr<BufferInstance>& task_commands,
+                                const std::shared_ptr<BufferInstance>& draws,
+                                const std::shared_ptr<ImageInstance>& shadow_map, IGpu* gpu)
         : graphics_pipeline(gpu) {
-      resource_component.add_resource(geometry_buffer, ResourceUsage::READ,
-                                      {BindingType::DESCRIPTOR, 0, 0});
-      resource_component.add_resource(shadow_map, ResourceUsage::WRITE,
-                                      {BindingType::DEPTH_ATTACHMENT, 0, 0});
+      resources.add_resource(camera_buffer, ResourceUsage::READ, {BindingType::DESCRIPTOR, 0, 0});
+
+      resources.add_resource(light_matrices, ResourceUsage::READ, {BindingType::DESCRIPTOR, 1, 0});
+      resources.add_resource(directional_light, ResourceUsage::READ,
+                             {BindingType::DESCRIPTOR, 1, 1});
+      resources.add_resource(point_light, ResourceUsage::READ, {BindingType::DESCRIPTOR, 1, 2});
+
+      resources.add_resource(vertex_positions, ResourceUsage::READ,
+                             {BindingType::DESCRIPTOR, 2, 0});
+      resources.add_resource(vertex_data, ResourceUsage::READ, {BindingType::DESCRIPTOR, 2, 1});
+      resources.add_resource(meshlet, ResourceUsage::READ, {BindingType::DESCRIPTOR, 2, 2});
+      resources.add_resource(meshlet_vertices, ResourceUsage::READ,
+                             {BindingType::DESCRIPTOR, 2, 3});
+      resources.add_resource(meshlet_indices, ResourceUsage::READ, {BindingType::DESCRIPTOR, 2, 4});
+      resources.add_resource(task_commands, ResourceUsage::READ,
+                             {BindingType::DEPTH_ATTACHMENT, 2, 5});
+      resources.add_resource(draws, ResourceUsage::READ, {BindingType::DEPTH_ATTACHMENT, 2, 6});
+      resources.add_resource(shadow_map, ResourceUsage::WRITE, {BindingType::DEPTH_ATTACHMENT});
       name = "Meshlet Directional Depth Pass";
     }
 
-    std::vector<std::shared_ptr<ResourceInstance>> get_resources(const ResourceUsage usage) override {
-      return resource_component.get_resources(usage);
+    std::vector<std::shared_ptr<ResourceInstance>> get_resources(
+        const ResourceUsage usage) override {
+      return resources.get_resources(usage);
     }
 
     void compile() override {
+      auto write = resources.get_resources(ResourceUsage::WRITE);
+
       GraphicsPipelineBuilder pipeline_builder{};
       pipeline_builder.set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
           .set_polygon_mode(VK_POLYGON_MODE_FILL)
           .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
           .set_multisampling_none()
           .disable_blending()
-          .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL);
+          .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
+          .set_depth_format(VK_FORMAT_D32_SFLOAT);
 
       graphics_pipeline
           .add_descriptor_set_layout(
@@ -872,13 +878,11 @@ namespace gestalt::graphics::fg {
                                        VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
                               .binding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                        VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
-                              .binding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
                               .get())
                   .get())
           .set_mesh_task_shading("geometry_depth.task.spv", "geometry_depth.mesh.spv",
                                  "geometry_depth.frag.spv")
-          .add_pipeline_layout(name, resource_component.get_push_constant_range())
+          .add_pipeline_layout(name, resources.get_push_constant_range())
           .create_graphics_pipeline(pipeline_builder.build_pipeline_info(), name);
     }
 
@@ -895,11 +899,11 @@ namespace gestalt::graphics::fg {
       return resource_component.get_resources(usage);
     }
 
-    GeometryPass(const std::shared_ptr<ResourceInstance>& g_buffer_1,
-                 const std::shared_ptr<ResourceInstance>& g_buffer_2,
-                 const std::shared_ptr<ResourceInstance>& g_buffer_3,
-                 const std::shared_ptr<ResourceInstance>& g_buffer_depth,
-                 const std::shared_ptr<ResourceInstance>& geometry_buffer, IGpu* gpu)
+    GeometryPass(const std::shared_ptr<ImageInstance>& g_buffer_1,
+                 const std::shared_ptr<ImageInstance>& g_buffer_2,
+                 const std::shared_ptr<ImageInstance>& g_buffer_3,
+                 const std::shared_ptr<ImageInstance>& g_buffer_depth,
+                 const std::shared_ptr<BufferInstance>& geometry_buffer, IGpu* gpu)
         : graphics_pipeline(gpu) {
       resource_component.add_resource(geometry_buffer, ResourceUsage::READ,
                                       {BindingType::DESCRIPTOR, 0, 0});
@@ -1083,18 +1087,19 @@ namespace gestalt::graphics::fg {
     explicit ResourceRegistry(ResourceAllocator* resource_factory)
         : resource_factory_(resource_factory) {}
 
-    std::shared_ptr<ResourceInstance> add_template(ImageTemplate&& image_template);
+    std::shared_ptr<ImageInstance> add_template(ImageTemplate&& image_template);
 
-    std::shared_ptr<ResourceInstance> add_template(BufferTemplate&& buffer_template);
+    std::shared_ptr<BufferInstance> add_template(BufferTemplate&& buffer_template);
 
-    std::shared_ptr<ResourceInstance> add_resource(std::shared_ptr<ImageInstance> image_resource);
-
-    std::shared_ptr<ResourceInstance> add_resource(std::shared_ptr<BufferInstance> buffer_resource);
+    template <typename ResourceInstanceType>
+    std::shared_ptr<ResourceInstanceType> add_resource(
+        std::shared_ptr<ResourceInstanceType> resource_instance);
 
     std::shared_ptr<ResourceInstance> get_resource(const uint32 handle) {
       return resource_map_.at(handle);
     }
   };
+
 
   class FrameGraph : public NonCopyable<FrameGraph> {
     std::vector<std::shared_ptr<FrameGraphNode>> nodes_;
@@ -1111,28 +1116,57 @@ namespace gestalt::graphics::fg {
     void topological_sort();
 
   public:
-    explicit FrameGraph(ResourceAllocator* resource_factory);
+    explicit FrameGraph(ResourceAllocator* resource_allocator);
 
     void add_render_pass(std::shared_ptr<RenderPass>&& pass);
 
-    template <typename ResourceTemplateType>
-    auto add_resource(ResourceTemplateType&& resource_template,
-                      CreationType creation_type = CreationType::INTERNAL) {
-      auto resource
-          = resource_registry_->add_template(std::forward<ResourceTemplateType>(resource_template));
-      edges_.insert({resource->resource_handle,
-                     std::make_shared<FrameGraphEdge>(std::move(resource), creation_type)});
-      return resource;
+    std::shared_ptr<ImageInstance> add_resource(ImageTemplate&& image_template,
+                                                CreationType creation_type
+                                                = CreationType::INTERNAL) {
+      auto resource = resource_registry_->add_template(std::move(image_template));
+      const uint64 handle = resource->resource_handle;
+      assert(handle != 0 && "Invalid resource handle!");
+
+      auto inserted = edges_.emplace(
+          handle, std::make_shared<FrameGraphEdge>(std::move(resource), creation_type));
+      assert(inserted.second && "Failed to insert edge into edges map!");
+
+      return std::static_pointer_cast<ImageInstance>(inserted.first->second->resource);
     }
+
+    std::shared_ptr<BufferInstance> add_resource(BufferTemplate&& buffer_template,
+                                                 CreationType creation_type
+                                                 = CreationType::INTERNAL) {
+      auto resource = resource_registry_->add_template(std::move(buffer_template));
+      const uint64 handle = resource->resource_handle;
+      assert(handle != 0 && "Invalid resource handle!");
+
+      auto inserted = edges_.emplace(
+          handle, std::make_shared<FrameGraphEdge>(std::move(resource), creation_type));
+      assert(inserted.second && "Failed to insert edge into edges map!");
+
+      return std::static_pointer_cast<BufferInstance>(inserted.first->second->resource);
+    }
+
 
     template <typename ResourceInstanceType>
     auto add_resource(std::shared_ptr<ResourceInstanceType> resource_instance,
                       CreationType creation_type = CreationType::EXTERNAL) {
+      assert(resource_instance != nullptr && "Resource instance cannot be null!");
+
       auto resource = resource_registry_->add_resource(resource_instance);
-      edges_.insert({resource->resource_handle,
-                     std::make_shared<FrameGraphEdge>(std::move(resource), creation_type)});
-      return resource;
+      assert(resource != nullptr && "Failed to add resource to the registry!");
+
+      uint64 handle = resource->resource_handle;
+      assert(handle != -1 && "Invalid resource handle!");
+
+      auto inserted = edges_.emplace(
+          handle, std::make_shared<FrameGraphEdge>(std::move(resource), creation_type));
+      assert(inserted.second && "Failed to insert edge into edges map!");
+
+      return std::static_pointer_cast<ResourceInstanceType>(inserted.first->second->resource);
     }
+
 
     void compile();
 

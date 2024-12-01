@@ -10,7 +10,6 @@
 #include "Repository.hpp"
 #include <VkBootstrap.h>
 
-#include "FrameGraph.hpp"
 #include "VulkanCheck.hpp"
 
 #include "FrameProvider.hpp"
@@ -40,90 +39,99 @@ namespace gestalt::graphics {
     resource_registry_ = std::make_unique<ResourceRegistry>();
     resource_registry_->init(gpu_, repository_);
 
-    {
-      const auto frame_graph = std::make_unique<fg::FrameGraph>(resource_allocator);
+    frame_graph_ = std::make_unique<fg::FrameGraph>(resource_allocator);
 
-      auto shadow_map
-          = frame_graph->add_resource(ImageTemplate("shadow_map")
-                                          .set_image_type(TextureType::kDepth, VK_FORMAT_D32_SFLOAT)
-                                          .set_image_size(2048 * 4, 2048 * 4)
-                                          .build());
-      auto g_buffer_1 = frame_graph->add_resource(ImageTemplate("g_buffer1"));
-      auto g_buffer_2 = frame_graph->add_resource(ImageTemplate("g_buffer2"));
-      auto g_buffer_3 = frame_graph->add_resource(ImageTemplate("g_buffer3"));
-      auto g_buffer_depth
-          = frame_graph->add_resource(ImageTemplate("g_buffer_depth")
-                                          .set_image_type(TextureType::kDepth, VK_FORMAT_D32_SFLOAT)
-                                          .build());
-      auto scene_lit = frame_graph->add_resource(ImageTemplate("scene_lit"));
-      auto scene_final = frame_graph->add_resource(ImageTemplate("scene_final"));
-      auto rotation_texture = frame_graph->add_resource(
+    {
+      auto shadow_map = frame_graph_->add_resource(
+          ImageTemplate("shadow_map")
+              .set_image_type(TextureType::kDepth, VK_FORMAT_D32_SFLOAT)
+              .set_image_size(2048 * 4, 2048 * 4)
+              .build());
+      auto g_buffer_1 = frame_graph_->add_resource(ImageTemplate("g_buffer1"));
+      auto g_buffer_2 = frame_graph_->add_resource(ImageTemplate("g_buffer2"));
+      auto g_buffer_3 = frame_graph_->add_resource(ImageTemplate("g_buffer3"));
+      auto g_buffer_depth = frame_graph_->add_resource(
+          ImageTemplate("g_buffer_depth")
+              .set_image_type(TextureType::kDepth, VK_FORMAT_D32_SFLOAT)
+              .build());
+      auto scene_lit = frame_graph_->add_resource(ImageTemplate("scene_lit"));
+      auto scene_final = frame_graph_->add_resource(ImageTemplate("scene_final"));
+      auto rotation_texture = frame_graph_->add_resource(
           ImageTemplate("rotation_texture")
               .set_initial_value(std::filesystem::current_path() / "../../assets/rot_texture.bmp")
               .build(),
           fg::CreationType::EXTERNAL);
-      auto occlusion_texture
-          = frame_graph->add_resource(ImageTemplate("occlusion_texture")
-                                          .set_image_type(TextureType::kColor, VK_FORMAT_R16_SFLOAT)
-                                          .set_image_size(0.5f)
-                                          .build());
+      auto occlusion_texture = frame_graph_->add_resource(
+          ImageTemplate("occlusion_texture")
+              .set_image_type(TextureType::kColor, VK_FORMAT_R16_SFLOAT)
+              .set_image_size(0.5f)
+              .build());
 
-      auto index_buffer = frame_graph->add_resource(repository->mesh_buffers->geometry_buffer,
-                                                    fg::CreationType::EXTERNAL);
-      auto vertex_position_buffer = frame_graph->add_resource(
-          repository->mesh_buffers->geometry_buffer, fg::CreationType::EXTERNAL);
-      auto vertex_data_buffer = frame_graph->add_resource(repository->mesh_buffers->geometry_buffer,
-                                                          fg::CreationType::EXTERNAL);
+      // camera
+      auto camera_buffer = frame_graph_->add_resource(
+          repository->per_frame_data_buffers->uniform_buffers_instance);
 
-      auto meshlet_buffer = frame_graph->add_resource(repository->mesh_buffers->geometry_buffer,
-                                                      fg::CreationType::EXTERNAL);
-      auto meshlet_vertices = frame_graph->add_resource(repository->mesh_buffers->geometry_buffer,
-                                                        fg::CreationType::EXTERNAL);
-      auto meshlet_triangles = frame_graph->add_resource(repository->mesh_buffers->geometry_buffer,
-                                                         fg::CreationType::EXTERNAL);
-      auto meshlet_task_commands_buffer = frame_graph->add_resource(
-          repository->mesh_buffers->geometry_buffer, fg::CreationType::EXTERNAL);
-      auto mesh_draw_buffer = frame_graph->add_resource(repository->mesh_buffers->geometry_buffer,
-                                                        fg::CreationType::EXTERNAL);
-      auto draw_count_buffer = frame_graph->add_resource(repository->mesh_buffers->geometry_buffer,
-                                                         fg::CreationType::EXTERNAL);
+      // geometry
+      auto index_buffer = frame_graph_->add_resource(
+          repository->mesh_buffers->index_buffer_instance, fg::CreationType::EXTERNAL);
+      auto vertex_position_buffer
+          = frame_graph_->add_resource(repository->mesh_buffers->vertex_position_buffer_instance);
+      auto vertex_data_buffer
+          = frame_graph_->add_resource(repository->mesh_buffers->vertex_data_buffer_instance);
 
-      auto material_buffer = frame_graph->add_resource(
-          repository->material_buffers->material_buffer, fg::CreationType::EXTERNAL);
-      auto light_buffer = frame_graph->add_resource(repository->light_buffers->light_buffer,
-                                                    fg::CreationType::EXTERNAL);
+      auto meshlet_buffer
+          = frame_graph_->add_resource(repository->mesh_buffers->meshlet_buffer_instance);
+      auto meshlet_vertices
+          = frame_graph_->add_resource(repository->mesh_buffers->meshlet_vertices_instance);
+      auto meshlet_triangles
+          = frame_graph_->add_resource(repository->mesh_buffers->meshlet_triangles_instance);
+      auto meshlet_task_commands_buffer = frame_graph_->add_resource(
+          repository->mesh_buffers->meshlet_task_commands_buffer_instance);
+      auto mesh_draw_buffer
+          = frame_graph_->add_resource(repository->mesh_buffers->mesh_draw_buffer_instance);
+      auto draw_count_buffer
+          = frame_graph_->add_resource(repository->mesh_buffers->draw_count_buffer_instance);
+      // Material
+      auto material_buffer
+          = frame_graph_->add_resource(repository->material_buffers->material_buffer);
+
+      // Light
+      auto directional_light
+          = frame_graph_->add_resource(repository->light_buffers->dir_light_buffer_instance);
+      auto point_light
+          = frame_graph_->add_resource(repository->light_buffers->point_light_buffer_instance);
+      auto light_matrices
+          = frame_graph_->add_resource(repository->light_buffers->view_proj_matrices_instance);
+
       // Shader Passes
       auto draw_cull_directional_depth_pass = std::make_shared<fg::DrawCullDirectionalDepthPass>(
-          meshlet_task_commands_buffer, mesh_draw_buffer, draw_count_buffer, gpu_);
+          camera_buffer, meshlet_task_commands_buffer, mesh_draw_buffer, draw_count_buffer, gpu_);
       auto task_submit_directional_depth_pass
-          = std::make_shared<fg::TaskSubmitDirectionalDepthPass>(meshlet_task_commands_buffer, draw_count_buffer,
-                                                                 gpu_);
+          = std::make_shared<fg::TaskSubmitDirectionalDepthPass>(meshlet_task_commands_buffer,
+                                                                 draw_count_buffer, gpu_);
       auto meshlet_directional_depth_pass = std::make_shared<fg::MeshletDirectionalDepthPass>(
-          shadow_map, vertex_position_buffer, gpu_);
+          camera_buffer, light_matrices, directional_light, point_light, vertex_position_buffer,
+          vertex_data_buffer, meshlet_buffer, meshlet_vertices, meshlet_triangles,
+          meshlet_task_commands_buffer, mesh_draw_buffer, shadow_map, gpu_);
 
       auto geometry_pass = std::make_shared<fg::GeometryPass>(
           g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth, vertex_position_buffer, gpu_);
       auto lighting_pass = std::make_shared<fg::LightingPass>(
           scene_lit, g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth, shadow_map,
-          material_buffer, light_buffer, gpu_);
+          material_buffer, directional_light, gpu_);
       auto tone_map_pass = std::make_shared<fg::ToneMapPass>(scene_final, scene_lit, gpu_);
       auto ssao_pass = std::make_shared<fg::SsaoPass>(scene_lit, g_buffer_depth, rotation_texture,
                                                       occlusion_texture, gpu_);
 
-      frame_graph->add_render_pass(std::move(draw_cull_directional_depth_pass));
-      frame_graph->add_render_pass(std::move(task_submit_directional_depth_pass));
-      frame_graph->add_render_pass(std::move(meshlet_directional_depth_pass));
-      frame_graph->add_render_pass(std::move(geometry_pass));
-      frame_graph->add_render_pass(std::move(lighting_pass));
-      frame_graph->add_render_pass(std::move(tone_map_pass));
-      frame_graph->add_render_pass(std::move(ssao_pass));
+      frame_graph_->add_render_pass(std::move(draw_cull_directional_depth_pass));
+      frame_graph_->add_render_pass(std::move(task_submit_directional_depth_pass));
+      frame_graph_->add_render_pass(std::move(meshlet_directional_depth_pass));
+      frame_graph_->add_render_pass(std::move(geometry_pass));
+      frame_graph_->add_render_pass(std::move(lighting_pass));
+      frame_graph_->add_render_pass(std::move(tone_map_pass));
+      frame_graph_->add_render_pass(std::move(ssao_pass));
 
-      frame_graph->compile();
-
-      // TODO
-      const VkCommandBuffer command_buffer = nullptr;
-      const fg::CommandBuffer cmd{command_buffer};
-      frame_graph->execute(cmd);
+      frame_graph_->compile();
     }
 
     render_passes_.push_back(std::make_shared<DrawCullDirectionalDepthPass>());
@@ -353,6 +361,11 @@ namespace gestalt::graphics {
       ZoneScopedN("Execute Pass");
       execute(renderpass, cmd);
     }
+
+      // TODO
+    const VkCommandBuffer command_buffer = nullptr;
+    const fg::CommandBuffer cmd_buffer{command_buffer};
+    frame_graph_->execute(cmd_buffer);
 
     const auto color_image = resource_registry_->resources_.final_color.image;
     const auto swapchain_image = swapchain_->swapchain_images[swapchain_image_index_];

@@ -54,11 +54,10 @@ namespace gestalt::application {
         VMA_MEMORY_USAGE_CPU_TO_GPU, "Material Data Buffer");
 
     //TODO
-    BufferTemplate buffer_template(
+    mat_buffers->material_buffer = resource_allocator_->create_buffer(BufferTemplate(
         "Material Buffer", sizeof(PbrMaterial::PbrConstants) * getMaxMaterials(),
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VMA_MEMORY_USAGE_CPU_TO_GPU);
-    mat_buffers->material_buffer = resource_allocator_->create_buffer(std::move(buffer_template));
+        VMA_MEMORY_USAGE_CPU_TO_GPU));
   }
 
   void MaterialSystem::create_default_material() {
