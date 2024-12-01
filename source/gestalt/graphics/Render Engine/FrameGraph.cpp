@@ -114,7 +114,6 @@ namespace gestalt::graphics::fg {
         edge->nodes_from.push_back(node);
         node->edges_out.push_back(edge);
       }
-      node->render_pass->compile();
     }
 
     print_graph();

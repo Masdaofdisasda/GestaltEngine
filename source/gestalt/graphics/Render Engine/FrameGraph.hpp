@@ -39,6 +39,17 @@ namespace gestalt::graphics::fg {
     VkPushConstantRange push_constant_range = {.size = 0};
   };
 
+  template <typename ResourceInstanceType> struct ResourceBinding {
+    std::shared_ptr<ResourceInstanceType> resource;
+    struct ResourceBindingInfo {
+      uint32 set_index;
+      uint32 binding_index;
+      VkDescriptorType descriptor_type;
+      VkShaderStageFlags shader_stages;
+      uint32 descriptor_count;
+    } info;
+  };
+
   class CommandBuffer {
     VkCommandBuffer cmd;
 
@@ -153,6 +164,31 @@ namespace gestalt::graphics::fg {
     std::unordered_map<VkShaderStageFlagBits, VkPipelineShaderStageCreateInfo> shader_stages_;
     std::unordered_map<VkShaderStageFlagBits, VkShaderModule> shader_modules_;
 
+    void create_descriptor_layout(
+        std::unordered_map<uint32, std::unordered_map<uint32, VkDescriptorSetLayoutBinding>>&&
+            sets) {
+      this->set_bindings_ = std::move(sets);
+
+      for (const auto& [set_index, bindings] : set_bindings_) {
+        std::vector<VkDescriptorSetLayoutBinding> binding_vector;
+        binding_vector.reserve(bindings.size());
+        for (const auto& binding : bindings | std::views::values) {
+          binding_vector.push_back(binding);
+        }
+
+        VkDescriptorSetLayoutCreateInfo info
+            = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+               .pNext = nullptr,
+               .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT,
+               .bindingCount = static_cast<uint32>(binding_vector.size()),
+               .pBindings = binding_vector.data()};
+
+        VkDescriptorSetLayout set;
+        VK_CHECK(vkCreateDescriptorSetLayout(gpu_->getDevice(), &info, nullptr, &set));
+        descriptor_set_layouts_.emplace(set_index, set);
+      }
+    }
+
   public:
     explicit PipelineUtil(IGpu* gpu) : gpu_(gpu) {}
 
@@ -223,30 +259,31 @@ namespace gestalt::graphics::fg {
           shader_stage, vkinit::pipeline_shader_stage_create_info(shader_stage, shader_module));
     }
 
+
     void create_descriptor_layout(
-        std::unordered_map<uint32, std::unordered_map<uint32, VkDescriptorSetLayoutBinding>>&&
-            sets) {
+        std::span<const ResourceBinding<ImageInstance>> image_bindings,
+        std::span<const ResourceBinding<BufferInstance>> buffer_bindings) {
+      std::unordered_map<uint32, std::unordered_map<uint32, VkDescriptorSetLayoutBinding>> sets;
 
-      this->set_bindings_ = std::move(sets);
-
-      for (const auto& [set_index, bindings] : set_bindings_) {
-        std::vector<VkDescriptorSetLayoutBinding> binding_vector;
-        binding_vector.reserve(bindings.size());
-        for (const auto& binding : bindings | std::views::values) {
-          binding_vector.push_back(binding);
-        }
-
-        VkDescriptorSetLayoutCreateInfo info
-            = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-               .pNext = nullptr,
-               .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT,
-               .bindingCount = static_cast<uint32>(binding_vector.size()),
-               .pBindings = binding_vector.data()};
-
-        VkDescriptorSetLayout set;
-        VK_CHECK(vkCreateDescriptorSetLayout(gpu_->getDevice(), &info, nullptr, &set));
-        descriptor_set_layouts_.emplace(set_index, set);
+      for (const auto& [_, info] : image_bindings) {
+        sets[info.set_index].emplace(info.binding_index,
+                                     VkDescriptorSetLayoutBinding{
+                                         .binding = info.binding_index,
+                                         .descriptorType = info.descriptor_type,
+                                         .descriptorCount = info.descriptor_count,
+                                         .stageFlags = info.shader_stages,
+                                     });
       }
+      for (const auto& [_, info] : buffer_bindings) {
+        sets[info.set_index].emplace(info.binding_index,
+                                     VkDescriptorSetLayoutBinding{
+                                         .binding = info.binding_index,
+                                         .descriptorType = info.descriptor_type,
+                                         .descriptorCount = info.descriptor_count,
+                                         .stageFlags = info.shader_stages,
+                                     });
+      }
+      create_descriptor_layout(std::move(sets));
     }
 
     void create_pipeline_layout(const std::string_view pipeline_name,
@@ -540,10 +577,10 @@ namespace gestalt::graphics::fg {
     explicit GraphicsPipeline(IGpu* gpu) : util_(gpu) {}
 
     GraphicsPipeline& add_descriptor_set_layout(
-        std::unordered_map<uint32, std::unordered_map<uint32, VkDescriptorSetLayoutBinding>>&&
-            sets) {
+        const std::span<const ResourceBinding<ImageInstance>> image_bindings,
+        const std::span<const ResourceBinding<BufferInstance>> buffer_bindings) {
       guard_.in_descriptor_stage();
-      util_.create_descriptor_layout(std::move(sets));
+      util_.create_descriptor_layout(image_bindings, buffer_bindings);
       guard_.next_stage();
       return *this;
     }
@@ -605,10 +642,10 @@ namespace gestalt::graphics::fg {
     explicit ComputePipeline(IGpu* gpu) : util_(gpu) {}
 
     ComputePipeline& add_descriptor_set_layout(
-        std::unordered_map<uint32, std::unordered_map<uint32, VkDescriptorSetLayoutBinding>>&&
-            sets) {
+        const std::span<const ResourceBinding<ImageInstance>> image_bindings,
+        const std::span<const ResourceBinding<BufferInstance>> buffer_bindings) {
       guard_.in_descriptor_stage();
-      util_.create_descriptor_layout(std::move(sets));
+      util_.create_descriptor_layout(image_bindings, buffer_bindings);
       guard_.next_stage();
       return *this;
     }
@@ -638,22 +675,6 @@ namespace gestalt::graphics::fg {
     VkPipeline get_pipeline() const { return util_.get_pipeline(); }
   };
 
-  enum class BindingType {
-    DESCRIPTOR,
-    COLOR_ATTACHMENT,
-    DEPTH_ATTACHMENT,
-  };
-
-  struct ResourceBinding {
-    BindingType type;
-    uint32_t setIndex = 0;         // Descriptor set index for DESCRIPTOR
-    uint32_t bindingIndex = 0;     // Binding index for DESCRIPTOR
-    uint32_t attachmentIndex = 0;  // Attachment index for COLOR/DEPTH_ATTACHMENT
-    VkImageLayout layout
-        = VK_IMAGE_LAYOUT_UNDEFINED;  // Optional: Track image layout for attachments
-  };
-
-
   enum class ResourceUsage {
     READ, WRITE,
     COUNT  // To represent the total number of usage types
@@ -663,19 +684,16 @@ namespace gestalt::graphics::fg {
 template <typename ResourceInstanceType> class ResourceCollection {
     struct ResourceMetadata {
       std::bitset<static_cast<size_t>(ResourceUsage::COUNT)> usage_mask;  // Bitset for usage types
-      ResourceBinding binding;
     };
 
     std::unordered_map<std::shared_ptr<ResourceInstanceType>, ResourceMetadata> resources_;
 
   public:
     // Add or update a resource with a specific usage
-    void add_resource(const std::shared_ptr<ResourceInstanceType>& resource, ResourceUsage usage,
-                      const ResourceBinding& binding) {
+    void add_resource(const std::shared_ptr<ResourceInstanceType>& resource, ResourceUsage usage) {
       assert(resource && "Resource cannot be null!");
       auto& metadata = resources_[resource];
       metadata.usage_mask.set(static_cast<size_t>(usage));  // Set the usage bit
-      metadata.binding = binding;
     }
 
     // Get resources by a specific usage
@@ -687,23 +705,6 @@ template <typename ResourceInstanceType> class ResourceCollection {
         }
       }
       return result;
-    }
-
-    const ResourceBinding* get_binding(
-        const std::shared_ptr<ResourceInstanceType>& resource) const {
-      auto it = resources_.find(resource);
-      return (it != resources_.end()) ? &it->second.binding : nullptr;
-    }
-
-  std::shared_ptr<ResourceInstanceType> get_resource_for_binding(
-        const ResourceBinding& binding) const {
-      for (const auto& [resource, metadata] : resources_) {
-        if (metadata.binding.setIndex == binding.setIndex
-            && metadata.binding.bindingIndex == binding.bindingIndex) {
-          return resource;
-        }
-      }
-      return nullptr;
     }
 
     bool has_usage(const std::shared_ptr<ResourceInstanceType>& resource,
@@ -720,14 +721,39 @@ template <typename ResourceInstanceType> class ResourceCollection {
 
   class ResourceComponent {
   public:
-    void add(const std::shared_ptr<ImageInstance>& image, ResourceUsage usage,
-                      const ResourceBinding& binding) {
-      images_.add_resource(image, usage, binding);
+
+    ResourceComponent& add_attachment(const std::shared_ptr<ImageInstance>& image,
+                                     const ResourceUsage usage, uint32 attachment_index = 0) {
+      assert(usage == ResourceUsage::WRITE && "Attachment must be write only");
+      if (image->image_template.type == TextureType::kColor) {
+        color_attachments_.emplace(attachment_index, image);
+      } else if (image->image_template.type == TextureType::kDepth) {
+        assert(attachment_index == 0 && "Depth attachment index must be 0");
+        depth_attachment_ = image;
+      }
+      images_.add_resource(image, usage);
+      return *this;
     }
 
-    void add(const std::shared_ptr<BufferInstance>& buffer, ResourceUsage usage,
-                      const ResourceBinding& binding) {
-      buffers_.add_resource(buffer, usage, binding);
+    ResourceComponent& add_binding(const std::shared_ptr<ImageInstance>& image, ResourceUsage usage,
+                                   const uint32 set_index, const uint32 binding_index,
+                                   const VkDescriptorType descriptor_type,
+                     const VkShaderStageFlags shader_stages, const uint32 descriptor_count = 1) {
+      image_bindings_.push_back(
+          {image, {set_index, binding_index, descriptor_type, shader_stages, descriptor_count}});
+      images_.add_resource(image, usage);
+      return *this;
+    }
+
+    ResourceComponent& add_binding(const std::shared_ptr<BufferInstance>& buffer,
+                                   ResourceUsage usage, const uint32 set_index,
+                                   const uint32 binding_index,
+                                   const VkDescriptorType descriptor_type,
+                     const VkShaderStageFlags shader_stages) {
+      buffer_bindings_.push_back(
+          {buffer, {set_index, binding_index, descriptor_type, shader_stages, 1}});
+      buffers_.add_resource(buffer, usage);
+      return *this;
     }
 
     // Get resources of all types based on usage
@@ -754,22 +780,38 @@ template <typename ResourceInstanceType> class ResourceCollection {
       return buffers_.get_resources(usage);
     }
 
-    [[nodiscard]] const ResourceBinding* get_binding_type(const std::shared_ptr<ImageInstance>& image) const {
-      return images_.get_binding(image);
+    [[nodiscard]] const std::unordered_map<uint32, std::shared_ptr<ImageInstance>>* get_color_attachment() const {
+      return &color_attachments_;
     }
 
-    [[nodiscard]] const ResourceBinding* get_binding_type(const std::shared_ptr<BufferInstance>& buffer) const {
-      return buffers_.get_binding(buffer);
+    [[nodiscard]] const std::shared_ptr<ImageInstance>* get_depth_attachment() const { return &depth_attachment_; }
+
+    [[nodiscard]] ResourceBinding<BufferInstance> get_buffer_binding(const uint32 set_index, const uint32 binding_index) const {
+      for (const auto& resource : buffer_bindings_) {
+        if (resource.info.set_index == set_index && resource.info.binding_index == binding_index) {
+          return resource;
+        }
+      }
+      throw std::runtime_error("Resource binding not found");
     }
 
-        [[nodiscard]] std::shared_ptr<ImageInstance> get_image_for_binding(
-        const ResourceBinding& binding) const {
-      return images_.get_resource_for_binding(binding);
+    [[nodiscard]] ResourceBinding<ImageInstance> get_image_binding(const uint32 set_index, const uint32 binding_index) const {
+      for (const auto& resource : image_bindings_) {
+        if (resource.info.set_index == set_index && resource.info.binding_index == binding_index) {
+          return resource;
+        }
+      }
+      throw std::runtime_error("Resource binding not found");
     }
 
-    [[nodiscard]] std::shared_ptr<BufferInstance> get_buffer_for_binding(const ResourceBinding& binding) const {
-      return buffers_.get_resource_for_binding(binding);
+    [[nodiscard]] std::span<const ResourceBinding<ImageInstance>> get_image_bindings() const {
+      return image_bindings_;
     }
+
+    [[nodiscard]] std::span<const ResourceBinding<BufferInstance>> get_buffer_bindings() const {
+      return buffer_bindings_;
+    }
+
 
     [[nodiscard]] bool has_usage(const std::shared_ptr<ImageInstance>& image,
                                  ResourceUsage usage) const {
@@ -781,8 +823,10 @@ template <typename ResourceInstanceType> class ResourceCollection {
       return buffers_.has_usage(buffer, usage);
     }
 
-    void add_push_constant(uint32_t size, VkShaderStageFlags stage_flags) {
+    ResourceComponent& add_push_constant(uint32_t size, VkShaderStageFlags stage_flags) {
       push_descriptor_ = PushDescriptor(size, stage_flags);
+
+      return *this;
     }
 
     [[nodiscard]] VkPushConstantRange get_push_constant_range() const {
@@ -790,11 +834,16 @@ template <typename ResourceInstanceType> class ResourceCollection {
     }
 
   private:
+    std::unordered_map<uint32, std::shared_ptr<ImageInstance>> color_attachments_;
+    std::shared_ptr<ImageInstance> depth_attachment_;
+
+    std::vector<ResourceBinding<ImageInstance>> image_bindings_;
+    std::vector<ResourceBinding<BufferInstance>> buffer_bindings_;
+
     ResourceCollection<ImageInstance> images_;
     ResourceCollection<BufferInstance> buffers_;
     PushDescriptor push_descriptor_;
   };
-
 
   class RenderPass {
     std::string name_;
@@ -802,7 +851,6 @@ template <typename ResourceInstanceType> class ResourceCollection {
     explicit RenderPass(std::string name) : name_(std::move(name)) {}
   public:
     [[nodiscard]] std::string_view get_name() const { return name_; }
-    virtual void compile() = 0;
     virtual std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) = 0;
     virtual void execute(CommandBuffer cmd) = 0;
     virtual ~RenderPass() = default;
@@ -813,54 +861,40 @@ template <typename ResourceInstanceType> class ResourceCollection {
     struct alignas(16) DrawCullDepthConstants {
       int32 draw_count;
     };
-    ComputePipeline compute_pipeline;
-    ResourceComponent resources;
+    ComputePipeline compute_pipeline_;
+    ResourceComponent resources_;
 
   public:
     DrawCullDirectionalDepthPass(const std::shared_ptr<BufferInstance>& camera_buffer,
                                  const std::shared_ptr<BufferInstance>& task_commands,
                                  const std::shared_ptr<BufferInstance>& draws,
-                                 const std::shared_ptr<BufferInstance>& command_count,
-                                 IGpu* gpu)
-        : RenderPass("Draw Cull Directional Depth Pass"), compute_pipeline(gpu) {
-      resources.add(camera_buffer, ResourceUsage::READ, {BindingType::DESCRIPTOR, 0, 0});
-      resources.add(draws, ResourceUsage::READ, {BindingType::DESCRIPTOR, 1, 6});
-      resources.add(task_commands, ResourceUsage::WRITE,
-                                      {BindingType::DESCRIPTOR, 1, 5});
-      resources.add(command_count, ResourceUsage::WRITE,
-                                      {BindingType::DESCRIPTOR, 1, 7});
-      resources.add_push_constant(sizeof(DrawCullDepthConstants),
-                                           VK_SHADER_STAGE_COMPUTE_BIT);
+                                 const std::shared_ptr<BufferInstance>& command_count, IGpu* gpu)
+        : RenderPass("Draw Cull Directional Depth Pass"), compute_pipeline_(gpu) {
+      resources_
+          .add_binding(camera_buffer, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                       VK_SHADER_STAGE_COMPUTE_BIT)
+          .add_binding(draws, ResourceUsage::READ, 1, 6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_COMPUTE_BIT)
+          .add_binding(task_commands, ResourceUsage::WRITE, 1, 5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_COMPUTE_BIT)
+          .add_binding(command_count, ResourceUsage::WRITE, 1, 7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_COMPUTE_BIT)
+      .add_push_constant(sizeof(DrawCullDepthConstants), VK_SHADER_STAGE_COMPUTE_BIT);
+      compute_pipeline_
+          .add_descriptor_set_layout(resources_.get_image_bindings(),
+                                     resources_.get_buffer_bindings())
+          .add_compute_shader("draw_cull_depth.comp.spv")
+          .add_pipeline_layout(get_name(), resources_.get_push_constant_range())
+          .create_compute_pipeline(get_name());
     }
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(
         const ResourceUsage usage) override {
-      return resources.get_resources(usage);
-    }
-
-    void compile() override {
-      compute_pipeline
-          .add_descriptor_set_layout(DescriptorLayoutBuilder()
-                                         .set(0, DescriptorSetLayoutBuilder()
-                                                     .binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                                                              VK_SHADER_STAGE_COMPUTE_BIT)
-                                                     .get())
-                                         .set(1, DescriptorSetLayoutBuilder()
-                                                     .binding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                                              VK_SHADER_STAGE_COMPUTE_BIT)
-                                                     .binding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                                              VK_SHADER_STAGE_COMPUTE_BIT)
-                                                     .binding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                                              VK_SHADER_STAGE_COMPUTE_BIT)
-                                                     .get())
-                                         .get())
-          .add_compute_shader("draw_cull_depth.comp.spv")
-          .add_pipeline_layout(get_name(), resources.get_push_constant_range())
-          .create_compute_pipeline(get_name());
+      return resources_.get_resources(usage);
     }
 
     void execute(CommandBuffer cmd) override {
-      const auto command_count = resources.get_buffer_for_binding({BindingType::DESCRIPTOR, 1, 7});
+      const auto command_count = resources_.get_buffer_binding(1, 7).resource;
 
       cmd.fill_buffer(command_count->allocated_buffer.buffer_handle, 0,
                       command_count->allocated_buffer.info.size, 0);
@@ -871,48 +905,39 @@ template <typename ResourceInstanceType> class ResourceCollection {
 
       const DrawCullDepthConstants draw_cull_constants{.draw_count = maxCommandCount};
 
-      cmd.bind_pipeline(VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipeline.get_pipeline());
+      cmd.bind_pipeline(VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipeline_.get_pipeline());
 
-      cmd.push_constants(compute_pipeline.get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
+      cmd.push_constants(compute_pipeline_.get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
                          sizeof(DrawCullDepthConstants), &draw_cull_constants);
       cmd.dispatch(groupCount, 1, 1);
     }
   };
 
   class TaskSubmitDirectionalDepthPass : public RenderPass {
-    ComputePipeline compute_pipeline;
-    ResourceComponent resources;
+    ComputePipeline compute_pipeline_;
+    ResourceComponent resources_;
 
   public:
     TaskSubmitDirectionalDepthPass(const std::shared_ptr<BufferInstance>& task_commands,
-                                   const std::shared_ptr<BufferInstance>& command_count,
-                                   IGpu* gpu)
-        : RenderPass("Task Submit Directional Depth Pass"), compute_pipeline(gpu) {
-      resources.add(task_commands, ResourceUsage::READ,
-                                      {BindingType::DESCRIPTOR, 0, 5});
-      resources.add(task_commands, ResourceUsage::WRITE,
-                                      {BindingType::DESCRIPTOR, 0, 5});
-      resources.add(command_count, ResourceUsage::WRITE,
-                                      {BindingType::DESCRIPTOR, 0, 7});
+                                   const std::shared_ptr<BufferInstance>& command_count, IGpu* gpu)
+        : RenderPass("Task Submit Directional Depth Pass"), compute_pipeline_(gpu) {
+      resources_
+          .add_binding(task_commands, ResourceUsage::READ, 0, 5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_COMPUTE_BIT)
+          .add_binding(task_commands, ResourceUsage::WRITE, 0, 5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_COMPUTE_BIT)
+          .add_binding(command_count, ResourceUsage::WRITE, 0, 7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_COMPUTE_BIT);
+      compute_pipeline_
+          .add_descriptor_set_layout(resources_.get_image_bindings(),
+                                     resources_.get_buffer_bindings())
+          .add_compute_shader("task_submit.comp.spv")
+          .add_pipeline_layout(get_name(), resources_.get_push_constant_range())
+          .create_compute_pipeline(get_name());
     }
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
-      return resources.get_resources(usage);
-    }
-
-    void compile() override {
-      compute_pipeline
-          .add_descriptor_set_layout(DescriptorLayoutBuilder()
-                                         .set(0, DescriptorSetLayoutBuilder()
-                                                     .binding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                                              VK_SHADER_STAGE_COMPUTE_BIT)
-                                                     .binding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                                              VK_SHADER_STAGE_COMPUTE_BIT)
-                                                     .get())
-                                         .get())
-          .add_compute_shader("task_submit.comp.spv")
-          .add_pipeline_layout(get_name(), resources.get_push_constant_range())
-          .create_compute_pipeline(get_name());
+      return resources_.get_resources(usage);
     }
 
     void execute(CommandBuffer cmd) override {
@@ -921,8 +946,8 @@ template <typename ResourceInstanceType> class ResourceCollection {
   };
 
   class MeshletDirectionalDepthPass : public RenderPass {
-    GraphicsPipeline graphics_pipeline;
-    ResourceComponent resources;
+    GraphicsPipeline graphics_pipeline_;
+    ResourceComponent resources_;
 
   public:
     MeshletDirectionalDepthPass(const std::shared_ptr<BufferInstance>& camera_buffer,
@@ -937,84 +962,57 @@ template <typename ResourceInstanceType> class ResourceCollection {
                                 const std::shared_ptr<BufferInstance>& task_commands,
                                 const std::shared_ptr<BufferInstance>& draws,
                                 const std::shared_ptr<ImageInstance>& shadow_map, IGpu* gpu)
-        : RenderPass("Meshlet Directional Depth Pass"), graphics_pipeline(gpu) {
-      resources.add(camera_buffer, ResourceUsage::READ, {BindingType::DESCRIPTOR, 0, 0});
+        : RenderPass("Meshlet Directional Depth Pass"), graphics_pipeline_(gpu) {
+      resources_
+          .add_binding(camera_buffer, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT
+                           | VK_SHADER_STAGE_FRAGMENT_BIT)
+          .add_binding(light_matrices, ResourceUsage::READ, 1, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_MESH_BIT_EXT)
+          .add_binding(directional_light, ResourceUsage::READ, 1, 1,
+                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT)
+          .add_binding(point_light, ResourceUsage::READ, 1, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_MESH_BIT_EXT)
+          .add_binding(vertex_positions, ResourceUsage::READ, 2, 0,
+                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
+          .add_binding(vertex_data, ResourceUsage::READ, 2, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
+          .add_binding(meshlet, ResourceUsage::READ, 2, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
+          .add_binding(meshlet_vertices, ResourceUsage::READ, 2, 3,
+                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
+          .add_binding(meshlet_indices, ResourceUsage::READ, 2, 4,
+                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
+          .add_binding(task_commands, ResourceUsage::READ, 2, 5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
+          .add_binding(draws, ResourceUsage::READ, 2, 6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
+          .add_attachment(shadow_map, ResourceUsage::WRITE);
 
-      resources.add(light_matrices, ResourceUsage::READ, {BindingType::DESCRIPTOR, 1, 0});
-      resources.add(directional_light, ResourceUsage::READ,
-                             {BindingType::DESCRIPTOR, 1, 1});
-      resources.add(point_light, ResourceUsage::READ, {BindingType::DESCRIPTOR, 1, 2});
-
-      resources.add(vertex_positions, ResourceUsage::READ,
-                             {BindingType::DESCRIPTOR, 2, 0});
-      resources.add(vertex_data, ResourceUsage::READ, {BindingType::DESCRIPTOR, 2, 1});
-      resources.add(meshlet, ResourceUsage::READ, {BindingType::DESCRIPTOR, 2, 2});
-      resources.add(meshlet_vertices, ResourceUsage::READ,
-                             {BindingType::DESCRIPTOR, 2, 3});
-      resources.add(meshlet_indices, ResourceUsage::READ, {BindingType::DESCRIPTOR, 2, 4});
-      resources.add(task_commands, ResourceUsage::READ,
-                             {BindingType::DEPTH_ATTACHMENT, 2, 5});
-      resources.add(draws, ResourceUsage::READ, {BindingType::DEPTH_ATTACHMENT, 2, 6});
-      resources.add(shadow_map, ResourceUsage::WRITE, {BindingType::DEPTH_ATTACHMENT});
-    }
-
-    std::vector<std::shared_ptr<ResourceInstance>> get_resources(
-        const ResourceUsage usage) override {
-      return resources.get_resources(usage);
-    }
-
-    void compile() override {
       GraphicsPipelineBuilder pipeline_builder{};
       pipeline_builder.set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
           .set_polygon_mode(VK_POLYGON_MODE_FILL)
           .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
           .set_multisampling_none()
           .disable_blending()
-          .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL);
+          .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
+          .set_depth_format(resources_.get_depth_attachment()->get()->image_template.format);
 
-      for (const auto& image : resources.get_image_resources(ResourceUsage::WRITE)) {
-        if (image->image_template.type == TextureType::kDepth) {
-          pipeline_builder.set_depth_format(image->image_template.format);
-        }
-      }
-
-      graphics_pipeline
-          .add_descriptor_set_layout(
-              DescriptorLayoutBuilder()
-                  .set(0, DescriptorSetLayoutBuilder()
-                              .binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT
-                                           | VK_SHADER_STAGE_FRAGMENT_BIT)
-                              .get())
-                  .set(1, DescriptorSetLayoutBuilder()
-                              .binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                       VK_SHADER_STAGE_MESH_BIT_EXT)
-                              .binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                       VK_SHADER_STAGE_MESH_BIT_EXT)
-                              .binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                       VK_SHADER_STAGE_MESH_BIT_EXT)
-                              .get())
-                  .set(2, DescriptorSetLayoutBuilder()
-                              .binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
-                              .binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
-                              .binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
-                              .binding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
-                              .binding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
-                              .binding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
-                              .binding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
-                              .get())
-                  .get())
+      graphics_pipeline_
+          .add_descriptor_set_layout(resources_.get_image_bindings(),
+                                     resources_.get_buffer_bindings())
           .set_mesh_task_shading("geometry_depth.task.spv", "geometry_depth.mesh.spv",
                                  "geometry_depth.frag.spv")
-          .add_pipeline_layout(get_name(), resources.get_push_constant_range())
+          .add_pipeline_layout(get_name(), resources_.get_push_constant_range())
           .create_graphics_pipeline(pipeline_builder.build_pipeline_info(), get_name());
+    }
+
+    std::vector<std::shared_ptr<ResourceInstance>> get_resources(
+        const ResourceUsage usage) override {
+      return resources_.get_resources(usage);
     }
 
     void execute(CommandBuffer cmd) override {
@@ -1023,34 +1021,31 @@ template <typename ResourceInstanceType> class ResourceCollection {
   };
 
   class GeometryPass : public RenderPass {
-    GraphicsPipeline graphics_pipeline;
-    ResourceComponent resources;
+    GraphicsPipeline graphics_pipeline_;
+    ResourceComponent resources_;
 
   public:
-    std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
-      return resources.get_resources(usage);
-    }
-
     GeometryPass(const std::shared_ptr<ImageInstance>& g_buffer_1,
                  const std::shared_ptr<ImageInstance>& g_buffer_2,
                  const std::shared_ptr<ImageInstance>& g_buffer_3,
                  const std::shared_ptr<ImageInstance>& g_buffer_depth,
                  const std::shared_ptr<BufferInstance>& geometry_buffer, IGpu* gpu)
-        : RenderPass("Geometry Pass"), graphics_pipeline(gpu) {
-      resources.add(geometry_buffer, ResourceUsage::READ,
-                                      {BindingType::DESCRIPTOR, 0, 0});
-      resources.add(g_buffer_1, ResourceUsage::WRITE,
-                                      {BindingType::DESCRIPTOR, 0, 0});
-      resources.add(g_buffer_2, ResourceUsage::WRITE,
-                                      {BindingType::DESCRIPTOR, 0, 0});
-      resources.add(g_buffer_3, ResourceUsage::WRITE,
-                                      {BindingType::DESCRIPTOR, 0, 0});
-      resources.add(g_buffer_depth, ResourceUsage::WRITE,
-                                      {BindingType::DESCRIPTOR, 0, 0});
+        : RenderPass("Geometry Pass"), graphics_pipeline_(gpu) {
+      resources_
+          .add_binding(geometry_buffer, ResourceUsage::READ, 0, 0,
+                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+          .add_binding(g_buffer_1, ResourceUsage::WRITE, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_COMPUTE_BIT)
+          .add_binding(g_buffer_2, ResourceUsage::WRITE, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_COMPUTE_BIT)
+          .add_binding(g_buffer_3, ResourceUsage::WRITE, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_COMPUTE_BIT)
+          .add_binding(g_buffer_depth, ResourceUsage::WRITE, 0, 0,
+                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
     }
 
-    void compile() override {
-      // Specific pipeline layout and pipeline creation for graphics
+    std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
+      return resources_.get_resources(usage);
     }
 
     void execute(CommandBuffer cmd) override {
@@ -1059,8 +1054,8 @@ template <typename ResourceInstanceType> class ResourceCollection {
   };
 
   class LightingPass : public RenderPass {
-    ComputePipeline compute_pipeline;
-    ResourceComponent resources;
+    ComputePipeline compute_pipeline_;
+    ResourceComponent resources_;
 
   public:
     LightingPass(const std::shared_ptr<ImageInstance>& scene_lit,
@@ -1071,24 +1066,28 @@ template <typename ResourceInstanceType> class ResourceCollection {
                  const std::shared_ptr<ImageInstance>& shadow_map,
                  const std::shared_ptr<BufferInstance>& material_buffer,
                  const std::shared_ptr<BufferInstance>& light_buffer, IGpu* gpu)
-        : RenderPass("Lighting Pass"), compute_pipeline(gpu) {
-      resources.add(scene_lit, ResourceUsage::WRITE, {});
-      resources.add(g_buffer_1, ResourceUsage::READ,
-                                      {});
-      resources.add(g_buffer_2, ResourceUsage::READ, {});
-      resources.add(g_buffer_3, ResourceUsage::READ, {});
-      resources.add(g_buffer_depth, ResourceUsage::READ, {});
-      resources.add(shadow_map, ResourceUsage::READ, {});
-      resources.add(material_buffer, ResourceUsage::READ, {});
-      resources.add(light_buffer, ResourceUsage::READ, {});
+        : RenderPass("Lighting Pass"), compute_pipeline_(gpu) {
+      resources_
+          .add_binding(scene_lit, ResourceUsage::WRITE, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_COMPUTE_BIT)
+          .add_binding(g_buffer_1, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_COMPUTE_BIT)
+          .add_binding(g_buffer_2, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_COMPUTE_BIT)
+          .add_binding(g_buffer_3, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_COMPUTE_BIT)
+          .add_binding(g_buffer_depth, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_COMPUTE_BIT)
+          .add_binding(shadow_map, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_COMPUTE_BIT)
+          .add_binding(material_buffer, ResourceUsage::READ, 0, 0,
+                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+          .add_binding(light_buffer, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_COMPUTE_BIT);
     }
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
-      return resources.get_resources(usage);
-    }
-
-    void compile() override {
-      // Specific pipeline layout and pipeline creation for compute
+      return resources_.get_resources(usage);
     }
 
     void execute(CommandBuffer cmd) override {
@@ -1097,27 +1096,28 @@ template <typename ResourceInstanceType> class ResourceCollection {
   };
 
   class SsaoPass : public RenderPass {
-    ComputePipeline compute_pipeline;
-    ResourceComponent resources;
+    ComputePipeline compute_pipeline_;
+    ResourceComponent resources_;
 
   public:
     SsaoPass(const std::shared_ptr<ImageInstance>& g_buffer_depth,
              const std::shared_ptr<ImageInstance>& g_buffer_2,
              const std::shared_ptr<ImageInstance>& rotation_texture,
              const std::shared_ptr<ImageInstance>& occlusion, IGpu* gpu)
-        : RenderPass("Ssao Pass"), compute_pipeline(gpu) {
-      resources.add(g_buffer_depth, ResourceUsage::READ, {});
-      resources.add(g_buffer_2, ResourceUsage::READ, {});
-      resources.add(rotation_texture, ResourceUsage::READ, {});
-      resources.add(occlusion, ResourceUsage::WRITE, {});
+        : RenderPass("Ssao Pass"), compute_pipeline_(gpu) {
+      resources_
+          .add_binding(g_buffer_depth, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_COMPUTE_BIT)
+          .add_binding(g_buffer_2, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_COMPUTE_BIT)
+          .add_binding(rotation_texture, ResourceUsage::READ, 0, 0,
+                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+          .add_binding(occlusion, ResourceUsage::WRITE, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_COMPUTE_BIT);
     }
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
-      return resources.get_resources(usage);
-    }
-
-    void compile() override {
-      // Specific pipeline layout and pipeline creation for compute
+      return resources_.get_resources(usage);
     }
 
     void execute(CommandBuffer cmd) override {
@@ -1126,23 +1126,22 @@ template <typename ResourceInstanceType> class ResourceCollection {
   };
 
   class ToneMapPass : public RenderPass {
-    ComputePipeline compute_pipeline;
-    ResourceComponent resources;
+    ComputePipeline compute_pipeline_;
+    ResourceComponent resources_;
 
   public:
     ToneMapPass(const std::shared_ptr<ImageInstance>& scene_final,
                 const std::shared_ptr<ImageInstance>& scene_lit, IGpu* gpu)
-        : RenderPass("Tone Map Pass"), compute_pipeline(gpu) {
-      resources.add(scene_lit, ResourceUsage::READ, {});
-      resources.add(scene_final, ResourceUsage::WRITE, {});
+        : RenderPass("Tone Map Pass"), compute_pipeline_(gpu) {
+      resources_
+          .add_binding(scene_lit, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_COMPUTE_BIT)
+          .add_binding(scene_final, ResourceUsage::WRITE, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                       VK_SHADER_STAGE_COMPUTE_BIT);
     }
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
-      return resources.get_resources(usage);
-    }
-
-    void compile() override {
-      // Specific pipeline layout and pipeline creation for compute
+      return resources_.get_resources(usage);
     }
 
     void execute(CommandBuffer cmd) override {
