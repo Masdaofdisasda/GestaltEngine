@@ -34,7 +34,7 @@ namespace gestalt::graphics::fg {
 
   void FrameGraph::print_graph() const {
     for (const auto& node : nodes_) {
-      fmt::println(" - Render Pass: {}", node->render_pass->name);
+      fmt::println(" - Render Pass: {}", node->render_pass->get_name());
       fmt::println("   |-needs:");
       for (const auto& edge : node->edges_in) {
         fmt::println("   |---->{}", edge->resource->name());
@@ -86,7 +86,7 @@ namespace gestalt::graphics::fg {
 
     fmt::print("Sorted Nodes:\n");
     for (const auto& node : sorted_nodes_) {
-      fmt::println("{}", node->render_pass->name);
+      fmt::println("{}", node->render_pass->get_name());
     }
   }
 
@@ -103,7 +103,7 @@ namespace gestalt::graphics::fg {
 
   void FrameGraph::compile() {
     for (auto& node : nodes_) {
-      fmt::println("Compiling Render Pass: {}", node->render_pass->name);
+      fmt::println("Compiling Render Pass: {}", node->render_pass->get_name());
       for (const auto& read_resource : node->render_pass->get_resources(ResourceUsage::READ)) {
         auto& edge = edges_.at(read_resource->resource_handle);
         edge->nodes_to.push_back(node);

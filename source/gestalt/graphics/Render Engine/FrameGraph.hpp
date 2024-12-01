@@ -796,15 +796,19 @@ template <typename ResourceInstanceType> class ResourceCollection {
   };
 
 
-  struct RenderPass {
+  class RenderPass {
+    std::string name_;
+  protected:
+    explicit RenderPass(std::string name) : name_(std::move(name)) {}
+  public:
+    [[nodiscard]] std::string_view get_name() const { return name_; }
     virtual void compile() = 0;
     virtual std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) = 0;
     virtual void execute(CommandBuffer cmd) = 0;
     virtual ~RenderPass() = default;
-    std::string name;
   };
 
-  struct DrawCullDirectionalDepthPass : RenderPass {
+  class DrawCullDirectionalDepthPass : public RenderPass {
     // TODO
     struct alignas(16) DrawCullDepthConstants {
       int32 draw_count;
@@ -812,12 +816,13 @@ template <typename ResourceInstanceType> class ResourceCollection {
     ComputePipeline compute_pipeline;
     ResourceComponent resources;
 
+  public:
     DrawCullDirectionalDepthPass(const std::shared_ptr<BufferInstance>& camera_buffer,
                                  const std::shared_ptr<BufferInstance>& task_commands,
                                  const std::shared_ptr<BufferInstance>& draws,
                                  const std::shared_ptr<BufferInstance>& command_count,
                                  IGpu* gpu)
-        : compute_pipeline(gpu) {
+        : RenderPass("Draw Cull Directional Depth Pass"), compute_pipeline(gpu) {
       resources.add(camera_buffer, ResourceUsage::READ, {BindingType::DESCRIPTOR, 0, 0});
       resources.add(draws, ResourceUsage::READ, {BindingType::DESCRIPTOR, 1, 6});
       resources.add(task_commands, ResourceUsage::WRITE,
@@ -826,7 +831,6 @@ template <typename ResourceInstanceType> class ResourceCollection {
                                       {BindingType::DESCRIPTOR, 1, 7});
       resources.add_push_constant(sizeof(DrawCullDepthConstants),
                                            VK_SHADER_STAGE_COMPUTE_BIT);
-      name = "Draw Cull Directional Depth Pass";
     }
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(
@@ -851,8 +855,8 @@ template <typename ResourceInstanceType> class ResourceCollection {
                                                      .get())
                                          .get())
           .add_compute_shader("draw_cull_depth.comp.spv")
-          .add_pipeline_layout(name, resources.get_push_constant_range())
-          .create_compute_pipeline(name);
+          .add_pipeline_layout(get_name(), resources.get_push_constant_range())
+          .create_compute_pipeline(get_name());
     }
 
     void execute(CommandBuffer cmd) override {
@@ -875,21 +879,21 @@ template <typename ResourceInstanceType> class ResourceCollection {
     }
   };
 
-  struct TaskSubmitDirectionalDepthPass : RenderPass {
+  class TaskSubmitDirectionalDepthPass : public RenderPass {
     ComputePipeline compute_pipeline;
     ResourceComponent resources;
 
+  public:
     TaskSubmitDirectionalDepthPass(const std::shared_ptr<BufferInstance>& task_commands,
                                    const std::shared_ptr<BufferInstance>& command_count,
                                    IGpu* gpu)
-        : compute_pipeline(gpu) {
+        : RenderPass("Task Submit Directional Depth Pass"), compute_pipeline(gpu) {
       resources.add(task_commands, ResourceUsage::READ,
                                       {BindingType::DESCRIPTOR, 0, 5});
       resources.add(task_commands, ResourceUsage::WRITE,
                                       {BindingType::DESCRIPTOR, 0, 5});
       resources.add(command_count, ResourceUsage::WRITE,
                                       {BindingType::DESCRIPTOR, 0, 7});
-      name = "Task Submit Directional Depth Pass";
     }
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
@@ -907,18 +911,20 @@ template <typename ResourceInstanceType> class ResourceCollection {
                                                      .get())
                                          .get())
           .add_compute_shader("task_submit.comp.spv")
-          .add_pipeline_layout(name, resources.get_push_constant_range())
-          .create_compute_pipeline(name);
+          .add_pipeline_layout(get_name(), resources.get_push_constant_range())
+          .create_compute_pipeline(get_name());
     }
 
     void execute(CommandBuffer cmd) override {
       // draw
     }
   };
-  struct MeshletDirectionalDepthPass : RenderPass {
+
+  class MeshletDirectionalDepthPass : public RenderPass {
     GraphicsPipeline graphics_pipeline;
     ResourceComponent resources;
 
+  public:
     MeshletDirectionalDepthPass(const std::shared_ptr<BufferInstance>& camera_buffer,
                                 const std::shared_ptr<BufferInstance>& light_matrices,
                                 const std::shared_ptr<BufferInstance>& directional_light,
@@ -931,7 +937,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
                                 const std::shared_ptr<BufferInstance>& task_commands,
                                 const std::shared_ptr<BufferInstance>& draws,
                                 const std::shared_ptr<ImageInstance>& shadow_map, IGpu* gpu)
-        : graphics_pipeline(gpu) {
+        : RenderPass("Meshlet Directional Depth Pass"), graphics_pipeline(gpu) {
       resources.add(camera_buffer, ResourceUsage::READ, {BindingType::DESCRIPTOR, 0, 0});
 
       resources.add(light_matrices, ResourceUsage::READ, {BindingType::DESCRIPTOR, 1, 0});
@@ -950,7 +956,6 @@ template <typename ResourceInstanceType> class ResourceCollection {
                              {BindingType::DEPTH_ATTACHMENT, 2, 5});
       resources.add(draws, ResourceUsage::READ, {BindingType::DEPTH_ATTACHMENT, 2, 6});
       resources.add(shadow_map, ResourceUsage::WRITE, {BindingType::DEPTH_ATTACHMENT});
-      name = "Meshlet Directional Depth Pass";
     }
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(
@@ -1008,8 +1013,8 @@ template <typename ResourceInstanceType> class ResourceCollection {
                   .get())
           .set_mesh_task_shading("geometry_depth.task.spv", "geometry_depth.mesh.spv",
                                  "geometry_depth.frag.spv")
-          .add_pipeline_layout(name, resources.get_push_constant_range())
-          .create_graphics_pipeline(pipeline_builder.build_pipeline_info(), name);
+          .add_pipeline_layout(get_name(), resources.get_push_constant_range())
+          .create_graphics_pipeline(pipeline_builder.build_pipeline_info(), get_name());
     }
 
     void execute(CommandBuffer cmd) override {
@@ -1017,10 +1022,11 @@ template <typename ResourceInstanceType> class ResourceCollection {
     }
   };
 
-  struct GeometryPass : RenderPass {
+  class GeometryPass : public RenderPass {
     GraphicsPipeline graphics_pipeline;
     ResourceComponent resources;
 
+  public:
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
       return resources.get_resources(usage);
     }
@@ -1030,7 +1036,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
                  const std::shared_ptr<ImageInstance>& g_buffer_3,
                  const std::shared_ptr<ImageInstance>& g_buffer_depth,
                  const std::shared_ptr<BufferInstance>& geometry_buffer, IGpu* gpu)
-        : graphics_pipeline(gpu) {
+        : RenderPass("Geometry Pass"), graphics_pipeline(gpu) {
       resources.add(geometry_buffer, ResourceUsage::READ,
                                       {BindingType::DESCRIPTOR, 0, 0});
       resources.add(g_buffer_1, ResourceUsage::WRITE,
@@ -1041,7 +1047,6 @@ template <typename ResourceInstanceType> class ResourceCollection {
                                       {BindingType::DESCRIPTOR, 0, 0});
       resources.add(g_buffer_depth, ResourceUsage::WRITE,
                                       {BindingType::DESCRIPTOR, 0, 0});
-      name = "Geometry Pass";
     }
 
     void compile() override {
@@ -1053,10 +1058,11 @@ template <typename ResourceInstanceType> class ResourceCollection {
     }
   };
 
-  struct LightingPass : RenderPass {
+  class LightingPass : public RenderPass {
     ComputePipeline compute_pipeline;
     ResourceComponent resources;
 
+  public:
     LightingPass(const std::shared_ptr<ImageInstance>& scene_lit,
                  const std::shared_ptr<ImageInstance>& g_buffer_1,
                  const std::shared_ptr<ImageInstance>& g_buffer_2,
@@ -1065,7 +1071,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
                  const std::shared_ptr<ImageInstance>& shadow_map,
                  const std::shared_ptr<BufferInstance>& material_buffer,
                  const std::shared_ptr<BufferInstance>& light_buffer, IGpu* gpu)
-        : compute_pipeline(gpu) {
+        : RenderPass("Lighting Pass"), compute_pipeline(gpu) {
       resources.add(scene_lit, ResourceUsage::WRITE, {});
       resources.add(g_buffer_1, ResourceUsage::READ,
                                       {});
@@ -1075,7 +1081,6 @@ template <typename ResourceInstanceType> class ResourceCollection {
       resources.add(shadow_map, ResourceUsage::READ, {});
       resources.add(material_buffer, ResourceUsage::READ, {});
       resources.add(light_buffer, ResourceUsage::READ, {});
-      name = "Lighting Pass";
     }
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
@@ -1091,20 +1096,20 @@ template <typename ResourceInstanceType> class ResourceCollection {
     }
   };
 
-  struct SsaoPass : RenderPass {
+  class SsaoPass : public RenderPass {
     ComputePipeline compute_pipeline;
     ResourceComponent resources;
 
+  public:
     SsaoPass(const std::shared_ptr<ImageInstance>& g_buffer_depth,
              const std::shared_ptr<ImageInstance>& g_buffer_2,
              const std::shared_ptr<ImageInstance>& rotation_texture,
              const std::shared_ptr<ImageInstance>& occlusion, IGpu* gpu)
-        : compute_pipeline(gpu) {
+        : RenderPass("Ssao Pass"), compute_pipeline(gpu) {
       resources.add(g_buffer_depth, ResourceUsage::READ, {});
       resources.add(g_buffer_2, ResourceUsage::READ, {});
       resources.add(rotation_texture, ResourceUsage::READ, {});
       resources.add(occlusion, ResourceUsage::WRITE, {});
-      name = "Ssao Pass";
     }
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
@@ -1120,16 +1125,16 @@ template <typename ResourceInstanceType> class ResourceCollection {
     }
   };
 
-  struct ToneMapPass : RenderPass {
+  class ToneMapPass : public RenderPass {
     ComputePipeline compute_pipeline;
     ResourceComponent resources;
 
+  public:
     ToneMapPass(const std::shared_ptr<ImageInstance>& scene_final,
                 const std::shared_ptr<ImageInstance>& scene_lit, IGpu* gpu)
-        : compute_pipeline(gpu) {
+        : RenderPass("Tone Map Pass"), compute_pipeline(gpu) {
       resources.add(scene_lit, ResourceUsage::READ, {});
       resources.add(scene_final, ResourceUsage::WRITE, {});
-      name = "Tone Map Pass";
     }
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
