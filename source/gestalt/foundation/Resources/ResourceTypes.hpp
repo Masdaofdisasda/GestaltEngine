@@ -104,9 +104,10 @@ namespace gestalt::foundation {
   //TODO split into template and instance
   struct ResourceInstance {
     uint64 resource_handle = -1; // todo refactor to return instance handles
-    ResourceTemplate resource_template;
-    explicit ResourceInstance(ResourceTemplate&& resource_template) : resource_template(std::move(resource_template)) {}
-    [[nodiscard]] std::string_view name() const { return resource_template.name; }
+    std::string resource_name;
+    explicit ResourceInstance(std::string resource_name) : resource_name(std::move(resource_name)) {}
+    [[nodiscard]] std::string_view name() const {
+      return resource_name; }
   };
 
   struct AllocatedImage {
@@ -118,8 +119,12 @@ namespace gestalt::foundation {
   struct ImageInstance : ResourceInstance {
     ImageInstance(ImageTemplate&& image_template, const AllocatedImage& allocated_image,
                   const VkExtent3D extent)
-        : ResourceInstance(std::move(image_template)), allocated_image(allocated_image), extent(extent) {}
+        : ResourceInstance(image_template.name),
+          image_template(std::move(image_template)),
+          allocated_image(allocated_image),
+          extent(extent) {}
 
+    ImageTemplate image_template;
     AllocatedImage allocated_image;
     VkExtent3D extent;
     VkImageLayout current_layout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -135,8 +140,9 @@ namespace gestalt::foundation {
   struct BufferInstance : ResourceInstance {
     BufferInstance(BufferTemplate&& buffer_template,
                    const AllocatedBuffer& allocated_buffer)
-        : ResourceInstance(std::move(buffer_template)), allocated_buffer(allocated_buffer) {}
+        : ResourceInstance(buffer_template.name), buffer_template(std::move(buffer_template)), allocated_buffer(allocated_buffer) {}
 
+    BufferTemplate buffer_template;
     AllocatedBuffer allocated_buffer; 
     VkAccessFlags2 current_access = 0;        // Current access flags
     VkPipelineStageFlags2 current_stage = 0;  // Current pipeline stage

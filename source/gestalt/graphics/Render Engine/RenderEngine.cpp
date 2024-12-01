@@ -91,6 +91,7 @@ namespace gestalt::graphics {
           = frame_graph_->add_resource(repository->mesh_buffers->mesh_draw_buffer_instance);
       auto draw_count_buffer
           = frame_graph_->add_resource(repository->mesh_buffers->draw_count_buffer_instance);
+
       // Material
       auto material_buffer
           = frame_graph_->add_resource(repository->material_buffers->material_buffer);
@@ -104,32 +105,29 @@ namespace gestalt::graphics {
           = frame_graph_->add_resource(repository->light_buffers->view_proj_matrices_instance);
 
       // Shader Passes
-      auto draw_cull_directional_depth_pass = std::make_shared<fg::DrawCullDirectionalDepthPass>(
+      frame_graph_->add_pass<fg::DrawCullDirectionalDepthPass>(
           camera_buffer, meshlet_task_commands_buffer, mesh_draw_buffer, draw_count_buffer, gpu_);
-      auto task_submit_directional_depth_pass
-          = std::make_shared<fg::TaskSubmitDirectionalDepthPass>(meshlet_task_commands_buffer,
+
+      frame_graph_->add_pass<fg::TaskSubmitDirectionalDepthPass>(meshlet_task_commands_buffer,
                                                                  draw_count_buffer, gpu_);
-      auto meshlet_directional_depth_pass = std::make_shared<fg::MeshletDirectionalDepthPass>(
+
+      frame_graph_->add_pass<fg::MeshletDirectionalDepthPass>(
           camera_buffer, light_matrices, directional_light, point_light, vertex_position_buffer,
           vertex_data_buffer, meshlet_buffer, meshlet_vertices, meshlet_triangles,
           meshlet_task_commands_buffer, mesh_draw_buffer, shadow_map, gpu_);
 
-      auto geometry_pass = std::make_shared<fg::GeometryPass>(
-          g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth, vertex_position_buffer, gpu_);
-      auto lighting_pass = std::make_shared<fg::LightingPass>(
-          scene_lit, g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth, shadow_map,
-          material_buffer, directional_light, gpu_);
-      auto tone_map_pass = std::make_shared<fg::ToneMapPass>(scene_final, scene_lit, gpu_);
-      auto ssao_pass = std::make_shared<fg::SsaoPass>(scene_lit, g_buffer_depth, rotation_texture,
-                                                      occlusion_texture, gpu_);
+      frame_graph_->add_pass<fg::GeometryPass>(g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth,
+                                               vertex_position_buffer, gpu_);
 
-      frame_graph_->add_render_pass(std::move(draw_cull_directional_depth_pass));
-      frame_graph_->add_render_pass(std::move(task_submit_directional_depth_pass));
-      frame_graph_->add_render_pass(std::move(meshlet_directional_depth_pass));
-      frame_graph_->add_render_pass(std::move(geometry_pass));
-      frame_graph_->add_render_pass(std::move(lighting_pass));
-      frame_graph_->add_render_pass(std::move(tone_map_pass));
-      frame_graph_->add_render_pass(std::move(ssao_pass));
+      frame_graph_->add_pass<fg::LightingPass>(scene_lit, g_buffer_1, g_buffer_2, g_buffer_3,
+                                               g_buffer_depth, shadow_map, material_buffer,
+                                               directional_light, gpu_);
+
+      frame_graph_->add_pass<fg::ToneMapPass>(scene_final, scene_lit, gpu_);
+
+      frame_graph_->add_pass<fg::SsaoPass>(scene_lit, g_buffer_depth, rotation_texture,
+                                           occlusion_texture, gpu_);
+
 
       frame_graph_->compile();
     }
@@ -363,8 +361,7 @@ namespace gestalt::graphics {
     }
 
       // TODO
-    const VkCommandBuffer command_buffer = nullptr;
-    const fg::CommandBuffer cmd_buffer{command_buffer};
+    const fg::CommandBuffer cmd_buffer{cmd};
     frame_graph_->execute(cmd_buffer);
 
     const auto color_image = resource_registry_->resources_.final_color.image;

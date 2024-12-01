@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include <array>
+#include <bitset>
 #include <memory>
 #include <ranges>
 #include <unordered_map>
@@ -275,6 +276,9 @@ namespace gestalt::graphics::fg {
       gpu_->set_debug_name(pipeline_name, VK_OBJECT_TYPE_PIPELINE_LAYOUT,
                            reinterpret_cast<uint64_t>(pipeline_layout_));
     }
+
+    VkPipelineLayout get_pipeline_layout() const { return pipeline_layout_; }
+    VkPipeline get_pipeline() const { return pipeline_; }
   };
 
     class GraphicsPipelineBuilder {
@@ -587,6 +591,10 @@ namespace gestalt::graphics::fg {
       util_.create_graphics_pipeline(pipeline_create_info, shader_types_, pipeline_name);
     }
 
+    VkPipelineLayout get_pipeline_layout() const { return util_.get_pipeline_layout(); }
+
+     VkPipeline get_pipeline() const { return util_.get_pipeline(); }
+
   };
 
   class ComputePipeline {
@@ -624,10 +632,10 @@ namespace gestalt::graphics::fg {
       guard_.in_pipeline_stage();
       util_.create_compute_pipeline(pipeline_name);
     }
-  };
 
-  struct Resources {
-    std::vector<std::shared_ptr<ResourceInstance>> resources;
+    VkPipelineLayout get_pipeline_layout() const { return util_.get_pipeline_layout(); }
+
+    VkPipeline get_pipeline() const { return util_.get_pipeline(); }
   };
 
   enum class BindingType {
@@ -646,28 +654,131 @@ namespace gestalt::graphics::fg {
   };
 
 
-  enum class ResourceUsage { READ, WRITE };
+  enum class ResourceUsage {
+    READ, WRITE,
+    COUNT  // To represent the total number of usage types
+    };
 
-  class ResourceComponent {
+  
+template <typename ResourceInstanceType> class ResourceCollection {
+    struct ResourceMetadata {
+      std::bitset<static_cast<size_t>(ResourceUsage::COUNT)> usage_mask;  // Bitset for usage types
+      ResourceBinding binding;
+    };
+
+    std::unordered_map<std::shared_ptr<ResourceInstanceType>, ResourceMetadata> resources_;
+
   public:
-    void add_resource(const std::shared_ptr<ResourceInstance>& resource, const ResourceUsage usage,
+    // Add or update a resource with a specific usage
+    void add_resource(const std::shared_ptr<ResourceInstanceType>& resource, ResourceUsage usage,
                       const ResourceBinding& binding) {
-      resources_[resource] = {usage, binding};
+      assert(resource && "Resource cannot be null!");
+      auto& metadata = resources_[resource];
+      metadata.usage_mask.set(static_cast<size_t>(usage));  // Set the usage bit
+      metadata.binding = binding;
     }
 
-    std::vector<std::shared_ptr<ResourceInstance>> get_resources(const ResourceUsage usage) const {
-      std::vector<std::shared_ptr<ResourceInstance>> result;
+    // Get resources by a specific usage
+    std::vector<std::shared_ptr<ResourceInstanceType>> get_resources(ResourceUsage usage) const {
+      std::vector<std::shared_ptr<ResourceInstanceType>> result;
       for (const auto& [resource, metadata] : resources_) {
-        if (metadata.usage == usage) {
+        if (metadata.usage_mask.test(static_cast<size_t>(usage))) {  // Check usage bit
           result.push_back(resource);
         }
       }
       return result;
     }
 
-    const ResourceBinding* get_binding(const std::shared_ptr<ResourceInstance>& resource) const {
+    const ResourceBinding* get_binding(
+        const std::shared_ptr<ResourceInstanceType>& resource) const {
       auto it = resources_.find(resource);
       return (it != resources_.end()) ? &it->second.binding : nullptr;
+    }
+
+  std::shared_ptr<ResourceInstanceType> get_resource_for_binding(
+        const ResourceBinding& binding) const {
+      for (const auto& [resource, metadata] : resources_) {
+        if (metadata.binding.setIndex == binding.setIndex
+            && metadata.binding.bindingIndex == binding.bindingIndex) {
+          return resource;
+        }
+      }
+      return nullptr;
+    }
+
+    bool has_usage(const std::shared_ptr<ResourceInstanceType>& resource,
+                   ResourceUsage usage) const {
+      auto it = resources_.find(resource);
+      return (it != resources_.end()) && it->second.usage_mask.test(static_cast<size_t>(usage));
+    }
+
+    std::bitset<static_cast<size_t>(ResourceUsage::COUNT)> get_usage_mask(
+        const std::shared_ptr<ResourceInstanceType>& resource) const {
+      return resources_.at(resource).usage_mask;
+    }
+  };
+
+  class ResourceComponent {
+  public:
+    void add(const std::shared_ptr<ImageInstance>& image, ResourceUsage usage,
+                      const ResourceBinding& binding) {
+      images_.add_resource(image, usage, binding);
+    }
+
+    void add(const std::shared_ptr<BufferInstance>& buffer, ResourceUsage usage,
+                      const ResourceBinding& binding) {
+      buffers_.add_resource(buffer, usage, binding);
+    }
+
+    // Get resources of all types based on usage
+    [[nodiscard]] std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) const {
+      std::vector<std::shared_ptr<ResourceInstance>> result;
+
+      auto image_resources = images_.get_resources(usage);
+      auto buffer_resources = buffers_.get_resources(usage);
+
+      // Append images and buffers to the result
+      result.insert(result.end(), image_resources.begin(), image_resources.end());
+      result.insert(result.end(), buffer_resources.begin(), buffer_resources.end());
+
+      return result;
+    }
+
+    // Get image resources only
+    [[nodiscard]] std::vector<std::shared_ptr<ImageInstance>> get_image_resources(ResourceUsage usage) const {
+      return images_.get_resources(usage);
+    }
+
+    // Get buffer resources only
+    [[nodiscard]] std::vector<std::shared_ptr<BufferInstance>> get_buffer_resources(ResourceUsage usage) const {
+      return buffers_.get_resources(usage);
+    }
+
+    [[nodiscard]] const ResourceBinding* get_binding_type(const std::shared_ptr<ImageInstance>& image) const {
+      return images_.get_binding(image);
+    }
+
+    [[nodiscard]] const ResourceBinding* get_binding_type(const std::shared_ptr<BufferInstance>& buffer) const {
+      return buffers_.get_binding(buffer);
+    }
+
+        [[nodiscard]] std::shared_ptr<ImageInstance> get_image_for_binding(
+        const ResourceBinding& binding) const {
+      return images_.get_resource_for_binding(binding);
+    }
+
+    [[nodiscard]] std::shared_ptr<BufferInstance> get_buffer_for_binding(const ResourceBinding& binding) const {
+      return buffers_.get_resource_for_binding(binding);
+    }
+
+    [[nodiscard]] bool has_usage(const std::shared_ptr<ImageInstance>& image,
+                                 ResourceUsage usage) const {
+        return images_.has_usage(image, usage);
+    }
+
+        [[nodiscard]] bool has_usage(const std::shared_ptr<BufferInstance>& buffer,
+                                 ResourceUsage usage) const {
+      return buffers_.has_usage(buffer, usage);
     }
 
     void add_push_constant(uint32_t size, VkShaderStageFlags stage_flags) {
@@ -679,14 +790,11 @@ namespace gestalt::graphics::fg {
     }
 
   private:
-    struct ResourceMetadata {
-      ResourceUsage usage;
-      ResourceBinding binding;
-    };
-
-    std::unordered_map<std::shared_ptr<ResourceInstance>, ResourceMetadata> resources_;
+    ResourceCollection<ImageInstance> images_;
+    ResourceCollection<BufferInstance> buffers_;
     PushDescriptor push_descriptor_;
   };
+
 
   struct RenderPass {
     virtual void compile() = 0;
@@ -702,7 +810,7 @@ namespace gestalt::graphics::fg {
       int32 draw_count;
     };
     ComputePipeline compute_pipeline;
-    ResourceComponent resource_component;
+    ResourceComponent resources;
 
     DrawCullDirectionalDepthPass(const std::shared_ptr<BufferInstance>& camera_buffer,
                                  const std::shared_ptr<BufferInstance>& task_commands,
@@ -710,20 +818,20 @@ namespace gestalt::graphics::fg {
                                  const std::shared_ptr<BufferInstance>& command_count,
                                  IGpu* gpu)
         : compute_pipeline(gpu) {
-      resource_component.add_resource(camera_buffer, ResourceUsage::READ, {BindingType::DESCRIPTOR, 0, 0});
-      resource_component.add_resource(draws, ResourceUsage::READ, {BindingType::DESCRIPTOR, 1, 6});
-      resource_component.add_resource(task_commands, ResourceUsage::WRITE,
+      resources.add(camera_buffer, ResourceUsage::READ, {BindingType::DESCRIPTOR, 0, 0});
+      resources.add(draws, ResourceUsage::READ, {BindingType::DESCRIPTOR, 1, 6});
+      resources.add(task_commands, ResourceUsage::WRITE,
                                       {BindingType::DESCRIPTOR, 1, 5});
-      resource_component.add_resource(command_count, ResourceUsage::WRITE,
+      resources.add(command_count, ResourceUsage::WRITE,
                                       {BindingType::DESCRIPTOR, 1, 7});
-      resource_component.add_push_constant(sizeof(DrawCullDepthConstants),
+      resources.add_push_constant(sizeof(DrawCullDepthConstants),
                                            VK_SHADER_STAGE_COMPUTE_BIT);
       name = "Draw Cull Directional Depth Pass";
     }
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(
         const ResourceUsage usage) override {
-      return resource_component.get_resources(usage);
+      return resources.get_resources(usage);
     }
 
     void compile() override {
@@ -743,34 +851,49 @@ namespace gestalt::graphics::fg {
                                                      .get())
                                          .get())
           .add_compute_shader("draw_cull_depth.comp.spv")
-          .add_pipeline_layout(name, resource_component.get_push_constant_range())
+          .add_pipeline_layout(name, resources.get_push_constant_range())
           .create_compute_pipeline(name);
     }
 
     void execute(CommandBuffer cmd) override {
-      // draw
+      const auto command_count = resources.get_buffer_for_binding({BindingType::DESCRIPTOR, 1, 7});
+
+      cmd.fill_buffer(command_count->allocated_buffer.buffer_handle, 0,
+                      command_count->allocated_buffer.info.size, 0);
+
+      const int32 maxCommandCount = 123;
+      const uint32 groupCount
+          = (static_cast<uint32>(maxCommandCount) + 63) / 64;  // 64 threads per group
+
+      const DrawCullDepthConstants draw_cull_constants{.draw_count = maxCommandCount};
+
+      cmd.bind_pipeline(VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipeline.get_pipeline());
+
+      cmd.push_constants(compute_pipeline.get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
+                         sizeof(DrawCullDepthConstants), &draw_cull_constants);
+      cmd.dispatch(groupCount, 1, 1);
     }
   };
 
   struct TaskSubmitDirectionalDepthPass : RenderPass {
     ComputePipeline compute_pipeline;
-    ResourceComponent resource_component;
+    ResourceComponent resources;
 
     TaskSubmitDirectionalDepthPass(const std::shared_ptr<BufferInstance>& task_commands,
                                    const std::shared_ptr<BufferInstance>& command_count,
                                    IGpu* gpu)
         : compute_pipeline(gpu) {
-      resource_component.add_resource(task_commands, ResourceUsage::READ,
+      resources.add(task_commands, ResourceUsage::READ,
                                       {BindingType::DESCRIPTOR, 0, 5});
-      resource_component.add_resource(task_commands, ResourceUsage::WRITE,
+      resources.add(task_commands, ResourceUsage::WRITE,
                                       {BindingType::DESCRIPTOR, 0, 5});
-      resource_component.add_resource(command_count, ResourceUsage::WRITE,
+      resources.add(command_count, ResourceUsage::WRITE,
                                       {BindingType::DESCRIPTOR, 0, 7});
       name = "Task Submit Directional Depth Pass";
     }
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
-      return resource_component.get_resources(usage);
+      return resources.get_resources(usage);
     }
 
     void compile() override {
@@ -784,7 +907,7 @@ namespace gestalt::graphics::fg {
                                                      .get())
                                          .get())
           .add_compute_shader("task_submit.comp.spv")
-          .add_pipeline_layout(name, resource_component.get_push_constant_range())
+          .add_pipeline_layout(name, resources.get_push_constant_range())
           .create_compute_pipeline(name);
     }
 
@@ -809,24 +932,24 @@ namespace gestalt::graphics::fg {
                                 const std::shared_ptr<BufferInstance>& draws,
                                 const std::shared_ptr<ImageInstance>& shadow_map, IGpu* gpu)
         : graphics_pipeline(gpu) {
-      resources.add_resource(camera_buffer, ResourceUsage::READ, {BindingType::DESCRIPTOR, 0, 0});
+      resources.add(camera_buffer, ResourceUsage::READ, {BindingType::DESCRIPTOR, 0, 0});
 
-      resources.add_resource(light_matrices, ResourceUsage::READ, {BindingType::DESCRIPTOR, 1, 0});
-      resources.add_resource(directional_light, ResourceUsage::READ,
+      resources.add(light_matrices, ResourceUsage::READ, {BindingType::DESCRIPTOR, 1, 0});
+      resources.add(directional_light, ResourceUsage::READ,
                              {BindingType::DESCRIPTOR, 1, 1});
-      resources.add_resource(point_light, ResourceUsage::READ, {BindingType::DESCRIPTOR, 1, 2});
+      resources.add(point_light, ResourceUsage::READ, {BindingType::DESCRIPTOR, 1, 2});
 
-      resources.add_resource(vertex_positions, ResourceUsage::READ,
+      resources.add(vertex_positions, ResourceUsage::READ,
                              {BindingType::DESCRIPTOR, 2, 0});
-      resources.add_resource(vertex_data, ResourceUsage::READ, {BindingType::DESCRIPTOR, 2, 1});
-      resources.add_resource(meshlet, ResourceUsage::READ, {BindingType::DESCRIPTOR, 2, 2});
-      resources.add_resource(meshlet_vertices, ResourceUsage::READ,
+      resources.add(vertex_data, ResourceUsage::READ, {BindingType::DESCRIPTOR, 2, 1});
+      resources.add(meshlet, ResourceUsage::READ, {BindingType::DESCRIPTOR, 2, 2});
+      resources.add(meshlet_vertices, ResourceUsage::READ,
                              {BindingType::DESCRIPTOR, 2, 3});
-      resources.add_resource(meshlet_indices, ResourceUsage::READ, {BindingType::DESCRIPTOR, 2, 4});
-      resources.add_resource(task_commands, ResourceUsage::READ,
+      resources.add(meshlet_indices, ResourceUsage::READ, {BindingType::DESCRIPTOR, 2, 4});
+      resources.add(task_commands, ResourceUsage::READ,
                              {BindingType::DEPTH_ATTACHMENT, 2, 5});
-      resources.add_resource(draws, ResourceUsage::READ, {BindingType::DEPTH_ATTACHMENT, 2, 6});
-      resources.add_resource(shadow_map, ResourceUsage::WRITE, {BindingType::DEPTH_ATTACHMENT});
+      resources.add(draws, ResourceUsage::READ, {BindingType::DEPTH_ATTACHMENT, 2, 6});
+      resources.add(shadow_map, ResourceUsage::WRITE, {BindingType::DEPTH_ATTACHMENT});
       name = "Meshlet Directional Depth Pass";
     }
 
@@ -836,16 +959,19 @@ namespace gestalt::graphics::fg {
     }
 
     void compile() override {
-      auto write = resources.get_resources(ResourceUsage::WRITE);
-
       GraphicsPipelineBuilder pipeline_builder{};
       pipeline_builder.set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
           .set_polygon_mode(VK_POLYGON_MODE_FILL)
           .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
           .set_multisampling_none()
           .disable_blending()
-          .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-          .set_depth_format(VK_FORMAT_D32_SFLOAT);
+          .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL);
+
+      for (const auto& image : resources.get_image_resources(ResourceUsage::WRITE)) {
+        if (image->image_template.type == TextureType::kDepth) {
+          pipeline_builder.set_depth_format(image->image_template.format);
+        }
+      }
 
       graphics_pipeline
           .add_descriptor_set_layout(
@@ -893,10 +1019,10 @@ namespace gestalt::graphics::fg {
 
   struct GeometryPass : RenderPass {
     GraphicsPipeline graphics_pipeline;
-    ResourceComponent resource_component;
+    ResourceComponent resources;
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
-      return resource_component.get_resources(usage);
+      return resources.get_resources(usage);
     }
 
     GeometryPass(const std::shared_ptr<ImageInstance>& g_buffer_1,
@@ -905,15 +1031,15 @@ namespace gestalt::graphics::fg {
                  const std::shared_ptr<ImageInstance>& g_buffer_depth,
                  const std::shared_ptr<BufferInstance>& geometry_buffer, IGpu* gpu)
         : graphics_pipeline(gpu) {
-      resource_component.add_resource(geometry_buffer, ResourceUsage::READ,
+      resources.add(geometry_buffer, ResourceUsage::READ,
                                       {BindingType::DESCRIPTOR, 0, 0});
-      resource_component.add_resource(g_buffer_1, ResourceUsage::WRITE,
+      resources.add(g_buffer_1, ResourceUsage::WRITE,
                                       {BindingType::DESCRIPTOR, 0, 0});
-      resource_component.add_resource(g_buffer_2, ResourceUsage::WRITE,
+      resources.add(g_buffer_2, ResourceUsage::WRITE,
                                       {BindingType::DESCRIPTOR, 0, 0});
-      resource_component.add_resource(g_buffer_3, ResourceUsage::WRITE,
+      resources.add(g_buffer_3, ResourceUsage::WRITE,
                                       {BindingType::DESCRIPTOR, 0, 0});
-      resource_component.add_resource(g_buffer_depth, ResourceUsage::WRITE,
+      resources.add(g_buffer_depth, ResourceUsage::WRITE,
                                       {BindingType::DESCRIPTOR, 0, 0});
       name = "Geometry Pass";
     }
@@ -929,31 +1055,31 @@ namespace gestalt::graphics::fg {
 
   struct LightingPass : RenderPass {
     ComputePipeline compute_pipeline;
-    ResourceComponent resource_component;
+    ResourceComponent resources;
 
-    LightingPass(const std::shared_ptr<ResourceInstance>& scene_lit,
-                 const std::shared_ptr<ResourceInstance>& g_buffer_1,
-                 const std::shared_ptr<ResourceInstance>& g_buffer_2,
-                 const std::shared_ptr<ResourceInstance>& g_buffer_3,
-                 const std::shared_ptr<ResourceInstance>& g_buffer_depth,
-                 const std::shared_ptr<ResourceInstance>& shadow_map,
-                 const std::shared_ptr<ResourceInstance>& material_buffer,
-                 const std::shared_ptr<ResourceInstance>& light_buffer, IGpu* gpu)
+    LightingPass(const std::shared_ptr<ImageInstance>& scene_lit,
+                 const std::shared_ptr<ImageInstance>& g_buffer_1,
+                 const std::shared_ptr<ImageInstance>& g_buffer_2,
+                 const std::shared_ptr<ImageInstance>& g_buffer_3,
+                 const std::shared_ptr<ImageInstance>& g_buffer_depth,
+                 const std::shared_ptr<ImageInstance>& shadow_map,
+                 const std::shared_ptr<BufferInstance>& material_buffer,
+                 const std::shared_ptr<BufferInstance>& light_buffer, IGpu* gpu)
         : compute_pipeline(gpu) {
-      resource_component.add_resource(scene_lit, ResourceUsage::WRITE, {});
-      resource_component.add_resource(g_buffer_1, ResourceUsage::READ,
+      resources.add(scene_lit, ResourceUsage::WRITE, {});
+      resources.add(g_buffer_1, ResourceUsage::READ,
                                       {});
-      resource_component.add_resource(g_buffer_2, ResourceUsage::READ, {});
-      resource_component.add_resource(g_buffer_3, ResourceUsage::READ, {});
-      resource_component.add_resource(g_buffer_depth, ResourceUsage::READ, {});
-      resource_component.add_resource(shadow_map, ResourceUsage::READ, {});
-      resource_component.add_resource(material_buffer, ResourceUsage::READ, {});
-      resource_component.add_resource(light_buffer, ResourceUsage::READ, {});
+      resources.add(g_buffer_2, ResourceUsage::READ, {});
+      resources.add(g_buffer_3, ResourceUsage::READ, {});
+      resources.add(g_buffer_depth, ResourceUsage::READ, {});
+      resources.add(shadow_map, ResourceUsage::READ, {});
+      resources.add(material_buffer, ResourceUsage::READ, {});
+      resources.add(light_buffer, ResourceUsage::READ, {});
       name = "Lighting Pass";
     }
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
-      return resource_component.get_resources(usage);
+      return resources.get_resources(usage);
     }
 
     void compile() override {
@@ -967,22 +1093,22 @@ namespace gestalt::graphics::fg {
 
   struct SsaoPass : RenderPass {
     ComputePipeline compute_pipeline;
-    ResourceComponent resource_component;
+    ResourceComponent resources;
 
-    SsaoPass(const std::shared_ptr<ResourceInstance>& g_buffer_depth,
-             const std::shared_ptr<ResourceInstance>& g_buffer_2,
-             const std::shared_ptr<ResourceInstance>& rotation_texture,
-             const std::shared_ptr<ResourceInstance>& occlusion, IGpu* gpu)
+    SsaoPass(const std::shared_ptr<ImageInstance>& g_buffer_depth,
+             const std::shared_ptr<ImageInstance>& g_buffer_2,
+             const std::shared_ptr<ImageInstance>& rotation_texture,
+             const std::shared_ptr<ImageInstance>& occlusion, IGpu* gpu)
         : compute_pipeline(gpu) {
-      resource_component.add_resource(g_buffer_depth, ResourceUsage::READ, {});
-      resource_component.add_resource(g_buffer_2, ResourceUsage::READ, {});
-      resource_component.add_resource(rotation_texture, ResourceUsage::READ, {});
-      resource_component.add_resource(occlusion, ResourceUsage::WRITE, {});
+      resources.add(g_buffer_depth, ResourceUsage::READ, {});
+      resources.add(g_buffer_2, ResourceUsage::READ, {});
+      resources.add(rotation_texture, ResourceUsage::READ, {});
+      resources.add(occlusion, ResourceUsage::WRITE, {});
       name = "Ssao Pass";
     }
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
-      return resource_component.get_resources(usage);
+      return resources.get_resources(usage);
     }
 
     void compile() override {
@@ -996,18 +1122,18 @@ namespace gestalt::graphics::fg {
 
   struct ToneMapPass : RenderPass {
     ComputePipeline compute_pipeline;
-    ResourceComponent resource_component;
+    ResourceComponent resources;
 
-    ToneMapPass(const std::shared_ptr<ResourceInstance>& scene_final,
-                const std::shared_ptr<ResourceInstance>& scene_lit, IGpu* gpu)
+    ToneMapPass(const std::shared_ptr<ImageInstance>& scene_final,
+                const std::shared_ptr<ImageInstance>& scene_lit, IGpu* gpu)
         : compute_pipeline(gpu) {
-      resource_component.add_resource(scene_lit, ResourceUsage::READ, {});
-      resource_component.add_resource(scene_final, ResourceUsage::WRITE, {});
+      resources.add(scene_lit, ResourceUsage::READ, {});
+      resources.add(scene_final, ResourceUsage::WRITE, {});
       name = "Tone Map Pass";
     }
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
-      return resource_component.get_resources(usage);
+      return resources.get_resources(usage);
     }
 
     void compile() override {
@@ -1111,6 +1237,8 @@ namespace gestalt::graphics::fg {
     std::unique_ptr<SynchronizationManager> synchronization_manager_;
     std::unique_ptr<ResourceRegistry> resource_registry_;
 
+    void add_render_pass(std::shared_ptr<RenderPass>&& pass);
+
     void print_graph() const;
 
     void topological_sort();
@@ -1118,11 +1246,14 @@ namespace gestalt::graphics::fg {
   public:
     explicit FrameGraph(ResourceAllocator* resource_allocator);
 
-    void add_render_pass(std::shared_ptr<RenderPass>&& pass);
+    template <typename PassType, typename... Args> void add_pass(Args&&... args) {
+      add_render_pass(std::make_shared<PassType>(std::forward<Args>(args)...));
+    }
+
 
     std::shared_ptr<ImageInstance> add_resource(ImageTemplate&& image_template,
                                                 CreationType creation_type
-                                                = CreationType::INTERNAL) {
+                                                    = CreationType::INTERNAL) {
       auto resource = resource_registry_->add_template(std::move(image_template));
       const uint64 handle = resource->resource_handle;
       assert(handle != 0 && "Invalid resource handle!");
