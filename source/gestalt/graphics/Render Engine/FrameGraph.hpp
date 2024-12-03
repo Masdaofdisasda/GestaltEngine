@@ -606,153 +606,76 @@ namespace gestalt::graphics::fg {
 
     };
 
-  class CreationStageGuard {
-      enum class CreationStage {
-        kDescriptorLayout,
-        kShader,
-        kPipelineLayout,
-        kPipeline
-      } stage_ = CreationStage::kDescriptorLayout;
-
-    void is_stage(const CreationStage stage) const {
-      if (stage_ != stage) {
-        throw std::runtime_error("Invalid stage");
-      }
-    }
-  public:
-
-    void in_descriptor_stage() const { is_stage(CreationStage::kDescriptorLayout); }
-    void in_shader_stage() const { is_stage(CreationStage::kShader); }
-    void in_pipeline_layout_stage() const { is_stage(CreationStage::kPipelineLayout); }
-    void in_pipeline_stage() const { is_stage(CreationStage::kPipeline); }
-
-    void next_stage() {
-      switch (stage_) {
-        case CreationStage::kDescriptorLayout:
-          stage_ = CreationStage::kShader;
-          break;
-        case CreationStage::kShader:
-          stage_ = CreationStage::kPipelineLayout;
-          break;
-        case CreationStage::kPipelineLayout:
-          stage_ = CreationStage::kPipeline;
-          break;
-        case CreationStage::kPipeline:
-          throw std::runtime_error("Invalid stage");
-      }
-    }
-  };
-
   class GraphicsPipeline {
     PipelineUtil util_;
-    CreationStageGuard guard_;
-    GraphicsPipelineBuilder graphics_pipeline_builder_{};
-    std::vector<VkShaderStageFlagBits> shader_types_;
     VkPipelineBindPoint bind_point_ = VK_PIPELINE_BIND_POINT_GRAPHICS;
 
   public:
-
-    explicit GraphicsPipeline(IGpu* gpu, const std::string_view pipeline_name) : util_(gpu, pipeline_name) {}
-
-    GraphicsPipeline& add_descriptor_set_layout(
-        const std::span<const ResourceBinding<ImageInstance>> image_bindings,
-        const std::span<const ResourceBinding<BufferInstance>> buffer_bindings) {
-      guard_.in_descriptor_stage();
+         
+    GraphicsPipeline(IGpu* gpu, const std::string_view pipeline_name,
+                     const std::span<const ResourceBinding<ImageInstance>> image_bindings,
+                     const std::span<const ResourceBinding<BufferInstance>> buffer_bindings,
+                     const VkPushConstantRange push_constant_range, std::string&& task_source,
+                     std::string&& mesh_source, std::string&& fragment_source,
+                     VkGraphicsPipelineCreateInfo&& pipeline_create_info)
+        : util_(gpu, pipeline_name) {
       util_.create_descriptor_layout(image_bindings, buffer_bindings);
-      guard_.next_stage();
-      return *this;
-    }
-
-    GraphicsPipeline& set_vertex_shading(const std::string&& vertex_source,
-                                         const std::string&& fragment_source) {
-      guard_.in_shader_stage();
-      util_.add_shader(std::move(vertex_source), VK_SHADER_STAGE_VERTEX_BIT);
-      util_.add_shader(std::move(fragment_source), VK_SHADER_STAGE_FRAGMENT_BIT);
-
-      shader_types_.push_back(VK_SHADER_STAGE_VERTEX_BIT);
-      shader_types_.push_back(VK_SHADER_STAGE_FRAGMENT_BIT);
-      guard_.next_stage();
-
-      return *this;
-    }
-
-    GraphicsPipeline& set_mesh_task_shading(const std::string&& task_source,
-                                            const std::string&& mesh_source,
-                                            const std::string&& fragment_source) {
-      guard_.in_shader_stage();
       util_.add_shader(std::move(task_source), VK_SHADER_STAGE_TASK_BIT_EXT);
       util_.add_shader(std::move(mesh_source), VK_SHADER_STAGE_MESH_BIT_EXT);
       util_.add_shader(std::move(fragment_source), VK_SHADER_STAGE_FRAGMENT_BIT);
-
-      shader_types_.push_back(VK_SHADER_STAGE_TASK_BIT_EXT);
-      shader_types_.push_back(VK_SHADER_STAGE_MESH_BIT_EXT);
-      shader_types_.push_back(VK_SHADER_STAGE_FRAGMENT_BIT);
-      guard_.next_stage();
-
-      return *this;
-    }
-
-    GraphicsPipeline& add_pipeline_layout(VkPushConstantRange push_constant_range) {
-      guard_.in_pipeline_layout_stage();
       util_.create_pipeline_layout(push_constant_range);
-      guard_.next_stage();
-      return *this;
+      util_.create_graphics_pipeline(pipeline_create_info,
+                                     {VK_SHADER_STAGE_TASK_BIT_EXT, VK_SHADER_STAGE_MESH_BIT_EXT,
+                                      VK_SHADER_STAGE_FRAGMENT_BIT});
     }
-
-    void create_graphics_pipeline(const VkGraphicsPipelineCreateInfo& pipeline_create_info) {
-      guard_.in_pipeline_stage();
-      util_.create_graphics_pipeline(pipeline_create_info, shader_types_);
+         
+    GraphicsPipeline(IGpu* gpu, const std::string_view pipeline_name,
+                     const std::span<const ResourceBinding<ImageInstance>> image_bindings,
+                     const std::span<const ResourceBinding<BufferInstance>> buffer_bindings,
+                     const VkPushConstantRange push_constant_range, std::string&& vertex_source,
+                     std::string&& fragment_source,
+                     VkGraphicsPipelineCreateInfo&& pipeline_create_info)
+        : util_(gpu, pipeline_name) {
+      util_.create_descriptor_layout(image_bindings, buffer_bindings);
+      util_.add_shader(std::move(vertex_source), VK_SHADER_STAGE_VERTEX_BIT);
+      util_.add_shader(std::move(fragment_source), VK_SHADER_STAGE_FRAGMENT_BIT);
+      util_.create_pipeline_layout(push_constant_range);
+      util_.create_graphics_pipeline(pipeline_create_info,
+                                     {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT});
     }
 
     void bind_descriptors(const CommandBuffer cmd) { util_.bind_descriptors(cmd, bind_point_); }
 
-    VkPipelineLayout get_pipeline_layout() const { return util_.get_pipeline_layout(); }
+    [[nodiscard]] VkPipelineLayout get_pipeline_layout() const { return util_.get_pipeline_layout(); }
 
-     VkPipeline get_pipeline() const { return util_.get_pipeline(); }
+    [[nodiscard]] VkPipeline get_pipeline() const { return util_.get_pipeline(); }
 
   };
 
   class ComputePipeline {
     PipelineUtil util_;
-    CreationStageGuard guard_;
     VkPipelineBindPoint bind_point_ = VK_PIPELINE_BIND_POINT_COMPUTE;
 
   public:
-    explicit ComputePipeline(IGpu* gpu, const std::string_view pipeline_name) : util_(gpu, pipeline_name) {}
 
-    ComputePipeline& add_descriptor_set_layout(
-        const std::span<const ResourceBinding<ImageInstance>> image_bindings,
-        const std::span<const ResourceBinding<BufferInstance>> buffer_bindings) {
-      guard_.in_descriptor_stage();
+    ComputePipeline(IGpu* gpu, const std::string_view pipeline_name,
+                    const std::span<const ResourceBinding<ImageInstance>> image_bindings,
+                    const std::span<const ResourceBinding<BufferInstance>> buffer_bindings,
+                    const VkPushConstantRange push_constant_range,
+                    const std::string&& compute_source)
+        : util_(gpu, pipeline_name) {
       util_.create_descriptor_layout(image_bindings, buffer_bindings);
-      guard_.next_stage();
-      return *this;
-    }
-
-    ComputePipeline& add_compute_shader(const std::string&& compute_source) {
-      guard_.in_shader_stage();
       util_.add_shader(std::move(compute_source), VK_SHADER_STAGE_COMPUTE_BIT);
-      guard_.next_stage();
-      return *this;
-    }
-
-    ComputePipeline& add_pipeline_layout(const VkPushConstantRange push_constant_range) {
-      guard_.in_pipeline_layout_stage();
       util_.create_pipeline_layout(push_constant_range);
-      guard_.next_stage();
-      return *this;
-    }
-
-    void create_compute_pipeline() {
-      guard_.in_pipeline_stage();
       util_.create_compute_pipeline();
     }
 
+
     void bind_descriptors(const CommandBuffer cmd) { util_.bind_descriptors(cmd, bind_point_); }
 
-    VkPipelineLayout get_pipeline_layout() const { return util_.get_pipeline_layout(); }
+    [[nodiscard]] VkPipelineLayout get_pipeline_layout() const { return util_.get_pipeline_layout(); }
 
-    VkPipeline get_pipeline() const { return util_.get_pipeline(); }
+    [[nodiscard]] VkPipeline get_pipeline() const { return util_.get_pipeline(); }
   };
 
   enum class ResourceUsage {
@@ -787,8 +710,8 @@ template <typename ResourceInstanceType> class ResourceCollection {
       return result;
     }
 
-    bool has_usage(const std::shared_ptr<ResourceInstanceType>& resource,
-                   ResourceUsage usage) const {
+    [[nodiscard]] bool has_usage(const std::shared_ptr<ResourceInstanceType>& resource,
+                                 ResourceUsage usage) const {
       auto it = resources_.find(resource);
       return (it != resources_.end()) && it->second.usage_mask.test(static_cast<size_t>(usage));
     }
@@ -799,49 +722,71 @@ template <typename ResourceInstanceType> class ResourceCollection {
     }
   };
 
-  class ResourceComponent {
-  public:
+  struct ResourceComponentBindings {
+    std::unordered_map<uint32, std::shared_ptr<ImageInstance>> color_attachments;
+    std::shared_ptr<ImageInstance> depth_attachment;
 
-    ResourceComponent& add_attachment(const std::shared_ptr<ImageInstance>& image,
-                                     const ResourceUsage usage, uint32 attachment_index = 0) {
+    std::vector<ResourceBinding<ImageInstance>> image_bindings;
+    std::vector<ResourceBinding<BufferInstance>> buffer_bindings;
+
+    ResourceCollection<ImageInstance> images;
+    ResourceCollection<BufferInstance> buffers;
+    PushDescriptor push_descriptor;
+
+    ResourceComponentBindings& add_attachment(const std::shared_ptr<ImageInstance>& image,
+                                      const ResourceUsage usage, uint32 attachment_index = 0) {
       assert(usage == ResourceUsage::WRITE && "Attachment must be write only");
       if (image->image_template.type == TextureType::kColor) {
-        color_attachments_.emplace(attachment_index, image);
+        color_attachments.emplace(attachment_index, image);
       } else if (image->image_template.type == TextureType::kDepth) {
         assert(attachment_index == 0 && "Depth attachment index must be 0");
-        depth_attachment_ = image;
+        depth_attachment = image;
       }
-      images_.add_resource(image, usage);
+      images.add_resource(image, usage);
       return *this;
     }
 
-    ResourceComponent& add_binding(const std::shared_ptr<ImageInstance>& image, ResourceUsage usage,
+    ResourceComponentBindings& add_binding(const std::shared_ptr<ImageInstance>& image,
+                                           ResourceUsage usage,
                                    const uint32 set_index, const uint32 binding_index,
                                    const VkDescriptorType descriptor_type,
-                     const VkShaderStageFlags shader_stages, const uint32 descriptor_count = 1) {
-      image_bindings_.push_back(
+                                   const VkShaderStageFlags shader_stages,
+                                   const uint32 descriptor_count = 1) {
+      image_bindings.push_back(
           {image, {set_index, binding_index, descriptor_type, shader_stages, descriptor_count}});
-      images_.add_resource(image, usage);
+      images.add_resource(image, usage);
       return *this;
     }
 
-    ResourceComponent& add_binding(const std::shared_ptr<BufferInstance>& buffer,
+    ResourceComponentBindings& add_binding(const std::shared_ptr<BufferInstance>& buffer,
                                    ResourceUsage usage, const uint32 set_index,
                                    const uint32 binding_index,
                                    const VkDescriptorType descriptor_type,
-                     const VkShaderStageFlags shader_stages) {
-      buffer_bindings_.push_back(
+                                   const VkShaderStageFlags shader_stages) {
+      buffer_bindings.push_back(
           {buffer, {set_index, binding_index, descriptor_type, shader_stages, 1}});
-      buffers_.add_resource(buffer, usage);
+      buffers.add_resource(buffer, usage);
       return *this;
     }
+
+    ResourceComponentBindings& add_push_constant(uint32_t size, VkShaderStageFlags stage_flags) {
+      push_descriptor = PushDescriptor(size, stage_flags);
+
+      return *this;
+    }
+
+  };
+
+  class ResourceComponent {
+  public:
+    explicit ResourceComponent(ResourceComponentBindings&& bindings) : data_(std::move(bindings)) {}
 
     // Get resources of all types based on usage
     [[nodiscard]] std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) const {
       std::vector<std::shared_ptr<ResourceInstance>> result;
 
-      auto image_resources = images_.get_resources(usage);
-      auto buffer_resources = buffers_.get_resources(usage);
+      auto image_resources = data_.images.get_resources(usage);
+      auto buffer_resources = data_.buffers.get_resources(usage);
 
       // Append images and buffers to the result
       result.insert(result.end(), image_resources.begin(), image_resources.end());
@@ -852,22 +797,24 @@ template <typename ResourceInstanceType> class ResourceCollection {
 
     // Get image resources only
     [[nodiscard]] std::vector<std::shared_ptr<ImageInstance>> get_image_resources(ResourceUsage usage) const {
-      return images_.get_resources(usage);
+      return data_.images.get_resources(usage);
     }
 
     // Get buffer resources only
     [[nodiscard]] std::vector<std::shared_ptr<BufferInstance>> get_buffer_resources(ResourceUsage usage) const {
-      return buffers_.get_resources(usage);
+      return data_.buffers.get_resources(usage);
     }
 
     [[nodiscard]] const std::unordered_map<uint32, std::shared_ptr<ImageInstance>>* get_color_attachment() const {
-      return &color_attachments_;
+      return &data_.color_attachments;
     }
 
-    [[nodiscard]] const std::shared_ptr<ImageInstance>* get_depth_attachment() const { return &depth_attachment_; }
+    [[nodiscard]] const std::shared_ptr<ImageInstance>* get_depth_attachment() const {
+      return &data_.depth_attachment;
+    }
 
     [[nodiscard]] ResourceBinding<BufferInstance> get_buffer_binding(const uint32 set_index, const uint32 binding_index) const {
-      for (const auto& resource : buffer_bindings_) {
+      for (const auto& resource : data_.buffer_bindings) {
         if (resource.info.set_index == set_index && resource.info.binding_index == binding_index) {
           return resource;
         }
@@ -876,7 +823,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
     }
 
     [[nodiscard]] ResourceBinding<ImageInstance> get_image_binding(const uint32 set_index, const uint32 binding_index) const {
-      for (const auto& resource : image_bindings_) {
+      for (const auto& resource : data_.image_bindings) {
         if (resource.info.set_index == set_index && resource.info.binding_index == binding_index) {
           return resource;
         }
@@ -885,44 +832,31 @@ template <typename ResourceInstanceType> class ResourceCollection {
     }
 
     [[nodiscard]] std::span<const ResourceBinding<ImageInstance>> get_image_bindings() const {
-      return image_bindings_;
+      return data_.image_bindings;
     }
 
     [[nodiscard]] std::span<const ResourceBinding<BufferInstance>> get_buffer_bindings() const {
-      return buffer_bindings_;
+      return data_.buffer_bindings;
     }
 
 
     [[nodiscard]] bool has_usage(const std::shared_ptr<ImageInstance>& image,
                                  ResourceUsage usage) const {
-        return images_.has_usage(image, usage);
+      return data_.images.has_usage(image, usage);
     }
 
         [[nodiscard]] bool has_usage(const std::shared_ptr<BufferInstance>& buffer,
                                  ResourceUsage usage) const {
-      return buffers_.has_usage(buffer, usage);
+      return data_.buffers.has_usage(buffer, usage);
     }
 
-    ResourceComponent& add_push_constant(uint32_t size, VkShaderStageFlags stage_flags) {
-      push_descriptor_ = PushDescriptor(size, stage_flags);
-
-      return *this;
-    }
 
     [[nodiscard]] VkPushConstantRange get_push_constant_range() const {
-      return push_descriptor_.get_push_constant_range();
+      return data_.push_descriptor.get_push_constant_range();
     }
 
   private:
-    std::unordered_map<uint32, std::shared_ptr<ImageInstance>> color_attachments_;
-    std::shared_ptr<ImageInstance> depth_attachment_;
-
-    std::vector<ResourceBinding<ImageInstance>> image_bindings_;
-    std::vector<ResourceBinding<BufferInstance>> buffer_bindings_;
-
-    ResourceCollection<ImageInstance> images_;
-    ResourceCollection<BufferInstance> buffers_;
-    PushDescriptor push_descriptor_;
+    ResourceComponentBindings data_;
   };
 
   class RenderPass {
@@ -941,32 +875,29 @@ template <typename ResourceInstanceType> class ResourceCollection {
     struct alignas(16) DrawCullDepthConstants {
       int32 draw_count;
     };
-    ComputePipeline compute_pipeline_;
     ResourceComponent resources_;
+    ComputePipeline compute_pipeline_;
 
   public:
     DrawCullDirectionalDepthPass(const std::shared_ptr<BufferInstance>& camera_buffer,
                                  const std::shared_ptr<BufferInstance>& task_commands,
                                  const std::shared_ptr<BufferInstance>& draws,
                                  const std::shared_ptr<BufferInstance>& command_count, IGpu* gpu)
-        : RenderPass("Draw Cull Directional Depth Pass"), compute_pipeline_(gpu, get_name()) {
-      resources_
-          .add_binding(camera_buffer, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                       VK_SHADER_STAGE_COMPUTE_BIT)
-          .add_binding(draws, ResourceUsage::READ, 1, 6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_COMPUTE_BIT)
-          .add_binding(task_commands, ResourceUsage::WRITE, 1, 5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_COMPUTE_BIT)
-          .add_binding(command_count, ResourceUsage::WRITE, 1, 7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_COMPUTE_BIT)
-      .add_push_constant(sizeof(DrawCullDepthConstants), VK_SHADER_STAGE_COMPUTE_BIT);
-      compute_pipeline_
-          .add_descriptor_set_layout(resources_.get_image_bindings(),
-                                     resources_.get_buffer_bindings())
-          .add_compute_shader("draw_cull_depth.comp.spv")
-          .add_pipeline_layout(resources_.get_push_constant_range())
-          .create_compute_pipeline();
-    }
+        : RenderPass("Draw Cull Directional Depth Pass"),
+          resources_(std::move(
+              ResourceComponentBindings()
+                  .add_binding(camera_buffer, ResourceUsage::READ, 0, 0,
+                               VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(draws, ResourceUsage::READ, 1, 6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                               VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(task_commands, ResourceUsage::WRITE, 1, 5,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(command_count, ResourceUsage::WRITE, 1, 7,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_push_constant(sizeof(DrawCullDepthConstants), VK_SHADER_STAGE_COMPUTE_BIT))),
+          compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
+                            resources_.get_buffer_bindings(), resources_.get_push_constant_range(),
+                            "draw_cull_depth.comp.spv") {}
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(
         const ResourceUsage usage) override {
@@ -995,27 +926,24 @@ template <typename ResourceInstanceType> class ResourceCollection {
   };
 
   class TaskSubmitDirectionalDepthPass : public RenderPass {
-    ComputePipeline compute_pipeline_;
     ResourceComponent resources_;
+    ComputePipeline compute_pipeline_;
 
   public:
     TaskSubmitDirectionalDepthPass(const std::shared_ptr<BufferInstance>& task_commands,
                                    const std::shared_ptr<BufferInstance>& command_count, IGpu* gpu)
-        : RenderPass("Task Submit Directional Depth Pass"), compute_pipeline_(gpu, get_name()) {
-      resources_
-          .add_binding(task_commands, ResourceUsage::READ, 0, 5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_COMPUTE_BIT)
-          .add_binding(task_commands, ResourceUsage::WRITE, 0, 5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_COMPUTE_BIT)
-          .add_binding(command_count, ResourceUsage::WRITE, 0, 7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_COMPUTE_BIT);
-      compute_pipeline_
-          .add_descriptor_set_layout(resources_.get_image_bindings(),
-                                     resources_.get_buffer_bindings())
-          .add_compute_shader("task_submit.comp.spv")
-          .add_pipeline_layout(resources_.get_push_constant_range())
-          .create_compute_pipeline();
-    }
+        : RenderPass("Task Submit Directional Depth Pass"),
+          resources_(std::move(
+              ResourceComponentBindings()
+                  .add_binding(task_commands, ResourceUsage::READ, 0, 5,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(task_commands, ResourceUsage::WRITE, 0, 5,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(command_count, ResourceUsage::WRITE, 0, 7,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT))),
+          compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
+                            resources_.get_buffer_bindings(), resources_.get_push_constant_range(),
+                            "task_submit.comp.spv") {}
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
       return resources_.get_resources(usage);
@@ -1027,8 +955,8 @@ template <typename ResourceInstanceType> class ResourceCollection {
   };
 
   class MeshletDirectionalDepthPass : public RenderPass {
-    GraphicsPipeline graphics_pipeline_;
     ResourceComponent resources_;
+    GraphicsPipeline graphics_pipeline_;
 
   public:
     MeshletDirectionalDepthPass(const std::shared_ptr<BufferInstance>& camera_buffer,
@@ -1043,53 +971,56 @@ template <typename ResourceInstanceType> class ResourceCollection {
                                 const std::shared_ptr<BufferInstance>& task_commands,
                                 const std::shared_ptr<BufferInstance>& draws,
                                 const std::shared_ptr<ImageInstance>& shadow_map, IGpu* gpu)
-        : RenderPass("Meshlet Directional Depth Pass"), graphics_pipeline_(gpu, get_name()) {
-      resources_
-          .add_binding(camera_buffer, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT
-                           | VK_SHADER_STAGE_FRAGMENT_BIT)
-          .add_binding(light_matrices, ResourceUsage::READ, 1, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_MESH_BIT_EXT)
-          .add_binding(directional_light, ResourceUsage::READ, 1, 1,
-                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT)
-          .add_binding(point_light, ResourceUsage::READ, 1, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_MESH_BIT_EXT)
-          .add_binding(vertex_positions, ResourceUsage::READ, 2, 0,
-                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
-          .add_binding(vertex_data, ResourceUsage::READ, 2, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
-          .add_binding(meshlet, ResourceUsage::READ, 2, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
-          .add_binding(meshlet_vertices, ResourceUsage::READ, 2, 3,
-                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
-          .add_binding(meshlet_indices, ResourceUsage::READ, 2, 4,
-                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
-          .add_binding(task_commands, ResourceUsage::READ, 2, 5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
-          .add_binding(draws, ResourceUsage::READ, 2, 6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
-          .add_attachment(shadow_map, ResourceUsage::WRITE);
+        : RenderPass("Meshlet Directional Depth Pass"),
+          resources_(std::move(
+              ResourceComponentBindings()
+                  .add_binding(camera_buffer, ResourceUsage::READ, 0, 0,
+                               VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                               VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT
+                                   | VK_SHADER_STAGE_FRAGMENT_BIT)
+                  .add_binding(light_matrices, ResourceUsage::READ, 1, 0,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT)
+                  .add_binding(directional_light, ResourceUsage::READ, 1, 1,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT)
+                  .add_binding(point_light, ResourceUsage::READ, 1, 2,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT)
+                  .add_binding(vertex_positions, ResourceUsage::READ, 2, 0,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                               VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
+                  .add_binding(vertex_data, ResourceUsage::READ, 2, 1,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                               VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
+                  .add_binding(meshlet, ResourceUsage::READ, 2, 2,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                               VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
+                  .add_binding(meshlet_vertices, ResourceUsage::READ, 2, 3,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                               VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
+                  .add_binding(meshlet_indices, ResourceUsage::READ, 2, 4,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                               VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
+                  .add_binding(task_commands, ResourceUsage::READ, 2, 5,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                               VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
+                  .add_binding(draws, ResourceUsage::READ, 2, 6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                               VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
+                  .add_attachment(shadow_map, ResourceUsage::WRITE)
 
-      GraphicsPipelineBuilder pipeline_builder{};
-      pipeline_builder.set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
-          .set_polygon_mode(VK_POLYGON_MODE_FILL)
-          .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
-          .set_multisampling_none()
-          .disable_blending()
-          .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-          .set_depth_format(resources_.get_depth_attachment()->get()->image_template.format);
+                  )),
 
-      graphics_pipeline_
-          .add_descriptor_set_layout(resources_.get_image_bindings(),
-                                     resources_.get_buffer_bindings())
-          .set_mesh_task_shading("geometry_depth.task.spv", "geometry_depth.mesh.spv",
-                                 "geometry_depth.frag.spv")
-          .add_pipeline_layout(resources_.get_push_constant_range())
-          .create_graphics_pipeline(pipeline_builder.build_pipeline_info());
-    }
+          graphics_pipeline_(
+              gpu, get_name(), resources_.get_image_bindings(), resources_.get_buffer_bindings(),
+              resources_.get_push_constant_range(), "geometry_depth.task.spv",
+              "geometry_depth.mesh.spv", "geometry_depth.frag.spv",
+              GraphicsPipelineBuilder()
+                  .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+                  .set_polygon_mode(VK_POLYGON_MODE_FILL)
+                  .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
+                  .set_multisampling_none()
+                  .disable_blending()
+                  .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
+                  .set_depth_format(resources_.get_depth_attachment()->get()->image_template.format)
+                  .build_pipeline_info()) {}
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(
         const ResourceUsage usage) override {
@@ -1102,8 +1033,8 @@ template <typename ResourceInstanceType> class ResourceCollection {
   };
 
   class GeometryPass : public RenderPass {
-    GraphicsPipeline graphics_pipeline_;
     ResourceComponent resources_;
+    GraphicsPipeline graphics_pipeline_;
 
   public:
     GeometryPass(const std::shared_ptr<ImageInstance>& g_buffer_1,
@@ -1111,19 +1042,33 @@ template <typename ResourceInstanceType> class ResourceCollection {
                  const std::shared_ptr<ImageInstance>& g_buffer_3,
                  const std::shared_ptr<ImageInstance>& g_buffer_depth,
                  const std::shared_ptr<BufferInstance>& geometry_buffer, IGpu* gpu)
-        : RenderPass("Geometry Pass"), graphics_pipeline_(gpu, get_name()) {
-      resources_
-          .add_binding(geometry_buffer, ResourceUsage::READ, 0, 0,
-                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
-          .add_binding(g_buffer_1, ResourceUsage::WRITE, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_COMPUTE_BIT)
-          .add_binding(g_buffer_2, ResourceUsage::WRITE, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_COMPUTE_BIT)
-          .add_binding(g_buffer_3, ResourceUsage::WRITE, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_COMPUTE_BIT)
-          .add_binding(g_buffer_depth, ResourceUsage::WRITE, 0, 0,
-                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
-    }
+        : RenderPass("Geometry Pass"),
+          resources_(std::move(
+
+              ResourceComponentBindings()
+                  .add_binding(geometry_buffer, ResourceUsage::READ, 0, 0,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(g_buffer_1, ResourceUsage::WRITE, 0, 0,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(g_buffer_2, ResourceUsage::WRITE, 0, 0,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(g_buffer_3, ResourceUsage::WRITE, 0, 0,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(g_buffer_depth, ResourceUsage::WRITE, 0, 0,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT))),
+          graphics_pipeline_(
+              gpu, get_name(), resources_.get_image_bindings(), resources_.get_buffer_bindings(),
+              resources_.get_push_constant_range(), "geometry_depth.task.spv",
+              "geometry_depth.mesh.spv", "geometry_depth.frag.spv",
+              GraphicsPipelineBuilder()
+                  .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+                  .set_polygon_mode(VK_POLYGON_MODE_FILL)
+                  .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
+                  .set_multisampling_none()
+                  .disable_blending()
+                  .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
+                  .set_depth_format(resources_.get_depth_attachment()->get()->image_template.format)
+                  .build_pipeline_info()) {}
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
       return resources_.get_resources(usage);
@@ -1135,8 +1080,8 @@ template <typename ResourceInstanceType> class ResourceCollection {
   };
 
   class LightingPass : public RenderPass {
-    ComputePipeline compute_pipeline_;
     ResourceComponent resources_;
+    ComputePipeline compute_pipeline_;
 
   public:
     LightingPass(const std::shared_ptr<ImageInstance>& scene_lit,
@@ -1147,25 +1092,36 @@ template <typename ResourceInstanceType> class ResourceCollection {
                  const std::shared_ptr<ImageInstance>& shadow_map,
                  const std::shared_ptr<BufferInstance>& material_buffer,
                  const std::shared_ptr<BufferInstance>& light_buffer, IGpu* gpu)
-        : RenderPass("Lighting Pass"), compute_pipeline_(gpu, get_name()) {
-      resources_
-          .add_binding(scene_lit, ResourceUsage::WRITE, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_COMPUTE_BIT)
-          .add_binding(g_buffer_1, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_COMPUTE_BIT)
-          .add_binding(g_buffer_2, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_COMPUTE_BIT)
-          .add_binding(g_buffer_3, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_COMPUTE_BIT)
-          .add_binding(g_buffer_depth, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_COMPUTE_BIT)
-          .add_binding(shadow_map, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_COMPUTE_BIT)
-          .add_binding(material_buffer, ResourceUsage::READ, 0, 0,
-                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
-          .add_binding(light_buffer, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_COMPUTE_BIT);
-    }
+        : RenderPass("Lighting Pass"),
+          resources_(std::move(ResourceComponentBindings()
+                               .add_binding(scene_lit, ResourceUsage::WRITE, 0, 0,
+                                            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                            VK_SHADER_STAGE_COMPUTE_BIT)
+                               .add_binding(g_buffer_1, ResourceUsage::READ, 0, 0,
+                                            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                            VK_SHADER_STAGE_COMPUTE_BIT)
+                               .add_binding(g_buffer_2, ResourceUsage::READ, 0, 0,
+                                            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                            VK_SHADER_STAGE_COMPUTE_BIT)
+                               .add_binding(g_buffer_3, ResourceUsage::READ, 0, 0,
+                                            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                            VK_SHADER_STAGE_COMPUTE_BIT)
+                               .add_binding(g_buffer_depth, ResourceUsage::READ, 0, 0,
+                                            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                            VK_SHADER_STAGE_COMPUTE_BIT)
+                               .add_binding(shadow_map, ResourceUsage::READ, 0, 0,
+                                            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                            VK_SHADER_STAGE_COMPUTE_BIT)
+                               .add_binding(material_buffer, ResourceUsage::READ, 0, 0,
+                                            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                            VK_SHADER_STAGE_COMPUTE_BIT)
+                               .add_binding(light_buffer, ResourceUsage::READ, 0, 0,
+                                            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                            VK_SHADER_STAGE_COMPUTE_BIT)
+              )),
+          compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
+                            resources_.get_buffer_bindings(), resources_.get_push_constant_range(),
+                            "task_submit.comp.spv") {}
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
       return resources_.get_resources(usage);
@@ -1177,25 +1133,28 @@ template <typename ResourceInstanceType> class ResourceCollection {
   };
 
   class SsaoPass : public RenderPass {
-    ComputePipeline compute_pipeline_;
     ResourceComponent resources_;
+    ComputePipeline compute_pipeline_;
 
   public:
     SsaoPass(const std::shared_ptr<ImageInstance>& g_buffer_depth,
              const std::shared_ptr<ImageInstance>& g_buffer_2,
              const std::shared_ptr<ImageInstance>& rotation_texture,
              const std::shared_ptr<ImageInstance>& occlusion, IGpu* gpu)
-        : RenderPass("Ssao Pass"), compute_pipeline_(gpu, get_name()) {
-      resources_
-          .add_binding(g_buffer_depth, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_COMPUTE_BIT)
-          .add_binding(g_buffer_2, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_COMPUTE_BIT)
-          .add_binding(rotation_texture, ResourceUsage::READ, 0, 0,
-                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
-          .add_binding(occlusion, ResourceUsage::WRITE, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_COMPUTE_BIT);
-    }
+        : RenderPass("Ssao Pass"),
+          resources_(std::move(
+              ResourceComponentBindings()
+                  .add_binding(g_buffer_depth, ResourceUsage::READ, 0, 0,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(g_buffer_2, ResourceUsage::READ, 0, 0,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(rotation_texture, ResourceUsage::READ, 0, 0,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(occlusion, ResourceUsage::WRITE, 0, 0,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT))),
+          compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
+                            resources_.get_buffer_bindings(), resources_.get_push_constant_range(),
+                            "task_submit.comp.spv") {}
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
       return resources_.get_resources(usage);
@@ -1207,19 +1166,22 @@ template <typename ResourceInstanceType> class ResourceCollection {
   };
 
   class ToneMapPass : public RenderPass {
-    ComputePipeline compute_pipeline_;
     ResourceComponent resources_;
+    ComputePipeline compute_pipeline_;
 
   public:
     ToneMapPass(const std::shared_ptr<ImageInstance>& scene_final,
                 const std::shared_ptr<ImageInstance>& scene_lit, IGpu* gpu)
-        : RenderPass("Tone Map Pass"), compute_pipeline_(gpu, get_name()) {
-      resources_
-          .add_binding(scene_lit, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_COMPUTE_BIT)
-          .add_binding(scene_final, ResourceUsage::WRITE, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       VK_SHADER_STAGE_COMPUTE_BIT);
-    }
+        : RenderPass("Tone Map Pass"),
+          resources_(std::move(
+              ResourceComponentBindings()
+                  .add_binding(scene_lit, ResourceUsage::READ, 0, 0,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(scene_final, ResourceUsage::WRITE, 0, 0,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT))),
+          compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
+                            resources_.get_buffer_bindings(), resources_.get_push_constant_range(),
+                            "task_submit.comp.spv") {}
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
       return resources_.get_resources(usage);

@@ -115,7 +115,7 @@ namespace gestalt::graphics {
           camera_buffer, light_matrices, directional_light, point_light, vertex_position_buffer,
           vertex_data_buffer, meshlet_buffer, meshlet_vertices, meshlet_triangles,
           meshlet_task_commands_buffer, mesh_draw_buffer, shadow_map, gpu_);
-
+      /*
       frame_graph_->add_pass<fg::GeometryPass>(g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth,
                                                vertex_position_buffer, gpu_);
 
@@ -127,6 +127,7 @@ namespace gestalt::graphics {
 
       frame_graph_->add_pass<fg::SsaoPass>(scene_lit, g_buffer_depth, rotation_texture,
                                            occlusion_texture, gpu_);
+                                           */
 
 
       frame_graph_->compile();
