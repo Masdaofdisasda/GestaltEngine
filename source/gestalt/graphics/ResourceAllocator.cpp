@@ -123,7 +123,7 @@ namespace gestalt::graphics {
     return image;
   }
 
-  AllocatedBuffer ResourceAllocator::allocate_buffer(const std::string_view name, const VkDeviceSize size,
+  AllocatedBuffer ResourceAllocator::allocate_buffer(const std::string_view name, const size_t size,
                                                        VkBufferUsageFlags usage_flags,
                                                        const VmaMemoryUsage memory_usage) const {
     usage_flags |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;

@@ -96,11 +96,11 @@ namespace gestalt::foundation {
   };
 
     struct BufferTemplate final : ResourceTemplate {
-    VkDeviceSize size;
+    size_t size;
     VkBufferUsageFlags usage;
     VmaMemoryUsage memory_usage;
 
-    BufferTemplate(std::string name, const VkDeviceSize size,
+    BufferTemplate(std::string name, const size_t size,
                            const VkBufferUsageFlags usage, const VmaMemoryUsage memory_usage)
         : ResourceTemplate(std::move(name)), size(size), usage(usage), memory_usage(memory_usage) {}
   };
@@ -141,12 +141,24 @@ namespace gestalt::foundation {
   };
 
   struct BufferInstance : ResourceInstance {
-    BufferInstance(BufferTemplate&& buffer_template,
-                   const AllocatedBuffer& allocated_buffer)
-        : ResourceInstance(buffer_template.name), buffer_template(std::move(buffer_template)), allocated_buffer(allocated_buffer) {}
+    BufferInstance(BufferTemplate&& buffer_template, const AllocatedBuffer& allocated_buffer)
+        : ResourceInstance(buffer_template.name),
+          buffer_template(std::move(buffer_template)),
+          allocated_buffer(allocated_buffer){}
 
+    // size that was actually allocated, alignment might have been added
+    [[nodiscard]] VkDeviceSize get_size() const { return allocated_buffer.info.size; }
+
+    // size that was requested, max size that can be uploaded, used for descriptor buffer bindings
+    [[nodiscard]] VkDeviceSize get_requested_size() const { return buffer_template.size; }
+
+    [[nodiscard]] VkDeviceAddress get_address() const { return allocated_buffer.address; }
+
+    [[nodiscard]] VkBuffer get_buffer_handle() const { return allocated_buffer.buffer_handle; }
+
+  private:
     BufferTemplate buffer_template;
-    AllocatedBuffer allocated_buffer; 
+    AllocatedBuffer allocated_buffer;
     VkAccessFlags2 current_access = 0;        // Current access flags
     VkPipelineStageFlags2 current_stage = 0;  // Current pipeline stage
   };
@@ -162,7 +174,7 @@ namespace gestalt::foundation {
                                | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
     // Each offset corresponds to one layout binding in GLSL
     // Bindings need to start at 0 and have no gaps
-    std::vector<DescriptorBinding> bindings_;
+    std::unordered_map<uint32_t, DescriptorBinding> bindings_;
 
     IGpu* gpu_;
 
@@ -200,11 +212,12 @@ namespace gestalt::foundation {
     }
 
   public:
-    explicit DescriptorBufferInstance(IGpu* gpu,
-        const VkDescriptorSetLayout descriptor_layout, const uint32 num_bindings,
-        const VkBufferUsageFlags usage, const std::string& name)
+    explicit DescriptorBufferInstance(
+        IGpu* gpu, const std::string_view name,
+                                      const VkDescriptorSetLayout descriptor_layout,
+                                      const std::vector<uint32_t>& binding_indices)
         : gpu_(gpu) {
-      usage_ |= usage;
+      assert(gpu_ && "GPU instance cannot be null.");
 
       const VkDeviceSize descriptor_buffer_offset_alignment
           = gpu_->getDescriptorBufferProperties().descriptorBufferOffsetAlignment;
@@ -213,16 +226,16 @@ namespace gestalt::foundation {
       size_
           = aligned_size(size_, descriptor_buffer_offset_alignment);
 
-      bindings_.reserve(num_bindings);
       VkDeviceSize binding_offset = 0;
 
-      for (uint32 i = 0; i < num_bindings; ++i) {
-        vkGetDescriptorSetLayoutBindingOffsetEXT(gpu_->getDevice(), descriptor_layout, i,
-                                                 &binding_offset);
-        bindings_.emplace_back(DescriptorBinding{
-            .binding = i,
-            .offset = binding_offset,
-        });
+      for (uint32 binding_index : binding_indices) {
+        vkGetDescriptorSetLayoutBindingOffsetEXT(gpu_->getDevice(), descriptor_layout,
+                                                 binding_index, &binding_offset);
+        bindings_.emplace(binding_index, DescriptorBinding{
+          .descriptor_size = 0,  // Initialize to zero
+                                             .binding = binding_index,
+                                             .offset = binding_offset,
+                                         });
       }
 
       VkBufferCreateInfo bufferInfo = {};
@@ -230,7 +243,7 @@ namespace gestalt::foundation {
       bufferInfo.pNext = nullptr;
       bufferInfo.size = size_;
       bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-      bufferInfo.usage = usage;
+      bufferInfo.usage = usage_;
 
       VmaAllocationCreateInfo vmaallocInfo = {};
       vmaallocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
@@ -238,93 +251,133 @@ namespace gestalt::foundation {
       VK_CHECK(vmaCreateBuffer(gpu_->getAllocator(), &bufferInfo, &vmaallocInfo,
                                &buffer_handle_, &allocation_,
                                &info_));
-      gpu_->set_debug_name(name, VK_OBJECT_TYPE_BUFFER, reinterpret_cast<uint64>(buffer_handle_));
 
-      VkBufferDeviceAddressInfo deviceAddressInfo
+      gpu_->set_debug_name(std::string(name) + " Descriptor Buffer", VK_OBJECT_TYPE_BUFFER,
+                           reinterpret_cast<uint64>(buffer_handle_));
+
+      VkBufferDeviceAddressInfo device_address_info
           = {.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
-      deviceAddressInfo.buffer = buffer_handle_;
-      address_ = vkGetBufferDeviceAddress(gpu_->getDevice(), &deviceAddressInfo);
+      device_address_info.buffer = buffer_handle_;
+      address_ = vkGetBufferDeviceAddress(gpu_->getDevice(), &device_address_info);
     }
 
-    DescriptorBufferInstance& update() {
+    void update() {
       vkDeviceWaitIdle(gpu_->getDevice());
-      char* descriptor_buf_ptr;
-      VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation_, reinterpret_cast<void**>(&descriptor_buf_ptr)));
 
-      for (auto& [descriptorType, descriptorSize, binding, descriptorIndex, addr_info, img_info] :
-           update_infos_) {
+      char* descriptor_buf_ptr = nullptr;
+      VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation_,
+                            reinterpret_cast<void**>(&descriptor_buf_ptr)));
+
+      for (const auto& update_info : update_infos_) {
         VkDescriptorGetInfoEXT descriptor_info = {
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT,
-            .type = descriptorType,
+            .type = update_info.type,
         };
 
-        if (descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) {
-          descriptor_info.data.pUniformBuffer = &addr_info;
-        } else if (descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
-          descriptor_info.data.pStorageBuffer = &addr_info;
-        } else if (descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
-          descriptor_info.data.pCombinedImageSampler = &img_info;
-        } else if (descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) {
-          descriptor_info.data.pStorageImage = &img_info;
+        if (update_info.type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) {
+          descriptor_info.data.pUniformBuffer = &update_info.addr_info;
+        } else if (update_info.type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
+          descriptor_info.data.pStorageBuffer = &update_info.addr_info;
+        } else if (update_info.type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
+          descriptor_info.data.pCombinedImageSampler = &update_info.image_info;
+        } else if (update_info.type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) {
+          descriptor_info.data.pStorageImage = &update_info.image_info;
         } else {
-          assert(false && "Invalid descriptor type");
+          throw std::runtime_error("Unsupported descriptor type");
         }
 
-        const VkDeviceSize offset = descriptorIndex * descriptorSize + bindings_[binding].offset;
-        vkGetDescriptorEXT(gpu_->getDevice(), &descriptor_info, descriptorSize, descriptor_buf_ptr + offset);
+        auto binding_it = bindings_.find(update_info.binding);
+        if (binding_it == bindings_.end()) {
+          throw std::runtime_error("Invalid binding index.");
+        }
+
+        const VkDeviceSize offset
+            = update_info.descriptorIndex * update_info.descriptorSize + binding_it->second.offset;
+        vkGetDescriptorEXT(gpu_->getDevice(), &descriptor_info, update_info.descriptorSize,
+                           descriptor_buf_ptr + offset);
       }
 
       vmaUnmapMemory(gpu_->getAllocator(), allocation_);
       update_infos_.clear();
-
-      return *this;
     }
+
+    [[nodiscard]] VkDeviceAddress get_address() const { return address_; }
+
+    [[nodiscard]] VkBufferUsageFlags get_usage() const { return usage_; }
 
     void bind_descriptors(const VkCommandBuffer cmd, const VkPipelineBindPoint bind_point,
                           const VkPipelineLayout pipeline_layout, const uint32_t set) const {
-      VkDeviceSize buffer_offset = 0;
-      for (const auto& [descriptorSize, descriptorCount, binding, offset] : bindings_) {
-        for (int i = 0; i < descriptorCount; ++i) {
-          buffer_offset = i * descriptorSize;
-          vkCmdSetDescriptorBufferOffsetsEXT(cmd, bind_point, pipeline_layout, set, 1, &set,
-                                             &buffer_offset);
-        }
+      std::vector<uint32_t> binding_indices;
+      std::vector<VkDeviceSize> offsets;
+
+      for (const auto& [binding_index, descriptor_binding] : bindings_) {
+        binding_indices.push_back(binding_index);
+        offsets.push_back(descriptor_binding.offset);
       }
+
+      vkCmdSetDescriptorBufferOffsetsEXT(cmd, bind_point, pipeline_layout, set,
+                                         static_cast<uint32_t>(binding_indices.size()),
+                                         binding_indices.data(), offsets.data());
     }
 
     DescriptorBufferInstance& write_image(const uint32 binding, const VkDescriptorType type,
-                                          const VkDescriptorImageInfo& image_info,
+                                          VkDescriptorImageInfo&& image_info,
                                           const uint32 descriptor_index = 0) {
       return write_image_array(binding, type, {image_info}, descriptor_index);
     }
     DescriptorBufferInstance& write_buffer(const uint32 binding, const VkDescriptorType type,
-                                           const VkDeviceAddress resource_address, const size_t buffer_size) {
-      VkDescriptorAddressInfoEXT addr_info
-          = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_ADDRESS_INFO_EXT,
-             .address = resource_address,
-             .range = buffer_size,
-             .format = VK_FORMAT_UNDEFINED};
+                                           const VkDeviceAddress resource_address, const size_t buffer_size, const uint32 descriptor_index = 0) {
+      const auto binding_it = bindings_.find(binding);
+      if (binding_it == bindings_.end()) {
+        throw std::runtime_error("Invalid binding index.");
+      }
 
-      update_infos_.emplace_back(DescriptorUpdate{.type = type,
-                                                 .descriptorSize = MapDescriptorSize(type),
-                                                 .binding = binding,
-                                                 .addr_info = addr_info});
-      bindings_.at(binding).descriptor_size = MapDescriptorSize(type);
+      DescriptorBinding& descriptor_binding = binding_it->second;
+
+      DescriptorUpdate update_info = {
+        .type = type,
+        .descriptorSize = MapDescriptorSize(type),
+        .binding = binding,
+        .descriptorIndex = descriptor_index,
+        .addr_info = {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_ADDRESS_INFO_EXT,
+            .address = resource_address,
+            .range = buffer_size,
+            .format = VK_FORMAT_UNDEFINED,
+        },
+    };
+
+      update_infos_.emplace_back(update_info);
+      descriptor_binding.descriptor_size = MapDescriptorSize(type);
+
       return *this;
     }
     DescriptorBufferInstance& write_image_array(
         const uint32 binding, const VkDescriptorType type,
-                                        const std::vector<VkDescriptorImageInfo>& image_infos, const uint32 first_descriptor = 0) {
-      update_infos_.reserve(image_infos.size());
-      for (uint32 i = 0; i < image_infos.size(); ++i) {
-        DescriptorUpdate update_info{.type = type,
-                                     .descriptorSize = MapDescriptorSize(type),
-                                     .binding = binding,
-                                     .descriptorIndex = i + first_descriptor,
-                                     .image_info = image_infos[i]};
-        update_infos_.emplace_back(update_info);
+        const std::vector<VkDescriptorImageInfo>& image_infos, const uint32 first_descriptor = 0) {
+      auto binding_it = bindings_.find(binding);
+      if (binding_it == bindings_.end()) {
+        throw std::runtime_error("Invalid binding index.");
+        return *this;
       }
-      bindings_.at(binding).descriptor_size = MapDescriptorSize(type) * image_infos.size();
+
+      DescriptorBinding& descriptor_binding = binding_it->second;
+
+      size_t descriptor_size = MapDescriptorSize(type);
+      for (size_t i = 0; i < image_infos.size(); ++i) {
+        DescriptorUpdate update_info = {
+            .type = type,
+            .descriptorSize = descriptor_size,
+            .binding = binding,
+            .descriptorIndex = static_cast<uint32_t>(i + first_descriptor),
+            .image_info = image_infos[i],  // Store by value
+        };
+
+        update_infos_.emplace_back(std::move(update_info));
+      }
+
+      descriptor_binding.descriptor_size = descriptor_size * image_infos.size();
+
       return *this;
     }
 

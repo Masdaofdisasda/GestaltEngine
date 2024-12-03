@@ -55,6 +55,8 @@ namespace gestalt::graphics::fg {
 
   public:
     explicit CommandBuffer(const VkCommandBuffer cmd) : cmd(cmd) {}
+    // todo : add more command buffer functions and remove the get function
+    VkCommandBuffer get() const { return cmd; }
 
     void begin_rendering(const VkRenderingInfo& render_pass_info) const {
       vkCmdBeginRendering(cmd, &render_pass_info);
@@ -155,9 +157,12 @@ namespace gestalt::graphics::fg {
 
   class PipelineUtil : NonCopyable<PipelineUtil> {
     IGpu* gpu_ = nullptr;
+    std::string_view pipeline_name_;
 
     std::unordered_map<uint32, std::unordered_map<uint32, VkDescriptorSetLayoutBinding>>
         set_bindings_;
+
+    std::unordered_map<uint32, std::shared_ptr<DescriptorBufferInstance>> descriptor_buffers_;
     VkPipelineLayout pipeline_layout_ = nullptr;
     VkPipeline pipeline_ = nullptr;
     std::unordered_map<uint32, VkDescriptorSetLayout> descriptor_set_layouts_;
@@ -190,13 +195,12 @@ namespace gestalt::graphics::fg {
     }
 
   public:
-    explicit PipelineUtil(IGpu* gpu) : gpu_(gpu) {}
+    explicit PipelineUtil(IGpu* gpu, const std::string_view pipeline_name) : gpu_(gpu), pipeline_name_(pipeline_name) {}
 
     ~PipelineUtil() = default;
 
     void create_graphics_pipeline(VkGraphicsPipelineCreateInfo pipeline_create_info,
-                                  const std::vector<VkShaderStageFlagBits>& shader_types,
-                                  const std::string_view pipeline_name) {
+                                  const std::vector<VkShaderStageFlagBits>& shader_types) {
 
       for (const auto& shader_type : shader_types) {
         assert(shader_stages_.contains(shader_type) && "Missing shader stage");
@@ -214,7 +218,7 @@ namespace gestalt::graphics::fg {
       VK_CHECK(vkCreateGraphicsPipelines(gpu_->getDevice(), VK_NULL_HANDLE, 1,
                                          &pipeline_create_info, nullptr, &pipeline_));
 
-      gpu_->set_debug_name(pipeline_name, VK_OBJECT_TYPE_PIPELINE,
+      gpu_->set_debug_name(pipeline_name_, VK_OBJECT_TYPE_PIPELINE,
                            reinterpret_cast<uint64_t>(pipeline_));
 
       for (const auto& shader_module : shader_modules_ | std::views::values) {
@@ -222,7 +226,7 @@ namespace gestalt::graphics::fg {
       }
     }
 
-    void create_compute_pipeline(const std::string_view pipeline_name) {
+    void create_compute_pipeline() {
       assert(shader_stages_.contains(VK_SHADER_STAGE_COMPUTE_BIT) && "No compute shader added");
 
       const VkComputePipelineCreateInfo pipeline_info = {
@@ -236,7 +240,7 @@ namespace gestalt::graphics::fg {
       VK_CHECK(vkCreateComputePipelines(gpu_->getDevice(), VK_NULL_HANDLE, 1, &pipeline_info,
                                         nullptr, &pipeline_));
 
-      gpu_->set_debug_name(pipeline_name, VK_OBJECT_TYPE_PIPELINE,
+      gpu_->set_debug_name(pipeline_name_, VK_OBJECT_TYPE_PIPELINE,
                            reinterpret_cast<uint64_t>(pipeline_));
 
       for (const auto& shader_module : shader_modules_ | std::views::values) {
@@ -263,31 +267,88 @@ namespace gestalt::graphics::fg {
     void create_descriptor_layout(
         std::span<const ResourceBinding<ImageInstance>> image_bindings,
         std::span<const ResourceBinding<BufferInstance>> buffer_bindings) {
-      std::unordered_map<uint32, std::unordered_map<uint32, VkDescriptorSetLayoutBinding>> sets;
+      using BindingMap = std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding>;
+      std::unordered_map<uint32_t, BindingMap> descriptor_sets;
 
-      for (const auto& [_, info] : image_bindings) {
-        sets[info.set_index].emplace(info.binding_index,
-                                     VkDescriptorSetLayoutBinding{
-                                         .binding = info.binding_index,
-                                         .descriptorType = info.descriptor_type,
-                                         .descriptorCount = info.descriptor_count,
-                                         .stageFlags = info.shader_stages,
-                                     });
+      // Helper lambda to process bindings
+      auto process_bindings = [&descriptor_sets](const auto& bindings) {
+        for (const auto& binding : bindings) {
+          const auto& info = binding.info;
+          VkDescriptorSetLayoutBinding layout_binding{};
+          layout_binding.binding = info.binding_index;
+          layout_binding.descriptorType = info.descriptor_type;
+          layout_binding.descriptorCount = info.descriptor_count;
+          layout_binding.stageFlags = info.shader_stages;
+
+          descriptor_sets[info.set_index][info.binding_index] = layout_binding;
+        }
+      };
+
+      // Process image and buffer bindings
+      process_bindings(image_bindings);
+      process_bindings(buffer_bindings);
+
+      // Create the descriptor layouts
+      create_descriptor_layout(std::move(descriptor_sets));
+
+      // Group bindings by set index
+      std::unordered_map<uint32_t, std::vector<ResourceBinding<ImageInstance>>>
+          image_bindings_by_set;
+      std::unordered_map<uint32_t, std::vector<ResourceBinding<BufferInstance>>>
+          buffer_bindings_by_set;
+
+      for (const auto& binding : image_bindings) {
+        image_bindings_by_set[binding.info.set_index].push_back(binding);
       }
-      for (const auto& [_, info] : buffer_bindings) {
-        sets[info.set_index].emplace(info.binding_index,
-                                     VkDescriptorSetLayoutBinding{
-                                         .binding = info.binding_index,
-                                         .descriptorType = info.descriptor_type,
-                                         .descriptorCount = info.descriptor_count,
-                                         .stageFlags = info.shader_stages,
-                                     });
+
+      for (const auto& binding : buffer_bindings) {
+        buffer_bindings_by_set[binding.info.set_index].push_back(binding);
       }
-      create_descriptor_layout(std::move(sets));
+
+      // Iterate over each set index to create descriptor buffers and write descriptors
+      for (const auto& [set_index, bindings] : set_bindings_) {
+        std::vector<uint32> binding_indices;
+        for (const auto& binding_index : bindings | std::views::keys) {
+          binding_indices.push_back(binding_index);
+        }
+
+        // Create DescriptorBufferInstance
+        auto descriptor_buffer = std::make_shared<DescriptorBufferInstance>(
+            gpu_, pipeline_name_, descriptor_set_layouts_.at(set_index), binding_indices);
+
+        // Process image bindings for this set index
+        if (auto it = image_bindings_by_set.find(set_index); it != image_bindings_by_set.end()) {
+          for (const auto& binding : it->second) {
+            const auto& info = binding.info;
+            VkDescriptorImageInfo image_info{};
+            image_info.sampler = VK_NULL_HANDLE;  // TODO: Add sampler if needed
+            image_info.imageView = binding.resource->allocated_image.image_view;
+            image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;  // TODO: Set appropriate layout
+
+            descriptor_buffer->write_image(info.binding_index, info.descriptor_type, std::move(image_info));
+          }
+        }
+
+        // Process buffer bindings for this set index
+        if (auto it = buffer_bindings_by_set.find(set_index); it != buffer_bindings_by_set.end()) {
+          for (const auto& binding : it->second) {
+            const auto& info = binding.info;
+            descriptor_buffer->write_buffer(info.binding_index, info.descriptor_type,
+                                            binding.resource->get_address(),
+                                            binding.resource->get_requested_size());
+          }
+        }
+
+        // Update the descriptor buffer
+        descriptor_buffer->update();
+
+        // Store the descriptor buffer
+        descriptor_buffers_.emplace(set_index, std::move(descriptor_buffer));
+      }
     }
 
-    void create_pipeline_layout(const std::string_view pipeline_name,
-                                const VkPushConstantRange push_constant_range) {
+
+    void create_pipeline_layout(const VkPushConstantRange push_constant_range) {
       std::vector<VkDescriptorSetLayout> descriptor_set_layouts_vector;
       for (const auto& layout : descriptor_set_layouts_ | std::views::values) {
         descriptor_set_layouts_vector.push_back(layout);
@@ -310,10 +371,27 @@ namespace gestalt::graphics::fg {
                                       &pipeline_layout));
       pipeline_layout_ = pipeline_layout;
 
-      gpu_->set_debug_name(pipeline_name, VK_OBJECT_TYPE_PIPELINE_LAYOUT,
+      gpu_->set_debug_name(pipeline_name_, VK_OBJECT_TYPE_PIPELINE_LAYOUT,
                            reinterpret_cast<uint64_t>(pipeline_layout_));
     }
 
+    void bind_descriptors(const CommandBuffer cmd,
+                          const VkPipelineBindPoint bind_point) {
+      std::vector<VkDescriptorBufferBindingInfoEXT> bufferBindings;
+      bufferBindings.reserve(descriptor_buffers_.size());
+
+      for (const auto& descriptor_buffer : descriptor_buffers_ | std::views::values) {
+        bufferBindings.push_back({.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_BUFFER_BINDING_INFO_EXT,
+                                  .address = descriptor_buffer->get_address(),
+                                  .usage = descriptor_buffer->get_usage()});
+      }
+      vkCmdBindDescriptorBuffersEXT(cmd.get(), bufferBindings.size(), bufferBindings.data());
+
+      for (const auto& [set_index, descriptor_buffer] : descriptor_buffers_) {
+        descriptor_buffer->bind_descriptors(cmd.get(), bind_point, pipeline_layout_, set_index);
+      }
+    }
+ 
     VkPipelineLayout get_pipeline_layout() const { return pipeline_layout_; }
     VkPipeline get_pipeline() const { return pipeline_; }
   };
@@ -570,11 +648,11 @@ namespace gestalt::graphics::fg {
     CreationStageGuard guard_;
     GraphicsPipelineBuilder graphics_pipeline_builder_{};
     std::vector<VkShaderStageFlagBits> shader_types_;
-
+    VkPipelineBindPoint bind_point_ = VK_PIPELINE_BIND_POINT_GRAPHICS;
 
   public:
 
-    explicit GraphicsPipeline(IGpu* gpu) : util_(gpu) {}
+    explicit GraphicsPipeline(IGpu* gpu, const std::string_view pipeline_name) : util_(gpu, pipeline_name) {}
 
     GraphicsPipeline& add_descriptor_set_layout(
         const std::span<const ResourceBinding<ImageInstance>> image_bindings,
@@ -614,19 +692,19 @@ namespace gestalt::graphics::fg {
       return *this;
     }
 
-    GraphicsPipeline& add_pipeline_layout(const std::string_view pipeline_name,
-                                         VkPushConstantRange push_constant_range) {
+    GraphicsPipeline& add_pipeline_layout(VkPushConstantRange push_constant_range) {
       guard_.in_pipeline_layout_stage();
-      util_.create_pipeline_layout(pipeline_name, push_constant_range);
+      util_.create_pipeline_layout(push_constant_range);
       guard_.next_stage();
       return *this;
     }
 
-    void create_graphics_pipeline(const VkGraphicsPipelineCreateInfo& pipeline_create_info,
-                                  const std::string_view pipeline_name) {
+    void create_graphics_pipeline(const VkGraphicsPipelineCreateInfo& pipeline_create_info) {
       guard_.in_pipeline_stage();
-      util_.create_graphics_pipeline(pipeline_create_info, shader_types_, pipeline_name);
+      util_.create_graphics_pipeline(pipeline_create_info, shader_types_);
     }
+
+    void bind_descriptors(const CommandBuffer cmd) { util_.bind_descriptors(cmd, bind_point_); }
 
     VkPipelineLayout get_pipeline_layout() const { return util_.get_pipeline_layout(); }
 
@@ -637,9 +715,10 @@ namespace gestalt::graphics::fg {
   class ComputePipeline {
     PipelineUtil util_;
     CreationStageGuard guard_;
+    VkPipelineBindPoint bind_point_ = VK_PIPELINE_BIND_POINT_COMPUTE;
 
   public:
-    explicit ComputePipeline(IGpu* gpu) : util_(gpu) {}
+    explicit ComputePipeline(IGpu* gpu, const std::string_view pipeline_name) : util_(gpu, pipeline_name) {}
 
     ComputePipeline& add_descriptor_set_layout(
         const std::span<const ResourceBinding<ImageInstance>> image_bindings,
@@ -657,18 +736,19 @@ namespace gestalt::graphics::fg {
       return *this;
     }
 
-    ComputePipeline& add_pipeline_layout(const std::string_view pipeline_name,
-                                         VkPushConstantRange push_constant_range) {
+    ComputePipeline& add_pipeline_layout(const VkPushConstantRange push_constant_range) {
       guard_.in_pipeline_layout_stage();
-      util_.create_pipeline_layout(pipeline_name, push_constant_range);
+      util_.create_pipeline_layout(push_constant_range);
       guard_.next_stage();
       return *this;
     }
 
-    void create_compute_pipeline(const std::string_view pipeline_name) {
+    void create_compute_pipeline() {
       guard_.in_pipeline_stage();
-      util_.create_compute_pipeline(pipeline_name);
+      util_.create_compute_pipeline();
     }
+
+    void bind_descriptors(const CommandBuffer cmd) { util_.bind_descriptors(cmd, bind_point_); }
 
     VkPipelineLayout get_pipeline_layout() const { return util_.get_pipeline_layout(); }
 
@@ -869,7 +949,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
                                  const std::shared_ptr<BufferInstance>& task_commands,
                                  const std::shared_ptr<BufferInstance>& draws,
                                  const std::shared_ptr<BufferInstance>& command_count, IGpu* gpu)
-        : RenderPass("Draw Cull Directional Depth Pass"), compute_pipeline_(gpu) {
+        : RenderPass("Draw Cull Directional Depth Pass"), compute_pipeline_(gpu, get_name()) {
       resources_
           .add_binding(camera_buffer, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                        VK_SHADER_STAGE_COMPUTE_BIT)
@@ -884,8 +964,8 @@ template <typename ResourceInstanceType> class ResourceCollection {
           .add_descriptor_set_layout(resources_.get_image_bindings(),
                                      resources_.get_buffer_bindings())
           .add_compute_shader("draw_cull_depth.comp.spv")
-          .add_pipeline_layout(get_name(), resources_.get_push_constant_range())
-          .create_compute_pipeline(get_name());
+          .add_pipeline_layout(resources_.get_push_constant_range())
+          .create_compute_pipeline();
     }
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(
@@ -896,8 +976,8 @@ template <typename ResourceInstanceType> class ResourceCollection {
     void execute(CommandBuffer cmd) override {
       const auto command_count = resources_.get_buffer_binding(1, 7).resource;
 
-      cmd.fill_buffer(command_count->allocated_buffer.buffer_handle, 0,
-                      command_count->allocated_buffer.info.size, 0);
+      cmd.fill_buffer(command_count->get_buffer_handle(), 0,
+                      command_count->get_size(), 0);
 
       const int32 maxCommandCount = 123;
       const uint32 groupCount
@@ -905,6 +985,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
 
       const DrawCullDepthConstants draw_cull_constants{.draw_count = maxCommandCount};
 
+      //compute_pipeline_.bind_descriptors(cmd);
       cmd.bind_pipeline(VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipeline_.get_pipeline());
 
       cmd.push_constants(compute_pipeline_.get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
@@ -920,7 +1001,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
   public:
     TaskSubmitDirectionalDepthPass(const std::shared_ptr<BufferInstance>& task_commands,
                                    const std::shared_ptr<BufferInstance>& command_count, IGpu* gpu)
-        : RenderPass("Task Submit Directional Depth Pass"), compute_pipeline_(gpu) {
+        : RenderPass("Task Submit Directional Depth Pass"), compute_pipeline_(gpu, get_name()) {
       resources_
           .add_binding(task_commands, ResourceUsage::READ, 0, 5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                        VK_SHADER_STAGE_COMPUTE_BIT)
@@ -932,8 +1013,8 @@ template <typename ResourceInstanceType> class ResourceCollection {
           .add_descriptor_set_layout(resources_.get_image_bindings(),
                                      resources_.get_buffer_bindings())
           .add_compute_shader("task_submit.comp.spv")
-          .add_pipeline_layout(get_name(), resources_.get_push_constant_range())
-          .create_compute_pipeline(get_name());
+          .add_pipeline_layout(resources_.get_push_constant_range())
+          .create_compute_pipeline();
     }
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
@@ -962,7 +1043,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
                                 const std::shared_ptr<BufferInstance>& task_commands,
                                 const std::shared_ptr<BufferInstance>& draws,
                                 const std::shared_ptr<ImageInstance>& shadow_map, IGpu* gpu)
-        : RenderPass("Meshlet Directional Depth Pass"), graphics_pipeline_(gpu) {
+        : RenderPass("Meshlet Directional Depth Pass"), graphics_pipeline_(gpu, get_name()) {
       resources_
           .add_binding(camera_buffer, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                        VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT
@@ -1006,8 +1087,8 @@ template <typename ResourceInstanceType> class ResourceCollection {
                                      resources_.get_buffer_bindings())
           .set_mesh_task_shading("geometry_depth.task.spv", "geometry_depth.mesh.spv",
                                  "geometry_depth.frag.spv")
-          .add_pipeline_layout(get_name(), resources_.get_push_constant_range())
-          .create_graphics_pipeline(pipeline_builder.build_pipeline_info(), get_name());
+          .add_pipeline_layout(resources_.get_push_constant_range())
+          .create_graphics_pipeline(pipeline_builder.build_pipeline_info());
     }
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(
@@ -1030,7 +1111,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
                  const std::shared_ptr<ImageInstance>& g_buffer_3,
                  const std::shared_ptr<ImageInstance>& g_buffer_depth,
                  const std::shared_ptr<BufferInstance>& geometry_buffer, IGpu* gpu)
-        : RenderPass("Geometry Pass"), graphics_pipeline_(gpu) {
+        : RenderPass("Geometry Pass"), graphics_pipeline_(gpu, get_name()) {
       resources_
           .add_binding(geometry_buffer, ResourceUsage::READ, 0, 0,
                        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
@@ -1066,7 +1147,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
                  const std::shared_ptr<ImageInstance>& shadow_map,
                  const std::shared_ptr<BufferInstance>& material_buffer,
                  const std::shared_ptr<BufferInstance>& light_buffer, IGpu* gpu)
-        : RenderPass("Lighting Pass"), compute_pipeline_(gpu) {
+        : RenderPass("Lighting Pass"), compute_pipeline_(gpu, get_name()) {
       resources_
           .add_binding(scene_lit, ResourceUsage::WRITE, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                        VK_SHADER_STAGE_COMPUTE_BIT)
@@ -1104,7 +1185,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
              const std::shared_ptr<ImageInstance>& g_buffer_2,
              const std::shared_ptr<ImageInstance>& rotation_texture,
              const std::shared_ptr<ImageInstance>& occlusion, IGpu* gpu)
-        : RenderPass("Ssao Pass"), compute_pipeline_(gpu) {
+        : RenderPass("Ssao Pass"), compute_pipeline_(gpu, get_name()) {
       resources_
           .add_binding(g_buffer_depth, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                        VK_SHADER_STAGE_COMPUTE_BIT)
@@ -1132,7 +1213,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
   public:
     ToneMapPass(const std::shared_ptr<ImageInstance>& scene_final,
                 const std::shared_ptr<ImageInstance>& scene_lit, IGpu* gpu)
-        : RenderPass("Tone Map Pass"), compute_pipeline_(gpu) {
+        : RenderPass("Tone Map Pass"), compute_pipeline_(gpu, get_name()) {
       resources_
           .add_binding(scene_lit, ResourceUsage::READ, 0, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                        VK_SHADER_STAGE_COMPUTE_BIT)
@@ -1306,6 +1387,6 @@ template <typename ResourceInstanceType> class ResourceCollection {
     void compile();
 
     void execute(CommandBuffer cmd);
-  };
+  }; 
 
 }  // namespace gestalt::graphics::fg
