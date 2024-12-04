@@ -65,6 +65,8 @@ namespace gestalt::application {
       pool_info.pPoolSizes = pool_sizes;
 
       VK_CHECK(vkCreateDescriptorPool(gpu_->getDevice(), &pool_info, nullptr, &imguiPool_));
+      gpu_->set_debug_name("ImGui Descriptor Pool", VK_OBJECT_TYPE_DESCRIPTOR_POOL,
+                           reinterpret_cast<uint64_t>(imguiPool_));
 
 
       builder->clear();

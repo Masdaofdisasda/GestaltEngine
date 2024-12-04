@@ -4,6 +4,7 @@
 #include <memory>
 #include <ranges>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "ResourceTypes.hpp"
@@ -190,6 +191,11 @@ namespace gestalt::graphics::fg {
 
         VkDescriptorSetLayout descriptor_set_layout;
         VK_CHECK(vkCreateDescriptorSetLayout(gpu_->getDevice(), &info, nullptr, &descriptor_set_layout));
+        const std::string descriptor_set_layout_name = std::string(pipeline_name_) + " Set "
+                                                       + std::to_string(set_index)
+                                                       + " Descriptor Set Layout";
+        gpu_->set_debug_name(descriptor_set_layout_name, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
+                             reinterpret_cast<uint64_t>(descriptor_set_layout));
         descriptor_set_layouts_.emplace(set_index, descriptor_set_layout);
       }
     }
@@ -203,7 +209,9 @@ namespace gestalt::graphics::fg {
                                   const std::vector<VkShaderStageFlagBits>& shader_types) {
 
       for (const auto& shader_type : shader_types) {
-        assert(shader_stages_.contains(shader_type) && "Missing shader stage");
+        if (!shader_stages_.contains(shader_type)) {
+          throw std::runtime_error("Missing shader stage");
+        }
       }
 
       std::vector<VkPipelineShaderStageCreateInfo> shader_stages;
@@ -218,7 +226,8 @@ namespace gestalt::graphics::fg {
       VK_CHECK(vkCreateGraphicsPipelines(gpu_->getDevice(), VK_NULL_HANDLE, 1,
                                          &pipeline_create_info, nullptr, &pipeline_));
 
-      gpu_->set_debug_name(pipeline_name_, VK_OBJECT_TYPE_PIPELINE,
+      const std::string pipeline_name = std::string(pipeline_name_) + " - Graphics Pipeline";
+      gpu_->set_debug_name(pipeline_name, VK_OBJECT_TYPE_PIPELINE,
                            reinterpret_cast<uint64_t>(pipeline_));
 
       for (const auto& shader_module : shader_modules_ | std::views::values) {
@@ -227,7 +236,9 @@ namespace gestalt::graphics::fg {
     }
 
     void create_compute_pipeline() {
-      assert(shader_stages_.contains(VK_SHADER_STAGE_COMPUTE_BIT) && "No compute shader added");
+      if (!shader_stages_.contains(VK_SHADER_STAGE_COMPUTE_BIT)) {
+        throw std::runtime_error("Missing shader stage");
+      }
 
       const VkComputePipelineCreateInfo pipeline_info = {
           .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
@@ -240,7 +251,8 @@ namespace gestalt::graphics::fg {
       VK_CHECK(vkCreateComputePipelines(gpu_->getDevice(), VK_NULL_HANDLE, 1, &pipeline_info,
                                         nullptr, &pipeline_));
 
-      gpu_->set_debug_name(pipeline_name_, VK_OBJECT_TYPE_PIPELINE,
+      const std::string pipeline_name = std::string(pipeline_name_) + " - Compute Pipeline";
+      gpu_->set_debug_name(pipeline_name, VK_OBJECT_TYPE_PIPELINE,
                            reinterpret_cast<uint64_t>(pipeline_));
 
       for (const auto& shader_module : shader_modules_ | std::views::values) {
@@ -313,8 +325,11 @@ namespace gestalt::graphics::fg {
         }
 
         // Create DescriptorBufferInstance
+        const std::string descriptor_buffer_name
+            = std::string(pipeline_name_) + " Set " + std::to_string(set_index)
+              + " Descriptor Buffer";
         auto descriptor_buffer = std::make_shared<DescriptorBufferInstance>(
-            gpu_, pipeline_name_, descriptor_set_layouts_.at(set_index), binding_indices);
+            gpu_, descriptor_buffer_name, descriptor_set_layouts_.at(set_index), binding_indices);
 
         // Process image bindings for this set index
         if (auto it = image_bindings_by_set.find(set_index); it != image_bindings_by_set.end()) {
@@ -369,7 +384,8 @@ namespace gestalt::graphics::fg {
                                       &pipeline_layout));
       pipeline_layout_ = pipeline_layout;
 
-      gpu_->set_debug_name(pipeline_name_, VK_OBJECT_TYPE_PIPELINE_LAYOUT,
+      const std::string name = std::string(pipeline_name_) + " Pipeline Layout";
+      gpu_->set_debug_name(name, VK_OBJECT_TYPE_PIPELINE_LAYOUT,
                            reinterpret_cast<uint64_t>(pipeline_layout_));
     }
 
@@ -643,11 +659,69 @@ namespace gestalt::graphics::fg {
                                      {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT});
     }
 
-    void bind_descriptors(const CommandBuffer cmd) { util_.bind_descriptors(cmd, bind_point_); }
+    void bind(const CommandBuffer cmd) {
+      util_.bind_descriptors(cmd, bind_point_);
+      cmd.bind_pipeline(bind_point_, util_.get_pipeline());
+    }
+
+    void begin_render_pass(
+        const CommandBuffer cmd,
+        const std::unordered_map<uint32, std::shared_ptr<ImageInstance>>& color_attachments,
+        const std::shared_ptr<ImageInstance>& depth_attachment) {
+      std::vector<VkRenderingAttachmentInfo> color_attachment_info;
+      VkRenderingAttachmentInfo depth_attachment_info = {};
+      VkExtent2D extent = {0, 0};
+      VkViewport viewport{
+          .x = 0,
+          .y = 0,
+          .minDepth = 0.f,
+          .maxDepth = 1.f,
+      };
+      VkRect2D scissor{
+          .offset = {0, 0},
+      };
+
+      if (!color_attachments.empty()) {
+        color_attachment_info.reserve(color_attachments.size());
+        for (int i = 0; i < color_attachments.size(); ++i) {
+          const auto& attachment = color_attachments.at(i);
+          color_attachment_info.push_back(vkinit::attachment_info(attachment->allocated_image.image_view,
+                                                             nullptr, attachment->current_layout));
+          extent = {attachment->extent.width, attachment->extent.height};
+        }
+      }
+
+      if (depth_attachment != nullptr) {
+        depth_attachment_info = vkinit::attachment_info(depth_attachment->allocated_image.image_view,
+                                                  nullptr, depth_attachment->current_layout);
+        extent = {depth_attachment->extent.width, depth_attachment->extent.height};
+      }
+
+      viewport.width = static_cast<float>(extent.width);
+      viewport.height = static_cast<float>(extent.height);
+      scissor.extent.width = extent.width;
+      scissor.extent.height = extent.height;
+
+      VkRenderingInfo rendering_info;
+      if (color_attachment_info.empty()) {
+        rendering_info = vkinit::rendering_info(extent, nullptr,
+                                                depth_attachment_info.sType ? &depth_attachment_info : nullptr);
+      } else {
+        rendering_info = vkinit::rendering_info_for_gbuffer(
+            extent, color_attachment_info.data(), color_attachment_info.size(),
+                                     depth_attachment_info.sType ? &depth_attachment_info : nullptr);
+      }
+
+      cmd.begin_rendering(rendering_info);
+      cmd.set_viewport(0, 1, &viewport);
+      cmd.set_scissor(0, 1, &scissor);
+    }
 
     [[nodiscard]] VkPipelineLayout get_pipeline_layout() const { return util_.get_pipeline_layout(); }
 
     [[nodiscard]] VkPipeline get_pipeline() const { return util_.get_pipeline(); }
+
+    [[nodiscard]] VkPipelineBindPoint get_bind_point() const { return bind_point_; }
 
   };
 
@@ -669,12 +743,16 @@ namespace gestalt::graphics::fg {
       util_.create_compute_pipeline();
     }
 
-
-    void bind_descriptors(const CommandBuffer cmd) { util_.bind_descriptors(cmd, bind_point_); }
+    void bind(const CommandBuffer cmd) {
+      util_.bind_descriptors(cmd, bind_point_);
+      cmd.bind_pipeline(bind_point_, util_.get_pipeline());
+    }
 
     [[nodiscard]] VkPipelineLayout get_pipeline_layout() const { return util_.get_pipeline_layout(); }
 
     [[nodiscard]] VkPipeline get_pipeline() const { return util_.get_pipeline(); }
+
+    [[nodiscard]] VkPipelineBindPoint get_bind_point() const { return bind_point_; }
   };
 
   enum class ResourceUsage {
@@ -693,7 +771,9 @@ template <typename ResourceInstanceType> class ResourceCollection {
   public:
     // Add or update a resource with a specific usage
     void add_resource(const std::shared_ptr<ResourceInstanceType>& resource, ResourceUsage usage) {
-      assert(resource && "Resource cannot be null!");
+      if (resource == nullptr) {
+        throw std::runtime_error("Resource cannot be null!");
+      }
       auto& metadata = resources_[resource];
       metadata.usage_mask.set(static_cast<size_t>(usage));  // Set the usage bit
     }
@@ -734,11 +814,15 @@ template <typename ResourceInstanceType> class ResourceCollection {
 
     ResourceComponentBindings& add_attachment(const std::shared_ptr<ImageInstance>& image,
                                       const ResourceUsage usage, uint32 attachment_index = 0) {
-      assert(usage == ResourceUsage::WRITE && "Attachment must be write only");
+      if (usage != ResourceUsage::WRITE) {
+        throw std::runtime_error("Attachment must be write only");
+      }
       if (image->image_template.type == TextureType::kColor) {
         color_attachments.emplace(attachment_index, image);
       } else if (image->image_template.type == TextureType::kDepth) {
-        assert(attachment_index == 0 && "Depth attachment index must be 0");
+        if (attachment_index != 0) {
+          throw std::runtime_error("Depth attachment index must be 0");
+        }
         depth_attachment = image;
       }
       images.add_resource(image, usage);
@@ -747,7 +831,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
 
     ResourceComponentBindings& add_binding(const uint32 set_index, const uint32 binding_index,
                                            const std::shared_ptr<ImageInstance>& image,
-                                           ResourceUsage usage,
+                                           const ResourceUsage usage,
                                            const VkDescriptorType descriptor_type,
                                            const VkShaderStageFlags shader_stages,
                                            const uint32 descriptor_count = 1) {
@@ -759,7 +843,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
 
     ResourceComponentBindings& add_binding(const uint32 set_index, const uint32 binding_index,
                                            const std::shared_ptr<BufferInstance>& buffer,
-                                           ResourceUsage usage,
+                                           const ResourceUsage usage,
                                            const VkDescriptorType descriptor_type,
                                            const VkShaderStageFlags shader_stages) {
       buffer_bindings.push_back(
@@ -876,55 +960,57 @@ template <typename ResourceInstanceType> class ResourceCollection {
     };
     ResourceComponent resources_;
     ComputePipeline compute_pipeline_;
+    std::function<int32()> draw_count_provider_;  // Function to compute draw count
 
   public:
     DrawCullDirectionalDepthPass(const std::shared_ptr<BufferInstance>& camera_buffer,
                                  const std::shared_ptr<BufferInstance>& task_commands,
                                  const std::shared_ptr<BufferInstance>& draws,
-                                 const std::shared_ptr<BufferInstance>& command_count, IGpu* gpu)
+                                 const std::shared_ptr<BufferInstance>& command_count, IGpu* gpu,
+                                 std::function<int32()> draw_count_provider)
         : RenderPass("Draw Cull Directional Depth Pass"),
           resources_(std::move(
               ResourceComponentBindings()
-                  .add_binding( 0, 0,camera_buffer, ResourceUsage::READ,
+                  .add_binding(0, 0, camera_buffer, ResourceUsage::READ,
                                VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
-                  .add_binding(1, 6,draws, ResourceUsage::READ,  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                  .add_binding(1, 6, draws, ResourceUsage::READ, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                VK_SHADER_STAGE_COMPUTE_BIT)
-                  .add_binding(1, 5,task_commands, ResourceUsage::WRITE, 
+                  .add_binding(1, 5, task_commands, ResourceUsage::WRITE,
                                VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
-                  .add_binding(1, 7,command_count, ResourceUsage::WRITE, 
+                  .add_binding(1, 7, command_count, ResourceUsage::WRITE,
                                VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
                   .add_push_constant(sizeof(DrawCullDepthConstants), VK_SHADER_STAGE_COMPUTE_BIT))),
           compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
                             resources_.get_buffer_bindings(), resources_.get_push_constant_range(),
-                            "draw_cull_depth.comp.spv") {}
+                            "draw_cull_depth.comp.spv"),
+          draw_count_provider_(std::move(draw_count_provider)) {}
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(
         const ResourceUsage usage) override {
       return resources_.get_resources(usage);
     }
 
-    void execute(CommandBuffer cmd) override {
+    void execute(const CommandBuffer cmd) override {
       const auto command_count = resources_.get_buffer_binding(1, 7).resource;
 
       cmd.fill_buffer(command_count->get_buffer_handle(), 0,
                       command_count->get_size(), 0);
 
-      const int32 maxCommandCount = 123;
-      const uint32 groupCount
-          = (static_cast<uint32>(maxCommandCount) + 63) / 64;  // 64 threads per group
+      const int32 max_command_count = draw_count_provider_();
+      const uint32 group_count
+          = (static_cast<uint32>(max_command_count) + 63) / 64;  // 64 threads per group
 
-      const DrawCullDepthConstants draw_cull_constants{.draw_count = maxCommandCount};
+      const DrawCullDepthConstants draw_cull_constants{.draw_count = max_command_count};
 
-      compute_pipeline_.bind_descriptors(cmd);
-      cmd.bind_pipeline(VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipeline_.get_pipeline());
+      compute_pipeline_.bind(cmd);
 
       cmd.push_constants(compute_pipeline_.get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
                          sizeof(DrawCullDepthConstants), &draw_cull_constants);
-      cmd.dispatch(groupCount, 1, 1);
+      cmd.dispatch(group_count, 1, 1);
     }
   };
 
-  class TaskSubmitDirectionalDepthPass : public RenderPass {
+  class TaskSubmitDirectionalDepthPass final : public RenderPass {
     ResourceComponent resources_;
     ComputePipeline compute_pipeline_;
 
@@ -944,17 +1030,23 @@ template <typename ResourceInstanceType> class ResourceCollection {
                             resources_.get_buffer_bindings(), resources_.get_push_constant_range(),
                             "task_submit.comp.spv") {}
 
-    std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
+    std::vector<std::shared_ptr<ResourceInstance>> get_resources(const ResourceUsage usage) override {
       return resources_.get_resources(usage);
     }
 
-    void execute(CommandBuffer cmd) override {
-      compute_pipeline_.bind_descriptors(cmd);
-      // draw
+    void execute(const CommandBuffer cmd) override {
+      compute_pipeline_.bind(cmd);
+      cmd.dispatch(1, 1, 1);
     }
   };
 
-  class MeshletDirectionalDepthPass : public RenderPass {
+  class MeshletDirectionalDepthPass final : public RenderPass {
+    struct alignas(16) MeshletDepthPushConstants {
+      int cullFlags{0};
+      float32 pyramidWidth, pyramidHeight;  // depth pyramid size in texels
+      int32 clusterOcclusionEnabled;
+    };
+
     ResourceComponent resources_;
     GraphicsPipeline graphics_pipeline_;
 
@@ -970,6 +1062,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
                                 const std::shared_ptr<BufferInstance>& meshlet_indices,
                                 const std::shared_ptr<BufferInstance>& task_commands,
                                 const std::shared_ptr<BufferInstance>& draws,
+                                const std::shared_ptr<BufferInstance>& command_count,
                                 const std::shared_ptr<ImageInstance>& shadow_map, IGpu* gpu)
         : RenderPass("Meshlet Directional Depth Pass"),
           resources_(std::move(
@@ -1004,6 +1097,10 @@ template <typename ResourceInstanceType> class ResourceCollection {
                                VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
                   .add_binding(2, 6,draws, ResourceUsage::READ,  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
+                  .add_binding(2, 7, command_count, ResourceUsage::READ,  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                               VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
+                  .add_push_constant(sizeof(MeshletDepthPushConstants),
+                                     VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT)
                   .add_attachment(shadow_map, ResourceUsage::WRITE))),
 
           graphics_pipeline_(
@@ -1025,13 +1122,22 @@ template <typename ResourceInstanceType> class ResourceCollection {
       return resources_.get_resources(usage);
     }
 
-    void execute(CommandBuffer cmd) override {
-      graphics_pipeline_.bind_descriptors(cmd);
-      // draw
+    void execute(const CommandBuffer cmd) override {
+      graphics_pipeline_.begin_render_pass(cmd, *resources_.get_color_attachment(),
+                                           *resources_.get_depth_attachment());
+      graphics_pipeline_.bind(cmd);
+
+      constexpr MeshletDepthPushConstants draw_cull_constants{};
+      cmd.push_constants(graphics_pipeline_.get_pipeline_layout(),
+                         VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT, 0,
+                         sizeof(MeshletDepthPushConstants), &draw_cull_constants);
+      const auto command_count = resources_.get_buffer_binding(2, 7).resource;
+      cmd.draw_mesh_tasks_indirect_ext(command_count->get_buffer_handle(), sizeof(uint32), 1, 0);
+      cmd.end_rendering();
     }
   };
 
-  class GeometryPass : public RenderPass {
+  class GeometryPass final : public RenderPass {
     ResourceComponent resources_;
     GraphicsPipeline graphics_pipeline_;
 
@@ -1078,7 +1184,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
     }
   };
 
-  class LightingPass : public RenderPass {
+  class LightingPass final : public RenderPass {
     ResourceComponent resources_;
     ComputePipeline compute_pipeline_;
 
@@ -1131,7 +1237,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
     }
   };
 
-  class SsaoPass : public RenderPass {
+  class SsaoPass final : public RenderPass {
     ResourceComponent resources_;
     ComputePipeline compute_pipeline_;
 
@@ -1164,7 +1270,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
     }
   };
 
-  class ToneMapPass : public RenderPass {
+  class ToneMapPass final : public RenderPass {
     ResourceComponent resources_;
     ComputePipeline compute_pipeline_;
 
@@ -1302,11 +1408,15 @@ template <typename ResourceInstanceType> class ResourceCollection {
                                                     = CreationType::INTERNAL) {
       auto resource = resource_registry_->add_template(std::move(image_template));
       const uint64 handle = resource->resource_handle;
-      assert(handle != 0 && "Invalid resource handle!");
+      if (handle == -1) {
+        throw std::runtime_error("Invalid resource handle!");
+      }
 
       auto inserted = edges_.emplace(
           handle, std::make_shared<FrameGraphEdge>(std::move(resource), creation_type));
-      assert(inserted.second && "Failed to insert edge into edges map!");
+      if (!inserted.second) {
+        throw std::runtime_error("Failed to insert edge into edges map!");
+      }
 
       return std::static_pointer_cast<ImageInstance>(inserted.first->second->resource);
     }
@@ -1316,11 +1426,15 @@ template <typename ResourceInstanceType> class ResourceCollection {
                                                  = CreationType::INTERNAL) {
       auto resource = resource_registry_->add_template(std::move(buffer_template));
       const uint64 handle = resource->resource_handle;
-      assert(handle != 0 && "Invalid resource handle!");
+      if (handle == -1) {
+        throw std::runtime_error("Invalid resource handle!");
+      }
 
       auto inserted = edges_.emplace(
           handle, std::make_shared<FrameGraphEdge>(std::move(resource), creation_type));
-      assert(inserted.second && "Failed to insert edge into edges map!");
+      if (!inserted.second) {
+        throw std::runtime_error("Failed to insert edge into edges map!");
+      }
 
       return std::static_pointer_cast<BufferInstance>(inserted.first->second->resource);
     }
@@ -1329,17 +1443,25 @@ template <typename ResourceInstanceType> class ResourceCollection {
     template <typename ResourceInstanceType>
     auto add_resource(std::shared_ptr<ResourceInstanceType> resource_instance,
                       CreationType creation_type = CreationType::EXTERNAL) {
-      assert(resource_instance != nullptr && "Resource instance cannot be null!");
+      if (resource_instance == nullptr) {
+        throw std::runtime_error("Resource instance cannot be null!");
+      }
 
       auto resource = resource_registry_->add_resource(resource_instance);
-      assert(resource != nullptr && "Failed to add resource to the registry!");
+      if (resource == nullptr) {
+        throw std::runtime_error("Failed to add resource to the registry!");
+      }
 
       uint64 handle = resource->resource_handle;
-      assert(handle != -1 && "Invalid resource handle!");
+      if (handle == -1) {
+        throw std::runtime_error("Invalid resource handle!");
+      }
 
       auto inserted = edges_.emplace(
           handle, std::make_shared<FrameGraphEdge>(std::move(resource), creation_type));
-      assert(inserted.second && "Failed to insert edge into edges map!");
+      if (!inserted.second) {
+        throw std::runtime_error("Failed to insert edge into edges map!");
+      }
 
       return std::static_pointer_cast<ResourceInstanceType>(inserted.first->second->resource);
     }

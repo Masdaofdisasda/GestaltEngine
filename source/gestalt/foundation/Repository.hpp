@@ -48,6 +48,7 @@ namespace gestalt::foundation {
       if (it != components_.end()) {
         return it->second;
       }
+      throw std::runtime_error("Component not found");
     }
 
     // NOTE: this does not check if the entity exists

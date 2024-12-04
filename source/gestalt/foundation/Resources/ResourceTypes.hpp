@@ -30,8 +30,9 @@ namespace gestalt::foundation {
     float32 scale{1.0f};
 
     explicit RelativeImageSize(const float32 scale = 1.0f) : scale(scale) {
-      assert(scale > 0.0f && "Scale must be positive.");
-      assert(scale <= 16.0f && "Scale cannot be higher than 16.0.");
+      if (scale <= 0.0f || scale > 16.0f) {
+        throw std::runtime_error("Scale must be positive and less than 16.0.");
+      }
     }
   };
 
@@ -41,7 +42,9 @@ namespace gestalt::foundation {
 
     AbsoluteImageSize(const uint32 width, const uint32 height, const uint32 depth = 0) {
       extent = {width, height, depth};
-      assert(width > 0 && height > 0 && "Width and height must be positive.");
+      if (width <= 0 || height <= 0) {
+        throw std::runtime_error("Width and height must be positive.");
+      }
     }
   };
 
@@ -64,19 +67,25 @@ namespace gestalt::foundation {
     }
 
     ImageTemplate& set_initial_value(const VkClearColorValue& clear_value) {
-      assert(type == TextureType::kColor && "Clear color only supported for color images.");
+      if (type == TextureType::kDepth) {
+        throw std::runtime_error("Clear color only supported for color images.");
+      }
       this->initial_value = VkClearValue({.color = clear_value});
       return *this;
     }
 
     ImageTemplate& set_initial_value(const VkClearDepthStencilValue& clear_value) {
-      assert(type == TextureType::kDepth && "Clear depth only supported for depth images.");
+      if (type == TextureType::kColor) {
+        throw std::runtime_error("Clear depth only supported for depth images.");
+      }
       this->initial_value = VkClearValue({.depthStencil = clear_value});
       return *this;
     }
 
     ImageTemplate& set_initial_value(const std::filesystem::path& path) {
-      assert(type == TextureType::kColor && "path only supported for color images.");
+      if (type == TextureType::kDepth) {
+        throw std::runtime_error("path only supported for color images.");
+      }
       this->initial_value = path;
       return *this;
     }
@@ -201,9 +210,8 @@ namespace gestalt::foundation {
         case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
           return properties.inputAttachmentDescriptorSize;
         default:
-          assert(false && "Invalid descriptor type");
+          throw std::runtime_error("Descriptor type not implemented");
       }
-      return 0;
     }
 
     static size_t aligned_size(const size_t size, const size_t alignment) {
@@ -251,7 +259,8 @@ namespace gestalt::foundation {
       VK_CHECK(vmaCreateBuffer(gpu_->getAllocator(), &buffer_info, &vma_alloc_info, &buffer_handle_,
                                &allocation_, &info_));
 
-      gpu_->set_debug_name(std::string(name) + " Descriptor Buffer", VK_OBJECT_TYPE_BUFFER,
+      gpu_->set_debug_name(name,
+                           VK_OBJECT_TYPE_BUFFER,
                            reinterpret_cast<uint64>(buffer_handle_));
 
       const VkBufferDeviceAddressInfo device_address_info = {
