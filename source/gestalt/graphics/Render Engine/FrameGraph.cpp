@@ -120,7 +120,7 @@ namespace gestalt::graphics::fg {
     topological_sort();
   }
 
-  void FrameGraph::execute(CommandBuffer cmd) {
+  void FrameGraph::execute(const CommandBuffer cmd) const {
     // run each render pass in order and synchronize resources
     // for (auto& pass_node : pass_nodes_) {
     // bind resources to descriptor sets
@@ -128,6 +128,7 @@ namespace gestalt::graphics::fg {
     // pass_node.pass.execute(pass_node.inputs...)
 
     for (const auto& node : sorted_nodes_) {
+      synchronization_manager_->synchronize_resources(node, cmd);
       node->render_pass->execute(cmd);
     }
   }

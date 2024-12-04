@@ -25,6 +25,12 @@ namespace gestalt::foundation {
 
   enum class ImageType { kImage2D, kImage3D, kCubeMap };
 
+  enum class ResourceUsage {
+    READ,
+    WRITE,
+    COUNT  // To represent the total number of usage types
+  };
+
   // scaled from window/screen resolution
   struct RelativeImageSize {
     float32 scale{1.0f};
@@ -51,6 +57,7 @@ namespace gestalt::foundation {
   struct ImageTemplate final : ResourceTemplate {
     ImageType image_type = ImageType::kImage2D;
     TextureType type = TextureType::kColor;
+    VkImageAspectFlags aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT;    
     std::variant<VkClearValue, std::filesystem::path> initial_value
         = VkClearValue({.color = {0.f, 0.f, 0.f, 1.f}});
     std::variant<RelativeImageSize, AbsoluteImageSize> image_size = RelativeImageSize(1.f);
@@ -63,6 +70,11 @@ namespace gestalt::foundation {
     ImageTemplate& set_image_type(const TextureType texture_type, const VkFormat format) {
       this->type = texture_type;
       this->format = format;
+      if (type == TextureType::kDepth) {
+        aspect_flags = VK_IMAGE_ASPECT_DEPTH_BIT;
+      } else {
+        aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT;
+      }
       return *this;
     }
 
@@ -114,12 +126,24 @@ namespace gestalt::foundation {
         : ResourceTemplate(std::move(name)), size(size), usage(usage), memory_usage(memory_usage) {}
   };
 
+    struct BufferInstance;
+  struct ImageInstance;
+
+  struct ResourceVisitor {
+    virtual void visit(BufferInstance& buffer, ResourceUsage usage) = 0;
+    virtual void visit(ImageInstance& image, ResourceUsage usage) = 0;
+    virtual ~ResourceVisitor() = default;
+  };
+
   struct ResourceInstance {
     uint64 resource_handle = -1; // todo refactor to return instance handles
     std::string resource_name;
     explicit ResourceInstance(std::string resource_name) : resource_name(std::move(resource_name)) {}
     [[nodiscard]] std::string_view name() const {
       return resource_name; }
+
+    virtual void accept(ResourceVisitor& visitor, ResourceUsage usage) = 0;
+    virtual ~ResourceInstance() = default;
   };
 
   struct AllocatedImage {
@@ -135,6 +159,26 @@ namespace gestalt::foundation {
           image_template(std::move(image_template)),
           allocated_image(allocated_image),
           extent(extent) {}
+
+    void accept(ResourceVisitor& visitor, const ResourceUsage usage) override { visitor.visit(*this, usage); }
+
+    void set_layout(const VkImageLayout layout) { current_layout = layout; }
+
+    [[nodiscard]] VkImage get_image_handle() const { return allocated_image.image_handle; }
+
+    [[nodiscard]] VkImageAspectFlags get_image_aspect() const { return image_template.aspect_flags;
+    }
+ 
+    [[nodiscard]] VkImageView get_image_view() const { return allocated_image.image_view; }
+
+    [[nodiscard]] VkExtent3D get_extent() const { return extent; }
+
+    [[nodiscard]] VkImageLayout get_layout() const { return current_layout; }
+    [[nodiscard]] VkFormat get_format() const { return image_template.format; }
+
+    TextureType get_type() { return image_template.type; }
+
+  private:
 
     ImageTemplate image_template;
     AllocatedImage allocated_image;
@@ -155,6 +199,7 @@ namespace gestalt::foundation {
           buffer_template(std::move(buffer_template)),
           allocated_buffer(allocated_buffer){}
 
+    void accept(ResourceVisitor& visitor, const ResourceUsage usage) override { visitor.visit(*this, usage); }
     // size that was actually allocated, alignment might have been added
     [[nodiscard]] VkDeviceSize get_size() const { return allocated_buffer.info.size; }
 

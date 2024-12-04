@@ -337,7 +337,7 @@ namespace gestalt::graphics::fg {
             const auto& info = binding.info;
             VkDescriptorImageInfo image_info{};
             image_info.sampler = VK_NULL_HANDLE;  // TODO: Add sampler if needed
-            image_info.imageView = binding.resource->allocated_image.image_view;
+            image_info.imageView = binding.resource->get_image_view();
             image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;  // TODO: Set appropriate layout
 
             descriptor_buffer->write_image(info.binding_index, info.descriptor_type, std::move(image_info));
@@ -685,16 +685,16 @@ namespace gestalt::graphics::fg {
         color_attachment_info.reserve(color_attachments.size());
         for (int i = 0; i < color_attachments.size(); ++i) {
           const auto& attachment = color_attachments.at(i);
-          color_attachment_info.push_back(vkinit::attachment_info(attachment->allocated_image.image_view,
-                                                             nullptr, attachment->current_layout));
-          extent = {attachment->extent.width, attachment->extent.height};
+          color_attachment_info.push_back(vkinit::attachment_info(attachment->get_image_view(),
+                                                             nullptr, attachment->get_layout()));
+          extent = {attachment->get_extent().width, attachment->get_extent().height};
         }
       }
 
       if (depth_attachment != nullptr) {
-        depth_attachment_info = vkinit::attachment_info(depth_attachment->allocated_image.image_view,
-                                                  nullptr, depth_attachment->current_layout);
-        extent = {depth_attachment->extent.width, depth_attachment->extent.height};
+        depth_attachment_info = vkinit::attachment_info(depth_attachment->get_image_view(),
+                                                  nullptr, depth_attachment->get_layout());
+        extent = {depth_attachment->get_extent().width, depth_attachment->get_extent().height};
       }
 
       viewport.width = static_cast<float>(extent.width);
@@ -755,11 +755,6 @@ namespace gestalt::graphics::fg {
     [[nodiscard]] VkPipelineBindPoint get_bind_point() const { return bind_point_; }
   };
 
-  enum class ResourceUsage {
-    READ, WRITE,
-    COUNT  // To represent the total number of usage types
-    };
-
   
 template <typename ResourceInstanceType> class ResourceCollection {
     struct ResourceMetadata {
@@ -817,9 +812,9 @@ template <typename ResourceInstanceType> class ResourceCollection {
       if (usage != ResourceUsage::WRITE) {
         throw std::runtime_error("Attachment must be write only");
       }
-      if (image->image_template.type == TextureType::kColor) {
+      if (image->get_type() == TextureType::kColor) {
         color_attachments.emplace(attachment_index, image);
-      } else if (image->image_template.type == TextureType::kDepth) {
+      } else if (image->get_type() == TextureType::kDepth) {
         if (attachment_index != 0) {
           throw std::runtime_error("Depth attachment index must be 0");
         }
@@ -1114,7 +1109,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
                   .set_multisampling_none()
                   .disable_blending()
                   .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-                  .set_depth_format(resources_.get_depth_attachment()->get()->image_template.format)
+                  .set_depth_format(resources_.get_depth_attachment()->get()->get_format())
                   .build_pipeline_info()) {}
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(
@@ -1172,7 +1167,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
                   .set_multisampling_none()
                   .disable_blending()
                   .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-                  .set_depth_format(resources_.get_depth_attachment()->get()->image_template.format)
+                  .set_depth_format(resources_.get_depth_attachment()->get()->get_format())
                   .build_pipeline_info()) {}
 
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
@@ -1354,7 +1349,115 @@ template <typename ResourceInstanceType> class ResourceCollection {
   };
 
   class SynchronizationManager {
-    // manage synchronization between resources
+    class SynchronizationVisitor final : public ResourceVisitor {
+      CommandBuffer cmd_;
+      std::vector<VkImageMemoryBarrier> image_barriers;
+      std::vector<VkBufferMemoryBarrier> buffer_barriers;
+
+    public:
+      explicit SynchronizationVisitor(const CommandBuffer cmd) : cmd_(cmd) {}
+
+      void visit(BufferInstance& buffer, ResourceUsage usage) override {
+        VkBufferMemoryBarrier barrier = {};
+        barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        barrier.buffer = buffer.get_buffer_handle();
+        barrier.offset = 0;
+        barrier.size = VK_WHOLE_SIZE;
+
+        // Set appropriate access masks and pipeline stages based on usage
+        switch (usage) {
+          case ResourceUsage::READ:
+            barrier.srcAccessMask = VK_ACCESS_NONE;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            break;
+
+          case ResourceUsage::WRITE:
+            barrier.srcAccessMask = VK_ACCESS_NONE;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+            break;
+
+          default:
+            throw std::runtime_error("Unsupported ResourceUsage for buffer!");
+        }
+
+        buffer_barriers.push_back(barrier);
+      }
+
+      void visit(ImageInstance& image, ResourceUsage usage) override {
+        VkImageMemoryBarrier barrier = {};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.image = image.get_image_handle();
+        barrier.subresourceRange = vkinit::image_subresource_range(image.get_image_aspect());
+
+        // Set appropriate layouts and access masks based on type and usage
+        switch (image.get_type()) {
+          case TextureType::kColor:
+            barrier.oldLayout = image.get_layout();
+            barrier.newLayout = (usage == ResourceUsage::READ)
+                                    ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                                    : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            barrier.srcAccessMask = (usage == ResourceUsage::READ)
+                                        ? VK_ACCESS_NONE
+                                        : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            barrier.dstAccessMask = (usage == ResourceUsage::READ)
+                                        ? VK_ACCESS_SHADER_READ_BIT
+                                        : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            break;
+
+          case TextureType::kDepth:
+            barrier.oldLayout = image.get_layout();
+            barrier.newLayout = (usage == ResourceUsage::READ)
+                                    ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                                    : VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            barrier.srcAccessMask = (usage == ResourceUsage::READ)
+                                        ? VK_ACCESS_NONE
+                                        : VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            barrier.dstAccessMask = (usage == ResourceUsage::READ)
+                                        ? VK_ACCESS_SHADER_READ_BIT
+                                        : VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            break;
+
+          default:
+            throw std::runtime_error("Unsupported TextureType for image!");
+        }
+
+        // Update the current layout
+        image.set_layout(barrier.newLayout);
+
+        image_barriers.push_back(barrier);
+      }
+
+      void apply() const {
+        vkCmdPipelineBarrier(cmd_.get(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                             VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                             0,           // Dependency flags
+                             0, nullptr,  // Global memory barriers
+                             static_cast<uint32_t>(buffer_barriers.size()), buffer_barriers.data(),
+                             static_cast<uint32_t>(image_barriers.size()), image_barriers.data());
+      }
+    };
+
+
+  public:
+    void synchronize_resources(const std::shared_ptr<FrameGraphNode>& node, const CommandBuffer cmd) {
+      auto read_resources = node->render_pass->get_resources(ResourceUsage::READ);
+      auto write_resources = node->render_pass->get_resources(ResourceUsage::WRITE);
+
+      SynchronizationVisitor visitor(cmd);
+
+      // Process read resources
+      for (const auto& resource : read_resources) {
+        resource->accept(visitor, ResourceUsage::READ);
+      }
+
+      // Process write resources
+      for (const auto& resource : write_resources) {
+        resource->accept(visitor, ResourceUsage::WRITE);
+      }
+
+      // Apply all barriers
+      visitor.apply();
+    }
   };
 
   class ResourceRegistry {
@@ -1469,7 +1572,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
 
     void compile();
 
-    void execute(CommandBuffer cmd);
+    void execute(CommandBuffer cmd) const;
   }; 
 
 }  // namespace gestalt::graphics::fg

@@ -26,22 +26,10 @@ namespace gestalt::graphics {
     return usage_flags;
   }
 
-  VkImageAspectFlags get_aspect_flags(const TextureType type) {
-    if (type == TextureType::kColor) {
-      return VK_IMAGE_ASPECT_COLOR_BIT;
-    }
-    if (type == TextureType::kDepth) {
-      return VK_IMAGE_ASPECT_DEPTH_BIT;
-    }
-    return 0;
-  }
-
   std::shared_ptr<ImageInstance> ResourceAllocator::create_image(ImageTemplate&& image_template) {
     assert(image_template.format != VK_FORMAT_UNDEFINED && "Image format must be specified.");
 
     const VkImageUsageFlags usage_flags = get_usage_flags(image_template.type);
-
-    const VkImageAspectFlags aspect_flags = get_aspect_flags(image_template.type);
 
 
     if (std::holds_alternative<std::filesystem::path>(image_template.initial_value)) {
@@ -49,7 +37,7 @@ namespace gestalt::graphics {
       const ImageInfo image_info(path);
 
       auto allocated_image = allocate_image(image_template.name, image_info.get_format(), usage_flags,
-                                            image_info.get_extent(), aspect_flags);
+                                            image_info.get_extent(), image_template.aspect_flags);
 
       task_queue_.enqueue([this, path](VkCommandBuffer cmd) {
         ImageData image_data(path);
@@ -75,8 +63,8 @@ namespace gestalt::graphics {
       extent.depth = 1;
     }
 
-    auto allocated_image
-        = allocate_image(image_template.name, image_template.format, usage_flags, extent, aspect_flags);
+    auto allocated_image = allocate_image(image_template.name, image_template.format, usage_flags,
+                                          extent, image_template.aspect_flags);
 
     return std::make_unique<ImageInstance>(std::move(image_template), allocated_image, extent);
   }
