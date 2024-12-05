@@ -145,6 +145,24 @@ namespace gestalt::application {
                       &copy_regions[4]);
       vkCmdCopyBuffer(cmd, staging->buffer, mesh_buffers->meshlet_triangles->buffer, 1,
                       &copy_regions[5]);
+
+      vkCmdCopyBuffer(cmd, staging->buffer, mesh_buffers->vertex_position_buffer_instance->get_buffer_handle(), 1,
+                      &copy_regions[0]);
+      vkCmdCopyBuffer(cmd, staging->buffer,
+                      mesh_buffers->vertex_data_buffer_instance->get_buffer_handle(), 1,
+                      &copy_regions[1]);
+      vkCmdCopyBuffer(cmd, staging->buffer,
+                      mesh_buffers->index_buffer_instance->get_buffer_handle(), 1,
+                      &copy_regions[2]);
+      vkCmdCopyBuffer(cmd, staging->buffer,
+                      mesh_buffers->meshlet_buffer_instance->get_buffer_handle(), 1,
+                      &copy_regions[3]);
+      vkCmdCopyBuffer(cmd, staging->buffer,
+                      mesh_buffers->meshlet_vertices_instance->get_buffer_handle(), 1,
+                      &copy_regions[4]);
+      vkCmdCopyBuffer(cmd, staging->buffer,
+                      mesh_buffers->meshlet_triangles_instance->get_buffer_handle(), 1,
+                      &copy_regions[5]);
     });
     resource_manager_->destroy_buffer(staging);
   }

@@ -944,6 +944,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
   public:
     [[nodiscard]] std::string_view get_name() const { return name_; }
     virtual std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) = 0;
+    virtual VkPipelineBindPoint get_bind_point() = 0;
     virtual void execute(CommandBuffer cmd) = 0;
     virtual ~RenderPass() = default;
   };
@@ -984,6 +985,8 @@ template <typename ResourceInstanceType> class ResourceCollection {
         const ResourceUsage usage) override {
       return resources_.get_resources(usage);
     }
+
+    VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point();}
 
     void execute(const CommandBuffer cmd) override {
       const auto command_count = resources_.get_buffer_binding(1, 7).resource;
@@ -1028,6 +1031,8 @@ template <typename ResourceInstanceType> class ResourceCollection {
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(const ResourceUsage usage) override {
       return resources_.get_resources(usage);
     }
+
+    VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
 
     void execute(const CommandBuffer cmd) override {
       compute_pipeline_.bind(cmd);
@@ -1117,6 +1122,8 @@ template <typename ResourceInstanceType> class ResourceCollection {
       return resources_.get_resources(usage);
     }
 
+    VkPipelineBindPoint get_bind_point() override { return graphics_pipeline_.get_bind_point(); }
+
     void execute(const CommandBuffer cmd) override {
       graphics_pipeline_.begin_render_pass(cmd, *resources_.get_color_attachment(),
                                            *resources_.get_depth_attachment());
@@ -1174,6 +1181,8 @@ template <typename ResourceInstanceType> class ResourceCollection {
       return resources_.get_resources(usage);
     }
 
+    VkPipelineBindPoint get_bind_point() override { return graphics_pipeline_.get_bind_point(); }
+
     void execute(CommandBuffer cmd) override {
       // draw
     }
@@ -1227,6 +1236,8 @@ template <typename ResourceInstanceType> class ResourceCollection {
       return resources_.get_resources(usage);
     }
 
+    VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
+
     void execute(CommandBuffer cmd) override {
       // draw
     }
@@ -1260,6 +1271,8 @@ template <typename ResourceInstanceType> class ResourceCollection {
       return resources_.get_resources(usage);
     }
 
+    VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
+
     void execute(CommandBuffer cmd) override {
       // draw
     }
@@ -1286,6 +1299,8 @@ template <typename ResourceInstanceType> class ResourceCollection {
     std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
       return resources_.get_resources(usage);
     }
+
+    VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
 
     void execute(CommandBuffer cmd) override {
       // draw
@@ -1351,67 +1366,120 @@ template <typename ResourceInstanceType> class ResourceCollection {
   class SynchronizationManager {
     class SynchronizationVisitor final : public ResourceVisitor {
       CommandBuffer cmd_;
-      std::vector<VkImageMemoryBarrier> image_barriers;
-      std::vector<VkBufferMemoryBarrier> buffer_barriers;
+      std::vector<VkImageMemoryBarrier2> image_barriers;
+      std::vector<VkBufferMemoryBarrier2> buffer_barriers;
+
+      struct ImageTransitionRule {
+        VkImageAspectFlags aspect_mask;
+        VkPipelineStageFlags2 src_stage_mask;
+        VkAccessFlags2 src_access_mask;
+        ResourceUsage usage;
+        VkShaderStageFlags shader_stage;
+
+        VkPipelineStageFlags2 dst_stage_mask;
+        VkAccessFlags2 dst_access_mask;
+      };
+
+      struct BufferTransitionKey {
+        VkPipelineStageFlags2 src_stage_mask; // last used
+        VkAccessFlags2 src_access_mask; // last used
+        ResourceUsage usage; // currently needed
+        VkShaderStageFlags shader_stage; // used in
+
+        bool operator==(const BufferTransitionKey& other) const {
+          return src_stage_mask == other.src_stage_mask && src_access_mask == other.src_access_mask
+                 && usage == other.usage && shader_stage == other.shader_stage;
+        }
+      };
+
+      struct BufferTransitionKeyHash {
+        std::size_t operator()(const BufferTransitionKey& key) const {
+          return std::hash<VkPipelineStageFlags2>()(key.src_stage_mask)
+                 ^ std::hash<VkAccessFlags2>()(key.src_access_mask)
+                 ^ std::hash<ResourceUsage>()(key.usage)
+                 ^ std::hash<VkShaderStageFlags>()(key.shader_stage);
+        }
+      };
+
+      struct BufferTransitionRule {
+        VkPipelineStageFlags2 dst_stage_mask;
+        VkAccessFlags2 dst_access_mask;
+      };
+
+      //TODO
+      std::unordered_map<BufferTransitionKey, BufferTransitionRule, BufferTransitionKeyHash> buffer_transition_rules_
+          = {{{VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_ACCESS_NONE, ResourceUsage::READ,
+               VK_SHADER_STAGE_ALL_GRAPHICS},
+              {VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_ACCESS_SHADER_READ_BIT}},
+
+             {{VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_ACCESS_NONE, ResourceUsage::WRITE,
+               VK_SHADER_STAGE_ALL_GRAPHICS},
+              {VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_ACCESS_SHADER_WRITE_BIT}}};
 
     public:
       explicit SynchronizationVisitor(const CommandBuffer cmd) : cmd_(cmd) {}
 
-      void visit(BufferInstance& buffer, ResourceUsage usage) override {
-        VkBufferMemoryBarrier barrier = {};
-        barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+      void visit(BufferInstance& buffer, const ResourceUsage usage, const VkShaderStageFlags shader_stage) override {
+
+        VkBufferMemoryBarrier2 barrier = {};
+        barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
         barrier.buffer = buffer.get_buffer_handle();
         barrier.offset = 0;
         barrier.size = VK_WHOLE_SIZE;
 
-        // Set appropriate access masks and pipeline stages based on usage
-        switch (usage) {
-          case ResourceUsage::READ:
-            barrier.srcAccessMask = VK_ACCESS_NONE;
-            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-            break;
+        barrier.srcAccessMask = buffer.get_current_access();
+        barrier.srcStageMask = buffer.get_current_stage();
+         
+         if (usage == ResourceUsage::WRITE) {
+          barrier.dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+         } else if (usage == ResourceUsage::READ) {
+           barrier.dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT;
+         }
 
-          case ResourceUsage::WRITE:
-            barrier.srcAccessMask = VK_ACCESS_NONE;
-            barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-            break;
-
-          default:
-            throw std::runtime_error("Unsupported ResourceUsage for buffer!");
+        if (shader_stage == VK_SHADER_STAGE_ALL_GRAPHICS) {
+           barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+         } else if (shader_stage == VK_SHADER_STAGE_COMPUTE_BIT) {
+          barrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
         }
+
+        buffer.set_current_access(barrier.dstAccessMask);
+        buffer.set_current_stage(barrier.dstStageMask);
 
         buffer_barriers.push_back(barrier);
       }
 
-      void visit(ImageInstance& image, ResourceUsage usage) override {
-        VkImageMemoryBarrier barrier = {};
-        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+      void visit(ImageInstance& image, ResourceUsage usage,
+                 VkShaderStageFlags shader_stage) override {
+        VkImageMemoryBarrier2 barrier = {};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
         barrier.image = image.get_image_handle();
         barrier.subresourceRange = vkinit::image_subresource_range(image.get_image_aspect());
+
+        barrier.oldLayout = image.get_layout();
+        barrier.srcAccessMask = image.get_current_access();
+        barrier.srcStageMask = image.get_current_stage();
+
+        if (shader_stage == VK_SHADER_STAGE_ALL_GRAPHICS) {
+          barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+        } else if (shader_stage == VK_SHADER_STAGE_COMPUTE_BIT) {
+          barrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        }
 
         // Set appropriate layouts and access masks based on type and usage
         switch (image.get_type()) {
           case TextureType::kColor:
-            barrier.oldLayout = image.get_layout();
             barrier.newLayout = (usage == ResourceUsage::READ)
                                     ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
                                     : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            barrier.srcAccessMask = (usage == ResourceUsage::READ)
-                                        ? VK_ACCESS_NONE
-                                        : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
             barrier.dstAccessMask = (usage == ResourceUsage::READ)
                                         ? VK_ACCESS_SHADER_READ_BIT
                                         : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
             break;
 
           case TextureType::kDepth:
-            barrier.oldLayout = image.get_layout();
             barrier.newLayout = (usage == ResourceUsage::READ)
                                     ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
                                     : VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-            barrier.srcAccessMask = (usage == ResourceUsage::READ)
-                                        ? VK_ACCESS_NONE
-                                        : VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
             barrier.dstAccessMask = (usage == ResourceUsage::READ)
                                         ? VK_ACCESS_SHADER_READ_BIT
                                         : VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
@@ -1421,38 +1489,44 @@ template <typename ResourceInstanceType> class ResourceCollection {
             throw std::runtime_error("Unsupported TextureType for image!");
         }
 
-        // Update the current layout
         image.set_layout(barrier.newLayout);
+        image.set_current_access(barrier.dstAccessMask);
+        image.set_current_stage(barrier.dstStageMask);
 
         image_barriers.push_back(barrier);
       }
 
       void apply() const {
-        vkCmdPipelineBarrier(cmd_.get(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                             VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                             0,           // Dependency flags
-                             0, nullptr,  // Global memory barriers
-                             static_cast<uint32_t>(buffer_barriers.size()), buffer_barriers.data(),
-                             static_cast<uint32_t>(image_barriers.size()), image_barriers.data());
+        VkDependencyInfo dependency_info{ .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
+        dependency_info.bufferMemoryBarrierCount = static_cast<uint32_t>(buffer_barriers.size());
+        dependency_info.pBufferMemoryBarriers = buffer_barriers.data();
+        dependency_info.imageMemoryBarrierCount = static_cast<uint32_t>(image_barriers.size());
+        dependency_info.pImageMemoryBarriers = image_barriers.data();
+
+        vkCmdPipelineBarrier2(cmd_.get(), &dependency_info);
       }
     };
 
 
   public:
     void synchronize_resources(const std::shared_ptr<FrameGraphNode>& node, const CommandBuffer cmd) {
-      auto read_resources = node->render_pass->get_resources(ResourceUsage::READ);
-      auto write_resources = node->render_pass->get_resources(ResourceUsage::WRITE);
+      const auto read_resources = node->render_pass->get_resources(ResourceUsage::READ);
+      const auto write_resources = node->render_pass->get_resources(ResourceUsage::WRITE);
+      const auto bind_point = node->render_pass->get_bind_point();
+      const auto shader_stage = bind_point == VK_PIPELINE_BIND_POINT_GRAPHICS
+                                  ? VK_SHADER_STAGE_ALL_GRAPHICS
+                                  : VK_SHADER_STAGE_COMPUTE_BIT;
 
       SynchronizationVisitor visitor(cmd);
 
       // Process read resources
       for (const auto& resource : read_resources) {
-        resource->accept(visitor, ResourceUsage::READ);
+        resource->accept(visitor, ResourceUsage::READ, shader_stage);
       }
 
       // Process write resources
       for (const auto& resource : write_resources) {
-        resource->accept(visitor, ResourceUsage::WRITE);
+        resource->accept(visitor, ResourceUsage::WRITE, shader_stage);
       }
 
       // Apply all barriers

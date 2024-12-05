@@ -130,8 +130,10 @@ namespace gestalt::foundation {
   struct ImageInstance;
 
   struct ResourceVisitor {
-    virtual void visit(BufferInstance& buffer, ResourceUsage usage) = 0;
-    virtual void visit(ImageInstance& image, ResourceUsage usage) = 0;
+    virtual void visit(BufferInstance& buffer, ResourceUsage usage, VkShaderStageFlags shader_stage)
+        = 0;
+    virtual void visit(ImageInstance& image, ResourceUsage usage, VkShaderStageFlags shader_stage)
+        = 0;
     virtual ~ResourceVisitor() = default;
   };
 
@@ -142,7 +144,9 @@ namespace gestalt::foundation {
     [[nodiscard]] std::string_view name() const {
       return resource_name; }
 
-    virtual void accept(ResourceVisitor& visitor, ResourceUsage usage) = 0;
+    virtual void accept(ResourceVisitor& visitor, ResourceUsage usage,
+                        VkShaderStageFlags shader_stage)
+        = 0;
     virtual ~ResourceInstance() = default;
   };
 
@@ -160,30 +164,40 @@ namespace gestalt::foundation {
           allocated_image(allocated_image),
           extent(extent) {}
 
-    void accept(ResourceVisitor& visitor, const ResourceUsage usage) override { visitor.visit(*this, usage); }
-
-    void set_layout(const VkImageLayout layout) { current_layout = layout; }
+    void accept(ResourceVisitor& visitor, const ResourceUsage usage,
+                VkShaderStageFlags shader_stage) override {
+      visitor.visit(*this, usage, shader_stage);
+    }
 
     [[nodiscard]] VkImage get_image_handle() const { return allocated_image.image_handle; }
 
-    [[nodiscard]] VkImageAspectFlags get_image_aspect() const { return image_template.aspect_flags;
+    [[nodiscard]] VkImageAspectFlags get_image_aspect() const {
+      return image_template.aspect_flags;
     }
- 
+
     [[nodiscard]] VkImageView get_image_view() const { return allocated_image.image_view; }
 
     [[nodiscard]] VkExtent3D get_extent() const { return extent; }
 
     [[nodiscard]] VkImageLayout get_layout() const { return current_layout; }
+    void set_layout(const VkImageLayout layout) { current_layout = layout; }
     [[nodiscard]] VkFormat get_format() const { return image_template.format; }
 
-    TextureType get_type() { return image_template.type; }
+    [[nodiscard]] TextureType get_type() const { return image_template.type; }
+
+    [[nodiscard]] VkAccessFlags2 get_current_access() const { return current_access; }
+    void set_current_access(const VkAccessFlags2 access) { current_access = access; }
+
+    [[nodiscard]] VkPipelineStageFlags2 get_current_stage() const { return current_stage; }
+    void set_current_stage(const VkPipelineStageFlags2 stage) { current_stage = stage; }
 
   private:
-
     ImageTemplate image_template;
     AllocatedImage allocated_image;
     VkExtent3D extent;
     VkImageLayout current_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    VkAccessFlags2 current_access = VK_ACCESS_2_NONE;
+    VkPipelineStageFlags2 current_stage = VK_PIPELINE_STAGE_2_NONE;
   };
 
   struct AllocatedBuffer {
@@ -197,9 +211,12 @@ namespace gestalt::foundation {
     BufferInstance(BufferTemplate&& buffer_template, const AllocatedBuffer& allocated_buffer)
         : ResourceInstance(buffer_template.name),
           buffer_template(std::move(buffer_template)),
-          allocated_buffer(allocated_buffer){}
+          allocated_buffer(allocated_buffer) {}
 
-    void accept(ResourceVisitor& visitor, const ResourceUsage usage) override { visitor.visit(*this, usage); }
+    void accept(ResourceVisitor& visitor, const ResourceUsage usage,
+                VkShaderStageFlags shader_stage) override {
+      visitor.visit(*this, usage, shader_stage);
+    }
     // size that was actually allocated, alignment might have been added
     [[nodiscard]] VkDeviceSize get_size() const { return allocated_buffer.info.size; }
 
@@ -210,11 +227,19 @@ namespace gestalt::foundation {
 
     [[nodiscard]] VkBuffer get_buffer_handle() const { return allocated_buffer.buffer_handle; }
 
+    [[nodiscard]] VkBufferUsageFlags get_usage() const { return buffer_template.usage; }
+
+    [[nodiscard]] VkAccessFlags2 get_current_access() const { return current_access; }
+    void set_current_access(const VkAccessFlags2 access) { current_access = access; }
+
+    [[nodiscard]] VkPipelineStageFlags2 get_current_stage() const { return current_stage; }
+    void set_current_stage(const VkPipelineStageFlags2 stage) { current_stage = stage; }
+
   private:
     BufferTemplate buffer_template;
     AllocatedBuffer allocated_buffer;
-    VkAccessFlags2 current_access = 0;        // Current access flags
-    VkPipelineStageFlags2 current_stage = 0;  // Current pipeline stage
+    VkAccessFlags2 current_access = VK_ACCESS_2_NONE;
+    VkPipelineStageFlags2 current_stage = VK_PIPELINE_STAGE_2_NONE;
   };
     
   class DescriptorBufferInstance {
