@@ -225,6 +225,8 @@ namespace gestalt::foundation {
 
     [[nodiscard]] VkDeviceAddress get_address() const { return allocated_buffer.address; }
 
+    [[nodiscard]] VmaAllocation get_allocation() const { return allocated_buffer.allocation; }
+
     [[nodiscard]] VkBuffer get_buffer_handle() const { return allocated_buffer.buffer_handle; }
 
     [[nodiscard]] VkBufferUsageFlags get_usage() const { return buffer_template.usage; }

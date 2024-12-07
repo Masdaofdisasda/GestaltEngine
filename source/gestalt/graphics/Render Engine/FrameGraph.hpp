@@ -1129,7 +1129,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
                                            *resources_.get_depth_attachment());
       graphics_pipeline_.bind(cmd);
 
-      constexpr MeshletDepthPushConstants draw_cull_constants{};
+      constexpr MeshletDepthPushConstants draw_cull_constants{.cullFlags = 1};
       cmd.push_constants(graphics_pipeline_.get_pipeline_layout(),
                          VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT, 0,
                          sizeof(MeshletDepthPushConstants), &draw_cull_constants);

@@ -60,17 +60,17 @@ namespace gestalt::application {
 
     light_data->dir_light_buffer_instance
         = resource_allocator_->create_buffer(std::move(BufferTemplate(
-            "Directional Light Buffer", sizeof(GpuDirectionalLight) * getMaxDirectionalLights(),
+            "Directional Light Buffer Instance", sizeof(GpuDirectionalLight) * getMaxDirectionalLights(),
             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
             VMA_MEMORY_USAGE_CPU_TO_GPU)));
     light_data->point_light_buffer_instance
         = resource_allocator_->create_buffer(std::move(BufferTemplate(
-            "Point Light Buffer", sizeof(GpuPointLight) * getMaxPointLights(),
+            "Point Light Buffer Instance", sizeof(GpuPointLight) * getMaxPointLights(),
             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
             VMA_MEMORY_USAGE_CPU_TO_GPU)));
     light_data->view_proj_matrices_instance
         = resource_allocator_->create_buffer(std::move(BufferTemplate(
-            "Point Light Buffer", sizeof(GpuProjViewData) * GetMaxViewProjMatrices(),
+            "View Proj Light Buffer Instance", sizeof(GpuProjViewData) * GetMaxViewProjMatrices(),
             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
             VMA_MEMORY_USAGE_CPU_TO_GPU)));
 
@@ -248,6 +248,31 @@ namespace gestalt::application {
            sizeof(GpuProjViewData) * repository_->light_view_projections.size());
     vmaUnmapMemory(gpu_->getAllocator(), light_data->view_proj_matrices->allocation);
 
+    {
+      void* directional_light_data;
+      VK_CHECK(vmaMapMemory(gpu_->getAllocator(), light_data->dir_light_buffer_instance->get_allocation(),
+                            &directional_light_data));
+      memcpy(directional_light_data, repository_->directional_lights.data().data(),
+             sizeof(GpuDirectionalLight) * repository_->directional_lights.size());
+      vmaUnmapMemory(gpu_->getAllocator(), light_data->dir_light_buffer_instance->get_allocation());
+
+      void* point_light_data;
+      VK_CHECK(vmaMapMemory(gpu_->getAllocator(), light_data->point_light_buffer_instance->get_allocation(),
+                            &point_light_data));
+      memcpy(point_light_data, repository_->point_lights.data().data(),
+             sizeof(GpuPointLight) * repository_->point_lights.size());
+      vmaUnmapMemory(gpu_->getAllocator(),
+                     light_data->point_light_buffer_instance->get_allocation());
+
+      // changes in the scene graph can affect the light view-projection matrices
+      void* view_matrix_data;
+      VK_CHECK(vmaMapMemory(gpu_->getAllocator(), light_data->view_proj_matrices_instance->get_allocation(),
+                            &view_matrix_data));
+      memcpy(view_matrix_data, repository_->light_view_projections.data().data(),
+             sizeof(GpuProjViewData) * repository_->light_view_projections.size());
+      vmaUnmapMemory(gpu_->getAllocator(),
+                     light_data->view_proj_matrices_instance->get_allocation());
+    }
   }
 
   void LightSystem::cleanup() {

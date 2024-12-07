@@ -244,7 +244,7 @@ namespace gestalt::application {
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
               | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
           VMA_MEMORY_USAGE_GPU_ONLY, "Drawcount Buffer");
-
+    }
       
     // TODO
       mesh_buffers->vertex_position_buffer_instance
@@ -299,11 +299,10 @@ namespace gestalt::application {
               VMA_MEMORY_USAGE_CPU_TO_GPU));
       mesh_buffers->draw_count_buffer_instance
           = resource_allocator_->create_buffer(BufferTemplate(
-          "mesh_draw_buffer_instance", kMaxDrawCountBufferSize,
+          "draw_count_buffer_instance", kMaxDrawCountBufferSize,
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
               | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
               VMA_MEMORY_USAGE_CPU_TO_GPU));
-    }
   }
 
   void MeshSystem::fill_descriptors() {
@@ -376,6 +375,16 @@ namespace gestalt::application {
     const auto mesh_draw_data = static_cast<MeshDraw*>(mapped_data);
     std::memcpy(mesh_draw_data, mesh_draws.data().data(), mesh_draws.size() * sizeof(MeshDraw));
     vmaUnmapMemory(gpu_->getAllocator(), mesh_buffers->mesh_draw_buffer[frame]->allocation);
+
+    {
+      void* mapped_data;
+      const VmaAllocation allocation = mesh_buffers->mesh_draw_buffer_instance->get_allocation();
+      VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation, &mapped_data));
+      const auto mesh_draw_data = static_cast<MeshDraw*>(mapped_data);
+      std::memcpy(mesh_draw_data, mesh_draws.data().data(), mesh_draws.size() * sizeof(MeshDraw));
+      vmaUnmapMemory(gpu_->getAllocator(), allocation);
+    }
+
   }
 
   void MeshSystem::traverse_scene(const Entity entity, const TransformComponent& parent_transform) {

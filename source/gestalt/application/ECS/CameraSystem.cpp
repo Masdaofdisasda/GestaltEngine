@@ -202,6 +202,15 @@ namespace gestalt::application {
       *scene_uniform_data = buffers->data[frame];
       vmaUnmapMemory(gpu_->getAllocator(), buffers->uniform_buffers[frame]->allocation);
 
+      {
+        void* mapped_data;
+        const VmaAllocation allocation = buffers->uniform_buffers_instance->get_allocation();
+        VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation, &mapped_data));
+        const auto scene_uniform_data = static_cast<PerFrameData*>(mapped_data);
+        *scene_uniform_data = buffers->data[frame];
+        vmaUnmapMemory(gpu_->getAllocator(), allocation);
+      }
+
       // TODO
       meshlet_push_constants.pyramidWidth = 0;
       meshlet_push_constants.pyramidHeight = 0;
