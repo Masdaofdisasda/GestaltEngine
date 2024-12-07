@@ -6,6 +6,7 @@
 
 
 namespace gestalt::graphics {
+
   void BasicResourceLoader::init(IGpu* gpu) {
     gpu_ = gpu;
     VkCommandPoolCreateInfo poolInfo = {};
@@ -150,7 +151,7 @@ namespace gestalt::graphics {
     cubemap_tasks_.push(task);
   }
 
-  void BasicResourceLoader::add_stagging_buffer(size_t size, AllocatedBufferOld& staging_buffer) {
+  void BasicResourceLoader::add_stagging_buffer(size_t size, StagingBuffer& staging_buffer) {
     // allocate buffer
     VkBufferCreateInfo bufferInfo = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
     bufferInfo.pNext = nullptr;
@@ -164,8 +165,7 @@ namespace gestalt::graphics {
 
     // allocate the buffer
     VK_CHECK(vmaCreateBuffer(gpu_->getAllocator(), &bufferInfo, &vmaallocInfo,
-                             &staging_buffer.buffer, &staging_buffer.allocation,
-                             &staging_buffer.info));
+                             &staging_buffer.buffer, &staging_buffer.allocation, nullptr));
   }
 
   void BasicResourceLoader::flush() {

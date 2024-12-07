@@ -63,8 +63,8 @@ namespace gestalt::graphics {
 
     const auto& mesh_buffers = repository_->mesh_buffers;
 
-    vkCmdFillBuffer(cmd, mesh_buffers->draw_count_buffer[frame]->buffer, 0,
-                    mesh_buffers->draw_count_buffer[frame]->info.size, 0);
+    vkCmdFillBuffer(cmd, mesh_buffers->draw_count_buffer[frame]->get_buffer_handle(), 0,
+                    mesh_buffers->draw_count_buffer[frame]->get_size(), 0);
 
     const int32 maxCommandCount = repository_->mesh_draws.size();  // each mesh gets a draw command
     const uint32 groupCount
@@ -227,7 +227,7 @@ namespace gestalt::graphics {
                        sizeof(MeshletDepthPushConstants), &push_constants);
 
     // first byte is the task count, so we need offset by one uint32
-    vkCmdDrawMeshTasksIndirectEXT(cmd, mesh_buffers->draw_count_buffer[frame]->buffer,
+    vkCmdDrawMeshTasksIndirectEXT(cmd, mesh_buffers->draw_count_buffer[frame]->get_buffer_handle(),
                                   sizeof(uint32), 1, 0);
 
     vkCmdEndRendering(cmd);

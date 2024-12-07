@@ -43,37 +43,6 @@ namespace gestalt::graphics {
       vkSetDebugUtilsObjectNameEXT(device, &nameInfo);
     }
 
-    std::shared_ptr<AllocatedBufferOld> ResourceManager::create_buffer(size_t allocSize,
-                                                                    VkBufferUsageFlags usage,
-                                                                    VmaMemoryUsage memoryUsage,
-                                                                    std::string name)
-    {
-      usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-
-      VkBufferCreateInfo bufferInfo = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-      bufferInfo.size = allocSize;
-      bufferInfo.usage = usage;
-
-      VmaAllocationCreateInfo vmaallocInfo = {};
-      vmaallocInfo.usage = memoryUsage;
-      vmaallocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-
-      AllocatedBufferOld new_buffer;
-      new_buffer.usage = usage;
-      new_buffer.memory_usage = memoryUsage;
-
-      VK_CHECK(vmaCreateBuffer(gpu_->getAllocator(), &bufferInfo, &vmaallocInfo, &new_buffer.buffer,
-                               &new_buffer.allocation, &new_buffer.info));
-
-      SetDebugName( name, VK_OBJECT_TYPE_BUFFER, gpu_->getDevice(), reinterpret_cast<uint64_t>(new_buffer.buffer));
-
-      const VkBufferDeviceAddressInfo device_address_info = {.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = new_buffer.buffer};
-      new_buffer.address
-          = vkGetBufferDeviceAddress(gpu_->getDevice(), &device_address_info);
-
-      return std::make_shared<AllocatedBufferOld>(new_buffer);
-    }
-
     // https://github.com/KhronosGroup/Vulkan-Samples/tree/main/samples/extensions/descriptor_buffer_basic
   inline size_t aligned_size(size_t size, size_t alignment) {
       return (size + alignment - 1) & ~(alignment - 1);
@@ -128,9 +97,6 @@ namespace gestalt::graphics {
       return std::make_shared<DescriptorBuffer>(descriptor_buffer);
     }
 
-    void ResourceManager::destroy_buffer(const std::shared_ptr<AllocatedBufferOld> buffer) {
-      vmaDestroyBuffer(gpu_->getAllocator(), buffer->buffer, buffer->allocation);
-    }
     void ResourceManager::destroy_descriptor_buffer(const std::shared_ptr<DescriptorBuffer> buffer) const {
       vmaDestroyBuffer(gpu_->getAllocator(), buffer->buffer, buffer->allocation);
     }

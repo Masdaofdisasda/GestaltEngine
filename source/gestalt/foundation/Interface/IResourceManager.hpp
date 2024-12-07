@@ -1,5 +1,4 @@
 ﻿#pragma once
-#include <Resources/AllocatedBufferOld.hpp>
 #include <Repository.hpp>
 
 namespace gestalt::foundation {
@@ -15,15 +14,10 @@ namespace gestalt::foundation {
 
     virtual void flush_loader() = 0;
 
-    virtual std::shared_ptr<AllocatedBufferOld> create_buffer(size_t allocSize, VkBufferUsageFlags usage,
-                                                           VmaMemoryUsage memoryUsage,
-                                                           std::string name = "")
-        = 0;
     virtual std::shared_ptr<DescriptorBuffer> create_descriptor_buffer(
         VkDescriptorSetLayout descriptor_layout, uint32 numBindings, VkBufferUsageFlags usage = 0 ,
         std::string name = "")
     = 0;
-    virtual void destroy_buffer(const std::shared_ptr<AllocatedBufferOld> buffer) = 0;
 
     virtual void destroy_descriptor_buffer(std::shared_ptr<DescriptorBuffer> buffer) const = 0;
 

@@ -12,5 +12,6 @@ namespace gestalt::foundation {
 
     virtual std::shared_ptr<BufferInstance> create_buffer(BufferTemplate&& buffer_template) const
         = 0;
+    virtual void destroy_buffer(const std::shared_ptr<BufferInstance>& buffer) const = 0;
   };
 }  // namespace gestalt

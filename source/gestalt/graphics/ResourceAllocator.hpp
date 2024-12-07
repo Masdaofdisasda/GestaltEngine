@@ -102,5 +102,6 @@ namespace gestalt::graphics {
 
     std::shared_ptr<BufferInstance> create_buffer(
           BufferTemplate&& buffer_template) const override;
-    };
+      void destroy_buffer(const std::shared_ptr<BufferInstance>& buffer) const;
+  };
 }  // namespace gestalt

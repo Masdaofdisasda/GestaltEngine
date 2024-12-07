@@ -148,4 +148,9 @@ namespace gestalt::graphics {
 
     return std::make_shared<BufferInstance>(std::move(buffer_template), allocated_buffer);
   }
+
+  void ResourceAllocator::destroy_buffer(const std::shared_ptr<BufferInstance>& buffer) const {
+    vmaDestroyBuffer(gpu_->getAllocator(), buffer->get_buffer_handle(), buffer->get_allocation());
+  }
+
 }  // namespace gestalt

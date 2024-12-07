@@ -7,16 +7,19 @@
 
 #include <vma/vk_mem_alloc.h>
 #include <cmath>
+
+#include "Resources/ResourceTypes.hpp"
+
 namespace gestalt::graphics {
-  vkutil::TransitionBuffer::TransitionBuffer(const std::shared_ptr<foundation::AllocatedBufferOld>& buffer) {
+  vkutil::TransitionBuffer::TransitionBuffer(const std::shared_ptr<BufferInstance>& buffer) {
     buffer_ = buffer;
 
     bufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-    bufferBarrier.srcStageMask = buffer_->currentStage;
-    bufferBarrier.srcAccessMask = buffer_->currentAccess;
+    bufferBarrier.srcStageMask = buffer_->get_current_stage();
+    bufferBarrier.srcAccessMask = buffer_->get_current_access();
     bufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     bufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    bufferBarrier.buffer = buffer_->buffer;
+    bufferBarrier.buffer = buffer_->get_buffer_handle();
     bufferBarrier.offset = 0;
     bufferBarrier.size = VK_WHOLE_SIZE;
   }
@@ -26,12 +29,13 @@ namespace gestalt::graphics {
                                  | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
     bufferBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
 
-    if (buffer_->usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) {
+    if (buffer_->get_usage() & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) {
       bufferBarrier.dstAccessMask |= VK_ACCESS_2_SHADER_WRITE_BIT;
     }
+    /*
     if (buffer_->memory_usage & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {
       bufferBarrier.dstAccessMask |= VK_ACCESS_2_HOST_WRITE_BIT;
-    }
+    }*/
 
     return *this;
   }
@@ -44,21 +48,21 @@ namespace gestalt::graphics {
 
     bufferBarrier.dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT;
 
-    if (buffer_->usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) {
+    if (buffer_->get_usage() & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) {
       bufferBarrier.dstAccessMask |= VK_ACCESS_2_SHADER_READ_BIT;
     }
-    if (buffer_->usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) {
+    if (buffer_->get_usage() & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) {
       bufferBarrier.dstAccessMask |= VK_ACCESS_2_UNIFORM_READ_BIT;
     }
-    if (buffer_->usage & VK_BUFFER_USAGE_INDEX_BUFFER_BIT) {
+    if (buffer_->get_usage() & VK_BUFFER_USAGE_INDEX_BUFFER_BIT) {
        bufferBarrier.dstStageMask |= VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT;
       bufferBarrier.dstAccessMask |= VK_ACCESS_2_INDEX_READ_BIT;
     }
-    if (buffer_->usage & VK_BUFFER_USAGE_VERTEX_BUFFER_BIT) {
+    if (buffer_->get_usage() & VK_BUFFER_USAGE_VERTEX_BUFFER_BIT) {
       bufferBarrier.dstStageMask |= VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
       bufferBarrier.dstAccessMask |= VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
     }
-    if (buffer_->usage & VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT) {
+    if (buffer_->get_usage() & VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT) {
        bufferBarrier.dstStageMask |= VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
       bufferBarrier.dstAccessMask |= VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT;
     }
@@ -75,8 +79,8 @@ namespace gestalt::graphics {
     };
     vkCmdPipelineBarrier2(cmd, &depInfo);
 
-    buffer_->currentAccess = bufferBarrier.dstAccessMask;  // Update current access
-    buffer_->currentStage = bufferBarrier.dstStageMask;    // Update current stage
+    buffer_->set_current_access(bufferBarrier.dstAccessMask);  // Update current access
+    buffer_->set_current_stage(bufferBarrier.dstStageMask);    // Update current stage
   }
 
   vkutil::TransitionImage::TransitionImage(const std::shared_ptr<foundation::TextureHandleOld>& image) {

@@ -7,22 +7,21 @@
 #include "EngineConfiguration.hpp"
 #include "common.hpp"
 #include "Descriptor/DescriptorBuffer.hpp"
-#include "Resources/AllocatedBufferOld.hpp"
 
 namespace gestalt::foundation {
 
   struct MeshBuffers final : BufferCollection {
-  std::shared_ptr<AllocatedBufferOld> index_buffer;            // regular index buffer
-  std::shared_ptr<AllocatedBufferOld> vertex_position_buffer;  // only vertex positions
-  std::shared_ptr<AllocatedBufferOld> vertex_data_buffer;      // normals, tangents, uvs
+    std::shared_ptr<BufferInstance> index_buffer;                // regular index buffer
+    std::shared_ptr<BufferInstance> vertex_position_buffer;  // only vertex positions
+    std::shared_ptr<BufferInstance> vertex_data_buffer;          // normals, tangents, uvs
 
-  std::shared_ptr<AllocatedBufferOld> meshlet_buffer;  // meshlets
-  std::shared_ptr<AllocatedBufferOld> meshlet_vertices;
-  std::shared_ptr<AllocatedBufferOld> meshlet_triangles;  // meshlet indices
-  std::array<std::shared_ptr<AllocatedBufferOld>, getFramesInFlight()> meshlet_task_commands_buffer;
-  std::array<std::shared_ptr<AllocatedBufferOld>, getFramesInFlight()>
+  std::shared_ptr<BufferInstance> meshlet_buffer;  // meshlets
+    std::shared_ptr<BufferInstance> meshlet_vertices;
+  std::shared_ptr<BufferInstance> meshlet_triangles;  // meshlet indices
+    std::array<std::shared_ptr<BufferInstance>, getFramesInFlight()> meshlet_task_commands_buffer;
+  std::array<std::shared_ptr<BufferInstance>, getFramesInFlight()>
       mesh_draw_buffer;  // TRS, material id
-  std::array<std::shared_ptr<AllocatedBufferOld>, getFramesInFlight()>
+    std::array<std::shared_ptr<BufferInstance>, getFramesInFlight()>
       draw_count_buffer;  // number of draws
 
   
@@ -40,7 +39,7 @@ namespace gestalt::foundation {
 
   std::array<std::shared_ptr<DescriptorBuffer>, getFramesInFlight()> descriptor_buffers;
 
-  std::vector<std::shared_ptr<AllocatedBufferOld>> get_buffers(int16 frame_index) const override {
+  std::vector<std::shared_ptr<BufferInstance>> get_buffers(int16 frame_index) const override {
     return {index_buffer,
             vertex_position_buffer,
             vertex_data_buffer,

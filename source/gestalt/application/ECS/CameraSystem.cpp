@@ -32,17 +32,17 @@ namespace gestalt::application {
               .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
 
     for (int i = 0; i < getFramesInFlight(); ++i) {
-      per_frame_data_buffers->uniform_buffers[i] = resource_manager_->create_buffer(
-          sizeof(PerFrameData),
-          VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-          VMA_MEMORY_USAGE_CPU_TO_GPU, "perFrameBuffer");
+      per_frame_data_buffers->uniform_buffers[i] = resource_allocator_->create_buffer(
+          BufferTemplate("per_frame_data_buffer", sizeof(PerFrameData),
+                         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU));
+
 
       per_frame_data_buffers->descriptor_buffers[i]
           = resource_manager_->create_descriptor_buffer(descriptor_layout, 1, 0);
 
       VkBufferDeviceAddressInfo deviceAdressInfo{
           .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-          .buffer = per_frame_data_buffers->uniform_buffers[i]->buffer};
+          .buffer = per_frame_data_buffers->uniform_buffers[i]->get_buffer_handle()};
       const VkDeviceAddress per_frame_data_buffer_address
           = vkGetBufferDeviceAddress(gpu_->getDevice(), &deviceAdressInfo);
 
@@ -196,11 +196,11 @@ namespace gestalt::application {
       }
 
       void* mapped_data;
-      const VmaAllocation allocation = buffers->uniform_buffers[frame]->allocation;
+      const VmaAllocation allocation = buffers->uniform_buffers[frame]->get_allocation();
       VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation, &mapped_data));
       const auto scene_uniform_data = static_cast<PerFrameData*>(mapped_data);
       *scene_uniform_data = buffers->data[frame];
-      vmaUnmapMemory(gpu_->getAllocator(), buffers->uniform_buffers[frame]->allocation);
+      vmaUnmapMemory(gpu_->getAllocator(), buffers->uniform_buffers[frame]->get_allocation());
 
       {
         void* mapped_data;
@@ -224,7 +224,7 @@ namespace gestalt::application {
 
       for (int i = 0; i < 2; ++i) {
         resource_manager_->destroy_descriptor_buffer(buffers->descriptor_buffers[i]);
-        resource_manager_->destroy_buffer(buffers->uniform_buffers[i]);
+        resource_allocator_->destroy_buffer(buffers->uniform_buffers[i]);
       }
 
     }

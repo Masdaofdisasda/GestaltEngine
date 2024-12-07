@@ -5,14 +5,13 @@
 #include "BufferCollection.hpp"
 #include "common.hpp"
 #include "Descriptor/DescriptorBuffer.hpp"
-#include "Resources/AllocatedBufferOld.hpp"
 #include "VulkanTypes.hpp"
 #include "Resources/TextureHandleOld.hpp"
 
 namespace gestalt::foundation {
 
   struct MaterialBuffers final : BufferCollection, NonCopyable<MaterialBuffers> {
-    std::shared_ptr<AllocatedBufferOld> uniform_buffer;
+    std::shared_ptr<BufferInstance> uniform_buffer;
 
     TextureHandleOld environment_map;
     TextureHandleOld environment_irradiance_map;
@@ -25,7 +24,7 @@ namespace gestalt::foundation {
 
     std::shared_ptr<DescriptorBuffer> descriptor_buffer;
 
-    std::vector<std::shared_ptr<AllocatedBufferOld>> get_buffers(int16 frame_index) const override {
+    std::vector<std::shared_ptr<BufferInstance>> get_buffers(int16 frame_index) const override {
       return {uniform_buffer};
     }
 

@@ -5,15 +5,14 @@
 #include "BufferCollection.hpp"
 #include "common.hpp"
 #include "Descriptor/DescriptorBuffer.hpp"
-#include "Resources/AllocatedBufferOld.hpp"
 #include "Resources/ResourceTypes.hpp"
 
 namespace gestalt::foundation {
 
   struct LightBuffers final : BufferCollection {
-  std::shared_ptr<AllocatedBufferOld> dir_light_buffer;
-  std::shared_ptr<AllocatedBufferOld> point_light_buffer;
-  std::shared_ptr<AllocatedBufferOld> view_proj_matrices;
+  std::shared_ptr<BufferInstance> dir_light_buffer;
+    std::shared_ptr<BufferInstance> point_light_buffer;
+  std::shared_ptr<BufferInstance> view_proj_matrices;
 
     std::shared_ptr<BufferInstance> dir_light_buffer_instance;
   std::shared_ptr<BufferInstance> point_light_buffer_instance;
@@ -21,7 +20,7 @@ namespace gestalt::foundation {
 
   std::shared_ptr<DescriptorBuffer> descriptor_buffer;
 
-  std::vector<std::shared_ptr<AllocatedBufferOld>> get_buffers(int16 frame_index) const override {
+  std::vector<std::shared_ptr<BufferInstance>> get_buffers(int16 frame_index) const override {
     return {dir_light_buffer, point_light_buffer, view_proj_matrices};
   }
 
