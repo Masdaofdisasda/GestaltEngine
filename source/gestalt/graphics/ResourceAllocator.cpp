@@ -27,7 +27,9 @@ namespace gestalt::graphics {
   }
 
   std::shared_ptr<ImageInstance> ResourceAllocator::create_image(ImageTemplate&& image_template) {
-    assert(image_template.format != VK_FORMAT_UNDEFINED && "Image format must be specified.");
+    if (image_template.format == VK_FORMAT_UNDEFINED) {
+      throw std::runtime_error("Image format must be specified.");
+    }
 
     const VkImageUsageFlags usage_flags = get_usage_flags(image_template.type);
 
@@ -91,7 +93,11 @@ namespace gestalt::graphics {
 
   AllocatedImage ResourceAllocator::allocate_image(const std::string_view name, const VkFormat format,
                                                      const VkImageUsageFlags usage_flags, const VkExtent3D extent, const VkImageAspectFlags aspect_flags) const {
-    const VkImageCreateInfo img_info = vkinit::image_create_info(format, usage_flags, extent);
+      //TODO fix image type
+    VkImageCreateInfo img_info = vkinit::image_create_info(format, usage_flags, extent);
+    if (extent.height > 1) {
+      img_info.imageType = VK_IMAGE_TYPE_3D;
+    }
 
     const VmaAllocationCreateInfo allocation_info = {
       .usage = VMA_MEMORY_USAGE_GPU_ONLY,
@@ -104,8 +110,11 @@ namespace gestalt::graphics {
     gpu_->set_debug_name(name, VK_OBJECT_TYPE_IMAGE,
                    reinterpret_cast<uint64_t>(image.image_handle));
 
-    const VkImageViewCreateInfo view_info
+    VkImageViewCreateInfo view_info
         = vkinit::imageview_create_info(format, image.image_handle, aspect_flags);
+    if (extent.height > 1) {
+      view_info.viewType = VK_IMAGE_VIEW_TYPE_3D; 
+    }
     VK_CHECK(vkCreateImageView(gpu_->getDevice(), &view_info, nullptr, &image.image_view));
 
     return image;

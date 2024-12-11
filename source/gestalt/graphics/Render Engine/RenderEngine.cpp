@@ -67,6 +67,48 @@ namespace gestalt::graphics {
               .set_image_size(0.5f)
               .build());
 
+      auto blue_noise = frame_graph_->add_resource(
+          ImageTemplate("rotation_texture")
+              .set_initial_value(std::filesystem::current_path()
+                                 / "../../assets/blue_noise_512_512.png")
+              .build(),
+          fg::CreationType::EXTERNAL);
+      auto froxel_data = frame_graph_->add_resource(
+          ImageTemplate("froxel_data_texture_0")
+              .set_image_type(TextureType::kColor, VK_FORMAT_R16G16B16A16_SFLOAT,
+                              ImageType::kImage3D)
+              .set_image_size(128, 128, 128)
+              .build());
+      auto light_scattering = frame_graph_->add_resource(
+          ImageTemplate("light_scattering_texture")
+              .set_image_type(TextureType::kColor, VK_FORMAT_R16G16B16A16_SFLOAT,
+                              ImageType::kImage3D)
+              .set_image_size(128, 128, 128)
+              .build());
+      auto integrated_light_scattering = frame_graph_->add_resource(
+          ImageTemplate("integrated_light_scattering_texture")
+              .set_image_type(TextureType::kColor, VK_FORMAT_R16G16B16A16_SFLOAT,
+                              ImageType::kImage3D)
+              .set_image_size(128, 128, 128)
+              .build());
+      auto volumetric_noise = frame_graph_->add_resource(
+          ImageTemplate("volumetric_noise_texture")
+              .set_image_type(TextureType::kColor, VK_FORMAT_R8_UNORM, ImageType::kImage3D)
+              .set_image_size(64, 64, 64)
+              .set_initial_value({1.f, 0.f, 0.f, 1.f})
+              .build());
+
+      // todo update this
+      auto post_process_sampler = repository_->get_sampler({
+          .magFilter = VK_FILTER_LINEAR,
+          .minFilter = VK_FILTER_LINEAR,
+          .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+          .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+          .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+          .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+          .anisotropyEnable = VK_FALSE,
+      });
+
       // camera
       auto camera_buffer = frame_graph_->add_resource(
           repository->per_frame_data_buffers->uniform_buffers_instance);
@@ -116,20 +158,66 @@ namespace gestalt::graphics {
           camera_buffer, light_matrices, directional_light, point_light, vertex_position_buffer,
           vertex_data_buffer, meshlet_buffer, meshlet_vertices, meshlet_triangles,
           meshlet_task_commands_buffer, mesh_draw_buffer, draw_count_buffer, shadow_map, gpu_);
+
+      // mesh shading
+      frame_graph_->add_pass<fg::DrawCullPass>(
+          camera_buffer, meshlet_task_commands_buffer, mesh_draw_buffer, draw_count_buffer, gpu_,
+          [&] { return static_cast<int32>(repository_->mesh_draws.size()); });
+
+      frame_graph_->add_pass<fg::TaskSubmitPass>(meshlet_task_commands_buffer, draw_count_buffer,
+                                                 gpu_);
+
+      frame_graph_->add_pass<fg::MeshletPass>(
+          camera_buffer, /*textures,*/ material_buffer, vertex_position_buffer, vertex_data_buffer,
+          meshlet_buffer, meshlet_vertices, meshlet_triangles, meshlet_task_commands_buffer,
+          mesh_draw_buffer, draw_count_buffer, g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth,
+          gpu_);
+
+      frame_graph_->add_pass<fg::SsaoPass>(
+          camera_buffer, g_buffer_2, g_buffer_depth, rotation_texture, occlusion_texture,
+          post_process_sampler, gpu_, [&] { return resource_registry_->config_.ssao; });
+
+      frame_graph_->add_pass<fg::VolumetricLightingInjectionPass>(
+          blue_noise, volumetric_noise, froxel_data, post_process_sampler,
+          [&] { return resource_registry_->config_.volumetric_lighting; },
+          [&] { return frame_->get_current_frame_number(); },
+          [&] {
+            return repository_->per_frame_data_buffers->data.at(frame_->get_current_frame_index());
+          },
+          gpu_);
+
+      frame_graph_->add_pass<fg::VolumetricLightingScatteringPass>(
+          camera_buffer, light_matrices, directional_light, point_light, blue_noise, froxel_data,
+          shadow_map, light_scattering, post_process_sampler,
+          [&] { return resource_registry_->config_.volumetric_lighting; },
+          [&] { return frame_->get_current_frame_number(); },
+          [&] {
+            return repository_->per_frame_data_buffers->data.at(frame_->get_current_frame_index());
+          },
+          [&] { return repository_->point_lights.size(); }, gpu_);
+
+      frame_graph_->add_pass<fg::LightingPass>(
+          camera_buffer, material_buffer, light_matrices, directional_light, point_light,
+          g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth, shadow_map,
+          integrated_light_scattering, occlusion_texture, scene_lit, post_process_sampler, gpu_);
+
+      frame_graph_->add_pass<fg::VolumetricLightingSpatialFilterPass>(
+          light_scattering, froxel_data, post_process_sampler,
+          [&] { return resource_registry_->config_.volumetric_lighting; }, gpu_);
+
+      frame_graph_->add_pass<fg::VolumetricLightingIntegrationPass>(
+          froxel_data, integrated_light_scattering, post_process_sampler,
+          [&] { return resource_registry_->config_.volumetric_lighting; },
+          [&] { return frame_->get_current_frame_number(); },
+          [&] {
+            return repository_->per_frame_data_buffers->data.at(frame_->get_current_frame_index());
+          }, gpu_);
+
+      frame_graph_->add_pass<fg::VolumetricLightingNoisePass>(volumetric_noise, gpu_);
+
       /*
-      frame_graph_->add_pass<fg::GeometryPass>(g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth,
-                                               vertex_position_buffer, gpu_);
-
-      frame_graph_->add_pass<fg::LightingPass>(scene_lit, g_buffer_1, g_buffer_2, g_buffer_3,
-                                               g_buffer_depth, shadow_map, material_buffer,
-                                               directional_light, gpu_);
-
       frame_graph_->add_pass<fg::ToneMapPass>(scene_final, scene_lit, gpu_);
-
-      frame_graph_->add_pass<fg::SsaoPass>(scene_lit, g_buffer_depth, rotation_texture,
-                                           occlusion_texture, gpu_);
                                            */
-
 
       frame_graph_->compile();
     }

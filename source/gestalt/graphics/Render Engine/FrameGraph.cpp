@@ -79,7 +79,7 @@ namespace gestalt::graphics::fg {
     }
 
     if (sorted_nodes.size() != nodes_.size()) {
-      assert(!"Cycle detected in the graph! Topological sorting is not possible.");
+      throw std::runtime_error("Cycle detected in the graph! Topological sorting is not possible.");
     }
 
     sorted_nodes_ = std::move(sorted_nodes);
@@ -103,7 +103,6 @@ namespace gestalt::graphics::fg {
 
   void FrameGraph::compile() {
     for (auto& node : nodes_) {
-      fmt::println("Compiling Render Pass: {}", node->render_pass->get_name());
       for (const auto& read_resource : node->render_pass->get_resources(ResourceUsage::READ)) {
         auto& edge = edges_.at(read_resource->resource_handle);
         edge->nodes_to.push_back(node);

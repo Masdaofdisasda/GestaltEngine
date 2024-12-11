@@ -67,7 +67,7 @@ namespace gestalt::foundation {
     explicit ImageTemplate(std::string name) : ResourceTemplate(std::move(name)) {}
 
     // Fluent setters for customization
-    ImageTemplate& set_image_type(const TextureType texture_type, const VkFormat format) {
+    ImageTemplate& set_image_type(const TextureType texture_type, const VkFormat format, const ImageType image_type = ImageType::kImage2D) {
       this->type = texture_type;
       this->format = format;
       if (type == TextureType::kDepth) {
@@ -75,6 +75,7 @@ namespace gestalt::foundation {
       } else {
         aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT;
       }
+      this->image_type = image_type;
       return *this;
     }
 
@@ -108,6 +109,9 @@ namespace gestalt::foundation {
     }
 
     ImageTemplate& set_image_size(const uint32 width, const uint32 height, const uint32 depth = 0) {
+      if (depth != 0 && image_type != ImageType::kImage3D) {
+        throw std::runtime_error("Depth can only be set for 3D images.");
+      }
       this->image_size = AbsoluteImageSize(width, height, depth);
       return *this;
     }
