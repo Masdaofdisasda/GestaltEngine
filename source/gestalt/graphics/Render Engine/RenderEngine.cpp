@@ -21,6 +21,11 @@
 #include "Interface/IGpu.hpp"
 
 namespace gestalt::graphics {
+
+  inline std::filesystem::path asset(const std::string& asset_name) {
+    return std::filesystem::current_path() / "../../assets" / asset_name;
+  }
+
   void RenderEngine::init(IGpu* gpu, Window* window,
                             ResourceManager* resource_manager, ResourceAllocator* resource_allocator,
                             Repository* repository, Gui* imgui_gui, FrameProvider* frame) {
@@ -43,56 +48,55 @@ namespace gestalt::graphics {
 
     {
       auto shadow_map = frame_graph_->add_resource(
-          ImageTemplate("shadow_map")
+          ImageTemplate("Shadow Map")
               .set_image_type(TextureType::kDepth, VK_FORMAT_D32_SFLOAT)
               .set_image_size(2048 * 4, 2048 * 4)
               .build());
-      auto g_buffer_1 = frame_graph_->add_resource(ImageTemplate("g_buffer1"));
-      auto g_buffer_2 = frame_graph_->add_resource(ImageTemplate("g_buffer2"));
-      auto g_buffer_3 = frame_graph_->add_resource(ImageTemplate("g_buffer3"));
+      auto g_buffer_1 = frame_graph_->add_resource(ImageTemplate("G Buffer 1"));
+      auto g_buffer_2 = frame_graph_->add_resource(ImageTemplate("G Buffer 2"));
+      auto g_buffer_3 = frame_graph_->add_resource(ImageTemplate("G Buffer 3"));
       auto g_buffer_depth = frame_graph_->add_resource(
-          ImageTemplate("g_buffer_depth")
+          ImageTemplate("G Buffer Depth")
               .set_image_type(TextureType::kDepth, VK_FORMAT_D32_SFLOAT)
               .build());
-      auto scene_lit = frame_graph_->add_resource(ImageTemplate("scene_lit"));
-      auto scene_final = frame_graph_->add_resource(ImageTemplate("scene_final"));
+      auto scene_lit = frame_graph_->add_resource(ImageTemplate("Scene Lit"));
+      auto scene_final = frame_graph_->add_resource(ImageTemplate("Scene Final"));
       auto rotation_texture = frame_graph_->add_resource(
           ImageTemplate("Rotation Pattern Texture")
-              .set_initial_value(std::filesystem::current_path() / "../../assets/rot_texture.bmp")
+              .set_initial_value(asset("rot_texture.bmp"))
               .build(),
           fg::CreationType::EXTERNAL);
       auto occlusion_texture = frame_graph_->add_resource(
-          ImageTemplate("occlusion_texture")
+          ImageTemplate("Ambient Occlusion Texture")
               .set_image_type(TextureType::kColor, VK_FORMAT_R16_SFLOAT)
               .set_image_size(0.5f)
               .build());
 
       auto blue_noise = frame_graph_->add_resource(
           ImageTemplate("Blue Noise Texture")
-              .set_initial_value(std::filesystem::current_path()
-                                 / "../../assets/blue_noise_512_512.png")
+              .set_initial_value(asset("blue_noise_512_512.png"))
               .build(),
           fg::CreationType::EXTERNAL);
       auto froxel_data = frame_graph_->add_resource(
-          ImageTemplate("froxel_data_texture_0")
+          ImageTemplate("Froxel Data 0")
               .set_image_type(TextureType::kColor, VK_FORMAT_R16G16B16A16_SFLOAT,
                               ImageType::kImage3D)
               .set_image_size(128, 128, 128)
               .build());
       auto light_scattering = frame_graph_->add_resource(
-          ImageTemplate("light_scattering_texture")
+          ImageTemplate("Light Scattering Texture")
               .set_image_type(TextureType::kColor, VK_FORMAT_R16G16B16A16_SFLOAT,
                               ImageType::kImage3D)
               .set_image_size(128, 128, 128)
               .build());
       auto integrated_light_scattering = frame_graph_->add_resource(
-          ImageTemplate("integrated_light_scattering_texture")
+          ImageTemplate("Integrated Light Scattering Texture")
               .set_image_type(TextureType::kColor, VK_FORMAT_R16G16B16A16_SFLOAT,
                               ImageType::kImage3D)
               .set_image_size(128, 128, 128)
               .build());
       auto volumetric_noise = frame_graph_->add_resource(
-          ImageTemplate("volumetric_noise_texture")
+          ImageTemplate("Volumetric Noise Texture")
               .set_image_type(TextureType::kColor, VK_FORMAT_R8_UNORM, ImageType::kImage3D)
               .set_image_size(64, 64, 64)
               .set_initial_value({1.f, 0.f, 0.f, 1.f})
