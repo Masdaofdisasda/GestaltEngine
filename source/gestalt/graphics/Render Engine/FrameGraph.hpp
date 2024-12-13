@@ -44,16 +44,20 @@ namespace gestalt::graphics::fg {
     VkPushConstantRange push_constant_range = {.size = 0};
   };
 
+  
+    struct ResourceBindingInfo {
+    uint32 set_index;
+    uint32 binding_index;
+    VkDescriptorType descriptor_type;
+    VkShaderStageFlags shader_stages;
+    uint32 descriptor_count;
+    std::optional<VkSampler> sampler;
+  };
+
   template <typename ResourceInstanceType> struct ResourceBinding {
     std::shared_ptr<ResourceInstanceType> resource;
-    struct ResourceBindingInfo {
-      uint32 set_index;
-      uint32 binding_index;
-      VkDescriptorType descriptor_type;
-      VkShaderStageFlags shader_stages;
-      uint32 descriptor_count;
-      std::optional<VkSampler> sampler;
-    } info;
+    ResourceBindingInfo info;
+    ResourceUsage usage;
   };
 
   class CommandBuffer {
@@ -348,13 +352,17 @@ namespace gestalt::graphics::fg {
         // Process image bindings for this set index
         if (auto it = image_bindings_by_set.find(set_index); it != image_bindings_by_set.end()) {
           for (const auto& binding : it->second) {
+            if (binding.info.descriptor_type == VK_DESCRIPTOR_TYPE_MAX_ENUM)
+              continue;  // image attachment
+
             const auto& info = binding.info;
             VkDescriptorImageInfo image_info{};
             image_info.sampler = binding.info.sampler.value_or(VK_NULL_HANDLE);
             image_info.imageView = binding.resource->get_image_view();
             image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;  // TODO: Set appropriate layout
 
-            descriptor_buffer->write_image(info.binding_index, info.descriptor_type, std::move(image_info));
+            descriptor_buffer->write_image(info.binding_index, info.descriptor_type,
+                                           std::move(image_info));
           }
         }
 
@@ -767,47 +775,6 @@ namespace gestalt::graphics::fg {
     [[nodiscard]] VkPipelineBindPoint get_bind_point() const { return bind_point_; }
   };
 
-  
-template <typename ResourceInstanceType> class ResourceCollection {
-    struct ResourceMetadata {
-      std::bitset<static_cast<size_t>(ResourceUsage::COUNT)> usage_mask;  // Bitset for usage types
-    };
-
-    std::unordered_map<std::shared_ptr<ResourceInstanceType>, ResourceMetadata> resources_;
-
-  public:
-    // Add or update a resource with a specific usage
-    void add_resource(const std::shared_ptr<ResourceInstanceType>& resource, ResourceUsage usage) {
-      if (resource == nullptr) {
-        throw std::runtime_error("Resource cannot be null!");
-      }
-      auto& metadata = resources_[resource];
-      metadata.usage_mask.set(static_cast<size_t>(usage));  // Set the usage bit
-    }
-
-    // Get resources by a specific usage
-    std::vector<std::shared_ptr<ResourceInstanceType>> get_resources(ResourceUsage usage) const {
-      std::vector<std::shared_ptr<ResourceInstanceType>> result;
-      for (const auto& [resource, metadata] : resources_) {
-        if (metadata.usage_mask.test(static_cast<size_t>(usage))) {  // Check usage bit
-          result.push_back(resource);
-        }
-      }
-      return result;
-    }
-
-    [[nodiscard]] bool has_usage(const std::shared_ptr<ResourceInstanceType>& resource,
-                                 ResourceUsage usage) const {
-      auto it = resources_.find(resource);
-      return (it != resources_.end()) && it->second.usage_mask.test(static_cast<size_t>(usage));
-    }
-
-    std::bitset<static_cast<size_t>(ResourceUsage::COUNT)> get_usage_mask(
-        const std::shared_ptr<ResourceInstanceType>& resource) const {
-      return resources_.at(resource).usage_mask;
-    }
-  };
-
   struct ResourceComponentBindings {
     std::unordered_map<uint32, std::shared_ptr<ImageInstance>> color_attachments;
     std::shared_ptr<ImageInstance> depth_attachment;
@@ -815,11 +782,10 @@ template <typename ResourceInstanceType> class ResourceCollection {
     std::vector<ResourceBinding<ImageInstance>> image_bindings;
     std::vector<ResourceBinding<BufferInstance>> buffer_bindings;
 
-    ResourceCollection<ImageInstance> images;
-    ResourceCollection<BufferInstance> buffers;
     PushDescriptor push_descriptor;
 
-    ResourceComponentBindings& add_attachment(const std::shared_ptr<ImageInstance>& image, uint32 attachment_index = 0) {
+    ResourceComponentBindings& add_attachment(const std::shared_ptr<ImageInstance>& image,
+                                              uint32 attachment_index = 0) {
       if (image->get_type() == TextureType::kColor) {
         color_attachments.emplace(attachment_index, image);
       } else if (image->get_type() == TextureType::kDepth) {
@@ -828,7 +794,11 @@ template <typename ResourceInstanceType> class ResourceCollection {
         }
         depth_attachment = image;
       }
-      images.add_resource(image, ResourceUsage::WRITE);
+
+      image_bindings.push_back({image,
+           {0, 0, VK_DESCRIPTOR_TYPE_MAX_ENUM,
+                                 VK_SHADER_STAGE_FRAGMENT_BIT, 1, nullptr},
+                                ResourceUsage::WRITE});
       return *this;
     }
 
@@ -840,8 +810,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
                                            const uint32 descriptor_count = 1) {
       image_bindings.push_back(
           {image,
-           {set_index, binding_index, descriptor_type, shader_stages, descriptor_count, sampler}});
-      images.add_resource(image, usage);
+           {set_index, binding_index, descriptor_type, shader_stages, descriptor_count, sampler}, usage});
       return *this;
     }
 
@@ -851,8 +820,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
                                            const VkDescriptorType descriptor_type,
                                            const VkShaderStageFlags shader_stages) {
       buffer_bindings.push_back(
-          {buffer, {set_index, binding_index, descriptor_type, shader_stages, 1}});
-      buffers.add_resource(buffer, usage);
+          {buffer, {set_index, binding_index, descriptor_type, shader_stages, 1}, usage});
       return *this;
     }
 
@@ -869,28 +837,76 @@ template <typename ResourceInstanceType> class ResourceCollection {
     explicit ResourceComponent(ResourceComponentBindings&& bindings) : data_(std::move(bindings)) {}
 
     // Get resources of all types based on usage
-    [[nodiscard]] std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) const {
-      std::vector<std::shared_ptr<ResourceInstance>> result;
+    [[nodiscard]] std::vector<ResourceBinding<ResourceInstance>> get_resources(
+        const ResourceUsage usage) const {
+      std::vector<ResourceBinding<ResourceInstance>> result;
 
-      auto image_resources = data_.images.get_resources(usage);
-      auto buffer_resources = data_.buffers.get_resources(usage);
+      auto image_bindings = get_image_bindings(usage);
+      auto buffer_bindings = get_buffer_bindings(usage);
 
-      // Append images and buffers to the result
-      result.insert(result.end(), image_resources.begin(), image_resources.end());
-      result.insert(result.end(), buffer_resources.begin(), buffer_resources.end());
+      result.insert(result.end(), image_bindings.begin(), image_bindings.end());
+      result.insert(result.end(), buffer_bindings.begin(), buffer_bindings.end());
 
       return result;
     }
 
     // Get image resources only
-    [[nodiscard]] std::vector<std::shared_ptr<ImageInstance>> get_image_resources(ResourceUsage usage) const {
-      return data_.images.get_resources(usage);
+    [[nodiscard]] std::vector<std::shared_ptr<ImageInstance>> get_image_resources(
+        const ResourceUsage resourceUsage) const {
+      std::vector<std::shared_ptr<ImageInstance>> result;
+      for (const auto& [resource, info, usage] : data_.image_bindings) {
+        if (usage == resourceUsage) {
+          result.push_back(resource);
+        }
+      }
+      return result;
     }
 
     // Get buffer resources only
-    [[nodiscard]] std::vector<std::shared_ptr<BufferInstance>> get_buffer_resources(ResourceUsage usage) const {
-      return data_.buffers.get_resources(usage);
+    [[nodiscard]] std::vector<std::shared_ptr<BufferInstance>> get_buffer_resources(
+        const ResourceUsage resourceUsage) const {
+      std::vector<std::shared_ptr<BufferInstance>> result;
+      for (const auto& [resource, info, usage] : data_.buffer_bindings) {
+        if (usage == resourceUsage) {
+          result.push_back(resource);
+        }
+      }
+      return result;
     }
+
+    [[nodiscard]] std::vector<ResourceBinding<ResourceInstance>> get_image_bindings(
+        ResourceUsage resourceUsage) const {
+      std::vector<ResourceBinding<ResourceInstance>> result;
+      for (auto& image_binding : data_.image_bindings) {
+        if (image_binding.usage == resourceUsage) {
+          // image_binding is ResourceBinding<ImageInstance>
+          // Need to cast std::shared_ptr<ImageInstance> to std::shared_ptr<ResourceInstance>
+          ResourceBinding<ResourceInstance> converted;
+          converted.resource = std::static_pointer_cast<ResourceInstance>(image_binding.resource);
+          converted.info = image_binding.info;
+          converted.usage = image_binding.usage;
+          result.push_back(std::move(converted));
+        }
+      }
+      return result;
+    }
+
+    [[nodiscard]] std::vector<ResourceBinding<ResourceInstance>> get_buffer_bindings(
+        ResourceUsage resourceUsage) const {
+      std::vector<ResourceBinding<ResourceInstance>> result;
+      for (const auto& buffer_binding : data_.buffer_bindings) {
+        if (buffer_binding.usage == resourceUsage) {
+          // buffer_binding is ResourceBinding<BufferInstance>
+          ResourceBinding<ResourceInstance> converted;
+          converted.resource = std::static_pointer_cast<ResourceInstance>(buffer_binding.resource);
+          converted.info = buffer_binding.info;
+          converted.usage = buffer_binding.usage;
+          result.push_back(std::move(converted));
+        }
+      }
+      return result;
+    }
+
 
     [[nodiscard]] const std::unordered_map<uint32, std::shared_ptr<ImageInstance>>* get_color_attachment() const {
       return &data_.color_attachments;
@@ -926,18 +942,6 @@ template <typename ResourceInstanceType> class ResourceCollection {
       return data_.buffer_bindings;
     }
 
-
-    [[nodiscard]] bool has_usage(const std::shared_ptr<ImageInstance>& image,
-                                 ResourceUsage usage) const {
-      return data_.images.has_usage(image, usage);
-    }
-
-        [[nodiscard]] bool has_usage(const std::shared_ptr<BufferInstance>& buffer,
-                                 ResourceUsage usage) const {
-      return data_.buffers.has_usage(buffer, usage);
-    }
-
-
     [[nodiscard]] VkPushConstantRange get_push_constant_range() const {
       return data_.push_descriptor.get_push_constant_range();
     }
@@ -954,7 +958,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
     }
   public:
     [[nodiscard]] std::string_view get_name() const { return name_; }
-    virtual std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) = 0;
+    virtual std::vector<ResourceBinding<ResourceInstance>> get_resources(ResourceUsage usage) = 0;
     virtual VkPipelineBindPoint get_bind_point() = 0;
     virtual void execute(CommandBuffer cmd) = 0;
     virtual ~RenderPass() = default;
@@ -992,7 +996,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
                             "draw_cull_depth.comp.spv"),
           draw_count_provider_(std::move(draw_count_provider)) {}
 
-    std::vector<std::shared_ptr<ResourceInstance>> get_resources(
+    std::vector<ResourceBinding<ResourceInstance>> get_resources(
         const ResourceUsage usage) override {
       return resources_.get_resources(usage);
     }
@@ -1039,7 +1043,8 @@ template <typename ResourceInstanceType> class ResourceCollection {
                             resources_.get_buffer_bindings(), resources_.get_push_constant_range(),
                             "task_submit.comp.spv") {}
 
-    std::vector<std::shared_ptr<ResourceInstance>> get_resources(const ResourceUsage usage) override {
+    std::vector<ResourceBinding<ResourceInstance>> get_resources(
+        const ResourceUsage usage) override {
       return resources_.get_resources(usage);
     }
 
@@ -1128,7 +1133,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
                   .set_depth_format(resources_.get_depth_attachment()->get()->get_format())
                   .build_pipeline_info()) {}
 
-    std::vector<std::shared_ptr<ResourceInstance>> get_resources(
+    std::vector<ResourceBinding<ResourceInstance>> get_resources(
         const ResourceUsage usage) override {
       return resources_.get_resources(usage);
     }
@@ -1182,7 +1187,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
                             "draw_cull.comp.spv"),
           draw_count_provider_(std::move(draw_count_provider)) {}
 
-    std::vector<std::shared_ptr<ResourceInstance>> get_resources(
+    std::vector<ResourceBinding<ResourceInstance>> get_resources(
         const ResourceUsage usage) override {
       return resources_.get_resources(usage);
     }
@@ -1228,7 +1233,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
                             resources_.get_buffer_bindings(), resources_.get_push_constant_range(),
                             "task_submit.comp.spv") {}
 
-    std::vector<std::shared_ptr<ResourceInstance>> get_resources(
+    std::vector<ResourceBinding<ResourceInstance>> get_resources(
         const ResourceUsage usage) override {
       return resources_.get_resources(usage);
     }
@@ -1320,7 +1325,8 @@ template <typename ResourceInstanceType> class ResourceCollection {
                   .set_depth_format(resources_.get_depth_attachment()->get()->get_format())
                   .build_pipeline_info()) {}
 
-    std::vector<std::shared_ptr<ResourceInstance>> get_resources(const ResourceUsage usage) override {
+    std::vector<ResourceBinding<ResourceInstance>> get_resources(
+        const ResourceUsage usage) override {
       return resources_.get_resources(usage);
     }
 
@@ -1377,7 +1383,8 @@ template <typename ResourceInstanceType> class ResourceCollection {
                             "ssao_filter.comp.spv"),
           push_constant_provider_(push_constant_provider) {}
 
-    std::vector<std::shared_ptr<ResourceInstance>> get_resources(const ResourceUsage usage) override {
+    std::vector<ResourceBinding<ResourceInstance>> get_resources(
+        const ResourceUsage usage) override {
       return resources_.get_resources(usage);
     }
 
@@ -1455,7 +1462,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
           frame_provider_(frame_provider),
           camera_provider_(camera_provider) {}
 
-    std::vector<std::shared_ptr<ResourceInstance>> get_resources(
+   std::vector<ResourceBinding<ResourceInstance>> get_resources(
         const ResourceUsage usage) override {
       return resources_.get_resources(usage);
     }
@@ -1569,7 +1576,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
           camera_provider_(camera_provider),
           point_light_count_provider_(point_light_count_provider) {}
 
-    std::vector<std::shared_ptr<ResourceInstance>> get_resources(
+    std::vector<ResourceBinding<ResourceInstance>> get_resources(
         const ResourceUsage usage) override {
       return resources_.get_resources(usage);
     }
@@ -1633,7 +1640,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
                             "volumetric_light_spatial_filter.comp.spv"),
           push_constant_provider_(push_constant_provider) {}
 
-    std::vector<std::shared_ptr<ResourceInstance>> get_resources(
+    std::vector<ResourceBinding<ResourceInstance>> get_resources(
         const ResourceUsage usage) override {
       return resources_.get_resources(usage);
     }
@@ -1696,7 +1703,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
           camera_provider_(camera_provider)
     {}
 
-    std::vector<std::shared_ptr<ResourceInstance>> get_resources(
+    std::vector<ResourceBinding<ResourceInstance>> get_resources(
         const ResourceUsage usage) override {
       return resources_.get_resources(usage);
     }
@@ -1744,7 +1751,7 @@ template <typename ResourceInstanceType> class ResourceCollection {
                             resources_.get_buffer_bindings(), resources_.get_push_constant_range(),
                             "volumetric_light_noise.comp.spv") {}
 
-    std::vector<std::shared_ptr<ResourceInstance>> get_resources(
+    std::vector<ResourceBinding<ResourceInstance>> get_resources(
         const ResourceUsage usage) override {
       return resources_.get_resources(usage);
     }
@@ -1820,7 +1827,7 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
                             resources_.get_buffer_bindings(), resources_.get_push_constant_range(),
                             "pbr_lighting.comp.spv") {}
 
-    std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
+    std::vector<ResourceBinding<ResourceInstance>> get_resources(ResourceUsage usage) override {
       return resources_.get_resources(usage);
     }
 
@@ -1850,7 +1857,7 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
                             resources_.get_buffer_bindings(), resources_.get_push_constant_range(),
                             "task_submit.comp.spv") {}
 
-    std::vector<std::shared_ptr<ResourceInstance>> get_resources(ResourceUsage usage) override {
+    std::vector<ResourceBinding<ResourceInstance>> get_resources(ResourceUsage usage) override {
       return resources_.get_resources(usage);
     }
 
@@ -1899,105 +1906,66 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
     }
   };
 
-  struct DescriptorSetLayout {
-    uint32 resource_handle;
-  };
-
-  struct DescriptorSet {
-    std::vector<DescriptorSetLayout> layouts;
-  };
-
-  struct DescriptorBindingPoint {
-    std::array<DescriptorSet, 10> descriptor_sets;
-  };
-
-  class DescriptorManger {
-    DescriptorBindingPoint graphics_binding_point;
-    DescriptorBindingPoint compute_binding_point;
-    // manage descriptor sets and bindings on CPU side
-  };
-
   class SynchronizationManager {
     class SynchronizationVisitor final : public ResourceVisitor {
       CommandBuffer cmd_;
       std::vector<VkImageMemoryBarrier2> image_barriers;
       std::vector<VkBufferMemoryBarrier2> buffer_barriers;
 
-      struct ImageTransitionRule {
-        VkImageAspectFlags aspect_mask;
-        VkPipelineStageFlags2 src_stage_mask;
-        VkAccessFlags2 src_access_mask;
-        ResourceUsage usage;
-        VkShaderStageFlags shader_stage;
-
-        VkPipelineStageFlags2 dst_stage_mask;
-        VkAccessFlags2 dst_access_mask;
-      };
-
-      struct BufferTransitionKey {
-        VkPipelineStageFlags2 src_stage_mask; // last used
-        VkAccessFlags2 src_access_mask; // last used
-        ResourceUsage usage; // currently needed
-        VkShaderStageFlags shader_stage; // used in
-
-        bool operator==(const BufferTransitionKey& other) const {
-          return src_stage_mask == other.src_stage_mask && src_access_mask == other.src_access_mask
-                 && usage == other.usage && shader_stage == other.shader_stage;
-        }
-      };
-
-      struct BufferTransitionKeyHash {
-        std::size_t operator()(const BufferTransitionKey& key) const {
-          return std::hash<VkPipelineStageFlags2>()(key.src_stage_mask)
-                 ^ std::hash<VkAccessFlags2>()(key.src_access_mask)
-                 ^ std::hash<ResourceUsage>()(key.usage)
-                 ^ std::hash<VkShaderStageFlags>()(key.shader_stage);
-        }
-      };
-
-      struct BufferTransitionRule {
-        VkPipelineStageFlags2 dst_stage_mask;
-        VkAccessFlags2 dst_access_mask;
-      };
-
-      //TODO
-      std::unordered_map<BufferTransitionKey, BufferTransitionRule, BufferTransitionKeyHash> buffer_transition_rules_
-          = {{{VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_ACCESS_NONE, ResourceUsage::READ,
-               VK_SHADER_STAGE_ALL_GRAPHICS},
-              {VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_ACCESS_SHADER_READ_BIT}},
-
-             {{VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_ACCESS_NONE, ResourceUsage::WRITE,
-               VK_SHADER_STAGE_ALL_GRAPHICS},
-              {VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_ACCESS_SHADER_WRITE_BIT}}};
-
     public:
       explicit SynchronizationVisitor(const CommandBuffer cmd) : cmd_(cmd) {}
 
-      void visit(BufferInstance& buffer, const ResourceUsage usage, const VkShaderStageFlags shader_stage) override {
-
+      void visit(BufferInstance& buffer, const ResourceUsage usage,
+                 const VkShaderStageFlags shader_stage) override {
+        // Prepare a buffer memory barrier
         VkBufferMemoryBarrier2 barrier = {};
         barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
         barrier.buffer = buffer.get_buffer_handle();
         barrier.offset = 0;
         barrier.size = VK_WHOLE_SIZE;
 
+        // Source: from the buffer's current known state
         barrier.srcAccessMask = buffer.get_current_access();
         barrier.srcStageMask = buffer.get_current_stage();
-         
-         if (usage == ResourceUsage::WRITE) {
-          barrier.dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
-         } else if (usage == ResourceUsage::READ) {
-           barrier.dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT;
-         }
 
+        // Determine destination stages and access masks based on usage
+        // If we know the exact shader stage, we could pick a more granular pipeline stage:
+        VkPipelineStageFlags2 dstStageMask = 0;
+        VkAccessFlags2 dstAccessMask = 0;
+
+        // Assign destination pipeline stages from shader_stage
+        // This can be refined if you know whether it's fragment-only, vertex-only, etc.
         if (shader_stage == VK_SHADER_STAGE_ALL_GRAPHICS) {
-           barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
-         } else if (shader_stage == VK_SHADER_STAGE_COMPUTE_BIT) {
-          barrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+          dstStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+        } else if (shader_stage == VK_SHADER_STAGE_COMPUTE_BIT) {
+          dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        } else {
+          // As a fallback for other shader stages:
+          dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         }
 
-        buffer.set_current_access(barrier.dstAccessMask);
-        buffer.set_current_stage(barrier.dstStageMask);
+        // Assign access mask based on usage
+        // Refine this depending on whether the buffer is used as a uniform, storage buffer, etc.
+        // For general READ: assume uniform buffer or sampled read.
+        // For WRITE: assume storage buffer writes.
+        if (usage == ResourceUsage::WRITE) {
+          // Writing to a storage buffer
+          dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+        } else if (usage == ResourceUsage::READ) {
+          // Reading from a uniform or storage buffer
+          // If uniform: VK_ACCESS_2_UNIFORM_READ_BIT
+          // If storage: VK_ACCESS_2_SHADER_STORAGE_READ_BIT
+          // For a generic read assumption:
+          dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
+        }
+
+        // Update the barrier
+        barrier.dstAccessMask = dstAccessMask;
+        barrier.dstStageMask = dstStageMask;
+
+        // Update the resource state
+        buffer.set_current_access(dstAccessMask);
+        buffer.set_current_stage(dstStageMask);
 
         buffer_barriers.push_back(barrier);
       }
@@ -2009,61 +1977,100 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
         barrier.image = image.get_image_handle();
         barrier.subresourceRange = vkinit::image_subresource_range(image.get_image_aspect());
 
+        // Source state
         barrier.oldLayout = image.get_layout();
         barrier.srcAccessMask = image.get_current_access();
         barrier.srcStageMask = image.get_current_stage();
 
+        // Determine pipeline stages
+        VkPipelineStageFlags2 dstStageMask = 0;
         if (shader_stage == VK_SHADER_STAGE_ALL_GRAPHICS) {
-          barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+          dstStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
         } else if (shader_stage == VK_SHADER_STAGE_COMPUTE_BIT) {
-          barrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+          dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        } else {
+          dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         }
 
-        if (shader_stage == VK_SHADER_STAGE_ALL_GRAPHICS) {
-          switch (image.get_type()) {
-            case TextureType::kColor:
-              barrier.newLayout = (usage == ResourceUsage::READ)
-                                      ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                                      : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-              barrier.dstAccessMask = (usage == ResourceUsage::READ)
-                                          ? VK_ACCESS_SHADER_READ_BIT
-                                          : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-              break;
+        // Determine new layout and access based on usage and texture type
+        VkImageLayout newLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        VkAccessFlags2 dstAccessMask = 0;
+        switch (image.get_type()) {
+          case TextureType::kColor:
+            if (shader_stage == VK_SHADER_STAGE_ALL_GRAPHICS) {
+              if (usage == ResourceUsage::READ) {
+                // Sampled read
+                newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+              } else {
+                // Color attachment write
+                newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+              }
+            } else {
+              // Compute stage
+              if (usage == ResourceUsage::READ) {
+                newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+              } else {
+                // General layout for compute read/write (e.g. storage image)
+                newLayout = VK_IMAGE_LAYOUT_GENERAL;
+                dstAccessMask
+                    = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
+              }
+            }
+            break;
 
-            case TextureType::kDepth:
-              barrier.newLayout = (usage == ResourceUsage::READ)
-                                      ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
-                                      : VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-              barrier.dstAccessMask = (usage == ResourceUsage::READ)
-                                          ? VK_ACCESS_SHADER_READ_BIT
-                                          : VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-              break;
+          case TextureType::kDepth:
+            if (shader_stage == VK_SHADER_STAGE_ALL_GRAPHICS) {
+              if (usage == ResourceUsage::READ) {
+                newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+                dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+              } else {
+                newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+                dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
+                                | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+              }
+            } else {
+              // For compute reading a depth texture, typically sampled read:
+              if (usage == ResourceUsage::READ) {
+                newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+              } else {
+                // General for compute write to depth? Usually unusual, but handle generically:
+                newLayout = VK_IMAGE_LAYOUT_GENERAL;
+                dstAccessMask
+                    = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
+              }
+            }
+            break;
 
-            default:
-              throw std::runtime_error("Unsupported TextureType for image!");
-          }
-        } else if (shader_stage == VK_SHADER_STAGE_COMPUTE_BIT) {
-          barrier.newLayout = (usage == ResourceUsage::READ)
-                                  ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                                  : VK_IMAGE_LAYOUT_GENERAL;
-          barrier.dstAccessMask = (usage == ResourceUsage::READ) ? VK_ACCESS_SHADER_READ_BIT
-                                                                 : VK_ACCESS_SHADER_WRITE_BIT;
+          default:
+            throw std::runtime_error("Unsupported TextureType for image!");
         }
 
+        barrier.newLayout = newLayout;
+        barrier.dstAccessMask = dstAccessMask;
+        barrier.dstStageMask = dstStageMask;
 
-        image.set_layout(barrier.newLayout);
-        image.set_current_access(barrier.dstAccessMask);
-        image.set_current_stage(barrier.dstStageMask);
+        // Update image state
+        image.set_layout(newLayout);
+        image.set_current_access(dstAccessMask);
+        image.set_current_stage(dstStageMask);
 
         image_barriers.push_back(barrier);
       }
 
+
       void apply() const {
-        VkDependencyInfo dependency_info{ .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
+        VkDependencyInfo dependency_info{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        dependency_info.dependencyFlags = 0;
         dependency_info.bufferMemoryBarrierCount = static_cast<uint32_t>(buffer_barriers.size());
         dependency_info.pBufferMemoryBarriers = buffer_barriers.data();
         dependency_info.imageMemoryBarrierCount = static_cast<uint32_t>(image_barriers.size());
         dependency_info.pImageMemoryBarriers = image_barriers.data();
+        dependency_info.memoryBarrierCount = 0;
+        dependency_info.pMemoryBarriers = nullptr;
 
         vkCmdPipelineBarrier2(cmd_.get(), &dependency_info);
       }
@@ -2071,22 +2078,21 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
 
 
   public:
-    void synchronize_resources(const std::shared_ptr<FrameGraphNode>& node, const CommandBuffer cmd) {
+    void synchronize_resources(const std::shared_ptr<FrameGraphNode>& node,
+                               const CommandBuffer cmd) {
       const auto read_resources = node->render_pass->get_resources(ResourceUsage::READ);
       const auto write_resources = node->render_pass->get_resources(ResourceUsage::WRITE);
       const auto bind_point = node->render_pass->get_bind_point();
-      const auto shader_stage = bind_point == VK_PIPELINE_BIND_POINT_GRAPHICS
-                                  ? VK_SHADER_STAGE_ALL_GRAPHICS
-                                  : VK_SHADER_STAGE_COMPUTE_BIT;
 
       SynchronizationVisitor visitor(cmd);
 
-      for (const auto& resource : read_resources) {
-        resource->accept(visitor, ResourceUsage::READ, shader_stage);
+      for (const auto& [resource, info, _] : read_resources) {
+        resource->accept(visitor, ResourceUsage::READ,
+                                       info.shader_stages);
       }
 
-      for (const auto& resource : write_resources) {
-        resource->accept(visitor, ResourceUsage::WRITE, shader_stage);
+      for (const auto& [resource, info, _] : write_resources) {
+        resource->accept(visitor, ResourceUsage::WRITE, info.shader_stages);
       }
 
       visitor.apply();
@@ -2121,7 +2127,6 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
 
     std::vector<std::shared_ptr<FrameGraphNode>> sorted_nodes_;
 
-    std::unique_ptr<DescriptorManger> descriptor_manger_;
     std::unique_ptr<SynchronizationManager> synchronization_manager_;
     std::unique_ptr<ResourceRegistry> resource_registry_;
 

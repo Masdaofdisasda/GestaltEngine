@@ -92,7 +92,6 @@ namespace gestalt::graphics::fg {
 
   FrameGraph::FrameGraph(ResourceAllocator* resource_allocator) {
     nodes_.reserve(25);
-    descriptor_manger_ = std::make_unique<DescriptorManger>();
     synchronization_manager_ = std::make_unique<SynchronizationManager>();
     resource_registry_ = std::make_unique<ResourceRegistry>(resource_allocator);
   }
@@ -103,12 +102,12 @@ namespace gestalt::graphics::fg {
 
   void FrameGraph::compile() {
     for (auto& node : nodes_) {
-      for (const auto& read_resource : node->render_pass->get_resources(ResourceUsage::READ)) {
+      for (const auto& [read_resource, info, _] : node->render_pass->get_resources(ResourceUsage::READ)) {
         auto& edge = edges_.at(read_resource->resource_handle);
         edge->nodes_to.push_back(node);
         node->edges_in.push_back(edge);
       }
-      for (const auto& write_resource : node->render_pass->get_resources(ResourceUsage::WRITE)) {
+      for (const auto& [write_resource, info, _]: node->render_pass->get_resources(ResourceUsage::WRITE)) {
         auto& edge = edges_.at(write_resource->resource_handle);
         edge->nodes_from.push_back(node);
         node->edges_out.push_back(edge);
