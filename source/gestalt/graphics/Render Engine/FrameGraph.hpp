@@ -786,137 +786,86 @@ namespace gestalt::graphics::fg {
 
     ResourceComponentBindings& add_attachment(const std::shared_ptr<ImageInstance>& image,
                                               uint32 attachment_index = 0) {
-      if (image->get_type() == TextureType::kColor) {
-        color_attachments.emplace(attachment_index, image);
-      } else if (image->get_type() == TextureType::kDepth) {
-        if (attachment_index != 0) {
-          throw std::runtime_error("Depth attachment index must be 0");
-        }
-        depth_attachment = image;
+      if (!image) {
+        throw std::invalid_argument("Image cannot be null");
       }
 
-      image_bindings.push_back({image,
-           {0, 0, VK_DESCRIPTOR_TYPE_MAX_ENUM,
-                                 VK_SHADER_STAGE_FRAGMENT_BIT, 1, nullptr},
-                                ResourceUsage::WRITE});
-      return *this;
-    }
+      switch (image->get_type()) {
+        case TextureType::kColor:
+          color_attachments.emplace(attachment_index, image);
+          break;
+        case TextureType::kDepth:
+          if (attachment_index != 0) {
+            throw std::runtime_error("Depth attachment index must be 0");
+          }
+          depth_attachment = image;
+          break;
+        default:
+          throw std::runtime_error("Unsupported attachment type");
+      }
 
-    ResourceComponentBindings& add_binding(const uint32 set_index, const uint32 binding_index,
-                                           const std::shared_ptr<ImageInstance>& image,
-                                           const VkSampler sampler, const ResourceUsage usage,
-                                           const VkDescriptorType descriptor_type,
-                                           const VkShaderStageFlags shader_stages,
-                                           const uint32 descriptor_count = 1) {
       image_bindings.push_back(
           {image,
-           {set_index, binding_index, descriptor_type, shader_stages, descriptor_count, sampler}, usage});
+           {0, 0, VK_DESCRIPTOR_TYPE_MAX_ENUM, VK_SHADER_STAGE_FRAGMENT_BIT, 1, nullptr},
+           ResourceUsage::WRITE});
       return *this;
     }
 
-    ResourceComponentBindings& add_binding(const uint32 set_index, const uint32 binding_index,
+    // Add an image binding
+    ResourceComponentBindings& add_binding(uint32 set_index, uint32 binding_index,
+                                           const std::shared_ptr<ImageInstance>& image,
+                                           VkSampler sampler, ResourceUsage usage,
+                                           VkDescriptorType descriptor_type,
+                                           VkShaderStageFlags shader_stages,
+                                           uint32 descriptor_count = 1) {
+      if (!image) {
+        throw std::invalid_argument("Image cannot be null");
+      }
+
+      image_bindings.push_back(
+          {image,
+           {set_index, binding_index, descriptor_type, shader_stages, descriptor_count, sampler},
+           usage});
+      return *this;
+    }
+
+    // Add a buffer binding
+    ResourceComponentBindings& add_binding(uint32 set_index, uint32 binding_index,
                                            const std::shared_ptr<BufferInstance>& buffer,
-                                           const ResourceUsage usage,
-                                           const VkDescriptorType descriptor_type,
-                                           const VkShaderStageFlags shader_stages) {
+                                           ResourceUsage usage, VkDescriptorType descriptor_type,
+                                           VkShaderStageFlags shader_stages) {
+      if (!buffer) {
+        throw std::invalid_argument("Buffer cannot be null");
+      }
+
       buffer_bindings.push_back(
           {buffer, {set_index, binding_index, descriptor_type, shader_stages, 1}, usage});
       return *this;
     }
 
+    // Add push constants
     ResourceComponentBindings& add_push_constant(uint32_t size, VkShaderStageFlags stage_flags) {
       push_descriptor = PushDescriptor(size, stage_flags);
-
       return *this;
     }
-
   };
+
 
   class ResourceComponent {
   public:
     explicit ResourceComponent(ResourceComponentBindings&& bindings) : data_(std::move(bindings)) {}
 
-    // Get resources of all types based on usage
+    // Retrieve all resources based on usage
     [[nodiscard]] std::vector<ResourceBinding<ResourceInstance>> get_resources(
-        const ResourceUsage usage) const {
+        ResourceUsage usage) const {
       std::vector<ResourceBinding<ResourceInstance>> result;
-
-      auto image_bindings = get_image_bindings(usage);
-      auto buffer_bindings = get_buffer_bindings(usage);
-
-      result.insert(result.end(), image_bindings.begin(), image_bindings.end());
-      result.insert(result.end(), buffer_bindings.begin(), buffer_bindings.end());
-
+      append_bindings(result, data_.image_bindings, usage);
+      append_bindings(result, data_.buffer_bindings, usage);
       return result;
     }
 
-    // Get image resources only
-    [[nodiscard]] std::vector<std::shared_ptr<ImageInstance>> get_image_resources(
-        const ResourceUsage resourceUsage) const {
-      std::vector<std::shared_ptr<ImageInstance>> result;
-      for (const auto& [resource, info, usage] : data_.image_bindings) {
-        if (usage == resourceUsage) {
-          result.push_back(resource);
-        }
-      }
-      return result;
-    }
-
-    // Get buffer resources only
-    [[nodiscard]] std::vector<std::shared_ptr<BufferInstance>> get_buffer_resources(
-        const ResourceUsage resourceUsage) const {
-      std::vector<std::shared_ptr<BufferInstance>> result;
-      for (const auto& [resource, info, usage] : data_.buffer_bindings) {
-        if (usage == resourceUsage) {
-          result.push_back(resource);
-        }
-      }
-      return result;
-    }
-
-    [[nodiscard]] std::vector<ResourceBinding<ResourceInstance>> get_image_bindings(
-        ResourceUsage resourceUsage) const {
-      std::vector<ResourceBinding<ResourceInstance>> result;
-      for (auto& image_binding : data_.image_bindings) {
-        if (image_binding.usage == resourceUsage) {
-          // image_binding is ResourceBinding<ImageInstance>
-          // Need to cast std::shared_ptr<ImageInstance> to std::shared_ptr<ResourceInstance>
-          ResourceBinding<ResourceInstance> converted;
-          converted.resource = std::static_pointer_cast<ResourceInstance>(image_binding.resource);
-          converted.info = image_binding.info;
-          converted.usage = image_binding.usage;
-          result.push_back(std::move(converted));
-        }
-      }
-      return result;
-    }
-
-    [[nodiscard]] std::vector<ResourceBinding<ResourceInstance>> get_buffer_bindings(
-        ResourceUsage resourceUsage) const {
-      std::vector<ResourceBinding<ResourceInstance>> result;
-      for (const auto& buffer_binding : data_.buffer_bindings) {
-        if (buffer_binding.usage == resourceUsage) {
-          // buffer_binding is ResourceBinding<BufferInstance>
-          ResourceBinding<ResourceInstance> converted;
-          converted.resource = std::static_pointer_cast<ResourceInstance>(buffer_binding.resource);
-          converted.info = buffer_binding.info;
-          converted.usage = buffer_binding.usage;
-          result.push_back(std::move(converted));
-        }
-      }
-      return result;
-    }
-
-
-    [[nodiscard]] const std::unordered_map<uint32, std::shared_ptr<ImageInstance>>* get_color_attachment() const {
-      return &data_.color_attachments;
-    }
-
-    [[nodiscard]] const std::shared_ptr<ImageInstance>* get_depth_attachment() const {
-      return &data_.depth_attachment;
-    }
-
-    [[nodiscard]] ResourceBinding<BufferInstance> get_buffer_binding(const uint32 set_index, const uint32 binding_index) const {
+    [[nodiscard]] ResourceBinding<BufferInstance> get_buffer_binding(
+        const uint32 set_index, const uint32 binding_index) const {
       for (const auto& resource : data_.buffer_bindings) {
         if (resource.info.set_index == set_index && resource.info.binding_index == binding_index) {
           return resource;
@@ -925,7 +874,8 @@ namespace gestalt::graphics::fg {
       throw std::runtime_error("Resource binding not found");
     }
 
-    [[nodiscard]] ResourceBinding<ImageInstance> get_image_binding(const uint32 set_index, const uint32 binding_index) const {
+    [[nodiscard]] ResourceBinding<ImageInstance> get_image_binding(
+        const uint32 set_index, const uint32 binding_index) const {
       for (const auto& resource : data_.image_bindings) {
         if (resource.info.set_index == set_index && resource.info.binding_index == binding_index) {
           return resource;
@@ -934,6 +884,7 @@ namespace gestalt::graphics::fg {
       throw std::runtime_error("Resource binding not found");
     }
 
+    // Get image or buffer bindings as spans
     [[nodiscard]] std::span<const ResourceBinding<ImageInstance>> get_image_bindings() const {
       return data_.image_bindings;
     }
@@ -942,12 +893,30 @@ namespace gestalt::graphics::fg {
       return data_.buffer_bindings;
     }
 
+    // Retrieve specific attachments
+    [[nodiscard]] const auto& get_color_attachments() const { return data_.color_attachments; }
+    [[nodiscard]] const auto& get_depth_attachment() const { return data_.depth_attachment; }
+
+    // Get individual bindings
     [[nodiscard]] VkPushConstantRange get_push_constant_range() const {
       return data_.push_descriptor.get_push_constant_range();
     }
 
   private:
     ResourceComponentBindings data_;
+
+    // Helper function to append bindings with type conversion
+    template <typename T>
+    void append_bindings(std::vector<ResourceBinding<ResourceInstance>>& result,
+                         const std::vector<ResourceBinding<T>>& bindings,
+                         ResourceUsage usage) const {
+      for (const auto& binding : bindings) {
+        if (binding.usage == usage) {
+          result.push_back({std::static_pointer_cast<ResourceInstance>(binding.resource),
+                            binding.info, binding.usage});
+        }
+      }
+    }
   };
 
   class RenderPass {
@@ -1130,7 +1099,7 @@ namespace gestalt::graphics::fg {
                   .set_multisampling_none()
                   .disable_blending()
                   .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-                  .set_depth_format(resources_.get_depth_attachment()->get()->get_format())
+                  .set_depth_format(resources_.get_depth_attachment()->get_format())
                   .build_pipeline_info()) {}
 
     std::vector<ResourceBinding<ResourceInstance>> get_resources(
@@ -1141,8 +1110,8 @@ namespace gestalt::graphics::fg {
     VkPipelineBindPoint get_bind_point() override { return graphics_pipeline_.get_bind_point(); }
 
     void execute(const CommandBuffer cmd) override {
-      graphics_pipeline_.begin_render_pass(cmd, *resources_.get_color_attachment(),
-                                           *resources_.get_depth_attachment());
+      graphics_pipeline_.begin_render_pass(cmd, resources_.get_color_attachments(),
+                                           resources_.get_depth_attachment());
       graphics_pipeline_.bind(cmd);
 
       constexpr MeshletDepthPushConstants draw_cull_constants{.cullFlags = 1};
@@ -1322,7 +1291,7 @@ namespace gestalt::graphics::fg {
                   .set_multisampling_none()
                   .disable_blending(3)
                   .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-                  .set_depth_format(resources_.get_depth_attachment()->get()->get_format())
+                  .set_depth_format(resources_.get_depth_attachment()->get_format())
                   .build_pipeline_info()) {}
 
     std::vector<ResourceBinding<ResourceInstance>> get_resources(
@@ -1333,8 +1302,8 @@ namespace gestalt::graphics::fg {
     VkPipelineBindPoint get_bind_point() override { return graphics_pipeline_.get_bind_point(); }
 
     void execute(const CommandBuffer cmd) override {
-      graphics_pipeline_.begin_render_pass(cmd, *resources_.get_color_attachment(),
-                                           *resources_.get_depth_attachment());
+      graphics_pipeline_.begin_render_pass(cmd, resources_.get_color_attachments(),
+                                           resources_.get_depth_attachment());
       graphics_pipeline_.bind(cmd);
 
       constexpr MeshletPushConstants draw_cull_constants{};
