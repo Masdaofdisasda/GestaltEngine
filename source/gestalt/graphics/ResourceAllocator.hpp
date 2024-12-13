@@ -22,6 +22,13 @@ namespace gestalt::graphics {
       return {static_cast<uint32>(width), static_cast<uint32>(height), 1};
     }
 
+    [[nodiscard]] VkDeviceSize get_device_size() const {
+      return static_cast<uint32>(width) * static_cast<uint32>(height) * channels;
+    }
+
+    [[nodiscard]] int get_channels() const { return channels;
+    }
+
     [[nodiscard]] VkFormat get_format() const {
       switch (channels) {
         case 1:
@@ -52,41 +59,129 @@ namespace gestalt::graphics {
     [[nodiscard]] VkFormat get_format() const { return image_info.get_format();
     }
 
+    [[nodiscard]] VkDeviceSize get_image_size() const { return image_info.get_device_size(); 
+    }
+
+
     [[nodiscard]] const unsigned char* get_data() const { return data; }
+
+    [[nodiscard]] int get_channels() const { return image_info.get_channels(); }
+
 
     ~ImageData();
   };
 
   class TaskQueue {
-  public:
-    void enqueue(std::function<void(VkCommandBuffer cmd)> task) {
-      std::lock_guard<std::mutex> lock(mutex_);
-      tasks_.push(task);
-      condition_.notify_one();
+    IGpu* gpu_ = nullptr;
+    VkCommandBuffer cmd;
+    VkCommandPool command_pool_ = {};
+    VkFence flushFence = {};
+
+    struct StagingBuffer {
+      VkBuffer buffer;
+      VmaAllocation allocation;
+    };
+
+    std::vector<StagingBuffer> staging_buffers_;
+
+    StagingBuffer create_staging_buffer(VkDeviceSize size) {
+      StagingBuffer staging_buffer;
+      VkBufferCreateInfo buffer_info = {};
+      buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+      buffer_info.size = size;
+      buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+      VmaAllocationCreateInfo alloc_info = {};
+      alloc_info.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+
+      if (vmaCreateBuffer(gpu_->getAllocator(), &buffer_info, &alloc_info, &staging_buffer.buffer,
+                          &staging_buffer.allocation, nullptr)
+          != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create staging buffer for image upload.");
+      }
+
+      staging_buffers_.push_back(staging_buffer);
+
+      return staging_buffer;
     }
 
-    void processTasks(VkCommandBuffer cmd) {
-      std::function<void(VkCommandBuffer cmd)> task;
-      {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (tasks_.empty()) return;
-        task = std::move(tasks_.front());
+  public:
+    explicit TaskQueue(IGpu* gpu) : gpu_(gpu) {
+      VkCommandPoolCreateInfo pool_info = {};
+      pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+      pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+      pool_info.queueFamilyIndex = gpu_->getGraphicsQueueFamily();
+
+      VK_CHECK(vkCreateCommandPool(gpu_->getDevice(), &pool_info, nullptr, &command_pool_));
+
+      VkCommandBufferAllocateInfo alloc_info = {};
+      alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+      alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+      alloc_info.commandPool = command_pool_;
+      alloc_info.commandBufferCount = 1;
+
+      VK_CHECK(vkAllocateCommandBuffers(gpu_->getDevice(), &alloc_info, &cmd));
+
+      VkFenceCreateInfo fenceInfo = {};
+      fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+      VK_CHECK(vkCreateFence(gpu_->getDevice(), &fenceInfo, nullptr, &flushFence));
+    }
+
+    void add_image(const std::filesystem::path& path, VkImage image);
+
+    void enqueue(std::function<void(VkCommandBuffer cmd)> task) {
+      tasks_.push(task);
+    }
+
+    void processTasks() {
+
+      if (tasks_.empty()) return;
+
+      VK_CHECK(vkResetCommandBuffer(cmd, 0));
+
+      VkCommandBufferBeginInfo beginInfo = {};
+      beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+      beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+      VK_CHECK(vkBeginCommandBuffer(cmd, &beginInfo));
+
+      while (!tasks_.empty()) {
+        auto task = tasks_.front();
+        task(cmd);
         tasks_.pop();
       }
-      // Execute the task
-      task(cmd);
+
+      // End recording
+      VK_CHECK(vkEndCommandBuffer(cmd));
+
+      VkCommandBufferSubmitInfo commandBufferSubmitInfo = {};
+      commandBufferSubmitInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+      commandBufferSubmitInfo.commandBuffer = cmd;
+
+      VkSubmitInfo2 submitInfo2 = {};
+      submitInfo2.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+      submitInfo2.commandBufferInfoCount = 1;
+      submitInfo2.pCommandBufferInfos = &commandBufferSubmitInfo;
+
+      VK_CHECK(vkQueueSubmit2(gpu_->getGraphicsQueue(), 1, &submitInfo2, flushFence));
+      VK_CHECK(vkWaitForFences(gpu_->getDevice(), 1, &flushFence, VK_TRUE, UINT64_MAX));
+      VK_CHECK(vkResetFences(gpu_->getDevice(), 1, &flushFence));
+      VK_CHECK(vkResetCommandBuffer(cmd, 0));
+
+      for (const auto& [buffer, allocation] : staging_buffers_) {
+        vmaDestroyBuffer(gpu_->getAllocator(), buffer, allocation);
+      }
+      staging_buffers_.clear();
+
     }
 
   private:
     std::queue<std::function<void(VkCommandBuffer cmd)>> tasks_;
-    std::mutex mutex_;
-    std::condition_variable condition_;
   };
 
   class ResourceAllocator final : public IResourceAllocator, NonCopyable<ResourceAllocator> {
 
       IGpu* gpu_ = nullptr;
-    TaskQueue task_queue_{};
+    TaskQueue task_queue_;
 
       [[nodiscard]] AllocatedImage allocate_image(std::string_view name, VkFormat format,
                                                   VkImageUsageFlags usage_flags, VkExtent3D extent,
@@ -96,12 +191,14 @@ namespace gestalt::graphics {
                                                     VmaMemoryUsage memory_usage) const;
 
     public:
-      explicit ResourceAllocator(IGpu* gpu) : gpu_(gpu) {}
+      explicit ResourceAllocator(IGpu* gpu) : gpu_(gpu), task_queue_(gpu) {}
 
       std::shared_ptr<ImageInstance> create_image(ImageTemplate&& image_template) override;
 
     std::shared_ptr<BufferInstance> create_buffer(
           BufferTemplate&& buffer_template) const override;
-      void destroy_buffer(const std::shared_ptr<BufferInstance>& buffer) const;
+      void destroy_buffer(const std::shared_ptr<BufferInstance>& buffer) const override;
+
+    void flush() { task_queue_.processTasks(); }
   };
 }  // namespace gestalt

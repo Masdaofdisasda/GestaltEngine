@@ -57,7 +57,7 @@ namespace gestalt::graphics {
       auto scene_lit = frame_graph_->add_resource(ImageTemplate("scene_lit"));
       auto scene_final = frame_graph_->add_resource(ImageTemplate("scene_final"));
       auto rotation_texture = frame_graph_->add_resource(
-          ImageTemplate("rotation_texture")
+          ImageTemplate("Rotation Pattern Texture")
               .set_initial_value(std::filesystem::current_path() / "../../assets/rot_texture.bmp")
               .build(),
           fg::CreationType::EXTERNAL);
@@ -68,7 +68,7 @@ namespace gestalt::graphics {
               .build());
 
       auto blue_noise = frame_graph_->add_resource(
-          ImageTemplate("rotation_texture")
+          ImageTemplate("Blue Noise Texture")
               .set_initial_value(std::filesystem::current_path()
                                  / "../../assets/blue_noise_512_512.png")
               .build(),
@@ -452,6 +452,7 @@ namespace gestalt::graphics {
 
       // TODO
     const fg::CommandBuffer cmd_buffer{cmd};
+    resource_allocator_->flush();
     frame_graph_->execute(cmd_buffer);
 
     const auto color_image = resource_registry_->resources_.final_color.image;

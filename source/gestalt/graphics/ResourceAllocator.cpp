@@ -41,10 +41,7 @@ namespace gestalt::graphics {
       auto allocated_image = allocate_image(image_template.name, image_info.get_format(), usage_flags,
                                             image_info.get_extent(), image_template.aspect_flags);
 
-      task_queue_.enqueue([this, path](VkCommandBuffer cmd) {
-        ImageData image_data(path);
-        // todo : copy image data to image
-      });
+      task_queue_.add_image(path, allocated_image.image_handle);
 
       return std::make_unique<ImageInstance>(std::move(image_template), allocated_image,
                                                  image_info.get_extent());
@@ -80,6 +77,11 @@ namespace gestalt::graphics {
     data = stbi_load(path.string().c_str(), &image_info.width, &image_info.height,
                       &image_info.channels,
                       STBI_rgb_alpha);
+    if (image_info.channels == 3) {
+      // Assume RGBA because many GPUs don't support RGB
+      image_info.channels = 4;
+    }
+
     if (!data) {
       throw std::runtime_error("Failed to load image data from file {" + path.string() + "}.");
     }
@@ -91,11 +93,74 @@ namespace gestalt::graphics {
     }
   }
 
+  void TaskQueue::add_image(const std::filesystem::path& path, VkImage image) {
+    enqueue([this, path, image](VkCommandBuffer cmd) {
+      const ImageData image_data(path);
+
+      const VkDeviceSize image_size = image_data.get_image_size();
+
+      // Step 2: Create a staging buffer
+      const auto [buffer, allocation] = create_staging_buffer(image_size);
+
+      // Copy pixel data to the staging buffer
+      void* data;
+      vmaMapMemory(gpu_->getAllocator(), allocation, &data);
+      memcpy(data, image_data.get_data(), image_size);
+      vmaUnmapMemory(gpu_->getAllocator(), allocation);
+
+      // Step 3: Create and transition the Vulkan image
+      VkImageSubresourceRange subresource_range;
+      subresource_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+      subresource_range.baseMipLevel = 0;
+      subresource_range.levelCount = 1;
+      subresource_range.baseArrayLayer = 0;
+      subresource_range.layerCount = 1;
+
+      VkImageMemoryBarrier barrier_to_transfer = {};
+      barrier_to_transfer.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+      barrier_to_transfer.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+      barrier_to_transfer.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+      barrier_to_transfer.srcAccessMask = 0;
+      barrier_to_transfer.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+      barrier_to_transfer.image = image;
+      barrier_to_transfer.subresourceRange = subresource_range;
+
+      vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                           0, 0, nullptr, 0, nullptr, 1, &barrier_to_transfer);
+
+      // Step 4: Copy from the staging buffer to the Vulkan image
+      VkBufferImageCopy region = {};
+      region.bufferOffset = 0;
+      region.bufferRowLength = 0;
+      region.bufferImageHeight = 0;
+      region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+      region.imageSubresource.mipLevel = 0;
+      region.imageSubresource.baseArrayLayer = 0;
+      region.imageSubresource.layerCount = 1;
+      region.imageOffset = {0, 0, 0};
+      region.imageExtent = image_data.get_extent();
+
+      vkCmdCopyBufferToImage(cmd, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+                             &region);
+
+      // Transition the image to the shader-readable layout
+      VkImageMemoryBarrier barrier_to_shader_read = barrier_to_transfer;
+      barrier_to_shader_read.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+      barrier_to_shader_read.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+      barrier_to_shader_read.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+      barrier_to_shader_read.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+      vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                           VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1,
+                           &barrier_to_shader_read);
+    });
+  }
+
   AllocatedImage ResourceAllocator::allocate_image(const std::string_view name, const VkFormat format,
-                                                     const VkImageUsageFlags usage_flags, const VkExtent3D extent, const VkImageAspectFlags aspect_flags) const {
+                                                   const VkImageUsageFlags usage_flags, const VkExtent3D extent, const VkImageAspectFlags aspect_flags) const {
       //TODO fix image type
     VkImageCreateInfo img_info = vkinit::image_create_info(format, usage_flags, extent);
-    if (extent.height > 1) {
+    if (extent.depth > 1) {
       img_info.imageType = VK_IMAGE_TYPE_3D;
     }
 
@@ -112,7 +177,7 @@ namespace gestalt::graphics {
 
     VkImageViewCreateInfo view_info
         = vkinit::imageview_create_info(format, image.image_handle, aspect_flags);
-    if (extent.height > 1) {
+    if (extent.depth > 1) {
       view_info.viewType = VK_IMAGE_VIEW_TYPE_3D; 
     }
     VK_CHECK(vkCreateImageView(gpu_->getDevice(), &view_info, nullptr, &image.image_view));
