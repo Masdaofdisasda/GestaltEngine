@@ -33,6 +33,21 @@ namespace gestalt::graphics {
 
     const VkImageUsageFlags usage_flags = get_usage_flags(image_template.type);
 
+    const auto image_size = image_template.image_size;
+    VkExtent3D extent = {};
+    if (std::holds_alternative<RelativeImageSize>(image_size)) {
+      const auto scale = std::get<RelativeImageSize>(image_size).scale;
+      extent = {static_cast<uint32>(getWindowedWidth() * scale),
+                static_cast<uint32>(getWindowedHeight() * scale), 1};
+    } else if (std::holds_alternative<AbsoluteImageSize>(image_size)) {
+      extent = std::get<AbsoluteImageSize>(image_size).extent;
+    } else {
+      throw std::runtime_error("Invalid image size type.");
+    }
+    if (image_template.image_type == ImageType::kImage2D) {
+      extent.depth = 1;
+    }
+
 
     if (std::holds_alternative<std::filesystem::path>(image_template.initial_value)) {
       const auto path = std::get<std::filesystem::path>(image_template.initial_value);
@@ -48,32 +63,17 @@ namespace gestalt::graphics {
     }
 
     if (std::holds_alternative<std::vector<unsigned char>>(image_template.initial_value)) {
-      const auto data = std::get<std::vector<unsigned char>>(image_template.initial_value);
-      const ImageInfo image_info(data.data(), data.size());
+      auto data = std::get<std::vector<unsigned char>>(image_template.initial_value);
+      const ImageInfo image_info(data.data(), data.size(), extent);
 
       auto allocated_image = allocate_image(image_template.name, image_info.get_format(),
                                             usage_flags,
                                             image_info.get_extent(), image_template.aspect_flags);
 
-      task_queue_.add_image(data, allocated_image.image_handle);
+      task_queue_.add_image(data, allocated_image.image_handle, image_info.get_extent());
 
       return std::make_unique<ImageInstance>(std::move(image_template), allocated_image,
                                              image_info.get_extent());
-    }
-
-    const auto image_size = image_template.image_size;
-    VkExtent3D extent = {};
-    if (std::holds_alternative<RelativeImageSize>(image_size)) {
-      const auto scale = std::get<RelativeImageSize>(image_size).scale;
-      extent = {static_cast<uint32>(getWindowedWidth() * scale),
-                static_cast<uint32>(getWindowedHeight() * scale), 1};
-    } else if (std::holds_alternative<AbsoluteImageSize>(image_size)) {
-      extent  = std::get<AbsoluteImageSize>(image_size).extent;
-    } else {
-      assert(false && "Invalid image size type.");
-    }
-    if (image_template.image_type == ImageType::kImage2D) {
-      extent.depth = 1;
     }
 
     auto allocated_image = allocate_image(image_template.name, image_template.format, usage_flags,
@@ -86,46 +86,67 @@ namespace gestalt::graphics {
     if (!stbi_info(path.string().c_str(), &width, &height, &channels)) {
       throw std::runtime_error("Failed to read image info from file: " + path.string());
     }
+    isEncodedData = true;
   }
 
-  ImageInfo::ImageInfo(const unsigned char* data, const size_t size) {
-    if (!stbi_info_from_memory(data, static_cast<int>(size), &width, &height, &channels)) {
-      throw std::runtime_error("Failed to read image info from memory");
+  ImageInfo::ImageInfo(const unsigned char* data, const size_t size, const VkExtent3D extent) {
+    if (stbi_info_from_memory(data, static_cast<int>(size), &width, &height, &channels)) {
+      isEncodedData = true;
+      return;
     }
+    
+      fmt::print("Failed to read image metadata from memory. Using extent as fallback\n");
+      width = extent.width;
+      height = extent.height;
+      channels = 4;
+      isEncodedData = false;
   }
 
   ImageData::ImageData(const std::filesystem::path& path)
     : image_info(path) {
-    data = stbi_load(path.string().c_str(), &image_info.width, &image_info.height,
-                      &image_info.channels,
-                      STBI_rgb_alpha);
+    unsigned char* decoded_data = stbi_load(path.string().c_str(), &image_info.width,
+                                            &image_info.height,
+                                            &image_info.channels,
+                                            STBI_rgb_alpha);
     if (image_info.channels == 3) {
       // Assume RGBA because many GPUs don't support RGB
       image_info.channels = 4;
     }
 
-    if (!data) {
+    const size_t data_size = static_cast<size_t>(image_info.width) * image_info.height * 4;
+    data.assign(decoded_data, decoded_data + data_size);
+
+    stbi_image_free(decoded_data);
+
+    if (!data.data()) {
       throw std::runtime_error("Failed to load image data from file {" + path.string() + "}.");
     }
   }
 
-  ImageData::ImageData(const std::vector<unsigned char>& data)
-    : image_info(data.data(), data.size()) {
-    this->data = stbi_load_from_memory(data.data(), static_cast<int>(data.size()),
-                                       &image_info.width,
-                                       &image_info.height, &image_info.channels, STBI_rgb_alpha);
+  ImageData::ImageData(std::vector<unsigned char> data, const VkExtent3D extent)
+    : image_info(data.data(), data.size(), extent) {
+    if (image_info.isEncodedData) {
+      unsigned char* decoded_data = stbi_load_from_memory(data.data(),
+                                                          static_cast<int>(data.size()),
+                                                          &image_info.width,
+                                                          &image_info.height, &image_info.channels,
+                                                          STBI_rgb_alpha);
+
+      const size_t data_size = static_cast<size_t>(image_info.width) * image_info.height * 4;
+      data.assign(decoded_data, decoded_data + data_size);
+
+      stbi_image_free(decoded_data);
+
+    } else {
+      this->data = std::move(data);
+    }
+
     if (image_info.channels == 3) {
       // Assume RGBA because many GPUs don't support RGB
       image_info.channels = 4;
     }
-    if (!this->data) {
+    if (!this->data.data()) {
       throw std::runtime_error("Failed to load image data from memory.");
-    }
-  }
-
-  ImageData::~ImageData() {
-    if (data) {
-      stbi_image_free(data);
     }
   }
 
@@ -196,9 +217,9 @@ namespace gestalt::graphics {
     });
   }
 
-  void TaskQueue::add_image(std::vector<unsigned char> data, VkImage image) {
-    enqueue([this, data = std::move(data), image]() {
-      const ImageData image_data(data);
+  void TaskQueue::add_image(std::vector<unsigned char>& data, VkImage image, VkExtent3D extent) {
+    enqueue([this, data = std::move(data), image, extent]() {
+      const ImageData image_data(data, extent);
       load_image(image_data, image);
     });
   }

@@ -16,8 +16,10 @@ namespace gestalt::graphics {
   struct ImageInfo {
     int width, height;
     int channels;
+    bool isEncodedData;
+
     explicit ImageInfo(const std::filesystem::path& path);
-    ImageInfo(const unsigned char* data, size_t size);
+    ImageInfo(const unsigned char* data, size_t size, VkExtent3D extent);
 
     [[nodiscard]] VkExtent3D get_extent() const {
       return {static_cast<uint32>(width), static_cast<uint32>(height), 1};
@@ -48,12 +50,12 @@ namespace gestalt::graphics {
 
   struct ImageData {
   private:
-    unsigned char* data;
+    std::vector<unsigned char> data;
     ImageInfo image_info;
 
   public:
     explicit ImageData(const std::filesystem::path& path);
-    explicit ImageData(const std::vector<unsigned char>& data);
+    explicit ImageData(std::vector<unsigned char> data, VkExtent3D extent);
 
     [[nodiscard]] VkExtent3D get_extent() const { return image_info.get_extent();
     }
@@ -65,12 +67,12 @@ namespace gestalt::graphics {
     }
 
 
-    [[nodiscard]] const unsigned char* get_data() const { return data; }
+    [[nodiscard]] const unsigned char* get_data() const { return data.data(); }
 
     [[nodiscard]] int get_channels() const { return image_info.get_channels(); }
 
 
-    ~ImageData();
+    ~ImageData() = default;
   };
 
   class TaskQueue {
@@ -132,7 +134,7 @@ namespace gestalt::graphics {
     }
 
     void add_image(const std::filesystem::path& path, VkImage image);
-    void add_image(std::vector<unsigned char> data, VkImage image);
+    void add_image(std::vector<unsigned char>& data, VkImage image, VkExtent3D extent);
 
     void enqueue(const std::function<void()>& task) {
       tasks_.push(task);

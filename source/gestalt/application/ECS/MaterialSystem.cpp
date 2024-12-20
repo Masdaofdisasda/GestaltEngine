@@ -17,6 +17,11 @@ namespace gestalt::application {
   constexpr uint32 kBlack = 0xFF000000;       // Black color for emissive
   constexpr uint32 kMagenta = 0xFFFF00FF;     // Magenta color for error textures
 
+  constexpr std::array<unsigned char, 4> kWhiteData = {255, 255, 255, 255};
+  constexpr std::array<unsigned char, 4> kDefaultMetallicRoughnessData = {0, 255, 0, 255};
+  constexpr std::array<unsigned char, 4> kFlatNormalData = {255, 128, 128, 255};
+  constexpr std::array<unsigned char, 4> kBlackData = {0, 0, 0, 255};
+
   void MaterialSystem::prepare() {
 
     create_buffers();
@@ -67,37 +72,98 @@ namespace gestalt::application {
 
     default_mat.color_image = resource_manager_->create_image(
         (void*)&kWhite, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-    repository_->textures.add(default_mat.color_image);
+    repository_->textures_old.add(default_mat.color_image);
+
+    default_mat.color_image_instance = resource_allocator_->create_image(
+        ImageTemplate("Default Color Image")
+        .set_image_size(1, 1).set_image_type(TextureType::kColor, VK_FORMAT_R8G8B8A8_UNORM)
+        .set_initial_value(kWhiteData.data(), kWhiteData.size()).build());
+    repository_->textures.add(default_mat.color_image_instance);
 
     default_mat.metallic_roughness_image
         = resource_manager_->create_image((void*)&kDefaultMetallicRoughness, VkExtent3D{1, 1, 1},
                                           VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-    repository_->textures.add(default_mat.metallic_roughness_image);
+    default_mat.metallic_roughness_image_instance = resource_allocator_->create_image(
+        ImageTemplate("Default Metallic Roughness Image")
+        .set_image_size(1, 1).set_image_type(TextureType::kColor, VK_FORMAT_R8G8B8A8_UNORM)
+        .set_initial_value(kDefaultMetallicRoughnessData.data(),
+                           kDefaultMetallicRoughnessData.size()).build());
+    repository_->textures_old.add(default_mat.metallic_roughness_image);
+    repository_->textures.add(default_mat.metallic_roughness_image_instance);
 
     default_mat.normal_image
         = resource_manager_->create_image((void*)&kFlatNormal, VkExtent3D{1, 1, 1},
                                           VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-    repository_->textures.add(default_mat.normal_image);
+    default_mat.normal_image_instance = resource_allocator_->create_image(
+        ImageTemplate("Default Normal Image")
+        .set_image_size(1, 1).set_image_type(TextureType::kColor, VK_FORMAT_R8G8B8A8_UNORM)
+        .set_initial_value(kFlatNormalData.data(), kFlatNormalData.size()).build());
+    repository_->textures_old.add(default_mat.normal_image);
+    repository_->textures.add(default_mat.normal_image_instance);
 
     default_mat.emissive_image = resource_manager_->create_image(
         (void*)&kBlack, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-    repository_->textures.add(default_mat.emissive_image);
+    default_mat.emissive_image_instance = resource_allocator_->create_image(
+        ImageTemplate("Default Emissive Image")
+        .set_image_size(1, 1).set_image_type(TextureType::kColor, VK_FORMAT_R8G8B8A8_UNORM)
+        .set_initial_value(kBlackData.data(), kBlackData.size()).build());
+    repository_->textures_old.add(default_mat.emissive_image);
+    repository_->textures.add(default_mat.emissive_image_instance);
 
     default_mat.occlusion_image = resource_manager_->create_image(
         (void*)&kWhite, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-    repository_->textures.add(default_mat.occlusion_image);
+    default_mat.occlusion_image_instance = resource_allocator_->create_image(
+        ImageTemplate("Default Occlusion Image")
+        .set_image_size(1, 1).set_image_type(TextureType::kColor, VK_FORMAT_R8G8B8A8_UNORM)
+        .set_initial_value(kWhiteData.data(), kWhiteData.size()).build());
+    repository_->textures_old.add(default_mat.occlusion_image);
+    repository_->textures.add(default_mat.occlusion_image_instance);
 
     // checkerboard image for error textures and testing
     constexpr size_t checkerboard_size = 256;
-    std::array<uint32_t, checkerboard_size> pixels;  // for 16x16 checkerboard texture
+    std::array<uint32, checkerboard_size> pixels; // for 16x16 checkerboard texture
     for (int x = 0; x < 16; x++) {
       for (int y = 0; y < 16; y++) {
-        pixels[y * 16 + x] = ((x % 2) ^ (y % 2)) ? kMagenta : kBlack;
+        pixels[y * 16 + x] = ((x % 2) ^ (y % 2))
+                               ? kMagenta
+                               : kBlack;
       }
     }
+    constexpr int checkerboard_width = 16;
+    constexpr int checkerboard_height = 16;
+    constexpr int checkerboard_channels = 4; // RGBA
+
+    std::array<unsigned char, checkerboard_width * checkerboard_height * checkerboard_channels>
+        checkerboard; // 16x16 RGBA texture
+
+    for (int y = 0; y < checkerboard_height; y++) {
+      for (int x = 0; x < checkerboard_width; x++) {
+        int index = (y * checkerboard_width + x) * checkerboard_channels;
+        // Index into the array for RGBA
+        if ((x % 2) ^ (y % 2)) {
+          // Magenta: RGBA = (255, 0, 255, 255)
+          checkerboard[index + 0] = 255; // Red
+          checkerboard[index + 1] = 0;   // Green
+          checkerboard[index + 2] = 255; // Blue
+          checkerboard[index + 3] = 255; // Alpha
+        } else {
+          // Black: RGBA = (0, 0, 0, 255)
+          checkerboard[index + 0] = 0;   // Red
+          checkerboard[index + 1] = 0;   // Green
+          checkerboard[index + 2] = 0;   // Blue
+          checkerboard[index + 3] = 255; // Alpha
+        }
+    }
+    }
+
     default_mat.error_checkerboard_image = resource_manager_->create_image(
         pixels.data(), VkExtent3D{16, 16, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-    repository_->textures.add(default_mat.error_checkerboard_image);
+    default_mat.error_checkerboard_image_instance = resource_allocator_->create_image(
+        ImageTemplate("Error Checkerboard Image")
+        .set_image_size(16, 16).set_image_type(TextureType::kColor, VK_FORMAT_R8G8B8A8_UNORM)
+        .set_initial_value(checkerboard.data(), checkerboard.size()).build());
+    repository_->textures_old.add(default_mat.error_checkerboard_image);
+    repository_->textures.add(default_mat.error_checkerboard_image_instance);
 
     default_mat.color_sampler = repository_->get_sampler();
     default_mat.metallic_roughness_sampler
@@ -207,10 +273,10 @@ namespace gestalt::application {
     resource_manager_->destroy_image(material_buffers->environment_map);
     vkDestroySampler(gpu_->getDevice(), material_buffers->cube_map_sampler, nullptr);
 
-    for (auto texture : repository_->textures.data()) {
+    for (auto texture : repository_->textures_old.data()) {
       resource_manager_->destroy_image(texture);
     }
-    repository_->textures.clear();
+    repository_->textures_old.clear();
 
     repository_->materials.clear();
 

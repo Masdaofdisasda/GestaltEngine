@@ -41,7 +41,7 @@ namespace gestalt::application {
       return;
     }
 
-    size_t image_offset = repository_->textures.size();
+    size_t image_offset = repository_->textures_old.size();
     const size_t material_offset = repository_->materials.size();
 
     import_nodes(gltf);
@@ -298,11 +298,12 @@ namespace gestalt::application {
       auto [old, img] = load_image(gltf, image);
 
       if (old.image != VK_NULL_HANDLE && img->get_image_handle() != VK_NULL_HANDLE) {
-        size_t image_id = repository_->textures.add(old);
+        size_t image_id_old = repository_->textures_old.add(old);
+        size_t image_id = repository_->textures.add(img);
         fmt::print("loaded texture {}, image_id {}\n", image.name, image_id);
       } else {
         fmt::print("gltf failed to load texture {}\n", image.name);
-        repository_->textures.add(repository_->default_material_.error_checkerboard_image);
+        repository_->textures_old.add(repository_->default_material_.error_checkerboard_image);
       }
     }
   }
@@ -323,7 +324,7 @@ namespace gestalt::application {
     const size_t image_index = gltf.textures[texture_index].imageIndex.value();
     const size_t sampler_index = gltf.textures[texture_index].samplerIndex.value();
 
-    return repository_->textures.get(image_index + image_offset);
+    return repository_->textures_old.get(image_index + image_offset);
   }
 
   void AssetLoader::import_albedo(const fastgltf::Asset& gltf, const size_t& image_offset,
