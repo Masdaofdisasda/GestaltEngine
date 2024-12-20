@@ -2030,6 +2030,13 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
         image_barriers.push_back(barrier);
       }
 
+      void visit(ImageArrayInstance& images, ResourceUsage usage,
+                 VkShaderStageFlags shader_stage) override {
+        for (auto& image : images.get_images()) {
+          image->accept(*this, usage, shader_stage);
+        }
+      }
+
 
       void apply() const {
         VkDependencyInfo dependency_info{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
@@ -2117,7 +2124,7 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
                                                 CreationType creation_type
                                                     = CreationType::INTERNAL) {
       auto resource = resource_registry_->add_template(std::move(image_template));
-      const uint64 handle = resource->resource_handle;
+      const uint64 handle = resource->handle();
       if (handle == -1) {
         throw std::runtime_error("Invalid resource handle!");
       }
@@ -2135,7 +2142,7 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
                                                  CreationType creation_type
                                                  = CreationType::INTERNAL) {
       auto resource = resource_registry_->add_template(std::move(buffer_template));
-      const uint64 handle = resource->resource_handle;
+      const uint64 handle = resource->handle();
       if (handle == -1) {
         throw std::runtime_error("Invalid resource handle!");
       }
@@ -2162,7 +2169,7 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
         throw std::runtime_error("Failed to add resource to the registry!");
       }
 
-      uint64 handle = resource->resource_handle;
+      uint64 handle = resource->handle();
       if (handle == -1) {
         throw std::runtime_error("Invalid resource handle!");
       }

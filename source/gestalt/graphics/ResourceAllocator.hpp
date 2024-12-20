@@ -17,6 +17,7 @@ namespace gestalt::graphics {
     int width, height;
     int channels;
     explicit ImageInfo(const std::filesystem::path& path);
+    ImageInfo(const unsigned char* data, size_t size);
 
     [[nodiscard]] VkExtent3D get_extent() const {
       return {static_cast<uint32>(width), static_cast<uint32>(height), 1};
@@ -52,6 +53,7 @@ namespace gestalt::graphics {
 
   public:
     explicit ImageData(const std::filesystem::path& path);
+    explicit ImageData(const std::vector<unsigned char>& data);
 
     [[nodiscard]] VkExtent3D get_extent() const { return image_info.get_extent();
     }
@@ -105,6 +107,8 @@ namespace gestalt::graphics {
       return staging_buffer;
     }
 
+    void load_image(const ImageData& image_data, VkImage image);
+
   public:
     explicit TaskQueue(IGpu* gpu) : gpu_(gpu) {
       VkCommandPoolCreateInfo pool_info = {};
@@ -128,8 +132,9 @@ namespace gestalt::graphics {
     }
 
     void add_image(const std::filesystem::path& path, VkImage image);
+    void add_image(std::vector<unsigned char> data, VkImage image);
 
-    void enqueue(std::function<void(VkCommandBuffer cmd)> task) {
+    void enqueue(const std::function<void()>& task) {
       tasks_.push(task);
     }
 
@@ -146,7 +151,7 @@ namespace gestalt::graphics {
 
       while (!tasks_.empty()) {
         auto task = tasks_.front();
-        task(cmd);
+        task();
         tasks_.pop();
       }
 
@@ -175,7 +180,7 @@ namespace gestalt::graphics {
     }
 
   private:
-    std::queue<std::function<void(VkCommandBuffer cmd)>> tasks_;
+    std::queue<std::function<void()>> tasks_;
   };
 
   class ResourceAllocator final : public IResourceAllocator, NonCopyable<ResourceAllocator> {

@@ -27,7 +27,8 @@ namespace gestalt::application {
 
 
     component_factory_->init(resource_manager_, repository_);
-    asset_loader_->init(resource_manager_, component_factory_.get(), repository_);
+    asset_loader_->init(resource_manager_, resource_allocator_, component_factory_.get(),
+                        repository_);
 
     component_factory_->create_directional_light(
         glm::vec3(1.f, 0.957f, 0.917f), 5.f, glm::vec3(-0.216, 0.941, -0.257));

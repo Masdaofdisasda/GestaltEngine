@@ -57,8 +57,8 @@ namespace gestalt::foundation {
   struct ImageTemplate final : ResourceTemplate {
     ImageType image_type = ImageType::kImage2D;
     TextureType type = TextureType::kColor;
-    VkImageAspectFlags aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT;    
-    std::variant<VkClearValue, std::filesystem::path> initial_value
+    VkImageAspectFlags aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT;
+    std::variant<VkClearValue, std::filesystem::path, std::vector<unsigned char>> initial_value
         = VkClearValue({.color = {0.f, 0.f, 0.f, 1.f}});
     std::variant<RelativeImageSize, AbsoluteImageSize> image_size = RelativeImageSize(1.f);
     VkFormat format = VK_FORMAT_R16G16B16A16_SFLOAT;
@@ -103,6 +103,11 @@ namespace gestalt::foundation {
       return *this;
     }
 
+    ImageTemplate& set_initial_value(const unsigned char* data, const size_t size) {
+      initial_value = std::vector(data, data + size);
+      return *this;
+    }
+
     ImageTemplate& set_image_size(const float32& relative_size) {
       this->image_size = RelativeImageSize(relative_size);
       return *this;
@@ -130,23 +135,32 @@ namespace gestalt::foundation {
         : ResourceTemplate(std::move(name)), size(size), usage(usage), memory_usage(memory_usage) {}
   };
 
-    struct BufferInstance;
-  struct ImageInstance;
+    class BufferInstance;
+    class ImageInstance;
+  class ImageArrayInstance;
 
   struct ResourceVisitor {
     virtual void visit(BufferInstance& buffer, ResourceUsage usage, VkShaderStageFlags shader_stage)
         = 0;
     virtual void visit(ImageInstance& image, ResourceUsage usage, VkShaderStageFlags shader_stage)
         = 0;
+    virtual void visit(ImageArrayInstance& images, ResourceUsage usage,
+                       VkShaderStageFlags shader_stage)
+    = 0;
     virtual ~ResourceVisitor() = default;
   };
 
-  struct ResourceInstance {
+  class ResourceInstance {
     uint64 resource_handle = -1; // todo refactor to return instance handles
     std::string resource_name;
+
+  public:
     explicit ResourceInstance(std::string resource_name) : resource_name(std::move(resource_name)) {}
     [[nodiscard]] std::string_view name() const {
       return resource_name; }
+
+    [[nodiscard]] uint64 handle() const { return resource_handle; }
+    void set_handle(const uint64 handle) { resource_handle = handle; }
 
     virtual void accept(ResourceVisitor& visitor, ResourceUsage usage,
                         VkShaderStageFlags shader_stage)
@@ -160,13 +174,27 @@ namespace gestalt::foundation {
     VmaAllocation allocation = VK_NULL_HANDLE;
   };
 
-  struct ImageInstance : ResourceInstance {
+  class ImageInstance final : public ResourceInstance {
+    ImageTemplate image_template;
+    AllocatedImage allocated_image;
+    VkExtent3D extent;
+    VkImageLayout current_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    VkAccessFlags2 current_access = VK_ACCESS_2_NONE;
+    VkPipelineStageFlags2 current_stage = VK_PIPELINE_STAGE_2_NONE;
+
+  public:
     ImageInstance(ImageTemplate&& image_template, const AllocatedImage& allocated_image,
                   const VkExtent3D extent)
         : ResourceInstance(image_template.name),
           image_template(std::move(image_template)),
           allocated_image(allocated_image),
           extent(extent) {}
+
+    ImageInstance(const ImageInstance&) = delete;
+    ImageInstance& operator=(const ImageInstance&) = delete;
+
+    ImageInstance(ImageInstance&&) noexcept = default;
+    ImageInstance& operator=(ImageInstance&&) noexcept = default;  
 
     void accept(ResourceVisitor& visitor, const ResourceUsage usage,
                 VkShaderStageFlags shader_stage) override {
@@ -194,14 +222,34 @@ namespace gestalt::foundation {
 
     [[nodiscard]] VkPipelineStageFlags2 get_current_stage() const { return current_stage; }
     void set_current_stage(const VkPipelineStageFlags2 stage) { current_stage = stage; }
+  };
 
-  private:
-    ImageTemplate image_template;
-    AllocatedImage allocated_image;
-    VkExtent3D extent;
-    VkImageLayout current_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-    VkAccessFlags2 current_access = VK_ACCESS_2_NONE;
-    VkPipelineStageFlags2 current_stage = VK_PIPELINE_STAGE_2_NONE;
+  class ImageArrayInstance final : public ResourceInstance {
+    std::vector<std::shared_ptr<ImageInstance>> images_;
+    bool should_rebuild_descriptors_ = true;
+
+  public:
+    ImageArrayInstance(std::string name, std::vector<std::shared_ptr<ImageInstance>>&& images)
+      : ResourceInstance(std::move(name)),
+        images_(std::move(images)) {
+    }
+
+    void accept(ResourceVisitor& visitor, const ResourceUsage usage,
+                const VkShaderStageFlags shader_stage) override {
+      visitor.visit(*this, usage, shader_stage);
+    }
+
+    void update(uint32 image_index, const std::shared_ptr<ImageInstance>& image) {
+      images_[image_index] = image;
+      should_rebuild_descriptors_ = true;
+    }
+
+    [[nodiscard]] bool should_rebuild_descriptors() const { return should_rebuild_descriptors_; }
+    void set_rebuild_descriptors(const bool rebuild) { should_rebuild_descriptors_ = rebuild; }
+
+    [[nodiscard]] const std::vector<std::shared_ptr<ImageInstance>>& get_images() const {
+      return images_;
+    }
   };
 
   struct AllocatedBuffer {
@@ -211,7 +259,13 @@ namespace gestalt::foundation {
     VkDeviceAddress address;
   };
 
-  struct BufferInstance : ResourceInstance {
+  class BufferInstance final : public ResourceInstance {
+    BufferTemplate buffer_template;
+    AllocatedBuffer allocated_buffer;
+    VkAccessFlags2 current_access = VK_ACCESS_2_NONE;
+    VkPipelineStageFlags2 current_stage = VK_PIPELINE_STAGE_2_NONE;
+
+  public:
     BufferInstance(BufferTemplate&& buffer_template, const AllocatedBuffer& allocated_buffer)
         : ResourceInstance(buffer_template.name),
           buffer_template(std::move(buffer_template)),
@@ -240,12 +294,6 @@ namespace gestalt::foundation {
 
     [[nodiscard]] VkPipelineStageFlags2 get_current_stage() const { return current_stage; }
     void set_current_stage(const VkPipelineStageFlags2 stage) { current_stage = stage; }
-
-  private:
-    BufferTemplate buffer_template;
-    AllocatedBuffer allocated_buffer;
-    VkAccessFlags2 current_access = VK_ACCESS_2_NONE;
-    VkPipelineStageFlags2 current_stage = VK_PIPELINE_STAGE_2_NONE;
   };
     
   class DescriptorBufferInstance {

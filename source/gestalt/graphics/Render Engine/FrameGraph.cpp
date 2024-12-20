@@ -20,11 +20,11 @@ namespace gestalt::graphics::fg {
   std::shared_ptr<ResourceInstanceType> ResourceRegistry::add_resource(
       std::shared_ptr<ResourceInstanceType> resource_instance) {
     assert(resource_instance != nullptr && "Resource instance cannot be null!");
-    resource_instance->resource_handle = reinterpret_cast<uint64>(resource_instance.get());
+    resource_instance->set_handle(reinterpret_cast<uint64>(resource_instance.get()));
 
-    resource_map_.insert({resource_instance->resource_handle, resource_instance});
+    resource_map_.insert({resource_instance->handle(), resource_instance});
 
-    auto it = resource_map_.find(resource_instance->resource_handle);
+    auto it = resource_map_.find(resource_instance->handle());
     if (it == resource_map_.end()) {
       throw std::runtime_error("Failed to insert resource into registry!");
     }
@@ -103,12 +103,12 @@ namespace gestalt::graphics::fg {
   void FrameGraph::compile() {
     for (auto& node : nodes_) {
       for (const auto& [read_resource, info, _] : node->render_pass->get_resources(ResourceUsage::READ)) {
-        auto& edge = edges_.at(read_resource->resource_handle);
+        auto& edge = edges_.at(read_resource->handle());
         edge->nodes_to.push_back(node);
         node->edges_in.push_back(edge);
       }
       for (const auto& [write_resource, info, _]: node->render_pass->get_resources(ResourceUsage::WRITE)) {
-        auto& edge = edges_.at(write_resource->resource_handle);
+        auto& edge = edges_.at(write_resource->handle());
         edge->nodes_from.push_back(node);
         node->edges_out.push_back(edge);
       }

@@ -15,14 +15,16 @@
 #include "ECS/ECSManager.hpp"
 #include "Animation/InterpolationType.hpp"
 #include "ECS/ComponentFactory.hpp"
+#include "Interface/IResourceAllocator.hpp"
 #include "Interface/IResourceManager.hpp"
 #include "Mesh/MeshSurface.hpp"
 
 namespace gestalt::application {
-
-  void AssetLoader::init(IResourceManager* resource_manager, ComponentFactory* component_factory,
+  void AssetLoader::init(IResourceManager* resource_manager, IResourceAllocator* resource_allocator,
+                         ComponentFactory* component_factory,
                          Repository* repository) {
     resource_manager_ = resource_manager;
+    resource_allocator_ = resource_allocator;
     repository_ = repository;
     component_factory_ = component_factory;
   }
@@ -202,10 +204,17 @@ namespace gestalt::application {
     return std::nullopt;
   }
 
-  std::optional<TextureHandleOld> AssetLoader::load_image(fastgltf::Asset& asset,
+  std::pair<TextureHandleOld, std::shared_ptr<ImageInstance>> AssetLoader::load_image(
+      fastgltf::Asset& asset,
                                                        fastgltf::Image& image) const {
     TextureHandleOld newImage = {};
     int width = 0, height = 0, nr_channels = 0;
+
+    std::string image_name = image.name.c_str();
+    if (image_name.empty()) {
+      image_name = "Image " + std::to_string(asset.images.size());
+    }
+    ImageTemplate image_template(image_name);
 
     const std::function<void(unsigned char*)> create_image = [&](unsigned char* data) {
       if (data) {
@@ -215,14 +224,23 @@ namespace gestalt::application {
 
         stbi_image_free(data);
       }
-    };
+    }; 
 
     const std::function<void(fastgltf::sources::URI&)> create_image_from_file
         = [&](fastgltf::sources::URI& file_path) {
             fmt::print("Loading image from file: {}\n", file_path.uri.string());
-            assert(file_path.fileByteOffset == 0);  // We don't support offsets with stbi.
-            assert(file_path.uri.isLocalPath());    // We're only capable of loading local files.
+            if (file_path.uri.string().empty()) {
+              throw std::runtime_error("Empty file path");
+            }
+            if (file_path.fileByteOffset != 0 || !file_path.uri.isLocalPath()) {
+              throw std::runtime_error("Image file offsets and external files are not supported!");
+            }
 
+            const auto image_path = std::filesystem::path(file_path.uri.path().begin(),
+                                                          file_path.uri.path().end());
+            image_template.set_initial_value(image_path);
+
+            // OLD
             const std::string filename(file_path.uri.path().begin(), file_path.uri.path().end());
             unsigned char* data = stbi_load(filename.c_str(), &width, &height, &nr_channels, 4);
             create_image(data);
@@ -230,6 +248,9 @@ namespace gestalt::application {
 
     const std::function<void(fastgltf::sources::Array&)> create_image_from_vector
         = [&](fastgltf::sources::Array& vector) {
+      image_template.set_initial_value(vector.bytes.data(), vector.bytes.size());
+
+      //OLD
             unsigned char* data
                 = stbi_load_from_memory(vector.bytes.data(), static_cast<int>(vector.bytes.size()),
                                         &width, &height, &nr_channels, 4);
@@ -243,6 +264,11 @@ namespace gestalt::application {
 
             std::visit(fastgltf::visitor{[](auto& arg) {},
                                          [&](fastgltf::sources::Array& vector) {
+                                           image_template.set_initial_value(
+                                               vector.bytes.data() + buffer_view.byteOffset,
+                                               buffer_view.byteLength);
+
+                                           //OLD
                                            unsigned char* data = stbi_load_from_memory(
                                                vector.bytes.data() + buffer_view.byteOffset,
                                                static_cast<int>(buffer_view.byteLength), &width,
@@ -261,19 +287,18 @@ namespace gestalt::application {
         },
         image.data);
 
-    if (newImage.image == VK_NULL_HANDLE) {
-      return {};
-    }
-    return newImage;
+    auto image_instance = resource_allocator_->create_image(std::move(image_template));
+
+    return {newImage, image_instance};
   }
 
   void AssetLoader::import_textures(fastgltf::Asset& gltf) const {
     fmt::print("importing textures\n");
     for (fastgltf::Image& image : gltf.images) {
-      std::optional<TextureHandleOld> img = load_image(gltf, image);
+      auto [old, img] = load_image(gltf, image);
 
-      if (img.has_value()) {
-        size_t image_id = repository_->textures.add(img.value());
+      if (old.image != VK_NULL_HANDLE && img->get_image_handle() != VK_NULL_HANDLE) {
+        size_t image_id = repository_->textures.add(old);
         fmt::print("loaded texture {}, image_id {}\n", image.name, image_id);
       } else {
         fmt::print("gltf failed to load texture {}\n", image.name);

@@ -21,6 +21,7 @@ namespace gestalt::foundation {
 
     std::shared_ptr<BufferInstance> material_buffer;
 
+    std::shared_ptr<ImageArrayInstance> textures;
 
     std::shared_ptr<DescriptorBuffer> descriptor_buffer;
 

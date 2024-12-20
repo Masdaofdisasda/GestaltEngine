@@ -47,6 +47,20 @@ namespace gestalt::graphics {
                                                  image_info.get_extent());
     }
 
+    if (std::holds_alternative<std::vector<unsigned char>>(image_template.initial_value)) {
+      const auto data = std::get<std::vector<unsigned char>>(image_template.initial_value);
+      const ImageInfo image_info(data.data(), data.size());
+
+      auto allocated_image = allocate_image(image_template.name, image_info.get_format(),
+                                            usage_flags,
+                                            image_info.get_extent(), image_template.aspect_flags);
+
+      task_queue_.add_image(data, allocated_image.image_handle);
+
+      return std::make_unique<ImageInstance>(std::move(image_template), allocated_image,
+                                             image_info.get_extent());
+    }
+
     const auto image_size = image_template.image_size;
     VkExtent3D extent = {};
     if (std::holds_alternative<RelativeImageSize>(image_size)) {
@@ -69,7 +83,15 @@ namespace gestalt::graphics {
   }
 
   ImageInfo::ImageInfo(const std::filesystem::path& path) {
-    stbi_info(path.string().c_str(), &width, &height, &channels);
+    if (!stbi_info(path.string().c_str(), &width, &height, &channels)) {
+      throw std::runtime_error("Failed to read image info from file: " + path.string());
+    }
+  }
+
+  ImageInfo::ImageInfo(const unsigned char* data, const size_t size) {
+    if (!stbi_info_from_memory(data, static_cast<int>(size), &width, &height, &channels)) {
+      throw std::runtime_error("Failed to read image info from memory");
+    }
   }
 
   ImageData::ImageData(const std::filesystem::path& path)
@@ -87,16 +109,28 @@ namespace gestalt::graphics {
     }
   }
 
+  ImageData::ImageData(const std::vector<unsigned char>& data)
+    : image_info(data.data(), data.size()) {
+    this->data = stbi_load_from_memory(data.data(), static_cast<int>(data.size()),
+                                       &image_info.width,
+                                       &image_info.height, &image_info.channels, STBI_rgb_alpha);
+    if (image_info.channels == 3) {
+      // Assume RGBA because many GPUs don't support RGB
+      image_info.channels = 4;
+    }
+    if (!this->data) {
+      throw std::runtime_error("Failed to load image data from memory.");
+    }
+  }
+
   ImageData::~ImageData() {
     if (data) {
       stbi_image_free(data);
     }
   }
 
-  void TaskQueue::add_image(const std::filesystem::path& path, VkImage image) {
-    enqueue([this, path, image](VkCommandBuffer cmd) {
-      const ImageData image_data(path);
-
+  void TaskQueue::load_image(const ImageData& image_data, const VkImage image) {
+    
       const VkDeviceSize image_size = image_data.get_image_size();
 
       // Step 2: Create a staging buffer
@@ -153,6 +187,19 @@ namespace gestalt::graphics {
       vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
                            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1,
                            &barrier_to_shader_read);
+  }
+
+  void TaskQueue::add_image(const std::filesystem::path& path, VkImage image) {
+    enqueue([this, path, image]() {
+      const ImageData image_data(path);
+      load_image(image_data, image);
+    });
+  }
+
+  void TaskQueue::add_image(std::vector<unsigned char> data, VkImage image) {
+    enqueue([this, data = std::move(data), image]() {
+      const ImageData image_data(data);
+      load_image(image_data, image);
     });
   }
 

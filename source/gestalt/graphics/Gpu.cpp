@@ -240,7 +240,9 @@ namespace gestalt::graphics {
 
   void Gpu::set_debug_name(const std::string_view name, const VkObjectType type,
       const uint64 handle) const {
-    assert(!name.empty());
+    if (name.empty()) {
+      throw std::runtime_error("Name cannot be empty!");
+    }
 
     VkDebugUtilsObjectNameInfoEXT name_info = {};
     name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
