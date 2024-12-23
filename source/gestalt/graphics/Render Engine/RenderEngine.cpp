@@ -15,6 +15,7 @@
 #include "FrameProvider.hpp"
 #include "RenderPassBase.hpp"
 #include "ResourceAllocator.hpp"
+#include "ResourceTypes.hpp"
 #include "ResourceManager.hpp"
 #include "Utils/vk_images.hpp"
 #include "vk_initializers.hpp"
@@ -142,6 +143,15 @@ namespace gestalt::graphics {
       auto material_buffer
           = frame_graph_->add_resource(repository->material_buffers->material_buffer);
 
+      auto material_textures = frame_graph_->add_resource(
+          std::make_shared<ImageArrayInstance>(
+              "PBR Textures",
+              [this]() -> std::vector<std::shared_ptr<ImageInstance>> {
+                return repository_->textures.data();
+              },
+              getMaxMaterials()),
+          fg::CreationType::EXTERNAL);
+
       // Light
       auto directional_light
           = frame_graph_->add_resource(repository->light_buffers->dir_light_buffer_instance);
@@ -172,7 +182,8 @@ namespace gestalt::graphics {
                                                  gpu_);
 
       frame_graph_->add_pass<fg::MeshletPass>(
-          camera_buffer, /*textures,*/ material_buffer, vertex_position_buffer, vertex_data_buffer,
+          camera_buffer, material_buffer, material_textures, vertex_position_buffer,
+          vertex_data_buffer,
           meshlet_buffer, meshlet_vertices, meshlet_triangles, meshlet_task_commands_buffer,
           mesh_draw_buffer, draw_count_buffer, g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth,
           gpu_);
@@ -332,6 +343,32 @@ namespace gestalt::graphics {
     });
   }
 
+  static void insert_global_barrier(VkCommandBuffer cmd) {
+    VkMemoryBarrier2 memoryBarrier = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+        .pNext = nullptr,
+        .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+        .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+        .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
+    };
+
+    VkDependencyInfo dependencyInfo = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .pNext = nullptr,
+        .dependencyFlags = 0,
+        .memoryBarrierCount = 1,
+        .pMemoryBarriers = &memoryBarrier,
+        .bufferMemoryBarrierCount = 0,
+        .pBufferMemoryBarriers = nullptr,
+        .imageMemoryBarrierCount = 0,
+        .pImageMemoryBarriers = nullptr,
+    };
+
+    vkCmdPipelineBarrier2(cmd, &dependencyInfo);
+  }
+
+
   void RenderEngine::execute(const std::shared_ptr<RenderPassBase>& render_pass,
                                VkCommandBuffer cmd) {
     auto renderDependencies = render_pass->get_dependencies();
@@ -372,8 +409,12 @@ namespace gestalt::graphics {
       }
     }
 
+    insert_global_barrier(cmd);
+
     //fmt::print("Executing {}\n", render_pass->get_name());
     render_pass->execute(cmd);
+
+    insert_global_barrier(cmd);
 
     if (false && render_pass->get_name() == "Bloom Blur Pass") {
       if (debug_texture_ != nullptr) return;
@@ -455,9 +496,9 @@ namespace gestalt::graphics {
     }
 
       // TODO
-    const fg::CommandBuffer cmd_buffer{cmd};
+    const CommandBuffer cmd_buffer{cmd};
     resource_allocator_->flush();
-    frame_graph_->execute(cmd_buffer);
+    //frame_graph_->execute(cmd_buffer);
 
     const auto color_image = resource_registry_->resources_.final_color.image;
     const auto swapchain_image = swapchain_->swapchain_images[swapchain_image_index_];
@@ -474,6 +515,9 @@ namespace gestalt::graphics {
         .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
         .andSubmitTo(cmd);
 
+    
+    insert_global_barrier(cmd);
+
     vkutil::CopyImage(color_image).toImage(swapchain_image).andSubmitTo(cmd);
 
     vkutil::TransitionImage(swapchain_image)
@@ -484,7 +528,10 @@ namespace gestalt::graphics {
                          VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)
         .andSubmitTo(cmd);
 
+    insert_global_barrier(cmd);
+
     imgui_->draw(cmd, swapchain_image);
+
 
     vkutil::TransitionImage(swapchain_image)
         .to(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
@@ -493,6 +540,7 @@ namespace gestalt::graphics {
         .withDestination(VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, 0)
         .andSubmitTo(cmd);
     swapchain_image->setFormat(VK_FORMAT_UNDEFINED);
+
 
     present(cmd);
   }

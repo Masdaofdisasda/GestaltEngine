@@ -1,6 +1,5 @@
 ﻿#include "Render Engine/FrameGraph.hpp"
 
-#include <common.hpp>
 #include "ResourceAllocator.hpp"
 
 namespace gestalt::graphics::fg {
@@ -16,21 +15,6 @@ namespace gestalt::graphics::fg {
     return add_resource(buffer);
   }
 
-  template <typename ResourceInstanceType>
-  std::shared_ptr<ResourceInstanceType> ResourceRegistry::add_resource(
-      std::shared_ptr<ResourceInstanceType> resource_instance) {
-    assert(resource_instance != nullptr && "Resource instance cannot be null!");
-    resource_instance->set_handle(reinterpret_cast<uint64>(resource_instance.get()));
-
-    resource_map_.insert({resource_instance->handle(), resource_instance});
-
-    auto it = resource_map_.find(resource_instance->handle());
-    if (it == resource_map_.end()) {
-      throw std::runtime_error("Failed to insert resource into registry!");
-    }
-
-    return std::static_pointer_cast<ResourceInstanceType>(it->second);
-  }
 
   void FrameGraph::print_graph() const {
     for (const auto& node : nodes_) {

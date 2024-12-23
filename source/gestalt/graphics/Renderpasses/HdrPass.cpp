@@ -12,6 +12,32 @@
 
 namespace gestalt::graphics {
 
+  static void insert_global_barrier(VkCommandBuffer cmd) {
+    VkMemoryBarrier2 memoryBarrier = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+        .pNext = nullptr,
+        .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+        .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+        .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
+    };
+
+    VkDependencyInfo dependencyInfo = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .pNext = nullptr,
+        .dependencyFlags = 0,
+        .memoryBarrierCount = 1,
+        .pMemoryBarriers = &memoryBarrier,
+        .bufferMemoryBarrierCount = 0,
+        .pBufferMemoryBarriers = nullptr,
+        .imageMemoryBarrierCount = 0,
+        .pImageMemoryBarriers = nullptr,
+    };
+
+    vkCmdPipelineBarrier2(cmd, &dependencyInfo);
+  }
+
+
   void BrightPass::prepare() {
     fmt::print("Preparing {}\n", get_name());
 
@@ -166,6 +192,7 @@ namespace gestalt::graphics {
           = vkinit::attachment_info(dstImage->imageView, nullptr, dstImage->getLayout());
       VkRenderingInfo renderInfo
           = vkinit::rendering_info(dstImage->getExtent2D(), &colorAttachment, nullptr);
+      insert_global_barrier(cmd);
       vkCmdBeginRendering(cmd, &renderInfo);
 
       
@@ -312,6 +339,8 @@ namespace gestalt::graphics {
                         .update();
       }
 
+      insert_global_barrier(cmd);
+
       VkRenderingAttachmentInfo newColorAttachment
           = vkinit::attachment_info(dst->imageView, nullptr, dst->getLayout());
       VkRenderingInfo newRenderInfo
@@ -328,6 +357,7 @@ namespace gestalt::graphics {
       scissor_.extent = dst->getExtent2D();
       vkCmdSetViewport(cmd, 0, 1, &viewport_);
       vkCmdSetScissor(cmd, 0, 1, &scissor_);
+
       vkCmdDraw(cmd, 3, 1, 0, 0);
       vkCmdEndRendering(cmd);
     }
@@ -409,6 +439,8 @@ namespace gestalt::graphics {
         = vkinit::attachment_info(new_lum->imageView, nullptr, new_lum->getLayout());
     VkRenderingInfo newRenderInfo
         = vkinit::rendering_info(new_lum->getExtent2D(), &newColorAttachment, nullptr);
+
+    insert_global_barrier(cmd);
     vkCmdBeginRendering(cmd, &newRenderInfo);
 
     bind_descriptor_buffers(cmd, {descriptor_buffers_.at(frame).get()});

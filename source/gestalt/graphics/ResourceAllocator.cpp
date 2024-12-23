@@ -2,8 +2,6 @@
 
 #include <stb_image.h>
 
-#include <cassert>
-
 #include "EngineConfiguration.hpp"
 #include "VulkanCheck.hpp"
 #include "vk_initializers.hpp"
@@ -27,13 +25,13 @@ namespace gestalt::graphics {
   }
 
   std::shared_ptr<ImageInstance> ResourceAllocator::create_image(ImageTemplate&& image_template) {
-    if (image_template.format == VK_FORMAT_UNDEFINED) {
+    if (image_template.get_format() == VK_FORMAT_UNDEFINED) {
       throw std::runtime_error("Image format must be specified.");
     }
 
-    const VkImageUsageFlags usage_flags = get_usage_flags(image_template.type);
+    const VkImageUsageFlags usage_flags = get_usage_flags(image_template.get_type());
 
-    const auto image_size = image_template.image_size;
+    const auto image_size = image_template.get_image_size();
     VkExtent3D extent = {};
     if (std::holds_alternative<RelativeImageSize>(image_size)) {
       const auto scale = std::get<RelativeImageSize>(image_size).scale;
@@ -44,17 +42,18 @@ namespace gestalt::graphics {
     } else {
       throw std::runtime_error("Invalid image size type.");
     }
-    if (image_template.image_type == ImageType::kImage2D) {
+    if (image_template.get_image_type() == ImageType::kImage2D) {
       extent.depth = 1;
     }
 
-
-    if (std::holds_alternative<std::filesystem::path>(image_template.initial_value)) {
-      const auto path = std::get<std::filesystem::path>(image_template.initial_value);
+    if (std::holds_alternative<std::filesystem::path>(image_template.get_initial_value())) {
+      const auto path = std::get<std::filesystem::path>(image_template.get_initial_value());
       const ImageInfo image_info(path);
 
-      auto allocated_image = allocate_image(image_template.name, image_info.get_format(), usage_flags,
-                                            image_info.get_extent(), image_template.aspect_flags);
+      auto allocated_image = allocate_image(image_template.get_name(), image_info.get_format(),
+                                            usage_flags,
+                                            image_info.get_extent(),
+                                            image_template.get_aspect_flags());
 
       task_queue_.add_image(path, allocated_image.image_handle);
 
@@ -62,13 +61,14 @@ namespace gestalt::graphics {
                                                  image_info.get_extent());
     }
 
-    if (std::holds_alternative<std::vector<unsigned char>>(image_template.initial_value)) {
-      auto data = std::get<std::vector<unsigned char>>(image_template.initial_value);
+    if (std::holds_alternative<std::vector<unsigned char>>(image_template.get_initial_value())) {
+      auto data = std::get<std::vector<unsigned char>>(image_template.get_initial_value());
       const ImageInfo image_info(data.data(), data.size(), extent);
 
-      auto allocated_image = allocate_image(image_template.name, image_info.get_format(),
+      auto allocated_image = allocate_image(image_template.get_name(), image_info.get_format(),
                                             usage_flags,
-                                            image_info.get_extent(), image_template.aspect_flags);
+                                            image_info.get_extent(),
+                                            image_template.get_aspect_flags());
 
       task_queue_.add_image(data, allocated_image.image_handle, image_info.get_extent());
 
@@ -76,8 +76,9 @@ namespace gestalt::graphics {
                                              image_info.get_extent());
     }
 
-    auto allocated_image = allocate_image(image_template.name, image_template.format, usage_flags,
-                                          extent, image_template.aspect_flags);
+    auto allocated_image = allocate_image(image_template.get_name(), image_template.get_format(),
+                                          usage_flags,
+                                          extent, image_template.get_aspect_flags());
 
     return std::make_unique<ImageInstance>(std::move(image_template), allocated_image, extent);
   }
@@ -108,12 +109,13 @@ namespace gestalt::graphics {
                                             &image_info.height,
                                             &image_info.channels,
                                             STBI_rgb_alpha);
-    if (image_info.channels == 3) {
-      // Assume RGBA because many GPUs don't support RGB
-      image_info.channels = 4;
+    if (!decoded_data) {
+      throw std::runtime_error("Failed to load image from file: " + path.string());
     }
+    image_info.channels = 4;
 
-    const size_t data_size = static_cast<size_t>(image_info.width) * image_info.height * 4;
+    const size_t data_size = static_cast<size_t>(image_info.width) * image_info.height * image_info.
+                             channels;
     data.assign(decoded_data, decoded_data + data_size);
 
     stbi_image_free(decoded_data);
@@ -131,9 +133,14 @@ namespace gestalt::graphics {
                                                           &image_info.width,
                                                           &image_info.height, &image_info.channels,
                                                           STBI_rgb_alpha);
+      if (!decoded_data) {
+        throw std::runtime_error("Failed to load image data from memory.");
+      }
+      image_info.channels = 4;
 
-      const size_t data_size = static_cast<size_t>(image_info.width) * image_info.height * 4;
-      data.assign(decoded_data, decoded_data + data_size);
+      const size_t data_size = static_cast<size_t>(image_info.width) * image_info.height *
+                               image_info.channels;
+      this->data.assign(decoded_data, decoded_data + data_size);
 
       stbi_image_free(decoded_data);
 
@@ -141,10 +148,6 @@ namespace gestalt::graphics {
       this->data = std::move(data);
     }
 
-    if (image_info.channels == 3) {
-      // Assume RGBA because many GPUs don't support RGB
-      image_info.channels = 4;
-    }
     if (!this->data.data()) {
       throw std::runtime_error("Failed to load image data from memory.");
     }
@@ -284,9 +287,9 @@ namespace gestalt::graphics {
 
   std::shared_ptr<BufferInstance> ResourceAllocator::create_buffer(
       BufferTemplate&& buffer_template) const {
-
-      auto allocated_buffer = allocate_buffer(buffer_template.name, buffer_template.size, buffer_template.usage,
-                            buffer_template.memory_usage);
+    auto allocated_buffer = allocate_buffer(buffer_template.get_name(), buffer_template.get_size(),
+                                            buffer_template.get_usage(),
+                                            buffer_template.get_memory_usage());
 
     return std::make_shared<BufferInstance>(std::move(buffer_template), allocated_buffer);
   }

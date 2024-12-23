@@ -3,7 +3,7 @@
 #include "VulkanTypes.hpp"
 #include "Window.hpp"
 
-#include <vma/vk_mem_alloc.h>
+#include <vk_mem_alloc.h>
 
 #include <functional>
 

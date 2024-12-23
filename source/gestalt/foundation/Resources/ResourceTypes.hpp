@@ -14,11 +14,21 @@
 #include "Descriptor/DescriptorUpdate.hpp"
 
 namespace gestalt::foundation {
+  class ResourceTemplate {
+    std::string name_;
 
-  struct ResourceTemplate {
-    std::string name;
+  public:
+    ResourceTemplate(const ResourceTemplate&) = delete;
+    ResourceTemplate& operator=(const ResourceTemplate&) = delete;
 
-    explicit ResourceTemplate(std::string name) : name(std::move(name)) {}
+    ResourceTemplate(ResourceTemplate&&) noexcept = default;
+    ResourceTemplate& operator=(ResourceTemplate&&) noexcept = default;
+
+    explicit ResourceTemplate(std::string name)
+      : name_(std::move(name)) {
+    }
+
+    [[nodiscard]] std::string get_name() const { return name_; }
 
     virtual ~ResourceTemplate() = default;
   };
@@ -54,7 +64,7 @@ namespace gestalt::foundation {
     }
   };
 
-  struct ImageTemplate final : ResourceTemplate {
+  class ImageTemplate final : public ResourceTemplate {
     ImageType image_type = ImageType::kImage2D;
     TextureType type = TextureType::kColor;
     VkImageAspectFlags aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -63,11 +73,21 @@ namespace gestalt::foundation {
     std::variant<RelativeImageSize, AbsoluteImageSize> image_size = RelativeImageSize(1.f);
     VkFormat format = VK_FORMAT_R16G16B16A16_SFLOAT;
 
-    // Constructor with name and optional customization
-    explicit ImageTemplate(std::string name) : ResourceTemplate(std::move(name)) {}
+  public:
+    explicit ImageTemplate(std::string name)
+      : ResourceTemplate(std::move(name)) {
+    }
 
-    // Fluent setters for customization
-    ImageTemplate& set_image_type(const TextureType texture_type, const VkFormat format, const ImageType image_type = ImageType::kImage2D) {
+    ImageTemplate(const ImageTemplate&) = delete;
+    ImageTemplate& operator=(const ImageTemplate&) = delete;
+
+    ImageTemplate(ImageTemplate&&) noexcept = default;
+    ImageTemplate& operator=(ImageTemplate&&) noexcept = default;
+
+    ~ImageTemplate() override = default;
+
+    ImageTemplate& set_image_type(const TextureType texture_type, const VkFormat format,
+                                  const ImageType image_type = ImageType::kImage2D) {
       this->type = texture_type;
       this->format = format;
       if (type == TextureType::kDepth) {
@@ -121,18 +141,48 @@ namespace gestalt::foundation {
       return *this;
     }
 
-    ImageTemplate build() { return *this; }
+    ImageTemplate build() { return std::move(*this); }
+
+    [[nodiscard]] ImageType get_image_type() const { return image_type; }
+    [[nodiscard]] TextureType get_type() const { return type; }
+    [[nodiscard]] VkImageAspectFlags get_aspect_flags() const { return aspect_flags; }
+    [[nodiscard]] VkFormat get_format() const { return format; }
+
+    [[nodiscard]] std::variant<VkClearValue, std::filesystem::path, std::vector<unsigned char>>
+    get_initial_value() const { return initial_value; }
+
+    [[nodiscard]] std::variant<RelativeImageSize, AbsoluteImageSize> get_image_size() const {
+      return image_size;
+    }
 
   };
 
-    struct BufferTemplate final : ResourceTemplate {
-    size_t size;
-    VkBufferUsageFlags usage;
-    VmaMemoryUsage memory_usage;
+  class BufferTemplate final : public ResourceTemplate {
+    size_t size_;
+    VkBufferUsageFlags usage_;
+    VmaMemoryUsage memory_usage_;
+
+  public:
 
     BufferTemplate(std::string name, const size_t size,
                            const VkBufferUsageFlags usage, const VmaMemoryUsage memory_usage)
-        : ResourceTemplate(std::move(name)), size(size), usage(usage), memory_usage(memory_usage) {}
+      : ResourceTemplate(std::move(name)),
+        size_(size),
+        usage_(usage),
+        memory_usage_(memory_usage) {
+    }
+
+    BufferTemplate(const BufferTemplate&) = delete;
+    BufferTemplate& operator=(const BufferTemplate&) = delete;
+
+    BufferTemplate(BufferTemplate&&) noexcept = default;
+    BufferTemplate& operator=(BufferTemplate&&) noexcept = default;
+
+    ~BufferTemplate() override = default;
+
+    [[nodiscard]] size_t get_size() const { return size_; }
+    [[nodiscard]] VkBufferUsageFlags get_usage() const { return usage_; }
+    [[nodiscard]] VmaMemoryUsage get_memory_usage() const { return memory_usage_; }
   };
 
     class BufferInstance;
@@ -185,10 +235,10 @@ namespace gestalt::foundation {
   public:
     ImageInstance(ImageTemplate&& image_template, const AllocatedImage& allocated_image,
                   const VkExtent3D extent)
-        : ResourceInstance(image_template.name),
-          image_template(std::move(image_template)),
-          allocated_image(allocated_image),
-          extent(extent) {}
+      : ResourceInstance(image_template.get_name()),
+        image_template(std::move(image_template)),
+        allocated_image(allocated_image),
+        extent(extent) {}
 
     ImageInstance(const ImageInstance&) = delete;
     ImageInstance& operator=(const ImageInstance&) = delete;
@@ -204,7 +254,7 @@ namespace gestalt::foundation {
     [[nodiscard]] VkImage get_image_handle() const { return allocated_image.image_handle; }
 
     [[nodiscard]] VkImageAspectFlags get_image_aspect() const {
-      return image_template.aspect_flags;
+      return image_template.get_aspect_flags();
     }
 
     [[nodiscard]] VkImageView get_image_view() const { return allocated_image.image_view; }
@@ -213,9 +263,9 @@ namespace gestalt::foundation {
 
     [[nodiscard]] VkImageLayout get_layout() const { return current_layout; }
     void set_layout(const VkImageLayout layout) { current_layout = layout; }
-    [[nodiscard]] VkFormat get_format() const { return image_template.format; }
+    [[nodiscard]] VkFormat get_format() const { return image_template.get_format(); }
 
-    [[nodiscard]] TextureType get_type() const { return image_template.type; }
+    [[nodiscard]] TextureType get_type() const { return image_template.get_type(); }
 
     [[nodiscard]] VkAccessFlags2 get_current_access() const { return current_access; }
     void set_current_access(const VkAccessFlags2 access) { current_access = access; }
@@ -225,13 +275,17 @@ namespace gestalt::foundation {
   };
 
   class ImageArrayInstance final : public ResourceInstance {
-    std::vector<std::shared_ptr<ImageInstance>> images_;
-    bool should_rebuild_descriptors_ = true;
+    std::function<std::vector<std::shared_ptr<ImageInstance>>()> images_;
+    size_t max_images_;
+    size_t previous_size_ = 0;
 
   public:
-    ImageArrayInstance(std::string name, std::vector<std::shared_ptr<ImageInstance>>&& images)
+    ImageArrayInstance(std::string name,
+                       std::function<std::vector<std::shared_ptr<ImageInstance>>()> images,
+                       const size_t max_images)
       : ResourceInstance(std::move(name)),
-        images_(std::move(images)) {
+        images_(std::move(images)),
+        max_images_(max_images) {
     }
 
     void accept(ResourceVisitor& visitor, const ResourceUsage usage,
@@ -239,17 +293,20 @@ namespace gestalt::foundation {
       visitor.visit(*this, usage, shader_stage);
     }
 
-    void update(uint32 image_index, const std::shared_ptr<ImageInstance>& image) {
-      images_[image_index] = image;
-      should_rebuild_descriptors_ = true;
+    [[nodiscard]] bool should_rebuild_descriptors() {
+      if (previous_size_ != images_().size()) {
+        previous_size_ = images_().size();
+        return true;
+      }
+      return false;
     }
 
-    [[nodiscard]] bool should_rebuild_descriptors() const { return should_rebuild_descriptors_; }
-    void set_rebuild_descriptors(const bool rebuild) { should_rebuild_descriptors_ = rebuild; }
-
-    [[nodiscard]] const std::vector<std::shared_ptr<ImageInstance>>& get_images() const {
-      return images_;
+    [[nodiscard]] std::vector<std::shared_ptr<ImageInstance>> get_images() const {
+      return images_();
     }
+
+    [[nodiscard]] size_t get_max_images() const { return max_images_; }
+
   };
 
   struct AllocatedBuffer {
@@ -267,9 +324,16 @@ namespace gestalt::foundation {
 
   public:
     BufferInstance(BufferTemplate&& buffer_template, const AllocatedBuffer& allocated_buffer)
-        : ResourceInstance(buffer_template.name),
-          buffer_template(std::move(buffer_template)),
-          allocated_buffer(allocated_buffer) {}
+      : ResourceInstance(buffer_template.get_name()),
+        buffer_template(std::move(buffer_template)),
+        allocated_buffer(allocated_buffer) {}
+
+
+    BufferInstance(const BufferInstance&) = delete;
+    BufferInstance& operator=(const BufferInstance&) = delete;
+
+    BufferInstance(BufferInstance&&) noexcept = default;
+    BufferInstance& operator=(BufferInstance&&) noexcept = default;  
 
     void accept(ResourceVisitor& visitor, const ResourceUsage usage,
                 VkShaderStageFlags shader_stage) override {
@@ -279,7 +343,7 @@ namespace gestalt::foundation {
     [[nodiscard]] VkDeviceSize get_size() const { return allocated_buffer.info.size; }
 
     // size that was requested, max size that can be uploaded, used for descriptor buffer bindings
-    [[nodiscard]] VkDeviceSize get_requested_size() const { return buffer_template.size; }
+    [[nodiscard]] VkDeviceSize get_requested_size() const { return buffer_template.get_size(); }
 
     [[nodiscard]] VkDeviceAddress get_address() const { return allocated_buffer.address; }
 
@@ -287,7 +351,7 @@ namespace gestalt::foundation {
 
     [[nodiscard]] VkBuffer get_buffer_handle() const { return allocated_buffer.buffer_handle; }
 
-    [[nodiscard]] VkBufferUsageFlags get_usage() const { return buffer_template.usage; }
+    [[nodiscard]] VkBufferUsageFlags get_usage() const { return buffer_template.get_usage(); }
 
     [[nodiscard]] VkAccessFlags2 get_current_access() const { return current_access; }
     void set_current_access(const VkAccessFlags2 access) { current_access = access; }

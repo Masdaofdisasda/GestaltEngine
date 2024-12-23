@@ -5,7 +5,6 @@
 #include "vk_images.hpp"
 #include "vk_initializers.hpp"
 
-#include <vma/vk_mem_alloc.h>
 #include <cmath>
 
 #include "Resources/ResourceTypes.hpp"
@@ -71,6 +70,8 @@ namespace gestalt::graphics {
   }
 
   void vkutil::TransitionBuffer::andSubmitTo(const VkCommandBuffer cmd) {
+    bufferBarrier.dstStageMask |= VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    bufferBarrier.srcStageMask |= VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
     VkDependencyInfo depInfo{
         .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
         .dependencyFlags = 0,
