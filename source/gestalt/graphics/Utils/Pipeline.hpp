@@ -591,8 +591,10 @@ namespace gestalt::graphics::fg {
         color_attachment_info.reserve(color_attachments.size());
         for (int i = 0; i < color_attachments.size(); ++i) {
           const auto& attachment = color_attachments.at(i);
-          color_attachment_info.push_back(vkinit::attachment_info(attachment->get_image_view(),
-                                                             nullptr, attachment->get_layout()));
+          auto attachment_info = vkinit::attachment_info(attachment->get_image_view(), nullptr,
+                                                         attachment->get_layout());
+          attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+          color_attachment_info.push_back(attachment_info);
           extent = {attachment->get_extent().width, attachment->get_extent().height};
         }
       }

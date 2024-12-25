@@ -110,6 +110,7 @@ namespace gestalt::graphics::fg {
     // pass_node.pass.execute(pass_node.inputs...)
 
     for (const auto& node : sorted_nodes_) {
+      //fmt::println("executing: {}", node->render_pass->get_name());
       synchronization_manager_->synchronize_resources(node, cmd);
       node->render_pass->execute(cmd);
     }

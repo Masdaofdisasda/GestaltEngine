@@ -498,7 +498,7 @@ namespace gestalt::graphics {
       // TODO
     const CommandBuffer cmd_buffer{cmd};
     resource_allocator_->flush();
-    //frame_graph_->execute(cmd_buffer);
+    frame_graph_->execute(cmd_buffer);
 
     const auto color_image = resource_registry_->resources_.final_color.image;
     const auto swapchain_image = swapchain_->swapchain_images[swapchain_image_index_];

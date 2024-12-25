@@ -65,9 +65,6 @@ namespace gestalt::graphics::fg {
     void execute(const CommandBuffer cmd) override {
       const auto command_count = resources_.get_buffer_binding(1, 7).resource;
 
-      cmd.fill_buffer(command_count->get_buffer_handle(), 0,
-                      command_count->get_size(), 0);
-
       const int32 max_command_count = draw_count_provider_();
       const uint32 group_count
           = (static_cast<uint32>(max_command_count) + 63) / 64;  // 64 threads per group
@@ -258,8 +255,6 @@ namespace gestalt::graphics::fg {
 
     void execute(const CommandBuffer cmd) override {
       const auto command_count = resources_.get_buffer_binding(1, 7).resource;
-
-      cmd.fill_buffer(command_count->get_buffer_handle(), 0, command_count->get_size(), 0);
 
       const int32 max_command_count = draw_count_provider_();
       const uint32 group_count

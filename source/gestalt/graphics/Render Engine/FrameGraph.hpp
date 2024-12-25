@@ -152,7 +152,8 @@ namespace gestalt::graphics::fg {
         VkAccessFlags2 dstAccessMask = 0;
         switch (image.get_type()) {
           case TextureType::kColor:
-            if (shader_stage == VK_SHADER_STAGE_ALL_GRAPHICS) {
+            assert(shader_stage != VK_SHADER_STAGE_ALL_GRAPHICS);
+            if (shader_stage == VK_SHADER_STAGE_FRAGMENT_BIT) {
               if (usage == ResourceUsage::READ) {
                 // Sampled read
                 newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -177,7 +178,8 @@ namespace gestalt::graphics::fg {
             break;
 
           case TextureType::kDepth:
-            if (shader_stage == VK_SHADER_STAGE_ALL_GRAPHICS) {
+            assert(shader_stage != VK_SHADER_STAGE_ALL_GRAPHICS);
+            if (shader_stage == VK_SHADER_STAGE_FRAGMENT_BIT) {
               if (usage == ResourceUsage::READ) {
                 newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
                 dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
@@ -237,7 +239,6 @@ namespace gestalt::graphics::fg {
         vkCmdPipelineBarrier2(cmd_.get(), &dependency_info);
       }
     };
-
 
   public:
     void synchronize_resources(const std::shared_ptr<FrameGraphNode>& node,
