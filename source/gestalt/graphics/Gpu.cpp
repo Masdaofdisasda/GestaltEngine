@@ -20,6 +20,7 @@ namespace gestalt::graphics {
                         .request_validation_layers(useValidationLayers())
                         .add_validation_feature_enable(
                             VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT)
+                        //.add_validation_feature_enable(VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT)
                         .enable_extension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME)
                         .use_default_debug_messenger()
                         .require_api_version(1, 3, 0)

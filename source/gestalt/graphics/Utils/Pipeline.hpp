@@ -1,6 +1,7 @@
 ﻿#pragma once 
 #include <VulkanTypes.hpp>
 #include <algorithm>
+#include <map>
 #include <memory>
 #include <optional>
 #include <ranges>
@@ -32,57 +33,14 @@ namespace gestalt::graphics::fg {
     ResourceUsage usage;
   };
 
-
-  struct DescriptorSetLayoutBuilder {
-    std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding> bindings;
-
-    DescriptorSetLayoutBuilder& binding(uint32_t binding_index, const VkDescriptorType descriptor_type,
-                                        VkShaderStageFlags shader_stages,
-                                        const uint32_t descriptor_count = 1) {
-      if (auto [_, inserted]
-          = bindings.emplace(binding_index, VkDescriptorSetLayoutBinding{
-                                 .binding = binding_index,
-                                 .descriptorType = descriptor_type,
-                                 .descriptorCount = descriptor_count,
-                                 .stageFlags = shader_stages,
-                             }); !inserted) {
-        throw std::runtime_error("Binding index " + std::to_string(binding_index)
-                                 + " already exists in DescriptorSetLayoutBuilder.");
-      }
-
-      return *this;
-    }
-
-    std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding> get() { return std::move(bindings); }
-  };
-
-  struct DescriptorLayoutBuilder {
-    std::unordered_map<uint32_t, std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding>>
-        set_bindings;
-
-    DescriptorLayoutBuilder& set(
-        uint32_t set_index, std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding>&& bindings) {
-      if (auto [_, inserted] = set_bindings.emplace(set_index, std::move(bindings)); !inserted) {
-        throw std::runtime_error("Set index " + std::to_string(set_index)
-                                 + " already exists in DescriptorLayoutBuilder.");
-      }
-
-      return *this;
-    }
-
-    std::unordered_map<uint32_t, std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding>> get() {
-      return std::move(set_bindings);
-    }
-  };
-
   class PipelineTool : NonCopyable<PipelineTool> {
     IGpu* gpu_ = nullptr;
     std::string_view pipeline_name_;
 
-    std::unordered_map<uint32, std::unordered_map<uint32, VkDescriptorSetLayoutBinding>>
+    std::map<uint32, std::map<uint32, VkDescriptorSetLayoutBinding>>
         set_bindings_;
 
-    std::unordered_map<uint32, std::shared_ptr<DescriptorBufferInstance>> descriptor_buffers_;
+    std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> descriptor_buffers_;
     VkPipelineLayout pipeline_layout_ = nullptr;
     VkPipeline pipeline_ = nullptr;
     std::unordered_map<uint32, VkDescriptorSetLayout> descriptor_set_layouts_;
@@ -90,7 +48,7 @@ namespace gestalt::graphics::fg {
     std::unordered_map<VkShaderStageFlagBits, VkShaderModule> shader_modules_;
 
     void create_descriptor_layout(
-        std::unordered_map<uint32, std::unordered_map<uint32, VkDescriptorSetLayoutBinding>>&&
+        std::map<uint32, std::map<uint32, VkDescriptorSetLayoutBinding>>&&
         sets);
 
   public:
@@ -177,8 +135,8 @@ namespace gestalt::graphics::fg {
         std::span<const ResourceBinding<BufferInstance>> buffer_bindings,
         std::span<const ResourceBinding<ImageArrayInstance>> image_array_bindings
         ) {
-      using BindingMap = std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding>;
-      std::unordered_map<uint32_t, BindingMap> descriptor_sets;
+      using BindingMap = std::map<uint32, VkDescriptorSetLayoutBinding>;
+      std::map<uint32, BindingMap> descriptor_sets;
 
       // Helper lambda to process bindings
       auto process_bindings = [&descriptor_sets](const auto& bindings) {
@@ -572,8 +530,10 @@ namespace gestalt::graphics::fg {
 
     void begin_render_pass(
         const CommandBuffer cmd,
-        const std::unordered_map<uint32, std::shared_ptr<ImageInstance>>& color_attachments,
-        const std::shared_ptr<ImageInstance>& depth_attachment) {
+        const std::map<uint32, std::shared_ptr<ImageInstance>>& color_attachments,
+        const std::shared_ptr<ImageInstance>& depth_attachment,
+        std::optional<VkClearColorValue> clear_color = std::nullopt,
+        std::optional<VkClearDepthStencilValue> clear_depth = std::nullopt) {
       std::vector<VkRenderingAttachmentInfo> color_attachment_info;
       VkRenderingAttachmentInfo depth_attachment_info = {};
       VkExtent2D extent = {0, 0};
@@ -587,43 +547,75 @@ namespace gestalt::graphics::fg {
           .offset = {0, 0},
       };
 
-      if (!color_attachments.empty()) {
-        color_attachment_info.reserve(color_attachments.size());
-        for (int i = 0; i < color_attachments.size(); ++i) {
-          const auto& attachment = color_attachments.at(i);
-          auto attachment_info = vkinit::attachment_info(attachment->get_image_view(), nullptr,
-                                                         attachment->get_layout());
+      // Process color attachments
+      for (const auto& attachment : color_attachments | std::views::values) {
+        auto attachment_info = vkinit::attachment_info(attachment->get_image_view(), nullptr,
+                                                       attachment->get_layout());
+
+        if (clear_color) {
+          attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+          attachment_info.clearValue.color = *clear_color;
+        } else {
           attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-          color_attachment_info.push_back(attachment_info);
+        }
+        attachment_info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        color_attachment_info.push_back(attachment_info);
+
+        // Validate and set extent
+        if (extent.width == 0 && extent.height == 0) {
           extent = {attachment->get_extent().width, attachment->get_extent().height};
+        } else if (extent.width != attachment->get_extent().width
+                   || extent.height != attachment->get_extent().height) {
+          throw std::runtime_error("Attachment dimensions mismatch!");
         }
       }
 
+      // Process depth attachment
       if (depth_attachment != nullptr) {
-        depth_attachment_info = vkinit::attachment_info(depth_attachment->get_image_view(),
-                                                  nullptr, depth_attachment->get_layout());
-        extent = {depth_attachment->get_extent().width, depth_attachment->get_extent().height};
+        depth_attachment_info = vkinit::attachment_info(depth_attachment->get_image_view(), nullptr,
+                                                        depth_attachment->get_layout());
+
+        if (clear_depth) {
+          depth_attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+          depth_attachment_info.clearValue.depthStencil = *clear_depth;
+        } else {
+          depth_attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        }
+        depth_attachment_info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+        // Validate and set extent
+        if (extent.width == 0 && extent.height == 0) {
+          extent = {depth_attachment->get_extent().width, depth_attachment->get_extent().height};
+        } else if (extent.width != depth_attachment->get_extent().width
+                   || extent.height != depth_attachment->get_extent().height) {
+          throw std::runtime_error("Attachment dimensions mismatch!");
+        }
       }
 
+      // Configure viewport and scissor
       viewport.width = static_cast<float>(extent.width);
       viewport.height = static_cast<float>(extent.height);
       scissor.extent.width = extent.width;
       scissor.extent.height = extent.height;
 
-      VkRenderingInfo rendering_info;
+      // Configure rendering info
+      VkRenderingInfo rendering_info = {};
       if (color_attachment_info.empty()) {
-        rendering_info = vkinit::rendering_info(extent, nullptr,
-                                                depth_attachment_info.sType ? &depth_attachment_info : nullptr);
+        rendering_info = vkinit::rendering_info(
+            extent, nullptr, depth_attachment ? &depth_attachment_info : nullptr);
       } else {
         rendering_info = vkinit::rendering_info_for_gbuffer(
-            extent, color_attachment_info.data(), color_attachment_info.size(),
-                                     depth_attachment_info.sType ? &depth_attachment_info : nullptr);
+            extent, color_attachment_info.data(),
+            static_cast<uint32_t>(color_attachment_info.size()),
+            depth_attachment ? &depth_attachment_info : nullptr);
       }
 
+      // Begin rendering
       cmd.begin_rendering(rendering_info);
       cmd.set_viewport(0, 1, &viewport);
       cmd.set_scissor(0, 1, &scissor);
     }
+
 
     [[nodiscard]] VkPipelineLayout get_pipeline_layout() const {
       return pipeline_tool_.get_pipeline_layout();

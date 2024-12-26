@@ -199,8 +199,10 @@ namespace gestalt::graphics::fg {
     VkPipelineBindPoint get_bind_point() override { return graphics_pipeline_.get_bind_point(); }
 
     void execute(const CommandBuffer cmd) override {
+      auto clear_depth = VkClearDepthStencilValue{1.0f, 0};
       graphics_pipeline_.begin_render_pass(cmd, resources_.get_color_attachments(),
-                                           resources_.get_depth_attachment());
+                                           resources_.get_depth_attachment(), std::nullopt,
+                                           {clear_depth});
       graphics_pipeline_.bind(cmd);
 
       constexpr MeshletDepthPushConstants draw_cull_constants{.cullFlags = 1};
@@ -393,8 +395,10 @@ namespace gestalt::graphics::fg {
     VkPipelineBindPoint get_bind_point() override { return graphics_pipeline_.get_bind_point(); }
 
     void execute(const CommandBuffer cmd) override {
+      auto clear_depth = VkClearDepthStencilValue{1.0f, 0};
       graphics_pipeline_.begin_render_pass(cmd, resources_.get_color_attachments(),
-                                           resources_.get_depth_attachment());
+                                           resources_.get_depth_attachment(), std::nullopt,
+                                           {clear_depth});
       graphics_pipeline_.bind(cmd);
 
       constexpr MeshletPushConstants draw_cull_constants{};
@@ -458,7 +462,7 @@ namespace gestalt::graphics::fg {
       cmd.push_constants(compute_pipeline_.get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
                          sizeof(RenderConfig::SsaoParams), &push_constants);
       const auto [width, height, _] = resources_.get_image_binding(1, 3).resource->get_extent();
-      //cmd.dispatch(width / 8, height / 8, 1);
+      cmd.dispatch(static_cast<uint32>(ceil(width / 8)), static_cast<uint32>(ceil(height / 8)), 1);
     }
   };
 

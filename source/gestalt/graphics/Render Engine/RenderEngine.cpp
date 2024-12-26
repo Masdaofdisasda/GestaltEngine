@@ -67,7 +67,7 @@ namespace gestalt::graphics {
               .set_initial_value(asset("rot_texture.bmp"))
               .build(),
           fg::CreationType::EXTERNAL);
-      auto occlusion_texture = frame_graph_->add_resource(
+      auto ambient_occlusion_texture = frame_graph_->add_resource(
           ImageTemplate("Ambient Occlusion Texture")
               .set_image_type(TextureType::kColor, VK_FORMAT_R16_SFLOAT)
               .set_image_size(0.5f)
@@ -189,7 +189,7 @@ namespace gestalt::graphics {
           gpu_);
 
       frame_graph_->add_pass<fg::SsaoPass>(
-          camera_buffer, g_buffer_2, g_buffer_depth, rotation_texture, occlusion_texture,
+          camera_buffer, g_buffer_depth, g_buffer_2, rotation_texture, ambient_occlusion_texture,
           post_process_sampler, gpu_, [&] { return resource_registry_->config_.ssao; });
 
       frame_graph_->add_pass<fg::VolumetricLightingInjectionPass>(
@@ -214,7 +214,7 @@ namespace gestalt::graphics {
       frame_graph_->add_pass<fg::LightingPass>(
           camera_buffer, material_buffer, light_matrices, directional_light, point_light,
           g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth, shadow_map,
-          integrated_light_scattering, occlusion_texture, scene_lit, post_process_sampler, gpu_);
+          integrated_light_scattering, ambient_occlusion_texture, scene_lit, post_process_sampler, gpu_);
 
       frame_graph_->add_pass<fg::VolumetricLightingSpatialFilterPass>(
           light_scattering, froxel_data, post_process_sampler,

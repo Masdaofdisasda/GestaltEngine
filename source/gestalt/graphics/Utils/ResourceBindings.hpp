@@ -9,7 +9,7 @@ namespace gestalt::graphics::fg {
 
 
   struct ResourceComponentBindings {
-    std::unordered_map<uint32, std::shared_ptr<ImageInstance>> color_attachments;
+    std::map<uint32, std::shared_ptr<ImageInstance>> color_attachments;
     std::shared_ptr<ImageInstance> depth_attachment;
 
     //TODO

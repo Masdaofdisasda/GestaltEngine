@@ -7,20 +7,11 @@
 
 namespace gestalt::graphics::fg {
   void PipelineTool::create_descriptor_layout(
-      std::unordered_map<uint32, std::unordered_map<uint32, VkDescriptorSetLayoutBinding>>&&
+      std::map<uint32, std::map<uint32, VkDescriptorSetLayoutBinding>>&&
       sets) {
     this->set_bindings_ = std::move(sets);
 
-    // pipeline layout expects descriptor set layouts to be sorted by set index
-    std::vector<uint32_t> sorted_keys;
-    sorted_keys.reserve(set_bindings_.size());
-    for (const auto& set_index : set_bindings_ | std::views::keys) {
-      sorted_keys.push_back(set_index);
-    }
-    std::ranges::sort(sorted_keys);
-
-    for (const auto& set_index : sorted_keys) {
-      const auto& bindings = set_bindings_.at(set_index);
+    for (const auto& [set_index, bindings ] : set_bindings_) {
       std::vector<VkDescriptorSetLayoutBinding> binding_vector;
       binding_vector.reserve(bindings.size());
       for (const auto& binding : bindings | std::views::values) {

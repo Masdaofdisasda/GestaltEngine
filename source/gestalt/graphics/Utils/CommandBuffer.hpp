@@ -65,5 +65,11 @@ namespace gestalt::graphics {
                   const uint32 group_count_z) const {
       vkCmdDispatch(cmd, group_count_x, group_count_y, group_count_z);
     }
+
+    void begin_debug_utils_label_ext(const VkDebugUtilsLabelEXT& label_info) const {
+      vkCmdBeginDebugUtilsLabelEXT(cmd, &label_info);
+    }
+
+    void end_debug_utils_label_ext() const { vkCmdEndDebugUtilsLabelEXT(cmd); }
   };
 }  // namespace gestalt

@@ -103,16 +103,20 @@ namespace gestalt::graphics::fg {
   }
 
   void FrameGraph::execute(const CommandBuffer cmd) const {
-    // run each render pass in order and synchronize resources
-    // for (auto& pass_node : pass_nodes_) {
-    // bind resources to descriptor sets
-    // sync resources
-    // pass_node.pass.execute(pass_node.inputs...)
-
     for (const auto& node : sorted_nodes_) {
-      //fmt::println("executing: {}", node->render_pass->get_name());
+      const auto name = std::string(node->render_pass->get_name());
+      //fmt::println("executing: {}", name);
       synchronization_manager_->synchronize_resources(node, cmd);
+
+      VkDebugUtilsLabelEXT labelInfo = {
+          .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
+          .pLabelName = name.c_str(),
+          .color = {0.0f, 1.0f, 0.0f, 1.0f},
+      };
+
+      cmd.begin_debug_utils_label_ext(labelInfo);
       node->render_pass->execute(cmd);
+      cmd.end_debug_utils_label_ext();
     }
   }
 }  // namespace gestalt::graphics::fg

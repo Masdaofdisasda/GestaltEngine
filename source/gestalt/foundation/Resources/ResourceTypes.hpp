@@ -373,6 +373,7 @@ namespace gestalt::foundation {
     std::unordered_map<uint32_t, DescriptorBinding> bindings_;
 
     IGpu* gpu_;
+    std::string name_;
 
     std::vector<DescriptorUpdate> update_infos_;
 
@@ -407,10 +408,10 @@ namespace gestalt::foundation {
     }
 
   public:
-    explicit DescriptorBufferInstance(IGpu* gpu, const std::string_view name,
+    explicit DescriptorBufferInstance(IGpu* gpu, const std::string name,
                                       const VkDescriptorSetLayout descriptor_layout,
                                       const std::vector<uint32_t>& binding_indices)
-        : gpu_(gpu) {
+        : gpu_(gpu), name_(name) {
       if (gpu_ == nullptr) {
         throw std::runtime_error("GPU instance cannot be null.");
       }
@@ -447,7 +448,7 @@ namespace gestalt::foundation {
       VK_CHECK(vmaCreateBuffer(gpu_->getAllocator(), &buffer_info, &vma_alloc_info, &buffer_handle_,
                                &allocation_, &info_));
 
-      gpu_->set_debug_name(name,
+      gpu_->set_debug_name(name_,
                            VK_OBJECT_TYPE_BUFFER,
                            reinterpret_cast<uint64>(buffer_handle_));
 

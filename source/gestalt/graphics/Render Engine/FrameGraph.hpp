@@ -139,7 +139,7 @@ namespace gestalt::graphics::fg {
 
         // Determine pipeline stages
         VkPipelineStageFlags2 dstStageMask = 0;
-        if (shader_stage == VK_SHADER_STAGE_ALL_GRAPHICS) {
+        if (shader_stage == VK_SHADER_STAGE_FRAGMENT_BIT) {
           dstStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
         } else if (shader_stage == VK_SHADER_STAGE_COMPUTE_BIT) {
           dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
@@ -152,7 +152,6 @@ namespace gestalt::graphics::fg {
         VkAccessFlags2 dstAccessMask = 0;
         switch (image.get_type()) {
           case TextureType::kColor:
-            assert(shader_stage != VK_SHADER_STAGE_ALL_GRAPHICS);
             if (shader_stage == VK_SHADER_STAGE_FRAGMENT_BIT) {
               if (usage == ResourceUsage::READ) {
                 // Sampled read
@@ -178,7 +177,6 @@ namespace gestalt::graphics::fg {
             break;
 
           case TextureType::kDepth:
-            assert(shader_stage != VK_SHADER_STAGE_ALL_GRAPHICS);
             if (shader_stage == VK_SHADER_STAGE_FRAGMENT_BIT) {
               if (usage == ResourceUsage::READ) {
                 newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
