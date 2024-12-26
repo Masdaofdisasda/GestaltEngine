@@ -8,12 +8,13 @@
 
 namespace gestalt::graphics::fg {
 	
-  class RenderPass {
+  class RenderPass : Moveable<RenderPass> {
     std::string name_;
   protected:
     explicit RenderPass(std::string name) : name_(std::move(name)) {
       fmt::println("Compiling Render Pass: {}", name_);
     }
+
   public:
     [[nodiscard]] std::string_view get_name() const { return name_; }
     virtual std::vector<ResourceBinding<ResourceInstance>> get_resources(ResourceUsage usage) = 0;
@@ -111,6 +112,7 @@ namespace gestalt::graphics::fg {
       compute_pipeline_.bind(cmd);
       cmd.dispatch(1, 1, 1);
     }
+
   };
 
   class MeshletDirectionalDepthPass final : public RenderPass {
@@ -560,7 +562,7 @@ namespace gestalt::graphics::fg {
       cmd.push_constants(compute_pipeline_.get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
                          sizeof(VolumetricLightingInjectionPassConstants), &push_constants);
       const auto [width, height, _] = resources_.get_image_binding(0, 2).resource->get_extent();
-      //cmd.dispatch((uint32)ceil(width / 8), (uint32)ceil(height / 8), 128);
+      cmd.dispatch(static_cast<uint32>(ceil(width / 8)), static_cast<uint32>(ceil(height / 8)), 128);
     }
   };
 
@@ -672,7 +674,7 @@ namespace gestalt::graphics::fg {
       cmd.push_constants(compute_pipeline_.get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
                          sizeof(VolumetricLightingScatteringPassConstants), &push_constants);
       const auto [width, height, _] = resources_.get_image_binding(1, 3).resource->get_extent();
-      //cmd.dispatch((uint32)ceil(width / 8), (uint32)ceil(height / 8), 128);
+      cmd.dispatch(static_cast<uint32>(ceil(width / 8)), static_cast<uint32>(ceil(height / 8)), 128);
     }
   };
 
@@ -725,7 +727,7 @@ namespace gestalt::graphics::fg {
       cmd.push_constants(compute_pipeline_.get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
                          sizeof(VolumetricLightingSpatialFilterPassConstants), &push_constants);
       const auto [width, height, _] = resources_.get_image_binding(0, 1).resource->get_extent();
-      //cmd.dispatch((uint32)ceil(width / 8), (uint32)ceil(height / 8), 128);
+      cmd.dispatch(static_cast<uint32>(ceil(width / 8)), static_cast<uint32>(ceil(height / 8)), 128);
     }
   };
 
@@ -795,7 +797,7 @@ namespace gestalt::graphics::fg {
       cmd.push_constants(compute_pipeline_.get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
                          sizeof(VolumetricLightingIntegrationPassConstants), &push_constants);
       const auto [width, height, _] = resources_.get_image_binding(0, 1).resource->get_extent();
-      //cmd.dispatch((uint32)ceil(width / 8), (uint32)ceil(height / 8), 128);
+      cmd.dispatch(static_cast<uint32>(ceil(width / 8)), static_cast<uint32>(ceil(height / 8)), 128);
     }
   };
 
@@ -831,7 +833,7 @@ namespace gestalt::graphics::fg {
     void execute(const CommandBuffer cmd) override {
       compute_pipeline_.bind(cmd);
 const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get_extent();
-      //cmd.dispatch((uint32)ceil(width / 8), (uint32)ceil(height / 8), 128);
+      cmd.dispatch(static_cast<uint32>(ceil(width / 8)), static_cast<uint32>(ceil(height / 8)), 128);
     }
   };
 

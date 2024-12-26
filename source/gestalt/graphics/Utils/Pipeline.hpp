@@ -33,7 +33,7 @@ namespace gestalt::graphics::fg {
     ResourceUsage usage;
   };
 
-  class PipelineTool : NonCopyable<PipelineTool> {
+  class PipelineTool : Moveable<PipelineTool> {
     IGpu* gpu_ = nullptr;
     std::string_view pipeline_name_;
 
@@ -56,8 +56,6 @@ namespace gestalt::graphics::fg {
       : gpu_(gpu),
         pipeline_name_(pipeline_name) {
     }
-
-    ~PipelineTool() = default;
 
     void create_graphics_pipeline(VkGraphicsPipelineCreateInfo pipeline_create_info,
                                   const std::vector<VkShaderStageFlagBits>& shader_types) {
@@ -479,7 +477,7 @@ namespace gestalt::graphics::fg {
 
     };
 
-  class GraphicsPipeline {
+  class GraphicsPipeline: Moveable<GraphicsPipeline> {
     PipelineTool pipeline_tool_;
     VkPipelineBindPoint bind_point_ = VK_PIPELINE_BIND_POINT_GRAPHICS;
 
@@ -627,7 +625,7 @@ namespace gestalt::graphics::fg {
 
   };
 
-  class ComputePipeline {
+  class ComputePipeline : Moveable<ComputePipeline> {
     PipelineTool pipeline_tool_;
     VkPipelineBindPoint bind_point_ = VK_PIPELINE_BIND_POINT_COMPUTE;
 
@@ -646,6 +644,12 @@ namespace gestalt::graphics::fg {
       pipeline_tool_.create_pipeline_layout(push_constant_range);
       pipeline_tool_.create_compute_pipeline();
     }
+
+    ComputePipeline(const ComputePipeline&) = delete;
+    ComputePipeline& operator=(const ComputePipeline&) = delete;
+
+    ComputePipeline(ComputePipeline&&) noexcept = default;
+    ComputePipeline& operator=(ComputePipeline&&) noexcept = default;
 
     void bind(const CommandBuffer cmd) {
       pipeline_tool_.bind_descriptors(cmd, bind_point_);

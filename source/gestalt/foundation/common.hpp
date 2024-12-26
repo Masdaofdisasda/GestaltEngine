@@ -30,6 +30,18 @@ protected:
   NonCopyable& operator=(NonCopyable&&) = delete;
 };
 
+template <typename T> class Moveable {
+protected:
+  Moveable() = default;
+  ~Moveable() = default;
+
+  Moveable(const Moveable&) = delete;
+  Moveable& operator=(const Moveable&) = delete;
+
+  Moveable(Moveable&&) = default;
+  Moveable& operator=(Moveable&&) = default;
+};
+
 namespace gestalt {
 
   namespace foundation {

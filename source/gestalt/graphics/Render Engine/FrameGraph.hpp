@@ -318,7 +318,6 @@ namespace gestalt::graphics::fg {
       add_render_pass(std::make_shared<PassType>(std::forward<Args>(args)...));
     }
 
-
     std::shared_ptr<ImageInstance> add_resource(ImageTemplate&& image_template,
                                                 CreationType creation_type
                                                     = CreationType::INTERNAL) {
