@@ -36,6 +36,35 @@ namespace gestalt::graphics {
                            image_memory_barriers);
     }
 
+    void pipeline_barrier2(const VkDependencyInfo& dependency_info) const {
+      vkCmdPipelineBarrier2(cmd, &dependency_info);
+    }
+
+    // only use for debugging
+    void global_barrier() const {
+      VkMemoryBarrier2 memoryBarrier = {
+          .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+          .pNext = nullptr,
+          .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+          .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
+          .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+          .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
+      };
+
+      VkDependencyInfo dependencyInfo = {
+          .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+          .pNext = nullptr,
+          .dependencyFlags = 0,
+          .memoryBarrierCount = 1,
+          .pMemoryBarriers = &memoryBarrier,
+          .bufferMemoryBarrierCount = 0,
+          .pBufferMemoryBarriers = nullptr,
+          .imageMemoryBarrierCount = 0,
+          .pImageMemoryBarriers = nullptr,
+      };
+      pipeline_barrier2(dependencyInfo);
+    }
+
     void fill_buffer(const VkBuffer buffer, const VkDeviceSize offset, const VkDeviceSize size,
                      const uint32 data) const {
       vkCmdFillBuffer(cmd, buffer, offset, size, data);

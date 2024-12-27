@@ -34,7 +34,8 @@ namespace gestalt::foundation {
   std::shared_ptr<BufferInstance> meshlet_triangles_instance;
     std::shared_ptr<BufferInstance> meshlet_task_commands_buffer_instance;
   std::shared_ptr<BufferInstance> mesh_draw_buffer_instance;
-    std::shared_ptr<BufferInstance> draw_count_buffer_instance;
+    std::shared_ptr<BufferInstance> command_count_buffer_instance;
+    std::shared_ptr<BufferInstance> group_count_buffer_instance;
 
 
   std::array<std::shared_ptr<DescriptorBuffer>, getFramesInFlight()> descriptor_buffers;

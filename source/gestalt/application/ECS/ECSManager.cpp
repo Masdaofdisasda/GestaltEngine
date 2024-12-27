@@ -31,7 +31,7 @@ namespace gestalt::application {
                         repository_);
 
     component_factory_->create_directional_light(
-        glm::vec3(1.f, 0.957f, 0.917f), 5.f, glm::vec3(-0.216, 0.941, -0.257));
+        glm::vec3(1.f, 0.957f, 0.917f), 100000.f, glm::vec3(-0.216, 0.941, -0.257));
     component_factory_->create_point_light(glm::vec3(1.0f), 5.0f, glm ::vec3(0.0, 6.0, 0.0), 100.f);
 
     auto [main_cam, main_cam_node] = component_factory_->create_entity("Editor Camera");

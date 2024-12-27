@@ -38,7 +38,8 @@ namespace gestalt::graphics::fg {
     DrawCullDirectionalDepthPass(const std::shared_ptr<BufferInstance>& camera_buffer,
                                  const std::shared_ptr<BufferInstance>& task_commands,
                                  const std::shared_ptr<BufferInstance>& draws,
-                                 const std::shared_ptr<BufferInstance>& command_count, IGpu* gpu,
+                                 const std::shared_ptr<BufferInstance>& command_count,
+        IGpu* gpu,
                                  std::function<int32()> draw_count_provider)
         : RenderPass("Draw Cull Directional Depth Pass"),
           resources_(std::move(
@@ -68,6 +69,12 @@ namespace gestalt::graphics::fg {
     void execute(const CommandBuffer cmd) override {
       const auto command_count = resources_.get_buffer_binding(1, 7).resource;
 
+      cmd.global_barrier();
+
+      cmd.fill_buffer(command_count->get_buffer_handle(), 0, command_count->get_size(), 0);
+
+      cmd.global_barrier();
+
       const int32 max_command_count = draw_count_provider_();
       const uint32 group_count
           = (static_cast<uint32>(max_command_count) + 63) / 64;  // 64 threads per group
@@ -88,16 +95,19 @@ namespace gestalt::graphics::fg {
 
   public:
     TaskSubmitDirectionalDepthPass(const std::shared_ptr<BufferInstance>& task_commands,
-                                   const std::shared_ptr<BufferInstance>& command_count, IGpu* gpu)
+                                   const std::shared_ptr<BufferInstance>& command_count, 
+                                   const std::shared_ptr<BufferInstance>& group_count, 
+        IGpu* gpu)
         : RenderPass("Task Submit Directional Depth Pass"),
           resources_(std::move(
               ResourceComponentBindings()
                   .add_binding(0, 5,task_commands, ResourceUsage::READ, 
                                VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
-                  .add_binding(0, 5,task_commands, ResourceUsage::WRITE, 
+                  .add_binding(0, 7,command_count, ResourceUsage::READ, 
                                VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
-                  .add_binding(0, 7,command_count, ResourceUsage::WRITE, 
-                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT))),
+                  .add_binding(0, 8,group_count, ResourceUsage::WRITE, 
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+          )),
           compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
                             resources_.get_buffer_bindings(), resources_.get_image_array_bindings(),
                             resources_.get_push_constant_range(),
@@ -111,6 +121,33 @@ namespace gestalt::graphics::fg {
     VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
 
     void execute(const CommandBuffer cmd) override {
+      const auto group_count = resources_.get_buffer_binding(0, 8).resource;
+      //cmd.fill_buffer(group_count->get_buffer_handle(), 0, group_count->get_size(), 0);
+
+      {
+        VkMemoryBarrier2 memoryBarrier = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+            .pNext = nullptr,
+            .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
+        };
+
+        VkDependencyInfo dependencyInfo = {
+            .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .pNext = nullptr,
+            .dependencyFlags = 0,
+            .memoryBarrierCount = 1,
+            .pMemoryBarriers = &memoryBarrier,
+            .bufferMemoryBarrierCount = 0,
+            .pBufferMemoryBarriers = nullptr,
+            .imageMemoryBarrierCount = 0,
+            .pImageMemoryBarriers = nullptr,
+        };
+        cmd.pipeline_barrier2(dependencyInfo);
+      }
+
       compute_pipeline_.bind(cmd);
       cmd.dispatch(1, 1, 1);
     }
@@ -139,7 +176,7 @@ namespace gestalt::graphics::fg {
                                 const std::shared_ptr<BufferInstance>& meshlet_indices,
                                 const std::shared_ptr<BufferInstance>& task_commands,
                                 const std::shared_ptr<BufferInstance>& draws,
-                                const std::shared_ptr<BufferInstance>& command_count,
+                                const std::shared_ptr<BufferInstance>& group_count,
                                 const std::shared_ptr<ImageInstance>& shadow_map, IGpu* gpu)
         : RenderPass("Meshlet Directional Depth Pass"),
           resources_(std::move(
@@ -174,8 +211,7 @@ namespace gestalt::graphics::fg {
                                VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
                   .add_binding(2, 6,draws, ResourceUsage::READ,  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
-                  .add_binding(2, 7, command_count, ResourceUsage::READ,  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                               VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
+                  .add_binding(2, 8, group_count, ResourceUsage::READ,  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_TASK_BIT_EXT)
                   .add_push_constant(sizeof(MeshletDepthPushConstants),
                                      VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT)
                   .add_attachment(shadow_map))),
@@ -213,8 +249,8 @@ namespace gestalt::graphics::fg {
       cmd.push_constants(graphics_pipeline_.get_pipeline_layout(),
                          VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT, 0,
                          sizeof(MeshletDepthPushConstants), &draw_cull_constants);
-      const auto command_count = resources_.get_buffer_binding(2, 7).resource;
-      cmd.draw_mesh_tasks_indirect_ext(command_count->get_buffer_handle(), sizeof(uint32), 1, 0);
+      const auto group_count = resources_.get_buffer_binding(2, 8).resource;
+      cmd.draw_mesh_tasks_indirect_ext(group_count->get_buffer_handle(), 0, 1, 0);
       cmd.end_rendering();
     }
   };
@@ -262,6 +298,10 @@ namespace gestalt::graphics::fg {
     void execute(const CommandBuffer cmd) override {
       const auto command_count = resources_.get_buffer_binding(1, 7).resource;
 
+      cmd.global_barrier();
+      cmd.fill_buffer(command_count->get_buffer_handle(), 0, command_count->get_size(), 0);
+      cmd.global_barrier();
+
       const int32 max_command_count = draw_count_provider_();
       const uint32 group_count
           = (static_cast<uint32>(max_command_count) + 63) / 64;  // 64 threads per group
@@ -282,16 +322,19 @@ namespace gestalt::graphics::fg {
 
   public:
     TaskSubmitPass(const std::shared_ptr<BufferInstance>& task_commands,
-                                   const std::shared_ptr<BufferInstance>& command_count, IGpu* gpu)
+                                   const std::shared_ptr<BufferInstance>& command_count,
+                                   const std::shared_ptr<BufferInstance>& group_count,
+        IGpu* gpu)
         : RenderPass("Task Submit Pass"),
           resources_(std::move(
               ResourceComponentBindings()
                   .add_binding(0, 5, task_commands, ResourceUsage::READ,
                                VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
-                  .add_binding(0, 5, task_commands, ResourceUsage::WRITE,
+                  .add_binding(0, 7, command_count, ResourceUsage::READ,
                                VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
-                  .add_binding(0, 7, command_count, ResourceUsage::WRITE,
-                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT))),
+                  .add_binding(0, 8, group_count, ResourceUsage::WRITE,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+          )),
           compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
                             resources_.get_buffer_bindings(), resources_.get_image_array_bindings(),
                             resources_.get_push_constant_range(),
@@ -305,6 +348,32 @@ namespace gestalt::graphics::fg {
     VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
 
     void execute(const CommandBuffer cmd) override {
+      const auto group_count = resources_.get_buffer_binding(0, 8).resource;
+      //cmd.fill_buffer(group_count->get_buffer_handle(), 0, group_count->get_size(), 0);
+
+      {
+        VkMemoryBarrier2 memoryBarrier = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+            .pNext = nullptr,
+            .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
+        };
+
+        VkDependencyInfo dependencyInfo = {
+            .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .pNext = nullptr,
+            .dependencyFlags = 0,
+            .memoryBarrierCount = 1,
+            .pMemoryBarriers = &memoryBarrier,
+            .bufferMemoryBarrierCount = 0,
+            .pBufferMemoryBarriers = nullptr,
+            .imageMemoryBarrierCount = 0,
+            .pImageMemoryBarriers = nullptr,
+        };
+        cmd.pipeline_barrier2(dependencyInfo);
+      }
       compute_pipeline_.bind(cmd);
       cmd.dispatch(1, 1, 1);
     }
@@ -331,7 +400,7 @@ namespace gestalt::graphics::fg {
                 const std::shared_ptr<BufferInstance>& meshlet_indices,
                 const std::shared_ptr<BufferInstance>& task_commands,
                 const std::shared_ptr<BufferInstance>& draws,
-                const std::shared_ptr<BufferInstance>& command_count,
+                const std::shared_ptr<BufferInstance>& group_count,
                 const std::shared_ptr<ImageInstance>& g_buffer_1,
                 const std::shared_ptr<ImageInstance>& g_buffer_2,
                 const std::shared_ptr<ImageInstance>& g_buffer_3,
@@ -367,9 +436,9 @@ namespace gestalt::graphics::fg {
                                VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
                   .add_binding(2, 6, draws, ResourceUsage::READ, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
-                  .add_binding(2, 7, command_count, ResourceUsage::READ,
+                  .add_binding(2, 8, group_count, ResourceUsage::READ,
                                VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                               VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT)
+                                VK_SHADER_STAGE_TASK_BIT_EXT)
                   .add_push_constant(sizeof(MeshletPushConstants),
                                      VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT)
                   .add_attachment(g_buffer_1, 0)
@@ -409,8 +478,8 @@ namespace gestalt::graphics::fg {
       cmd.push_constants(graphics_pipeline_.get_pipeline_layout(),
                          VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT, 0,
                          sizeof(MeshletPushConstants), &draw_cull_constants);
-      const auto command_count = resources_.get_buffer_binding(2, 7).resource;
-      cmd.draw_mesh_tasks_indirect_ext(command_count->get_buffer_handle(), sizeof(uint32), 1, 0);
+      const auto group_count = resources_.get_buffer_binding(2, 8).resource;
+      cmd.draw_mesh_tasks_indirect_ext(group_count->get_buffer_handle(), 0, 1, 0);
       cmd.end_rendering();
     }
   };

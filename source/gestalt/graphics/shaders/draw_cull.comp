@@ -15,7 +15,7 @@ layout(push_constant) uniform constants
 	int drawCount;
 } PushConstants;
 
-layout(set = 1, binding = 5) buffer TaskCommands
+layout(set = 1, binding = 5) writeonly buffer TaskCommands
 {
 	MeshTaskCommand taskCommands[];
 };
@@ -25,12 +25,12 @@ layout(set = 1, binding = 6) readonly buffer Draws
     MeshDraw draws[];
 };
 
-layout(set = 1, binding = 7) buffer CommandCount
+layout(set = 1, binding = 7) writeonly buffer CommandCount
 {
 	uint commandCount;
-	uint groupCountX;
-	uint groupCountY;
-	uint groupCountZ;
+	uint pad1;
+	uint pad2;
+	uint pad3;
 };
 
 void main()

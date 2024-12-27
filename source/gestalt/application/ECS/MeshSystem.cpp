@@ -305,7 +305,13 @@ namespace gestalt::application {
           "mesh_draw_buffer_instance", kMaxMeshDrawBufferSize,
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
               VMA_MEMORY_USAGE_CPU_TO_GPU));
-      mesh_buffers->draw_count_buffer_instance
+      mesh_buffers->command_count_buffer_instance
+          = resource_allocator_->create_buffer(BufferTemplate(
+          "draw_count_buffer_instance", kMaxDrawCountBufferSize,
+          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+              | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+          VMA_MEMORY_USAGE_GPU_ONLY));
+      mesh_buffers->group_count_buffer_instance
           = resource_allocator_->create_buffer(BufferTemplate(
           "draw_count_buffer_instance", kMaxDrawCountBufferSize,
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT

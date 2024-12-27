@@ -144,8 +144,10 @@ namespace gestalt::graphics {
           repository->mesh_buffers->meshlet_task_commands_buffer_instance);
       auto mesh_draw_buffer
           = frame_graph_->add_resource(repository->mesh_buffers->mesh_draw_buffer_instance);
-      auto draw_count_buffer
-          = frame_graph_->add_resource(repository->mesh_buffers->draw_count_buffer_instance);
+      auto command_count_buffer
+          = frame_graph_->add_resource(repository->mesh_buffers->command_count_buffer_instance);
+      auto group_count_buffer
+          = frame_graph_->add_resource(repository->mesh_buffers->group_count_buffer_instance);
 
       // Material
       auto material_buffer
@@ -170,30 +172,30 @@ namespace gestalt::graphics {
 
       // Shader Passes
       frame_graph_->add_pass<fg::DrawCullDirectionalDepthPass>(
-          camera_buffer, meshlet_task_commands_buffer, mesh_draw_buffer, draw_count_buffer, gpu_,
+          camera_buffer, meshlet_task_commands_buffer, mesh_draw_buffer, command_count_buffer, gpu_,
           [&]() { return static_cast<int32>(repository_->mesh_draws.size()); });
 
-     frame_graph_->add_pass<fg::TaskSubmitDirectionalDepthPass>(meshlet_task_commands_buffer,  draw_count_buffer, gpu_);
+     frame_graph_->add_pass<fg::TaskSubmitDirectionalDepthPass>(meshlet_task_commands_buffer,  command_count_buffer, group_count_buffer, gpu_);
 
 
       frame_graph_->add_pass<fg::MeshletDirectionalDepthPass>(
           camera_buffer, light_matrices, directional_light, point_light, vertex_position_buffer,
           vertex_data_buffer, meshlet_buffer, meshlet_vertices, meshlet_triangles,
-          meshlet_task_commands_buffer, mesh_draw_buffer, draw_count_buffer, shadow_map, gpu_);
+          meshlet_task_commands_buffer, mesh_draw_buffer, group_count_buffer, shadow_map, gpu_);
 
       // mesh shading
       frame_graph_->add_pass<fg::DrawCullPass>(
-          camera_buffer, meshlet_task_commands_buffer, mesh_draw_buffer, draw_count_buffer, gpu_,
+          camera_buffer, meshlet_task_commands_buffer, mesh_draw_buffer, command_count_buffer, gpu_,
           [&] { return static_cast<int32>(repository_->mesh_draws.size()); });
 
-      frame_graph_->add_pass<fg::TaskSubmitPass>(meshlet_task_commands_buffer, draw_count_buffer,
+      frame_graph_->add_pass<fg::TaskSubmitPass>(meshlet_task_commands_buffer, command_count_buffer, group_count_buffer,
                                                  gpu_);
 
       frame_graph_->add_pass<fg::MeshletPass>(
           camera_buffer, material_buffer, material_textures, vertex_position_buffer,
           vertex_data_buffer,
           meshlet_buffer, meshlet_vertices, meshlet_triangles, meshlet_task_commands_buffer,
-          mesh_draw_buffer, draw_count_buffer, g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth,
+          mesh_draw_buffer, group_count_buffer, g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth,
           gpu_);
 
       frame_graph_->add_pass<fg::SsaoPass>(
