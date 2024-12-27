@@ -247,6 +247,8 @@ namespace gestalt::graphics {
                                              g_buffer_depth,  post_process_sampler,gpu_,
                                              [&] { return resource_registry_->config_.skybox; });
 
+      frame_graph_->add_pass<fg::ToneMapPass>(scene_final, scene_lit, scene_skybox, post_process_sampler, gpu_,
+                                              [&] { return resource_registry_->config_.hdr; });
 
       /*
       frame_graph_->add_pass<fg::ToneMapPass>(scene_final, scene_lit, gpu_);
