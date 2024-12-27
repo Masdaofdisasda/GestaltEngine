@@ -21,6 +21,8 @@ namespace gestalt::graphics::fg {
     [[nodiscard]] std::string_view get_name() const { return name_; }
     virtual std::vector<ResourceBinding<ResourceInstance>> get_resources(ResourceUsage usage) = 0;
     virtual VkPipelineBindPoint get_bind_point() = 0;
+    virtual std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers()
+        = 0; 
     virtual void execute(CommandBuffer cmd) = 0;
     virtual ~RenderPass() = default;
   };
@@ -62,6 +64,10 @@ namespace gestalt::graphics::fg {
     std::vector<ResourceBinding<ResourceInstance>> get_resources(
         const ResourceUsage usage) override {
       return resources_.get_resources(usage);
+    }
+
+    std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
+      return compute_pipeline_.get_descriptor_buffers();
     }
 
     VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point();}
@@ -118,35 +124,14 @@ namespace gestalt::graphics::fg {
       return resources_.get_resources(usage);
     }
 
+    std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
+      return compute_pipeline_.get_descriptor_buffers();
+    }
+
     VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
 
     void execute(const CommandBuffer cmd) override {
       const auto group_count = resources_.get_buffer_binding(0, 8).resource;
-      //cmd.fill_buffer(group_count->get_buffer_handle(), 0, group_count->get_size(), 0);
-
-      {
-        VkMemoryBarrier2 memoryBarrier = {
-            .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
-            .pNext = nullptr,
-            .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-            .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
-            .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-            .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
-        };
-
-        VkDependencyInfo dependencyInfo = {
-            .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-            .pNext = nullptr,
-            .dependencyFlags = 0,
-            .memoryBarrierCount = 1,
-            .pMemoryBarriers = &memoryBarrier,
-            .bufferMemoryBarrierCount = 0,
-            .pBufferMemoryBarriers = nullptr,
-            .imageMemoryBarrierCount = 0,
-            .pImageMemoryBarriers = nullptr,
-        };
-        cmd.pipeline_barrier2(dependencyInfo);
-      }
 
       compute_pipeline_.bind(cmd);
       cmd.dispatch(1, 1, 1);
@@ -236,6 +221,10 @@ namespace gestalt::graphics::fg {
       return resources_.get_resources(usage);
     }
 
+    std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
+      return graphics_pipeline_.get_descriptor_buffers();
+    }
+
     VkPipelineBindPoint get_bind_point() override { return graphics_pipeline_.get_bind_point(); }
 
     void execute(const CommandBuffer cmd) override {
@@ -293,6 +282,10 @@ namespace gestalt::graphics::fg {
       return resources_.get_resources(usage);
     }
 
+    std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
+      return compute_pipeline_.get_descriptor_buffers();
+    }
+
     VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
 
     void execute(const CommandBuffer cmd) override {
@@ -345,35 +338,15 @@ namespace gestalt::graphics::fg {
       return resources_.get_resources(usage);
     }
 
+    
+    std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
+      return compute_pipeline_.get_descriptor_buffers();
+    }
     VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
 
     void execute(const CommandBuffer cmd) override {
       const auto group_count = resources_.get_buffer_binding(0, 8).resource;
-      //cmd.fill_buffer(group_count->get_buffer_handle(), 0, group_count->get_size(), 0);
-
-      {
-        VkMemoryBarrier2 memoryBarrier = {
-            .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
-            .pNext = nullptr,
-            .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-            .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
-            .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-            .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
-        };
-
-        VkDependencyInfo dependencyInfo = {
-            .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-            .pNext = nullptr,
-            .dependencyFlags = 0,
-            .memoryBarrierCount = 1,
-            .pMemoryBarriers = &memoryBarrier,
-            .bufferMemoryBarrierCount = 0,
-            .pBufferMemoryBarriers = nullptr,
-            .imageMemoryBarrierCount = 0,
-            .pImageMemoryBarriers = nullptr,
-        };
-        cmd.pipeline_barrier2(dependencyInfo);
-      }
+      
       compute_pipeline_.bind(cmd);
       cmd.dispatch(1, 1, 1);
     }
@@ -465,6 +438,10 @@ namespace gestalt::graphics::fg {
       return resources_.get_resources(usage);
     }
 
+    std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
+      return graphics_pipeline_.get_descriptor_buffers();
+    }
+
     VkPipelineBindPoint get_bind_point() override { return graphics_pipeline_.get_bind_point(); }
 
     void execute(const CommandBuffer cmd) override {
@@ -524,6 +501,10 @@ namespace gestalt::graphics::fg {
     std::vector<ResourceBinding<ResourceInstance>> get_resources(
         const ResourceUsage usage) override {
       return resources_.get_resources(usage);
+    }
+
+    std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
+      return compute_pipeline_.get_descriptor_buffers();
     }
 
     VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
@@ -605,6 +586,10 @@ namespace gestalt::graphics::fg {
         const ResourceUsage usage) override {
       return resources_.get_resources(usage);
     }
+
+   std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
+     return compute_pipeline_.get_descriptor_buffers();
+   }
 
     VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
 
@@ -721,6 +706,10 @@ namespace gestalt::graphics::fg {
       return resources_.get_resources(usage);
     }
 
+    std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
+      return compute_pipeline_.get_descriptor_buffers();
+    }
+
     VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
 
     void execute(const CommandBuffer cmd) override {
@@ -784,6 +773,10 @@ namespace gestalt::graphics::fg {
     std::vector<ResourceBinding<ResourceInstance>> get_resources(
         const ResourceUsage usage) override {
       return resources_.get_resources(usage);
+    }
+
+    std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
+      return compute_pipeline_.get_descriptor_buffers();
     }
 
     VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
@@ -850,6 +843,10 @@ namespace gestalt::graphics::fg {
       return resources_.get_resources(usage);
     }
 
+    std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
+      return compute_pipeline_.get_descriptor_buffers();
+    }
+
     VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
 
     void execute(const CommandBuffer cmd) override {
@@ -897,6 +894,10 @@ namespace gestalt::graphics::fg {
     std::vector<ResourceBinding<ResourceInstance>> get_resources(
         const ResourceUsage usage) override {
       return resources_.get_resources(usage);
+    }
+
+    std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
+      return compute_pipeline_.get_descriptor_buffers();
     }
 
     VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
@@ -986,6 +987,10 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
       return resources_.get_resources(usage);
     }
 
+    std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
+      return compute_pipeline_.get_descriptor_buffers();
+    }
+
     VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
 
     void execute(CommandBuffer cmd) override {
@@ -1053,6 +1058,10 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
       return resources_.get_resources(usage);
     }
 
+    std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
+      return graphics_pipeline_.get_descriptor_buffers();
+    }
+
     VkPipelineBindPoint get_bind_point() override { return graphics_pipeline_.get_bind_point(); }
 
     void execute(const CommandBuffer cmd) override {
@@ -1099,6 +1108,10 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
 
     std::vector<ResourceBinding<ResourceInstance>> get_resources(ResourceUsage usage) override {
       return resources_.get_resources(usage);
+    }
+
+    std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
+      return compute_pipeline_.get_descriptor_buffers();
     }
 
     VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }

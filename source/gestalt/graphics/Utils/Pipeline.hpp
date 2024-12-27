@@ -247,24 +247,26 @@ namespace gestalt::graphics::fg {
 
     void bind_descriptors(const CommandBuffer cmd,
                           const VkPipelineBindPoint bind_point) {
-      std::vector<VkDescriptorBufferBindingInfoEXT> buffer_bindings;
-      buffer_bindings.reserve(descriptor_buffers_.size());
 
-      for (const auto& descriptor_buffer : descriptor_buffers_ | std::views::values) {
-        buffer_bindings.push_back({.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_BUFFER_BINDING_INFO_EXT,
-                                  .address = descriptor_buffer->get_address(),
-                                  .usage = descriptor_buffer->get_usage()});
-      }
-      //TODO bind them once at the start of the frame
-      vkCmdBindDescriptorBuffersEXT(cmd.get(), buffer_bindings.size(), buffer_bindings.data());
+        std::vector<VkDescriptorBufferBindingInfoEXT> buffer_bindings;
+        buffer_bindings.reserve(descriptor_buffers_.size());
+
+        for (const auto& descriptor_buffer : descriptor_buffers_ | std::views::values) {
+          buffer_bindings.push_back({.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_BUFFER_BINDING_INFO_EXT,
+                                     .address = descriptor_buffer->get_address(),
+                                     .usage = descriptor_buffer->get_usage()});
+        }
+        // TODO bind them once at the start of the frame
+        cmd.bind_descriptor_buffers_ext(buffer_bindings.size(), buffer_bindings.data());
 
       for (const auto& [set_index, descriptor_buffer] : descriptor_buffers_) {
         descriptor_buffer->bind_descriptors(cmd.get(), bind_point, pipeline_layout_, set_index);
       }
     }
  
-    VkPipelineLayout get_pipeline_layout() const { return pipeline_layout_; }
-    VkPipeline get_pipeline() const { return pipeline_; }
+    [[nodiscard]] VkPipelineLayout get_pipeline_layout() const { return pipeline_layout_; }
+    [[nodiscard]] VkPipeline get_pipeline() const { return pipeline_; }
+    [[nodiscard]] auto get_descriptor_buffers() const { return descriptor_buffers_; }
   };
 
     class GraphicsPipelineBuilder {
@@ -623,6 +625,10 @@ namespace gestalt::graphics::fg {
 
     [[nodiscard]] VkPipelineBindPoint get_bind_point() const { return bind_point_; }
 
+            [[nodiscard]] auto get_descriptor_buffers() const {
+      return pipeline_tool_.get_descriptor_buffers();
+    }
+
   };
 
   class ComputePipeline : Moveable<ComputePipeline> {
@@ -663,5 +669,9 @@ namespace gestalt::graphics::fg {
     [[nodiscard]] VkPipeline get_pipeline() const { return pipeline_tool_.get_pipeline(); }
 
     [[nodiscard]] VkPipelineBindPoint get_bind_point() const { return bind_point_; }
+
+    [[nodiscard]] auto get_descriptor_buffers() const {
+      return pipeline_tool_.get_descriptor_buffers();
+    }
   };
 } // namespace gestalt

@@ -100,12 +100,25 @@ namespace gestalt::graphics::fg {
 
     print_graph();
     topological_sort();
+
+    for (const auto& node : sorted_nodes_) {
+      for (const auto& [set, descriptor_buffer] : node->render_pass->get_descriptor_buffers()) {
+        descriptor_buffer_bindings_.push_back(
+            {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_BUFFER_BINDING_INFO_EXT,
+             .address = descriptor_buffer->get_address(),
+             .usage = descriptor_buffer->get_usage()});
+      }
+    }
   }
 
   void FrameGraph::execute(const CommandBuffer cmd) const {
+
+    // TODO bind one global descriptor buffer
+    //cmd.bind_descriptor_buffers_ext(static_cast<uint32>(descriptor_buffer_bindings_.size()), descriptor_buffer_bindings_.data());
+
     for (const auto& node : sorted_nodes_) {
       const auto name = std::string(node->render_pass->get_name());
-      //fmt::println("executing: {}", name);
+       //fmt::println("executing: {}", name);
       synchronization_manager_->synchronize_resources(node, cmd);
 
       VkDebugUtilsLabelEXT label_info = {

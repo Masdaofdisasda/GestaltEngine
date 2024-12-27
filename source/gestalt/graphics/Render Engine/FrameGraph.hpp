@@ -352,6 +352,8 @@ namespace gestalt::graphics::fg {
 
     std::vector<std::shared_ptr<FrameGraphNode>> sorted_nodes_;
 
+    std::vector<VkDescriptorBufferBindingInfoEXT> descriptor_buffer_bindings_;
+
     std::unique_ptr<SynchronizationManager> synchronization_manager_;
     std::unique_ptr<ResourceRegistry> resource_registry_;
 

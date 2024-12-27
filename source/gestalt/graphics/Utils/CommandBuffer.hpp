@@ -65,6 +65,11 @@ namespace gestalt::graphics {
       pipeline_barrier2(dependencyInfo);
     }
 
+    void bind_descriptor_buffers_ext(const uint32_t buffer_count,
+                                     const VkDescriptorBufferBindingInfoEXT* binding_infos) const {
+      vkCmdBindDescriptorBuffersEXT(cmd, buffer_count, binding_infos);
+    }
+
     void fill_buffer(const VkBuffer buffer, const VkDeviceSize offset, const VkDeviceSize size,
                      const uint32 data) const {
       vkCmdFillBuffer(cmd, buffer, offset, size, data);
