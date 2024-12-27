@@ -61,6 +61,11 @@ namespace gestalt::graphics {
       vkCmdDrawMeshTasksIndirectEXT(cmd, buffer, offset, draw_count, stride);
     }
 
+    void draw(const uint32 vertex_count, const uint32 instance_count, const uint32 first_vertex,
+              const uint32 first_instance) const {
+      vkCmdDraw(cmd, vertex_count, instance_count, first_vertex, first_instance);
+    }
+
     void dispatch(const uint32 group_count_x, const uint32 group_count_y,
                   const uint32 group_count_z) const {
       vkCmdDispatch(cmd, group_count_x, group_count_y, group_count_z);

@@ -98,6 +98,7 @@ void main() {
 		MeR = texture(nonuniformEXT(textures[metalicRoughIndex]), UV);
 	}
 	
+	Kd.rgb = vec3(1.0, 0.0, 0.0);
 	gBuffer1 = vec4(Kd.rgb, MeR.b); // Albedo + Metalness
     gBuffer2 = vec4(SignedOctEncode(n), MeR.g); // Normal + Roughness
     gBuffer3 = vec4(Ke.rgb, Kao); // Emissive + Occlusion

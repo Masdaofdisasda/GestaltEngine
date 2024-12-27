@@ -5,6 +5,8 @@
 #include <RenderConfig.hpp>
 #include <PerFrameData.hpp>
 
+#include "RenderConfig.hpp"
+
 
 namespace gestalt::graphics::fg {
 	
@@ -840,6 +842,10 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
   class LightingPass final : public RenderPass {
     ResourceComponent resources_;
     ComputePipeline compute_pipeline_;
+    const std::function<RenderConfig::LightingParams()> push_constant_provider_;
+    std::function<PerFrameData()> camera_provider_;
+    std::function<uint32()> dir_light_count_provider_;
+    std::function<uint32()> point_light_count_provider_;
 
   public:
     LightingPass(const std::shared_ptr<BufferInstance>& camera_buffer,
@@ -855,50 +861,57 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
                  const std::shared_ptr<ImageInstance>& integrated_light_scattering,
                  const std::shared_ptr<ImageInstance>& ambient_occlusion,
                  const std::shared_ptr<ImageInstance>& scene_lit,
-                 const VkSampler post_process_sampler, IGpu* gpu)
-        : RenderPass("Lighting Pass"),
-          resources_(std::move(
+                 const VkSampler post_process_sampler, IGpu* gpu, const std::function<RenderConfig::LightingParams()>& push_constant_provider,
+                 const std::function<PerFrameData()>& camera_provider,
+                 const std::function<uint32()>& dir_light_count_provider,
+                 const std::function<uint32()>& point_light_count_provider
+    )
+        : RenderPass("Lighting Pass"), resources_(std::move(
               ResourceComponentBindings()
-                  .add_binding(0, 0, camera_buffer, ResourceUsage::READ,
-                               VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+              .add_binding(0, 0, camera_buffer, ResourceUsage::READ,
+                           VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
 
-                  // TODO add textures
-                  .add_binding(1, 4, material_buffer, ResourceUsage::READ,
-                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+              // TODO add textures
+              .add_binding(1, 4, material_buffer, ResourceUsage::READ,
+                           VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
 
-                  .add_binding(2, 0, light_matrices, ResourceUsage::READ,
-                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
-                  .add_binding(2, 1, directional_light, ResourceUsage::READ,
-                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
-                  .add_binding(2, 2, point_light, ResourceUsage::READ,
-                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+              .add_binding(2, 0, light_matrices, ResourceUsage::READ,
+                           VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+              .add_binding(2, 1, directional_light, ResourceUsage::READ,
+                           VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+              .add_binding(2, 2, point_light, ResourceUsage::READ,
+                           VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
 
-                  .add_binding(3, 0, g_buffer_1, post_process_sampler, ResourceUsage::READ,
+              .add_binding(3, 0, g_buffer_1, post_process_sampler, ResourceUsage::READ,
+                           VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                           VK_SHADER_STAGE_COMPUTE_BIT)
+              .add_binding(3, 1, g_buffer_2, post_process_sampler, ResourceUsage::READ,
+                           VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                           VK_SHADER_STAGE_COMPUTE_BIT)
+              .add_binding(3, 2, g_buffer_3, post_process_sampler, ResourceUsage::READ,
+                           VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                           VK_SHADER_STAGE_COMPUTE_BIT)
+              .add_binding(3, 3, g_buffer_depth, post_process_sampler, ResourceUsage::READ,
+                           VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                           VK_SHADER_STAGE_COMPUTE_BIT)
+              .add_binding(3, 4, shadow_map, post_process_sampler, ResourceUsage::READ,
+                           VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                           VK_SHADER_STAGE_COMPUTE_BIT)
+              .add_binding(3, 5, integrated_light_scattering, post_process_sampler,
+                               ResourceUsage::READ, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                           VK_SHADER_STAGE_COMPUTE_BIT)
+              .add_binding(3, 6, ambient_occlusion, post_process_sampler, ResourceUsage::READ,
                                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                VK_SHADER_STAGE_COMPUTE_BIT)
-                  .add_binding(3, 1, g_buffer_2, post_process_sampler, ResourceUsage::READ,
-                               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                               VK_SHADER_STAGE_COMPUTE_BIT)
-                  .add_binding(3, 2, g_buffer_3, post_process_sampler, ResourceUsage::READ,
-                               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                               VK_SHADER_STAGE_COMPUTE_BIT)
-                  .add_binding(3, 3, g_buffer_depth, post_process_sampler, ResourceUsage::READ,
-                               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                               VK_SHADER_STAGE_COMPUTE_BIT)
-                  .add_binding(3, 4, shadow_map, post_process_sampler, ResourceUsage::READ,
-                               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                               VK_SHADER_STAGE_COMPUTE_BIT)
-                  .add_binding(3, 5, integrated_light_scattering, post_process_sampler,
-                               ResourceUsage::READ, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-                               VK_SHADER_STAGE_COMPUTE_BIT)
-                  .add_binding(3, 6, ambient_occlusion, post_process_sampler, ResourceUsage::READ,
-                               VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT)
-                  .add_binding(3, 7, scene_lit, nullptr, ResourceUsage::WRITE,
-                               VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT))),
+              .add_binding(3, 7, scene_lit, nullptr, ResourceUsage::WRITE,
+                           VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT)
+              .add_push_constant(sizeof(RenderConfig::LightingParams),
+                                 VK_SHADER_STAGE_COMPUTE_BIT))),
           compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
                             resources_.get_buffer_bindings(), resources_.get_image_array_bindings(),
                             resources_.get_push_constant_range(),
-                            "pbr_lighting.comp.spv") {}
+                            "pbr_lighting.comp.spv"),
+          push_constant_provider_(push_constant_provider), camera_provider_(camera_provider), dir_light_count_provider_(dir_light_count_provider), point_light_count_provider_(point_light_count_provider) {}
 
     std::vector<ResourceBinding<ResourceInstance>> get_resources(ResourceUsage usage) override {
       return resources_.get_resources(usage);
@@ -907,7 +920,84 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
     VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
 
     void execute(CommandBuffer cmd) override {
-      // draw
+      compute_pipeline_.bind(cmd);
+
+              auto params = push_constant_provider_();
+      params.invViewProj = camera_provider_().inv_viewProj;
+              params.num_dir_lights = dir_light_count_provider_();
+      params.num_point_lights = point_light_count_provider_();
+              cmd.push_constants(compute_pipeline_.get_pipeline_layout(),
+                                 VK_SHADER_STAGE_COMPUTE_BIT, 0,
+                                 sizeof(RenderConfig::LightingParams), &params);
+
+      const auto [width, height, _] = resources_.get_image_binding(3, 7).resource->get_extent();
+      cmd.dispatch(static_cast<uint32>(ceil(width / 8)), static_cast<uint32>(ceil(height / 8)), 1);
+    }
+  };
+
+  
+  class SkyboxPass final : public RenderPass {
+    ResourceComponent resources_;
+    GraphicsPipeline graphics_pipeline_;
+    std::function<RenderConfig::SkyboxParams()> push_constant_provider_;
+
+  public:
+    SkyboxPass(const std::shared_ptr<BufferInstance>& camera_buffer,
+               const std::shared_ptr<BufferInstance>& directional_light,
+               const std::shared_ptr<ImageInstance>& scene_lit,
+               const std::shared_ptr<ImageInstance>& scene_skybox,
+                const std::shared_ptr<ImageInstance>& g_buffer_depth, 
+        const VkSampler post_process_sampler,
+        IGpu* gpu, const std::function<RenderConfig::SkyboxParams()>& push_constant_provider
+    )
+        : RenderPass("Skybox Pass"),
+          resources_(std::move(
+              ResourceComponentBindings()
+                  .add_binding(0, 0, camera_buffer, ResourceUsage::READ,
+                               VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                               VK_SHADER_STAGE_VERTEX_BIT
+                                   | VK_SHADER_STAGE_FRAGMENT_BIT)
+                  .add_binding(1, 1, directional_light, ResourceUsage::READ,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
+                  .add_binding(2, 0, scene_lit, post_process_sampler, ResourceUsage::READ,
+                               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+                  .add_push_constant(sizeof(RenderConfig::SkyboxParams),
+                                     VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
+                  .add_attachment(scene_skybox)
+                  .add_attachment(g_buffer_depth))),
+          graphics_pipeline_(
+              gpu, get_name(), resources_.get_image_bindings(), resources_.get_buffer_bindings(),
+              resources_.get_image_array_bindings(), resources_.get_push_constant_range(),
+              "skybox.vert.spv", "skybox.frag.spv",
+              GraphicsPipelineBuilder()
+                  .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+                  .set_polygon_mode(VK_POLYGON_MODE_FILL)
+                  .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
+                  .set_multisampling_none()
+                  .disable_blending()
+                  .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
+                  .set_depth_format(resources_.get_depth_attachment()->get_format())
+                  .build_pipeline_info()), push_constant_provider_(push_constant_provider) {}
+
+    std::vector<ResourceBinding<ResourceInstance>> get_resources(
+        const ResourceUsage usage) override {
+      return resources_.get_resources(usage);
+    }
+
+    VkPipelineBindPoint get_bind_point() override { return graphics_pipeline_.get_bind_point(); }
+
+    void execute(const CommandBuffer cmd) override {
+      graphics_pipeline_.begin_render_pass(cmd, resources_.get_color_attachments(),
+                                           resources_.get_depth_attachment());
+      graphics_pipeline_.bind(cmd);
+
+      auto push_constant = push_constant_provider_();
+      cmd.push_constants(graphics_pipeline_.get_pipeline_layout(),
+                         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                         sizeof(RenderConfig::SkyboxParams), &push_constant);
+
+      cmd.draw(36, 1, 0, 0);
+      cmd.end_rendering();
     }
   };
 

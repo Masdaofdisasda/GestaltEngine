@@ -9,7 +9,30 @@ layout(local_size_x = 16, local_size_y = 16) in;
 // set 0
 #include "per_frame_structs.glsl"
 // set 1
-#include "input_structures.glsl"
+//layout(set = 1, binding = 0) uniform samplerCube texEnvMap;
+//layout(set = 1, binding = 1) uniform samplerCube texEnvMapIrradiance;
+//layout(set = 1, binding = 2) uniform sampler2D texBdrfLut;
+
+struct MaterialConstants {
+    uint16_t albedo_tex_index;
+    uint16_t metal_rough_tex_index;
+    uint16_t normal_tex_index;
+    uint16_t emissive_tex_index;
+    uint16_t occlusion_tex_index;
+    uint textureFlags;
+
+    vec4 albedo_factor;
+    vec2 metal_rough_factor;
+    float occlusionStrength;
+    float alpha_cutoff;
+    vec3 emissiveColor;
+    float emissiveStrength; 
+};
+
+layout(std430, set = 1, binding = 4) readonly buffer MaterialData {
+    MaterialConstants materialData[256];
+};
+
 #include "pbr.glsl"
 #include "shadow_mapping.glsl"
 #include "volumetric_light_util.glsl"
@@ -55,7 +78,7 @@ layout(set = 3, binding = 3) uniform sampler2D depthBuffer;
 layout(set = 3, binding = 4) uniform sampler2D shadowMap;
 layout(set = 3, binding = 5) uniform sampler3D integrated_light_scattering_texture;
 layout(set = 3, binding = 6) uniform sampler2D texAo;
-layout(set = 3, binding = 7) writeonly uniform image2D outputImage;
+layout(set = 3, binding = 7, rgba16f) writeonly uniform image2D outputImage;
 
 layout( push_constant ) uniform constants
 {	
@@ -102,14 +125,18 @@ const mat4 biasMat = mat4(
 
 void main() {
 
+
+	ivec2 texSize = imageSize(outputImage);
 	ivec2 pixel_coord = ivec2(gl_GlobalInvocationID.xy);
+	if (gl_GlobalInvocationID.x >= texSize.x || gl_GlobalInvocationID.y >= texSize.y) {
+		return;
+	}
+    vec2 uv = vec2(pixel_coord) / texSize;
 
-    vec2 UV = vec2(pixel_coord) / vec2(textureSize(gbuffer1, 0));
-
-	vec4 albedoMetal = texture(gbuffer1, UV);
-	vec4 normalRough = texture(gbuffer2, UV);
-	vec4 emissiveOcclusion  = texture(gbuffer3, UV);
-	float ssao = texture(texAo, UV).r;
+	vec4 albedoMetal = texture(gbuffer1, uv);
+	vec4 normalRough = texture(gbuffer2, uv);
+	vec4 emissiveOcclusion  = texture(gbuffer3, uv);
+	float ssao = texture(texAo, uv).r;
 
 	vec4 Kd = vec4(albedoMetal.rgb, 1.0);
 
@@ -122,7 +149,6 @@ void main() {
 					albedoMetal.a,
 					1.0);
 
-	vec2 uv = UV;
     float depth = texture(depthBuffer, uv).r;
     vec3 worldPos = ReconstructWorldPos(depth, uv, params.invViewProj);
 	vec3 viewPos = -normalize(vec3(view[0][2], view[1][2], view[2][2]));
@@ -143,6 +169,7 @@ void main() {
 	calculatePBRInputsMetallicRoughness(Kd, n, viewPos.xyz, worldPos, MeR, materialInfo);
 
 	// Calculate lighting contribution from image based lighting source (IBL)
+	/*
 	if (params.ibl_mode == 0) {
 		materialInfo.f_diffuse_ibl += getIBLRadianceLambertian(materialInfo, texBdrfLut, texEnvMapIrradiance);
 		materialInfo.f_specular_ibl += getIBLRadianceGGX(materialInfo, texBdrfLut, texEnvMap);
@@ -150,7 +177,7 @@ void main() {
 		materialInfo.f_diffuse_ibl += getIBLRadianceLambertian(materialInfo, texBdrfLut, texEnvMapIrradiance);
 	} else if (params.ibl_mode == 2) {
 		materialInfo.f_specular_ibl += getIBLRadianceGGX(materialInfo, texBdrfLut, texEnvMap);
-	}
+	}*/
 
 	// directional light contribution
 	if (params.shading_mode == 0 || params.shading_mode == 1) {
@@ -228,7 +255,7 @@ void main() {
 
 	vec3 color = materialInfo.f_emissive + diffuse + specular;
 
-	vec2 uv_inv = vec2(UV.x, 1.0 - UV.y); // TODO : fog volume is somehow flipped
+	vec2 uv_inv = vec2(uv.x, 1.0 - uv.y); // TODO : fog volume is somehow flipped
 	color = apply_volumetric_fog( uv_inv, depth, color, znear, zfar, integrated_light_scattering_texture );
 
 	vec4 outColor = vec4(color, 1.0);
@@ -259,6 +286,7 @@ void main() {
 		outColor = vec4(normalize(normalizedLightSpacePos) * 0.5 + 0.5, 1.0);
 	}
 
+	outColor = vec4(ao.rrr * 0.5 * Kd.rgb * max(shadow, 0.1), 1.0);
 	imageStore(outputImage, pixel_coord, outColor);
 
 }

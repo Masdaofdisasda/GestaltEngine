@@ -61,6 +61,7 @@ namespace gestalt::graphics {
               .set_image_type(TextureType::kDepth, VK_FORMAT_D32_SFLOAT)
               .build());
       auto scene_lit = frame_graph_->add_resource(ImageTemplate("Scene Lit"));
+      auto scene_skybox = frame_graph_->add_resource(ImageTemplate("Scene Skybox"));
       auto scene_final = frame_graph_->add_resource(ImageTemplate("Scene Final"));
       auto rotation_texture = frame_graph_->add_resource(
           ImageTemplate("Rotation Pattern Texture")
@@ -235,7 +236,16 @@ namespace gestalt::graphics {
       frame_graph_->add_pass<fg::LightingPass>(
           camera_buffer, material_buffer, light_matrices, directional_light, point_light,
           g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth, shadow_map,
-          integrated_light_scattering, ambient_occlusion_texture, scene_lit, post_process_sampler, gpu_);
+          integrated_light_scattering, ambient_occlusion_texture, scene_lit, post_process_sampler, gpu_, [&] { return resource_registry_->config_.lighting; },
+          [&] {
+            return repository_->per_frame_data_buffers->data.at(frame_->get_current_frame_index());
+          },
+          [&] { return repository_->directional_lights.size(); },
+          [&] { return repository_->point_lights.size(); });
+
+      frame_graph_->add_pass<fg::SkyboxPass>(camera_buffer, directional_light, scene_lit, scene_skybox,
+                                             g_buffer_depth,  post_process_sampler,gpu_,
+                                             [&] { return resource_registry_->config_.skybox; });
 
 
       /*
