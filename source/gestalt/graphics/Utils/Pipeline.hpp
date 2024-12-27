@@ -250,7 +250,6 @@ namespace gestalt::graphics::fg {
 
         std::vector<VkDescriptorBufferBindingInfoEXT> buffer_bindings;
         buffer_bindings.reserve(descriptor_buffers_.size());
-
         for (const auto& descriptor_buffer : descriptor_buffers_ | std::views::values) {
           buffer_bindings.push_back({.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_BUFFER_BINDING_INFO_EXT,
                                      .address = descriptor_buffer->get_address(),

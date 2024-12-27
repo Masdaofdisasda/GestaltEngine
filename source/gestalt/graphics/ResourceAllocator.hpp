@@ -75,6 +75,25 @@ namespace gestalt::graphics {
     ~ImageData() = default;
   };
 
+  struct HdrImageData {
+    std::vector<float> data;
+    ImageInfo image_info;
+
+    explicit HdrImageData(const std::filesystem::path& path);
+
+    [[nodiscard]] VkExtent3D get_extent() const { return image_info.get_extent(); }
+
+    [[nodiscard]] VkFormat get_format() const { return VK_FORMAT_R32G32B32A32_SFLOAT; }
+    [[nodiscard]] VkDeviceSize get_image_size() const {
+      return static_cast<uint32>(image_info.width) * static_cast<uint32>(image_info.height) * 4
+             * sizeof(float);
+    }
+
+    [[nodiscard]] const float* get_data() const { return data.data(); }
+
+    [[nodiscard]] int get_channels() const { return 4; }
+  };
+
   class TaskQueue {
     IGpu* gpu_ = nullptr;
     VkCommandBuffer cmd;
@@ -109,6 +128,7 @@ namespace gestalt::graphics {
       return staging_buffer;
     }
 
+    void load_cubemap(const HdrImageData& image_data, VkImage image);
     void load_image(const ImageData& image_data, VkImage image);
 
   public:
@@ -133,7 +153,7 @@ namespace gestalt::graphics {
       VK_CHECK(vkCreateFence(gpu_->getDevice(), &fenceInfo, nullptr, &flushFence));
     }
 
-    void add_image(const std::filesystem::path& path, VkImage image);
+    void add_image(const std::filesystem::path& path, VkImage image, bool is_cubemap = false);
     void add_image(std::vector<unsigned char>& data, VkImage image, VkExtent3D extent);
 
     void enqueue(const std::function<void()>& task) {
@@ -192,7 +212,7 @@ namespace gestalt::graphics {
 
       [[nodiscard]] AllocatedImage allocate_image(std::string_view name, VkFormat format,
                                                   VkImageUsageFlags usage_flags, VkExtent3D extent,
-                                                  VkImageAspectFlags aspect_flags) const;
+                                                VkImageAspectFlags aspect_flags, ImageType image_type) const;
       [[nodiscard]] AllocatedBuffer allocate_buffer(std::string_view name, VkDeviceSize size,
                                                     VkBufferUsageFlags usage_flags,
                                                     VmaMemoryUsage memory_usage) const;
@@ -200,6 +220,7 @@ namespace gestalt::graphics {
     public:
       explicit ResourceAllocator(IGpu* gpu) : gpu_(gpu), task_queue_(gpu) {}
 
+      AllocatedImage load_and_create_cubemap(const std::filesystem::path& file_path);
       std::shared_ptr<ImageInstance> create_image(ImageTemplate&& image_template) override;
 
     std::shared_ptr<BufferInstance> create_buffer(
