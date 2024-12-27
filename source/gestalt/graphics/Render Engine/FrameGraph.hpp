@@ -67,66 +67,116 @@ namespace gestalt::graphics::fg {
       std::vector<VkImageMemoryBarrier2> image_barriers;
       std::vector<VkBufferMemoryBarrier2> buffer_barriers;
 
+      static VkPipelineStageFlags2 get_dst_stage_mask(const VkShaderStageFlags shader_stage) {
+        VkPipelineStageFlags2 dst_stage_mask = 0;
+
+        if (shader_stage & VK_SHADER_STAGE_VERTEX_BIT) {
+          dst_stage_mask |= VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT;
+        }
+
+        if (shader_stage & VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT) {
+          dst_stage_mask |= VK_PIPELINE_STAGE_2_TESSELLATION_CONTROL_SHADER_BIT;
+        }
+
+        if (shader_stage & VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT) {
+          dst_stage_mask |= VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT;
+        }
+
+        if (shader_stage & VK_SHADER_STAGE_GEOMETRY_BIT) {
+          dst_stage_mask |= VK_PIPELINE_STAGE_2_GEOMETRY_SHADER_BIT;
+        }
+
+        if (shader_stage & VK_SHADER_STAGE_FRAGMENT_BIT) {
+          dst_stage_mask |= VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+        }
+
+        if (shader_stage & VK_SHADER_STAGE_COMPUTE_BIT) {
+          dst_stage_mask |= VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        }
+
+        if (shader_stage & VK_SHADER_STAGE_TASK_BIT_EXT) {
+          dst_stage_mask |= VK_PIPELINE_STAGE_2_TASK_SHADER_BIT_EXT;
+        }
+
+        if (shader_stage & VK_SHADER_STAGE_MESH_BIT_EXT) {
+          dst_stage_mask |= VK_PIPELINE_STAGE_2_MESH_SHADER_BIT_EXT;
+        }
+
+        if (shader_stage & VK_SHADER_STAGE_RAYGEN_BIT_KHR) {
+          dst_stage_mask |= VK_PIPELINE_STAGE_2_RAY_TRACING_SHADER_BIT_KHR;
+        }
+
+        if (shader_stage & VK_SHADER_STAGE_ANY_HIT_BIT_KHR) {
+          dst_stage_mask |= VK_PIPELINE_STAGE_2_RAY_TRACING_SHADER_BIT_KHR;
+        }
+
+        if (shader_stage & VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR) {
+          dst_stage_mask |= VK_PIPELINE_STAGE_2_RAY_TRACING_SHADER_BIT_KHR;
+        }
+
+        if (shader_stage & VK_SHADER_STAGE_MISS_BIT_KHR) {
+          dst_stage_mask |= VK_PIPELINE_STAGE_2_RAY_TRACING_SHADER_BIT_KHR;
+        }
+
+        if (shader_stage & VK_SHADER_STAGE_INTERSECTION_BIT_KHR) {
+          dst_stage_mask |= VK_PIPELINE_STAGE_2_RAY_TRACING_SHADER_BIT_KHR;
+        }
+
+        if (shader_stage & VK_SHADER_STAGE_CALLABLE_BIT_KHR) {
+          dst_stage_mask |= VK_PIPELINE_STAGE_2_RAY_TRACING_SHADER_BIT_KHR;
+        }
+
+        // As a fallback
+        if (dst_stage_mask == 0) {
+          dst_stage_mask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        }
+
+        return dst_stage_mask;
+
+      }
+
     public:
       explicit SynchronizationVisitor(const CommandBuffer cmd) : cmd_(cmd) {}
 
       void visit(BufferInstance& buffer, const ResourceUsage usage,
                  const VkShaderStageFlags shader_stage) override {
-        // Prepare a buffer memory barrier
+
         VkBufferMemoryBarrier2 barrier = {};
         barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
         barrier.buffer = buffer.get_buffer_handle();
         barrier.offset = 0;
         barrier.size = VK_WHOLE_SIZE;
 
-        // Source: from the buffer's current known state
         barrier.srcAccessMask = buffer.get_current_access();
         barrier.srcStageMask = buffer.get_current_stage();
 
-        // Determine destination stages and access masks based on usage
-        // If we know the exact shader stage, we could pick a more granular pipeline stage:
-        VkPipelineStageFlags2 dstStageMask = 0;
-        VkAccessFlags2 dstAccessMask = 0;
+        const VkPipelineStageFlags2 dst_stage_mask = get_dst_stage_mask(shader_stage);
+        VkAccessFlags2 dst_access_mask = 0;
 
-        // Assign destination pipeline stages from shader_stage
-        // This can be refined if you know whether it's fragment-only, vertex-only, etc.
-        if (shader_stage == VK_SHADER_STAGE_ALL_GRAPHICS) {
-          dstStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
-        } else if (shader_stage == VK_SHADER_STAGE_COMPUTE_BIT) {
-          dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-        } else {
-          // As a fallback for other shader stages:
-          dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-        }
-
-        // Assign access mask based on usage
-        // Refine this depending on whether the buffer is used as a uniform, storage buffer, etc.
-        // For general READ: assume uniform buffer or sampled read.
-        // For WRITE: assume storage buffer writes.
         if (usage == ResourceUsage::WRITE) {
           // Writing to a storage buffer
-          dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+          dst_access_mask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
         } else if (usage == ResourceUsage::READ) {
           // Reading from a uniform or storage buffer
           // If uniform: VK_ACCESS_2_UNIFORM_READ_BIT
           // If storage: VK_ACCESS_2_SHADER_STORAGE_READ_BIT
           // For a generic read assumption:
-          dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
+          dst_access_mask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_UNIFORM_READ_BIT;
         }
 
         // Update the barrier
-        barrier.dstAccessMask = dstAccessMask;
-        barrier.dstStageMask = dstStageMask;
+        barrier.dstAccessMask = dst_access_mask;
+        barrier.dstStageMask = dst_stage_mask;
 
         // Update the resource state
-        buffer.set_current_access(dstAccessMask);
-        buffer.set_current_stage(dstStageMask);
+        buffer.set_current_access(dst_access_mask);
+        buffer.set_current_stage(dst_stage_mask);
 
         buffer_barriers.push_back(barrier);
       }
 
       void visit(ImageInstance& image, ResourceUsage usage,
-                 VkShaderStageFlags shader_stage) override {
+                 const VkShaderStageFlags shader_stage) override {
         VkImageMemoryBarrier2 barrier = {};
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
         barrier.image = image.get_image_handle();

@@ -43,6 +43,7 @@ namespace gestalt::graphics {
       std::vector<std::shared_ptr<RenderPassBase>> render_passes_;
 
     std::unique_ptr<fg::FrameGraph> frame_graph_;
+      std::shared_ptr<ImageInstance> scene_final_;
 
       std::shared_ptr<TextureHandleOld> debug_texture_;
 

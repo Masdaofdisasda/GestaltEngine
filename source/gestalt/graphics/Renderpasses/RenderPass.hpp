@@ -975,7 +975,7 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
                   .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE)
                   .set_multisampling_none()
                   .disable_blending()
-                  .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
+                  .enable_depthtest(false, VK_COMPARE_OP_LESS_OR_EQUAL)
                   .set_depth_format(resources_.get_depth_attachment()->get_format())
                   .build_pipeline_info()), push_constant_provider_(push_constant_provider) {}
 

@@ -63,6 +63,7 @@ namespace gestalt::graphics {
       auto scene_lit = frame_graph_->add_resource(ImageTemplate("Scene Lit"));
       auto scene_skybox = frame_graph_->add_resource(ImageTemplate("Scene Skybox"));
       auto scene_final = frame_graph_->add_resource(ImageTemplate("Scene Final"));
+      scene_final_ = scene_final;
       auto rotation_texture = frame_graph_->add_resource(
           ImageTemplate("Rotation Pattern Texture")
               .set_initial_value(asset("rot_texture.bmp"))
@@ -249,10 +250,6 @@ namespace gestalt::graphics {
 
       frame_graph_->add_pass<fg::ToneMapPass>(scene_final, scene_lit, scene_skybox, post_process_sampler, gpu_,
                                               [&] { return resource_registry_->config_.hdr; });
-
-      /*
-      frame_graph_->add_pass<fg::ToneMapPass>(scene_final, scene_lit, gpu_);
-                                           */
 
       frame_graph_->compile();
     }
@@ -470,8 +467,10 @@ namespace gestalt::graphics {
   }
 
   bool RenderEngine::acquire_next_image() {
-    VK_CHECK(vkWaitForFences(gpu_->getDevice(), 1, &frame().render_fence, true, UINT64_MAX));
+    VK_CHECK(vkWaitForFences(gpu_->getDevice(), 1, &frame().render_fence, VK_TRUE, UINT64_MAX));
     vkDeviceWaitIdle(gpu_->getDevice()); // TODO fix synchronization issues!!!
+
+    VK_CHECK(vkResetFences(gpu_->getDevice(), 1, &frame().render_fence));
 
     VkResult e
         = vkAcquireNextImageKHR(gpu_->getDevice(), swapchain_->swapchain, UINT64_MAX,
@@ -480,8 +479,8 @@ namespace gestalt::graphics {
       resize_requested_ = true;
       return true;
     }
+    VK_CHECK(e);
 
-    VK_CHECK(vkResetFences(gpu_->getDevice(), 1, &frame().render_fence));
     VK_CHECK(vkResetCommandBuffer(frame().main_command_buffer, 0));
 
     return false;
@@ -498,7 +497,6 @@ namespace gestalt::graphics {
   }
 
   void RenderEngine::execute_passes() {
-
     if (resize_requested_) {
       swapchain_->resize_swapchain(window_);
       resize_requested_ = false;
@@ -510,57 +508,206 @@ namespace gestalt::graphics {
 
     VkCommandBuffer cmd = start_draw();
 
-    for (auto& renderpass : render_passes_) {
-      ZoneScopedN("Execute Pass");
-      execute(renderpass, cmd);
-    }
+    if (false) {
+      for (auto& renderpass : render_passes_) {
+        ZoneScopedN("Execute Pass");
+        execute(renderpass, cmd);
+      }
 
+      const auto color_image = resource_registry_->resources_.final_color.image;
+      const auto swapchain_image = swapchain_->swapchain_images[swapchain_image_index_];
+
+      vkutil::TransitionImage(color_image)
+          .to(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+          .withSource(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                      VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)
+          .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
+          .andSubmitTo(cmd);
+      vkutil::TransitionImage(swapchain_image)
+          .to(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+          .withSource(VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0)
+          .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
+          .andSubmitTo(cmd);
+
+      insert_global_barrier(cmd);
+
+      vkutil::CopyImage(color_image).toImage(swapchain_image).andSubmitTo(cmd);
+
+      vkutil::TransitionImage(swapchain_image)
+          .to(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+          .withSource(VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                      VK_ACCESS_2_TRANSFER_WRITE_BIT)  // Wait for the copy to finish
+          .withDestination(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                           VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)
+          .andSubmitTo(cmd);
+
+      insert_global_barrier(cmd);
+
+      imgui_->draw(cmd, swapchain_image);
+
+      vkutil::TransitionImage(swapchain_image)
+          .to(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+          .withSource(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                      VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)
+          .withDestination(VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, 0)
+          .andSubmitTo(cmd);
+      swapchain_image->setFormat(VK_FORMAT_UNDEFINED);
+    } else {
       // TODO
-    const CommandBuffer cmd_buffer{cmd};
-    resource_allocator_->flush();
-    frame_graph_->execute(cmd_buffer);
+      const CommandBuffer cmd_buffer{cmd};
+      resource_allocator_->flush();
+      insert_global_barrier(cmd);
+      frame_graph_->execute(cmd_buffer);
 
-    const auto color_image = resource_registry_->resources_.final_color.image;
-    const auto swapchain_image = swapchain_->swapchain_images[swapchain_image_index_];
+      const auto swapchain_image = swapchain_->swapchain_images[swapchain_image_index_];
 
-    vkutil::TransitionImage(color_image)
-        .to(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
-        .withSource(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)
-        .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
-        .andSubmitTo(cmd);
-    vkutil::TransitionImage(swapchain_image)
-        .to(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
-        .withSource(VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0)
-        .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
-        .andSubmitTo(cmd);
+      {
+        // Transition color_image to TRANSFER_SRC_OPTIMAL
+        auto image_barrier = VkImageMemoryBarrier2{
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask = scene_final_->get_current_stage(),
+            .srcAccessMask = scene_final_->get_current_access(),
+            .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+            .dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT,
+            .oldLayout = scene_final_->get_layout(),
+            .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            .image = scene_final_->get_image_handle(),
+            .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+        };
+        auto dependency_info = VkDependencyInfo{
+            .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .imageMemoryBarrierCount = 1,
+            .pImageMemoryBarriers = &image_barrier,
+        };
+        vkCmdPipelineBarrier2(cmd, &dependency_info);
+        scene_final_->set_layout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+        scene_final_->set_current_access(VK_ACCESS_2_TRANSFER_READ_BIT);
+        scene_final_->set_current_stage(VK_PIPELINE_STAGE_2_TRANSFER_BIT);
+      }
 
-    
-    insert_global_barrier(cmd);
+      {
+        // Transition swapchain_image to TRANSFER_DST_OPTIMAL
+        auto image_barrier = VkImageMemoryBarrier2{
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+            .srcAccessMask = 0,
+            .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+            .dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            .image = swapchain_image->image,
+            .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+        };
+        auto dependency_info = VkDependencyInfo{
+            .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .imageMemoryBarrierCount = 1,
+            .pImageMemoryBarriers = &image_barrier,
+        };
+        vkCmdPipelineBarrier2(cmd, &dependency_info);
+      }
 
-    vkutil::CopyImage(color_image).toImage(swapchain_image).andSubmitTo(cmd);
+      {
+        // Insert a global barrier to ensure all transitions complete
+        insert_global_barrier(cmd);
+      }
 
-    vkutil::TransitionImage(swapchain_image)
-        .to(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
-        .withSource(VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-                    VK_ACCESS_2_TRANSFER_WRITE_BIT)  // Wait for the copy to finish
-        .withDestination(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-                         VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)
-        .andSubmitTo(cmd);
+      {
+        // Copy color_image to swapchain_image
+        VkImageBlit2 blitRegion = {
+    .sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2,
+    .pNext = nullptr,
+    .srcSubresource = {
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .mipLevel = 0,
+        .baseArrayLayer = 0,
+        .layerCount = 1,
+    },
+    .srcOffsets = {
+        {0, 0, 0}, // srcOffset[0]
+        {static_cast<int32_t>(scene_final_->get_extent().width), 
+         static_cast<int32_t>(scene_final_->get_extent().height), 
+         1}, // srcOffset[1]
+    },
+    .dstSubresource = {
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .mipLevel = 0,
+        .baseArrayLayer = 0,
+        .layerCount = 1,
+    },
+    .dstOffsets = {
+        {0, 0, 0}, // dstOffset[0]
+        {static_cast<int32_t>(swapchain_image->getExtent2D().width), 
+         static_cast<int32_t>(swapchain_image->getExtent2D().height), 
+         1}, // dstOffset[1]
+    },
+};
 
-    insert_global_barrier(cmd);
+        // Blit the image
+        VkBlitImageInfo2 blitInfo = {
+            .sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2,
+            .pNext = nullptr,
+            .srcImage = scene_final_->get_image_handle(),
+            .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            .dstImage = swapchain_image->image,
+            .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            .regionCount = 1,
+            .pRegions = &blitRegion,
+            .filter = VK_FILTER_LINEAR,  // Use VK_FILTER_LINEAR or VK_FILTER_NEAREST
+        };
 
-    imgui_->draw(cmd, swapchain_image);
+        vkCmdBlitImage2(cmd, &blitInfo);
+      }
 
+      {
+        // Transition swapchain_image back to COLOR_ATTACHMENT_OPTIMAL for ImGui rendering
+        auto image_barrier = VkImageMemoryBarrier2{
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+            .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            .image = swapchain_image->image,
+            .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+        };
+        auto dependency_info = VkDependencyInfo{
+            .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .imageMemoryBarrierCount = 1,
+            .pImageMemoryBarriers = &image_barrier,
+        };
+        vkCmdPipelineBarrier2(cmd, &dependency_info);
+      }
 
-    vkutil::TransitionImage(swapchain_image)
-        .to(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
-        .withSource(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)
-        .withDestination(VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, 0)
-        .andSubmitTo(cmd);
-    swapchain_image->setFormat(VK_FORMAT_UNDEFINED);
+      {
+        // Insert another global barrier to ensure everything is synchronized before presenting
+        insert_global_barrier(cmd);
+      }
 
+      // Render ImGui overlay
+      imgui_->draw(cmd, swapchain_image);
+
+      {
+        // Transition swapchain_image to PRESENT_SRC_KHR for presentation
+        auto image_barrier = VkImageMemoryBarrier2{
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT ,
+            .dstStageMask = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
+            .dstAccessMask = 0,
+            .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            .image = swapchain_image->image,
+            .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+        };
+        auto dependency_info = VkDependencyInfo{
+            .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .imageMemoryBarrierCount = 1,
+            .pImageMemoryBarriers = &image_barrier,
+        };
+        vkCmdPipelineBarrier2(cmd, &dependency_info);
+      }
+    }
 
     present(cmd);
   }
@@ -586,9 +733,9 @@ namespace gestalt::graphics {
 
     VkCommandBufferSubmitInfo cmdinfo = vkinit::command_buffer_submit_info(cmd);
     VkSemaphoreSubmitInfo waitInfo = vkinit::semaphore_submit_info(
-        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR, frame().swapchain_semaphore);
+        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, frame().swapchain_semaphore);
     VkSemaphoreSubmitInfo signalInfo = vkinit::semaphore_submit_info(
-        VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, frame().render_semaphore);
+        VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, frame().render_semaphore);
 
     VkSubmitInfo2 submit = vkinit::submit_info(&cmdinfo, &signalInfo, &waitInfo);
 
