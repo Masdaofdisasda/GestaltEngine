@@ -174,10 +174,10 @@ namespace gestalt::graphics {
       auto material_textures
           = frame_graph_->add_resource(std::make_shared<ImageArrayInstance>(
                                            "PBR Textures",
-                                           [this]() -> std::vector<std::shared_ptr<ImageInstance>> {
-                                             return repository_->textures.data();
+                                           [this]() -> std::vector<Material> {
+                                             return repository_->materials.data();
                                            },
-                                           getMaxMaterials()),
+                                           getMaxTextures()),
                                        fg::CreationType::EXTERNAL);
 
       // Light
@@ -254,7 +254,7 @@ namespace gestalt::graphics {
           gpu_);
 
       frame_graph_->add_pass<fg::LightingPass>(
-          camera_buffer, material_buffer, light_matrices, directional_light, point_light,
+          camera_buffer, texEnvMap, texIrradianceMap, brdf_lut, light_matrices, directional_light, point_light,
           g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth, shadow_map,
           integrated_light_scattering, ambient_occlusion_texture, scene_lit, post_process_sampler,
           gpu_, [&] { return resource_registry_->config_.lighting; },
@@ -265,7 +265,7 @@ namespace gestalt::graphics {
           [&] { return repository_->point_lights.size(); });
 
       frame_graph_->add_pass<fg::SkyboxPass>(
-          camera_buffer, directional_light, scene_lit, scene_skybox, g_buffer_depth,
+          camera_buffer, directional_light, scene_lit, texEnvMap, scene_skybox, g_buffer_depth,
           post_process_sampler, gpu_, [&] { return resource_registry_->config_.skybox; });
 
       frame_graph_->add_pass<fg::ToneMapPass>(scene_final, scene_lit, scene_skybox,

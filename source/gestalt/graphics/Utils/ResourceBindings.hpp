@@ -39,10 +39,13 @@ namespace gestalt::graphics::fg {
           throw std::runtime_error("Unsupported attachment type");
       }
 
+      // use VK_DESCRIPTOR_TYPE_MAX_ENUM so that the descriptor class knows that it can't use the
+      // descriptor type
       image_bindings.push_back(
-          {image,
-           {0, 0, VK_DESCRIPTOR_TYPE_MAX_ENUM, VK_SHADER_STAGE_FRAGMENT_BIT, 1, nullptr},
-           ResourceUsage::WRITE});
+          {.resource= image,
+           .info= {.set_index= 0, .binding_index= 0, .descriptor_type= VK_DESCRIPTOR_TYPE_MAX_ENUM, .shader_stages=
+                   VK_SHADER_STAGE_FRAGMENT_BIT, .descriptor_count= 1, .sampler = nullptr},
+           .usage= ResourceUsage::WRITE});
       return *this;
     }
 
@@ -73,7 +76,7 @@ namespace gestalt::graphics::fg {
       }
 
       image_array_bindings.push_back(
-          {images, {set_index, binding_index, descriptor_type, shader_stages, 1, nullptr}, usage}
+          {images, {set_index, binding_index, descriptor_type, shader_stages, static_cast<uint32>(images->get_max_images()), nullptr}, usage}
           );
 
       return *this;

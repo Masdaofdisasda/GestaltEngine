@@ -118,7 +118,7 @@ namespace gestalt::graphics::fg {
 
     for (const auto& node : sorted_nodes_) {
       const auto name = std::string(node->render_pass->get_name());
-       //fmt::println("executing: {}", name);
+      //fmt::println("executing: {}", name);
       synchronization_manager_->synchronize_resources(node, cmd);
 
       VkDebugUtilsLabelEXT label_info = {

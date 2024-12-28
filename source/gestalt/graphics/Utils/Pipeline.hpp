@@ -15,6 +15,7 @@
 #include "vk_initializers.hpp"
 #include "vk_pipelines.hpp"
 #include "Interface/IGpu.hpp"
+#include "Material/Material.hpp"
 #include "Resources/ResourceTypes.hpp"
 
 namespace gestalt::graphics::fg {
@@ -153,6 +154,7 @@ namespace gestalt::graphics::fg {
       // Process image and buffer bindings
       process_bindings(image_bindings);
       process_bindings(buffer_bindings);
+      process_bindings(image_array_bindings);
 
       // Create the descriptor layouts
       create_descriptor_layout(std::move(descriptor_sets));
@@ -162,6 +164,8 @@ namespace gestalt::graphics::fg {
           image_bindings_by_set;
       std::unordered_map<uint32_t, std::vector<ResourceBinding<BufferInstance>>>
           buffer_bindings_by_set;
+      std::unordered_map<uint32_t, std::vector<ResourceBinding<ImageArrayInstance>>>
+          image_array_bindings_by_set;
 
       for (const auto& binding : image_bindings) {
         image_bindings_by_set[binding.info.set_index].push_back(binding);
@@ -169,6 +173,10 @@ namespace gestalt::graphics::fg {
 
       for (const auto& binding : buffer_bindings) {
         buffer_bindings_by_set[binding.info.set_index].push_back(binding);
+      }
+
+      for (const auto& binding : image_array_bindings) {
+        image_array_bindings_by_set[binding.info.set_index].push_back(binding);
       }
 
       // Iterate over each set index to create descriptor buffers and write descriptors
@@ -199,6 +207,33 @@ namespace gestalt::graphics::fg {
 
             descriptor_buffer->write_image(info.binding_index, info.descriptor_type,
                                            std::move(image_info));
+          }
+        }
+
+        if (auto it = image_array_bindings_by_set.find(set_index);
+            it != image_array_bindings_by_set.end()) {
+          for (const auto& binding : it->second) {
+            std::vector<VkDescriptorImageInfo> image_infos;
+              const auto& info = binding.info;
+            for (const auto& material : binding.resource->get_materials()) {
+              image_infos.push_back({material.config.textures.albedo_sampler,
+                                     material.config.textures.albedo_image.imageView,
+                                     VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
+              image_infos.push_back({material.config.textures.normal_sampler,
+                                     material.config.textures.normal_image.imageView,
+                                     VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
+              image_infos.push_back({material.config.textures.metal_rough_sampler,
+                                     material.config.textures.metal_rough_image.imageView,
+                                     VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
+                  image_infos.push_back({material.config.textures.occlusion_sampler,
+                                     material.config.textures.occlusion_image.imageView,
+                                     VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
+              image_infos.push_back({material.config.textures.emissive_sampler,
+                                     material.config.textures.emissive_image.imageView,
+                                     VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
+            }
+              descriptor_buffer->write_image_array(info.binding_index, info.descriptor_type,
+                                                   image_infos);
           }
         }
 
@@ -302,10 +337,17 @@ namespace gestalt::graphics::fg {
 
     public:
 
+      GraphicsPipelineBuilder& set_depth_format(
+          const std::shared_ptr<ImageInstance>& depth_attachment) {
+        render_info_.depthAttachmentFormat = depth_attachment->get_format();
+        return *this;
+      }
 
-      GraphicsPipelineBuilder& set_depth_format(const VkFormat format) {
-          render_info_.depthAttachmentFormat = format;
-
+      GraphicsPipelineBuilder& set_color_attachment_formats(
+          const std::map<unsigned int, std::shared_ptr<ImageInstance>>& color_attachments) {
+        for (const auto& attachment : color_attachments | std::views::values) {
+          color_attachmentformats_.push_back(attachment->get_format());
+        }
         return *this;
       }
 
@@ -396,20 +438,6 @@ namespace gestalt::graphics::fg {
         return *this;
       }
 
-      GraphicsPipelineBuilder& set_color_attachment_format(VkFormat format) {
-        color_attachmentformats_.emplace_back(format);
-
-        return *this;
-      }
-
-      GraphicsPipelineBuilder& set_color_attachment_formats(
-          const std::vector<VkFormat>& formats) {
-        color_attachmentformats_.insert(color_attachmentformats_.end(), formats.begin(),
-                                        formats.end());
-
-        return *this;
-      }
-
       GraphicsPipelineBuilder& disable_depthtest() {
         depth_stencil_.depthTestEnable = VK_FALSE;
         depth_stencil_.depthWriteEnable = VK_FALSE;
@@ -481,45 +509,72 @@ namespace gestalt::graphics::fg {
   class GraphicsPipeline: Moveable<GraphicsPipeline> {
     PipelineTool pipeline_tool_;
     VkPipelineBindPoint bind_point_ = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    uint32_t color_attachment_count_;
+    VkFormat depth_format_;
+    VkFormat stencil_format_;
+
+    void set_attachments_for_validation(const VkGraphicsPipelineCreateInfo& pipelineInfo) {
+      const void* current = pipelineInfo.pNext;
+
+      while (current) {
+        const auto base = static_cast<const VkBaseInStructure*>(current);
+
+        if (base->sType == VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO) {
+          const auto rendering_info = static_cast<const VkPipelineRenderingCreateInfo*>(current);
+
+          // Access the number of color attachments and depth/stencil formats
+          color_attachment_count_ = rendering_info->colorAttachmentCount;
+          depth_format_ = rendering_info->depthAttachmentFormat;
+          stencil_format_ = rendering_info->stencilAttachmentFormat;
+          return;
+        }
+
+        // Move to the next structure in the chain
+        current = base->pNext;
+      }
+    }
 
   public:
          
-    GraphicsPipeline(IGpu* gpu, const std::string_view pipeline_name,
-                     const std::span<const ResourceBinding<ImageInstance>> image_bindings,
-                     const std::span<const ResourceBinding<BufferInstance>> buffer_bindings,
-                     const std::span<const ResourceBinding<ImageArrayInstance>>
-                     image_array_bindings,
-                     const VkPushConstantRange push_constant_range, std::string&& task_source,
-                     std::string&& mesh_source, std::string&& fragment_source,
-                     VkGraphicsPipelineCreateInfo&& pipeline_create_info)
-      : pipeline_tool_(gpu, pipeline_name) {
-      pipeline_tool_.
-          create_descriptor_layout(image_bindings, buffer_bindings, image_array_bindings);
+    GraphicsPipeline(
+        IGpu* gpu, const std::string_view pipeline_name,
+        const std::span<const ResourceBinding<ImageInstance>> image_bindings,
+        const std::span<const ResourceBinding<BufferInstance>> buffer_bindings,
+        const std::span<const ResourceBinding<ImageArrayInstance>> image_array_bindings,
+        const VkPushConstantRange push_constant_range, std::string&& task_source,
+        std::string&& mesh_source, std::string&& fragment_source,
+        VkGraphicsPipelineCreateInfo&& pipeline_create_info)
+        : pipeline_tool_(gpu, pipeline_name) {
+      pipeline_tool_.create_descriptor_layout(image_bindings, buffer_bindings,
+                                              image_array_bindings);
       pipeline_tool_.add_shader(std::move(task_source), VK_SHADER_STAGE_TASK_BIT_EXT);
       pipeline_tool_.add_shader(std::move(mesh_source), VK_SHADER_STAGE_MESH_BIT_EXT);
       pipeline_tool_.add_shader(std::move(fragment_source), VK_SHADER_STAGE_FRAGMENT_BIT);
       pipeline_tool_.create_pipeline_layout(push_constant_range);
-      pipeline_tool_.create_graphics_pipeline(pipeline_create_info,
-                                              {VK_SHADER_STAGE_TASK_BIT_EXT, VK_SHADER_STAGE_MESH_BIT_EXT,
-                                               VK_SHADER_STAGE_FRAGMENT_BIT});
+      pipeline_tool_.create_graphics_pipeline(
+          pipeline_create_info, {VK_SHADER_STAGE_TASK_BIT_EXT, VK_SHADER_STAGE_MESH_BIT_EXT,
+                                 VK_SHADER_STAGE_FRAGMENT_BIT});
+
+      set_attachments_for_validation(pipeline_create_info);
     }
          
-    GraphicsPipeline(IGpu* gpu, const std::string_view pipeline_name,
-                     const std::span<const ResourceBinding<ImageInstance>> image_bindings,
-                     const std::span<const ResourceBinding<BufferInstance>> buffer_bindings,
-                     const std::span<const ResourceBinding<ImageArrayInstance>>
-                     image_array_bindings,
-                     const VkPushConstantRange push_constant_range, std::string&& vertex_source,
-                     std::string&& fragment_source,
-                     VkGraphicsPipelineCreateInfo&& pipeline_create_info)
-      : pipeline_tool_(gpu, pipeline_name) {
-      pipeline_tool_.
-          create_descriptor_layout(image_bindings, buffer_bindings, image_array_bindings);
+    GraphicsPipeline(
+        IGpu* gpu, const std::string_view pipeline_name,
+        const std::span<const ResourceBinding<ImageInstance>> image_bindings,
+        const std::span<const ResourceBinding<BufferInstance>> buffer_bindings,
+        const std::span<const ResourceBinding<ImageArrayInstance>> image_array_bindings,
+        const VkPushConstantRange push_constant_range, std::string&& vertex_source,
+        std::string&& fragment_source, VkGraphicsPipelineCreateInfo&& pipeline_create_info)
+        : pipeline_tool_(gpu, pipeline_name) {
+      pipeline_tool_.create_descriptor_layout(image_bindings, buffer_bindings,
+                                              image_array_bindings);
       pipeline_tool_.add_shader(std::move(vertex_source), VK_SHADER_STAGE_VERTEX_BIT);
       pipeline_tool_.add_shader(std::move(fragment_source), VK_SHADER_STAGE_FRAGMENT_BIT);
       pipeline_tool_.create_pipeline_layout(push_constant_range);
-      pipeline_tool_.create_graphics_pipeline(pipeline_create_info,
-                                              {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT});
+      pipeline_tool_.create_graphics_pipeline(
+          pipeline_create_info, {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT});
+
+      set_attachments_for_validation(pipeline_create_info);
     }
 
     void bind(const CommandBuffer cmd) {
@@ -533,7 +588,21 @@ namespace gestalt::graphics::fg {
         const std::shared_ptr<ImageInstance>& depth_attachment,
         std::optional<VkClearColorValue> clear_color = std::nullopt,
         std::optional<VkClearDepthStencilValue> clear_depth = std::nullopt) {
+
+      if (color_attachments.empty() && depth_attachment == nullptr) {
+        throw std::runtime_error("At least one attachment must be provided!");
+      }
+
+      if (color_attachments.size() > color_attachment_count_) {
+        throw std::runtime_error("Color attachment was not specified in Pipeline!");
+      }
+      if (depth_attachment != nullptr && depth_format_ == VK_FORMAT_UNDEFINED) {
+        throw std::runtime_error("Depth attachment was not specified in Pipeline!");
+      }
+
       std::vector<VkRenderingAttachmentInfo> color_attachment_info;
+      color_attachment_info.reserve(color_attachments.size());
+
       VkRenderingAttachmentInfo depth_attachment_info = {};
       VkExtent2D extent = {0, 0};
       VkViewport viewport{
@@ -548,21 +617,18 @@ namespace gestalt::graphics::fg {
 
       // Process color attachments
       for (const auto& attachment : color_attachments | std::views::values) {
-        auto attachment_info = vkinit::attachment_info(attachment->get_image_view(), nullptr,
-                                                       attachment->get_layout());
-
         if (clear_color) {
-          attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-          attachment_info.clearValue.color = *clear_color;
+          VkClearValue clear_value = {.color = clear_color.value()};
+          color_attachment_info.push_back(vkinit::attachment_info(
+              attachment->get_image_view(), &clear_value, attachment->get_layout()));
         } else {
-          attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+          color_attachment_info.push_back(vkinit::attachment_info(
+              attachment->get_image_view(), nullptr, attachment->get_layout()));
         }
-        attachment_info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        color_attachment_info.push_back(attachment_info);
 
         // Validate and set extent
         if (extent.width == 0 && extent.height == 0) {
-          extent = {attachment->get_extent().width, attachment->get_extent().height};
+          extent = {.width= attachment->get_extent().width, .height= attachment->get_extent().height};
         } else if (extent.width != attachment->get_extent().width
                    || extent.height != attachment->get_extent().height) {
           throw std::runtime_error("Attachment dimensions mismatch!");
@@ -571,16 +637,15 @@ namespace gestalt::graphics::fg {
 
       // Process depth attachment
       if (depth_attachment != nullptr) {
-        depth_attachment_info = vkinit::attachment_info(depth_attachment->get_image_view(), nullptr,
-                                                        depth_attachment->get_layout());
-
         if (clear_depth) {
-          depth_attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-          depth_attachment_info.clearValue.depthStencil = *clear_depth;
+          VkClearValue clear_value = {.depthStencil = clear_depth.value()};
+          depth_attachment_info
+              = vkinit::attachment_info(depth_attachment->get_image_view(), &clear_value,
+                                        depth_attachment->get_layout());
         } else {
-          depth_attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+          depth_attachment_info = vkinit::attachment_info(depth_attachment->get_image_view(),
+                                                          nullptr, depth_attachment->get_layout());
         }
-        depth_attachment_info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 
         // Validate and set extent
         if (extent.width == 0 && extent.height == 0) {

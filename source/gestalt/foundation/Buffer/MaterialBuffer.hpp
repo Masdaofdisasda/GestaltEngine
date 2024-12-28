@@ -11,8 +11,6 @@
 namespace gestalt::foundation {
 
   struct MaterialBuffers final : BufferCollection, NonCopyable<MaterialBuffers> {
-    std::shared_ptr<BufferInstance> uniform_buffer;
-
     TextureHandleOld environment_map;
     TextureHandleOld environment_irradiance_map;
     TextureHandleOld bdrf_lut;
@@ -21,12 +19,10 @@ namespace gestalt::foundation {
 
     std::shared_ptr<BufferInstance> material_buffer;
 
-    std::shared_ptr<ImageArrayInstance> textures;
-
     std::shared_ptr<DescriptorBuffer> descriptor_buffer;
 
     std::vector<std::shared_ptr<BufferInstance>> get_buffers(int16 frame_index) const override {
-      return {uniform_buffer};
+      return {material_buffer};
     }
 
     std::shared_ptr<DescriptorBuffer> get_descriptor_buffer(

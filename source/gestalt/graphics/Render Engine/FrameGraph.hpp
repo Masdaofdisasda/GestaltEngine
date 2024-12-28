@@ -268,8 +268,9 @@ namespace gestalt::graphics::fg {
 
       void visit(ImageArrayInstance& images, ResourceUsage usage,
                  VkShaderStageFlags shader_stage) override {
-        for (auto& image : images.get_images()) {
-          image->accept(*this, usage, shader_stage);
+        for (auto& image : images.get_materials()) {
+          //TODO
+          //image->accept(*this, usage, shader_stage);
         }
       }
 
@@ -293,8 +294,7 @@ namespace gestalt::graphics::fg {
                                const CommandBuffer cmd) {
       const auto read_resources = node->render_pass->get_resources(ResourceUsage::READ);
       const auto write_resources = node->render_pass->get_resources(ResourceUsage::WRITE);
-      const auto bind_point = node->render_pass->get_bind_point();
-
+      
       SynchronizationVisitor visitor(cmd);
 
       for (const auto& [resource, info, _] : read_resources) {

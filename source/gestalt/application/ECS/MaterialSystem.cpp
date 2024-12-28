@@ -53,12 +53,6 @@ namespace gestalt::application {
         = resource_manager_->create_descriptor_buffer(descriptor_layout, 5);
     vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layout, nullptr);
 
-    mat_buffers->uniform_buffer =  resource_allocator_->create_buffer(BufferTemplate(
-        "Material Data Buffer", sizeof(PbrMaterial::PbrConstants) * getMaxMaterials(),
-        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VMA_MEMORY_USAGE_CPU_TO_GPU));
-
-    //TODO
     mat_buffers->material_buffer = resource_allocator_->create_buffer(BufferTemplate(
         "Material Buffer", sizeof(PbrMaterial::PbrConstants) * getMaxMaterials(),
         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -199,7 +193,7 @@ namespace gestalt::application {
   }
 
   void MaterialSystem::fill_uniform_buffer() {
-    const auto& constant_buffer = repository_->material_buffers->uniform_buffer;
+    const auto& constant_buffer = repository_->material_buffers->material_buffer;
 
     const std::vector<PbrMaterial::PbrConstants> material_constants(getMaxMaterials());
 
@@ -280,7 +274,7 @@ namespace gestalt::application {
 
     repository_->materials.clear();
 
-    resource_allocator_->destroy_buffer(material_buffers->uniform_buffer);
+    resource_allocator_->destroy_buffer(material_buffers->material_buffer);
 
     for (const auto& sampler : repository_->sampler_cache | std::views::values) {
       vkDestroySampler(gpu_->getDevice(), sampler, nullptr);
@@ -290,7 +284,9 @@ namespace gestalt::application {
   }
 
   void MaterialSystem::write_material(PbrMaterial& material, const uint32 material_id) {
-    assert(material_id < getMaxMaterials());
+    if (material_id >= getMaxMaterials()) {
+      throw std::runtime_error("Material ID exceeds maximum materials");
+    }
 
     const auto& mat_buffers = repository_->material_buffers;
 
@@ -332,10 +328,10 @@ namespace gestalt::application {
     }
 
     PbrMaterial::PbrConstants* mappedData;
-    vmaMapMemory(gpu_->getAllocator(), repository_->material_buffers->uniform_buffer->get_allocation(),
+    vmaMapMemory(gpu_->getAllocator(), repository_->material_buffers->material_buffer->get_allocation(),
                  (void**)&mappedData);
     memcpy(mappedData + material_id, &material.constants, sizeof(PbrMaterial::PbrConstants));
-    vmaUnmapMemory(gpu_->getAllocator(), repository_->material_buffers->uniform_buffer->get_allocation());
+    vmaUnmapMemory(gpu_->getAllocator(), repository_->material_buffers->material_buffer->get_allocation());
   }
 
 }  // namespace gestalt::application

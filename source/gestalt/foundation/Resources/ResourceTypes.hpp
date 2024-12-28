@@ -12,8 +12,10 @@
 
 #include "Descriptor/DescriptorBinding.hpp"
 #include "Descriptor/DescriptorUpdate.hpp"
+#include "Material/Material.hpp"
 
 namespace gestalt::foundation {
+
   class ResourceTemplate {
     std::string name_;
 
@@ -275,16 +277,15 @@ namespace gestalt::foundation {
   };
 
   class ImageArrayInstance final : public ResourceInstance {
-    std::function<std::vector<std::shared_ptr<ImageInstance>>()> images_;
+    std::function<std::vector<Material>()> materials_;
     size_t max_images_;
     size_t previous_size_ = 0;
 
   public:
-    ImageArrayInstance(std::string name,
-                       std::function<std::vector<std::shared_ptr<ImageInstance>>()> images,
+    ImageArrayInstance(std::string name, std::function<std::vector<Material>()> materials,
                        const size_t max_images)
       : ResourceInstance(std::move(name)),
-        images_(std::move(images)),
+        materials_(std::move(materials)),
         max_images_(max_images) {
     }
 
@@ -294,15 +295,15 @@ namespace gestalt::foundation {
     }
 
     [[nodiscard]] bool should_rebuild_descriptors() {
-      if (previous_size_ != images_().size()) {
-        previous_size_ = images_().size();
+      if (previous_size_ != materials_().size()) {
+        previous_size_ = materials_().size();
         return true;
       }
       return false;
     }
 
-    [[nodiscard]] std::vector<std::shared_ptr<ImageInstance>> get_images() const {
-      return images_();
+    [[nodiscard]] std::vector<Material> get_materials() const {
+      return materials_();
     }
 
     [[nodiscard]] size_t get_max_images() const { return max_images_; }
@@ -317,16 +318,16 @@ namespace gestalt::foundation {
   };
 
   class BufferInstance final : public ResourceInstance {
-    BufferTemplate buffer_template;
-    AllocatedBuffer allocated_buffer;
-    VkAccessFlags2 current_access = VK_ACCESS_2_NONE;
-    VkPipelineStageFlags2 current_stage = VK_PIPELINE_STAGE_2_NONE;
+    BufferTemplate buffer_template_;
+    AllocatedBuffer allocated_buffer_;
+    VkAccessFlags2 current_access_ = VK_ACCESS_2_NONE;
+    VkPipelineStageFlags2 current_stage_ = VK_PIPELINE_STAGE_2_NONE;
 
   public:
     BufferInstance(BufferTemplate&& buffer_template, const AllocatedBuffer& allocated_buffer)
       : ResourceInstance(buffer_template.get_name()),
-        buffer_template(std::move(buffer_template)),
-        allocated_buffer(allocated_buffer) {}
+        buffer_template_(std::move(buffer_template)),
+        allocated_buffer_(allocated_buffer) {}
 
 
     BufferInstance(const BufferInstance&) = delete;
@@ -340,24 +341,24 @@ namespace gestalt::foundation {
       visitor.visit(*this, usage, shader_stage);
     }
     // size that was actually allocated, alignment might have been added
-    [[nodiscard]] VkDeviceSize get_size() const { return allocated_buffer.info.size; }
+    [[nodiscard]] VkDeviceSize get_size() const { return allocated_buffer_.info.size; }
 
     // size that was requested, max size that can be uploaded, used for descriptor buffer bindings
-    [[nodiscard]] VkDeviceSize get_requested_size() const { return buffer_template.get_size(); }
+    [[nodiscard]] VkDeviceSize get_requested_size() const { return buffer_template_.get_size(); }
 
-    [[nodiscard]] VkDeviceAddress get_address() const { return allocated_buffer.address; }
+    [[nodiscard]] VkDeviceAddress get_address() const { return allocated_buffer_.address; }
 
-    [[nodiscard]] VmaAllocation get_allocation() const { return allocated_buffer.allocation; }
+    [[nodiscard]] VmaAllocation get_allocation() const { return allocated_buffer_.allocation; }
 
-    [[nodiscard]] VkBuffer get_buffer_handle() const { return allocated_buffer.buffer_handle; }
+    [[nodiscard]] VkBuffer get_buffer_handle() const { return allocated_buffer_.buffer_handle; }
 
-    [[nodiscard]] VkBufferUsageFlags get_usage() const { return buffer_template.get_usage(); }
+    [[nodiscard]] VkBufferUsageFlags get_usage() const { return buffer_template_.get_usage(); }
 
-    [[nodiscard]] VkAccessFlags2 get_current_access() const { return current_access; }
-    void set_current_access(const VkAccessFlags2 access) { current_access = access; }
+    [[nodiscard]] VkAccessFlags2 get_current_access() const { return current_access_; }
+    void set_current_access(const VkAccessFlags2 access) { current_access_ = access; }
 
-    [[nodiscard]] VkPipelineStageFlags2 get_current_stage() const { return current_stage; }
-    void set_current_stage(const VkPipelineStageFlags2 stage) { current_stage = stage; }
+    [[nodiscard]] VkPipelineStageFlags2 get_current_stage() const { return current_stage_; }
+    void set_current_stage(const VkPipelineStageFlags2 stage) { current_stage_ = stage; }
   };
     
   class DescriptorBufferInstance {
@@ -368,8 +369,8 @@ namespace gestalt::foundation {
     VkDeviceSize layout_size_in_bytes_;
     // these flags are required for descriptor buffers:
     VkBufferUsageFlags usage_ = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT
-                                | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT 
-                               | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+                                | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT
+                                | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
     std::unordered_map<uint32_t, DescriptorBinding> bindings_;
 
     IGpu* gpu_;
@@ -377,7 +378,7 @@ namespace gestalt::foundation {
 
     std::vector<DescriptorUpdate> update_infos_;
 
-    [[nodiscard]] size_t MapDescriptorSize(const VkDescriptorType type) const {
+    [[nodiscard]] size_t map_descriptor_size(const VkDescriptorType type) const {
       const auto& properties = gpu_->getDescriptorBufferProperties();
       switch (type) {
         case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
@@ -408,10 +409,10 @@ namespace gestalt::foundation {
     }
 
   public:
-    explicit DescriptorBufferInstance(IGpu* gpu, const std::string name,
+    explicit DescriptorBufferInstance(IGpu* gpu, std::string name,
                                       const VkDescriptorSetLayout descriptor_layout,
                                       const std::vector<uint32_t>& binding_indices)
-        : gpu_(gpu), name_(name) {
+        : gpu_(gpu), name_(std::move(name)) {
       if (gpu_ == nullptr) {
         throw std::runtime_error("GPU instance cannot be null.");
       }
@@ -419,7 +420,8 @@ namespace gestalt::foundation {
       const VkDeviceSize descriptor_buffer_offset_alignment
           = gpu_->getDescriptorBufferProperties().descriptorBufferOffsetAlignment;
       vkGetDescriptorSetLayoutSizeEXT(gpu_->getDevice(), descriptor_layout, &layout_size_in_bytes_);
-      layout_size_in_bytes_ = aligned_size(layout_size_in_bytes_, descriptor_buffer_offset_alignment);
+      layout_size_in_bytes_
+          = aligned_size(layout_size_in_bytes_, descriptor_buffer_offset_alignment);
 
       VkDeviceSize binding_offset = 0;
 
@@ -448,9 +450,7 @@ namespace gestalt::foundation {
       VK_CHECK(vmaCreateBuffer(gpu_->getAllocator(), &buffer_info, &vma_alloc_info, &buffer_handle_,
                                &allocation_, &info_));
 
-      gpu_->set_debug_name(name_,
-                           VK_OBJECT_TYPE_BUFFER,
-                           reinterpret_cast<uint64>(buffer_handle_));
+      gpu_->set_debug_name(name_, VK_OBJECT_TYPE_BUFFER, reinterpret_cast<uint64>(buffer_handle_));
 
       const VkBufferDeviceAddressInfo device_address_info = {
           .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
@@ -466,7 +466,8 @@ namespace gestalt::foundation {
       VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation_,
                             reinterpret_cast<void**>(&descriptor_buf_ptr)));
 
-      for (const auto& [type, descriptorSize, binding, descriptorIndex, addr_info, image_info] : update_infos_) {
+      for (const auto& [type, descriptorSize, binding, descriptorIndex, addr_info, image_info] :
+           update_infos_) {
         VkDescriptorGetInfoEXT descriptor_info = {
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT,
             .type = type,
@@ -489,8 +490,7 @@ namespace gestalt::foundation {
           throw std::runtime_error("Invalid binding index.");
         }
 
-        const VkDeviceSize offset
-            = descriptorIndex * descriptorSize + binding_it->second.offset;
+        const VkDeviceSize offset = descriptorIndex * descriptorSize + binding_it->second.offset;
         vkGetDescriptorEXT(gpu_->getDevice(), &descriptor_info, descriptorSize,
                            descriptor_buf_ptr + offset);
       }
@@ -506,7 +506,7 @@ namespace gestalt::foundation {
     void bind_descriptors(const VkCommandBuffer cmd, const VkPipelineBindPoint bind_point,
                           const VkPipelineLayout pipeline_layout, const uint32 set) const {
       VkDeviceSize buffer_offset = 0;
-      for (const auto& [binding_index, binding]: bindings_) {
+      for (const auto& [binding_index, binding] : bindings_) {
         for (int i = 0; i < binding.descriptor_count; ++i) {
           buffer_offset = i * binding.descriptor_size;
           vkCmdSetDescriptorBufferOffsetsEXT(cmd, bind_point, pipeline_layout, set, 1, &set,
@@ -521,7 +521,9 @@ namespace gestalt::foundation {
       return write_image_array(binding, type, {image_info}, descriptor_index);
     }
     DescriptorBufferInstance& write_buffer(const uint32 binding, const VkDescriptorType type,
-                                           const VkDeviceAddress resource_address, const size_t buffer_size, const uint32 descriptor_index = 0) {
+                                           const VkDeviceAddress resource_address,
+                                           const size_t buffer_size,
+                                           const uint32 descriptor_index = 0) {
       const auto binding_it = bindings_.find(binding);
       if (binding_it == bindings_.end()) {
         throw std::runtime_error("Invalid binding index.");
@@ -531,7 +533,7 @@ namespace gestalt::foundation {
 
       DescriptorUpdate update_info = {
         .type = type,
-        .descriptorSize = MapDescriptorSize(type),
+        .descriptorSize = map_descriptor_size(type),
         .binding = binding,
         .descriptorIndex = descriptor_index,
         .addr_info = {
@@ -543,22 +545,21 @@ namespace gestalt::foundation {
     };
 
       update_infos_.emplace_back(update_info);
-      descriptor_binding.descriptor_size = MapDescriptorSize(type);
+      descriptor_binding.descriptor_size = map_descriptor_size(type);
 
       return *this;
     }
     DescriptorBufferInstance& write_image_array(
         const uint32 binding, const VkDescriptorType type,
         const std::vector<VkDescriptorImageInfo>& image_infos, const uint32 first_descriptor = 0) {
-      auto binding_it = bindings_.find(binding);
+      const auto binding_it = bindings_.find(binding);
       if (binding_it == bindings_.end()) {
         throw std::runtime_error("Invalid binding index.");
-        return *this;
       }
 
       DescriptorBinding& descriptor_binding = binding_it->second;
 
-      const size_t descriptor_size = MapDescriptorSize(type);
+      const size_t descriptor_size = map_descriptor_size(type);
       for (size_t i = 0; i < image_infos.size(); ++i) {
         DescriptorUpdate update_info = {
             .type = type,
@@ -575,7 +576,6 @@ namespace gestalt::foundation {
 
       return *this;
     }
-
   };
 
 

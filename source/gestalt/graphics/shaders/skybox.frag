@@ -42,6 +42,7 @@ layout(set = 1, binding = 2) readonly buffer PointLightBuffer
 };
 
 layout(set = 2, binding = 0) uniform sampler2D scene_lit;
+layout(set = 2, binding = 1) uniform samplerCube texEnvMap;
 
 layout( push_constant ) uniform constants
 {
@@ -97,6 +98,7 @@ vec3 computeScattering(vec3 dir, vec3 lightDir, vec3 betaR, vec3 betaM, vec3 sun
 }
 
 void main() {
+#if 0
     vec3 dir = normalize(TexCoords);
 
     // Sunlight intensity and direction
@@ -111,4 +113,16 @@ void main() {
 
     // Output the final sky color
     FragColor = vec4(scattering, 1.0);
+
+#else
+    
+    // Normalize the incoming direction (TexCoords)
+    vec3 dir = normalize(TexCoords);
+
+    // Sample the environment texture using the normalized direction
+    vec4 envColor = texture(texEnvMap, dir);
+
+    // Output the sampled color directly for debugging
+    FragColor = envColor;
+#endif
 }

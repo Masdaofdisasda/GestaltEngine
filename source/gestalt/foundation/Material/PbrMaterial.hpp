@@ -4,6 +4,9 @@
 #include "VulkanTypes.hpp"
 #include "Resources/TextureHandleOld.hpp"
 #include "MaterialFlags.hpp"
+#include "glm/vec2.hpp"
+#include "glm/vec3.hpp"
+#include "glm/vec4.hpp"
 
 namespace gestalt::foundation {
 

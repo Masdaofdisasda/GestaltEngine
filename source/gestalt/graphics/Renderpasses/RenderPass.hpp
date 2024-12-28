@@ -20,7 +20,6 @@ namespace gestalt::graphics::fg {
   public:
     [[nodiscard]] std::string_view get_name() const { return name_; }
     virtual std::vector<ResourceBinding<ResourceInstance>> get_resources(ResourceUsage usage) = 0;
-    virtual VkPipelineBindPoint get_bind_point() = 0;
     virtual std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers()
         = 0; 
     virtual void execute(CommandBuffer cmd) = 0;
@@ -69,8 +68,6 @@ namespace gestalt::graphics::fg {
     std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
       return compute_pipeline_.get_descriptor_buffers();
     }
-
-    VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point();}
 
     void execute(const CommandBuffer cmd) override {
       const auto command_count = resources_.get_buffer_binding(1, 7).resource;
@@ -127,8 +124,6 @@ namespace gestalt::graphics::fg {
     std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
       return compute_pipeline_.get_descriptor_buffers();
     }
-
-    VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
 
     void execute(const CommandBuffer cmd) override {
       const auto group_count = resources_.get_buffer_binding(0, 8).resource;
@@ -213,7 +208,7 @@ namespace gestalt::graphics::fg {
                   .set_multisampling_none()
                   .disable_blending()
                   .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-                  .set_depth_format(resources_.get_depth_attachment()->get_format())
+                  .set_depth_format(resources_.get_depth_attachment())
                   .build_pipeline_info()) {}
 
     std::vector<ResourceBinding<ResourceInstance>> get_resources(
@@ -224,8 +219,6 @@ namespace gestalt::graphics::fg {
     std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
       return graphics_pipeline_.get_descriptor_buffers();
     }
-
-    VkPipelineBindPoint get_bind_point() override { return graphics_pipeline_.get_bind_point(); }
 
     void execute(const CommandBuffer cmd) override {
       auto clear_depth = VkClearDepthStencilValue{1.0f, 0};
@@ -286,8 +279,6 @@ namespace gestalt::graphics::fg {
       return compute_pipeline_.get_descriptor_buffers();
     }
 
-    VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
-
     void execute(const CommandBuffer cmd) override {
       const auto command_count = resources_.get_buffer_binding(1, 7).resource;
 
@@ -342,7 +333,6 @@ namespace gestalt::graphics::fg {
     std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
       return compute_pipeline_.get_descriptor_buffers();
     }
-    VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
 
     void execute(const CommandBuffer cmd) override {
       const auto group_count = resources_.get_buffer_binding(0, 8).resource;
@@ -430,7 +420,8 @@ namespace gestalt::graphics::fg {
                   .set_multisampling_none()
                   .disable_blending(3)
                   .enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL)
-                  .set_depth_format(resources_.get_depth_attachment()->get_format())
+                  .set_color_attachment_formats(resources_.get_color_attachments())
+                  .set_depth_format(resources_.get_depth_attachment())
                   .build_pipeline_info()) {}
 
     std::vector<ResourceBinding<ResourceInstance>> get_resources(
@@ -442,12 +433,11 @@ namespace gestalt::graphics::fg {
       return graphics_pipeline_.get_descriptor_buffers();
     }
 
-    VkPipelineBindPoint get_bind_point() override { return graphics_pipeline_.get_bind_point(); }
-
     void execute(const CommandBuffer cmd) override {
+      auto clear_color = VkClearColorValue{0.0f, 0.0f, 0.0f, 0.0f};
       auto clear_depth = VkClearDepthStencilValue{1.0f, 0};
       graphics_pipeline_.begin_render_pass(cmd, resources_.get_color_attachments(),
-                                           resources_.get_depth_attachment(), std::nullopt,
+                                           resources_.get_depth_attachment(), {clear_color},
                                            {clear_depth});
       graphics_pipeline_.bind(cmd);
 
@@ -506,8 +496,6 @@ namespace gestalt::graphics::fg {
     std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
       return compute_pipeline_.get_descriptor_buffers();
     }
-
-    VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
 
     void execute(const CommandBuffer cmd) override {
       compute_pipeline_.bind(cmd);
@@ -590,8 +578,6 @@ namespace gestalt::graphics::fg {
    std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
      return compute_pipeline_.get_descriptor_buffers();
    }
-
-    VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
 
     void execute(const CommandBuffer cmd) override {
       compute_pipeline_.bind(cmd);
@@ -710,8 +696,6 @@ namespace gestalt::graphics::fg {
       return compute_pipeline_.get_descriptor_buffers();
     }
 
-    VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
-
     void execute(const CommandBuffer cmd) override {
       compute_pipeline_.bind(cmd);
 
@@ -779,8 +763,6 @@ namespace gestalt::graphics::fg {
       return compute_pipeline_.get_descriptor_buffers();
     }
 
-    VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
-
     void execute(const CommandBuffer cmd) override {
       compute_pipeline_.bind(cmd);
 
@@ -847,8 +829,6 @@ namespace gestalt::graphics::fg {
       return compute_pipeline_.get_descriptor_buffers();
     }
 
-    VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
-
     void execute(const CommandBuffer cmd) override {
       compute_pipeline_.bind(cmd);
 
@@ -900,8 +880,6 @@ namespace gestalt::graphics::fg {
       return compute_pipeline_.get_descriptor_buffers();
     }
 
-    VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
-
     void execute(const CommandBuffer cmd) override {
       compute_pipeline_.bind(cmd);
 const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get_extent();
@@ -919,7 +897,9 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
 
   public:
     LightingPass(const std::shared_ptr<BufferInstance>& camera_buffer,
-                 const std::shared_ptr<BufferInstance>& material_buffer,
+                 const std::shared_ptr<ImageInstance>& tex_env_map,
+                 const std::shared_ptr<ImageInstance>& tex_env_map_irradiance,
+                 const std::shared_ptr<ImageInstance>& tex_bdrf_lut,
                  const std::shared_ptr<BufferInstance>& light_matrices,
                  const std::shared_ptr<BufferInstance>& directional_light,
                  const std::shared_ptr<BufferInstance>& point_light,
@@ -931,57 +911,66 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
                  const std::shared_ptr<ImageInstance>& integrated_light_scattering,
                  const std::shared_ptr<ImageInstance>& ambient_occlusion,
                  const std::shared_ptr<ImageInstance>& scene_lit,
-                 const VkSampler post_process_sampler, IGpu* gpu, const std::function<RenderConfig::LightingParams()>& push_constant_provider,
+                 const VkSampler post_process_sampler, IGpu* gpu,
+                 const std::function<RenderConfig::LightingParams()>& push_constant_provider,
                  const std::function<PerFrameData()>& camera_provider,
                  const std::function<uint32()>& dir_light_count_provider,
-                 const std::function<uint32()>& point_light_count_provider
-    )
-        : RenderPass("Lighting Pass"), resources_(std::move(
+                 const std::function<uint32()>& point_light_count_provider)
+        : RenderPass("Lighting Pass"),
+          resources_(std::move(
               ResourceComponentBindings()
-              .add_binding(0, 0, camera_buffer, ResourceUsage::READ,
-                           VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(0, 0, camera_buffer, ResourceUsage::READ,
+                               VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
 
-              // TODO add textures
-              .add_binding(1, 4, material_buffer, ResourceUsage::READ,
-                           VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
-
-              .add_binding(2, 0, light_matrices, ResourceUsage::READ,
-                           VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
-              .add_binding(2, 1, directional_light, ResourceUsage::READ,
-                           VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
-              .add_binding(2, 2, point_light, ResourceUsage::READ,
-                           VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
-
-              .add_binding(3, 0, g_buffer_1, post_process_sampler, ResourceUsage::READ,
-                           VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                           VK_SHADER_STAGE_COMPUTE_BIT)
-              .add_binding(3, 1, g_buffer_2, post_process_sampler, ResourceUsage::READ,
-                           VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                           VK_SHADER_STAGE_COMPUTE_BIT)
-              .add_binding(3, 2, g_buffer_3, post_process_sampler, ResourceUsage::READ,
-                           VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                           VK_SHADER_STAGE_COMPUTE_BIT)
-              .add_binding(3, 3, g_buffer_depth, post_process_sampler, ResourceUsage::READ,
-                           VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                           VK_SHADER_STAGE_COMPUTE_BIT)
-              .add_binding(3, 4, shadow_map, post_process_sampler, ResourceUsage::READ,
-                           VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                           VK_SHADER_STAGE_COMPUTE_BIT)
-              .add_binding(3, 5, integrated_light_scattering, post_process_sampler,
-                               ResourceUsage::READ, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                           VK_SHADER_STAGE_COMPUTE_BIT)
-              .add_binding(3, 6, ambient_occlusion, post_process_sampler, ResourceUsage::READ,
+                  .add_binding(1, 0, tex_env_map, post_process_sampler, ResourceUsage::READ,
                                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                VK_SHADER_STAGE_COMPUTE_BIT)
-              .add_binding(3, 7, scene_lit, nullptr, ResourceUsage::WRITE,
-                           VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT)
-              .add_push_constant(sizeof(RenderConfig::LightingParams),
-                                 VK_SHADER_STAGE_COMPUTE_BIT))),
+                  .add_binding(1, 1, tex_env_map_irradiance, post_process_sampler, ResourceUsage::READ,
+                               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                               VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(1, 2, tex_bdrf_lut, post_process_sampler, ResourceUsage::READ,
+                               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                               VK_SHADER_STAGE_COMPUTE_BIT)
+
+                  .add_binding(2, 0, light_matrices, ResourceUsage::READ,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(2, 1, directional_light, ResourceUsage::READ,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(2, 2, point_light, ResourceUsage::READ,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+
+                  .add_binding(3, 0, g_buffer_1, post_process_sampler, ResourceUsage::READ,
+                               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                               VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(3, 1, g_buffer_2, post_process_sampler, ResourceUsage::READ,
+                               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                               VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(3, 2, g_buffer_3, post_process_sampler, ResourceUsage::READ,
+                               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                               VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(3, 3, g_buffer_depth, post_process_sampler, ResourceUsage::READ,
+                               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                               VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(3, 4, shadow_map, post_process_sampler, ResourceUsage::READ,
+                               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                               VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(3, 5, integrated_light_scattering, post_process_sampler,
+                               ResourceUsage::READ, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                               VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(3, 6, ambient_occlusion, post_process_sampler, ResourceUsage::READ,
+                               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                               VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(3, 7, scene_lit, nullptr, ResourceUsage::WRITE,
+                               VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_push_constant(sizeof(RenderConfig::LightingParams),
+                                     VK_SHADER_STAGE_COMPUTE_BIT))),
           compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
                             resources_.get_buffer_bindings(), resources_.get_image_array_bindings(),
-                            resources_.get_push_constant_range(),
-                            "pbr_lighting.comp.spv"),
-          push_constant_provider_(push_constant_provider), camera_provider_(camera_provider), dir_light_count_provider_(dir_light_count_provider), point_light_count_provider_(point_light_count_provider) {}
+                            resources_.get_push_constant_range(), "pbr_lighting.comp.spv"),
+          push_constant_provider_(push_constant_provider),
+          camera_provider_(camera_provider),
+          dir_light_count_provider_(dir_light_count_provider),
+          point_light_count_provider_(point_light_count_provider) {}
 
     std::vector<ResourceBinding<ResourceInstance>> get_resources(ResourceUsage usage) override {
       return resources_.get_resources(usage);
@@ -990,8 +979,6 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
     std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
       return compute_pipeline_.get_descriptor_buffers();
     }
-
-    VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
 
     void execute(CommandBuffer cmd) override {
       compute_pipeline_.bind(cmd);
@@ -1019,6 +1006,7 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
     SkyboxPass(const std::shared_ptr<BufferInstance>& camera_buffer,
                const std::shared_ptr<BufferInstance>& directional_light,
                const std::shared_ptr<ImageInstance>& scene_lit,
+               const std::shared_ptr<ImageInstance>& texEnvMap,
                const std::shared_ptr<ImageInstance>& scene_skybox,
                 const std::shared_ptr<ImageInstance>& g_buffer_depth, 
         const VkSampler post_process_sampler,
@@ -1035,6 +1023,8 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
                                VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
                   .add_binding(2, 0, scene_lit, post_process_sampler, ResourceUsage::READ,
                                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+                  .add_binding(2, 1, texEnvMap, post_process_sampler, ResourceUsage::READ,
+                               VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
                   .add_push_constant(sizeof(RenderConfig::SkyboxParams),
                                      VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
                   .add_attachment(scene_skybox)
@@ -1050,7 +1040,8 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
                   .set_multisampling_none()
                   .disable_blending()
                   .enable_depthtest(false, VK_COMPARE_OP_LESS_OR_EQUAL)
-                  .set_depth_format(resources_.get_depth_attachment()->get_format())
+                  .set_color_attachment_formats(resources_.get_color_attachments())
+                  .set_depth_format(resources_.get_depth_attachment())
                   .build_pipeline_info()), push_constant_provider_(push_constant_provider) {}
 
     std::vector<ResourceBinding<ResourceInstance>> get_resources(
@@ -1062,11 +1053,10 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
       return graphics_pipeline_.get_descriptor_buffers();
     }
 
-    VkPipelineBindPoint get_bind_point() override { return graphics_pipeline_.get_bind_point(); }
-
     void execute(const CommandBuffer cmd) override {
+      auto clear_color = VkClearColorValue{0.0f, 0.0f, 0.0f, 0.0f};
       graphics_pipeline_.begin_render_pass(cmd, resources_.get_color_attachments(),
-                                           resources_.get_depth_attachment());
+                                           resources_.get_depth_attachment(), {clear_color});
       graphics_pipeline_.bind(cmd);
 
       auto push_constant = push_constant_provider_();
@@ -1113,8 +1103,6 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
     std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
       return compute_pipeline_.get_descriptor_buffers();
     }
-
-    VkPipelineBindPoint get_bind_point() override { return compute_pipeline_.get_bind_point(); }
 
     void execute(CommandBuffer cmd) override {
       compute_pipeline_.bind(cmd);

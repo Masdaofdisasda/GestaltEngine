@@ -9,29 +9,9 @@ layout(local_size_x = 8, local_size_y = 8) in;
 // set 0
 #include "per_frame_structs.glsl"
 // set 1
-//layout(set = 1, binding = 0) uniform samplerCube texEnvMap;
-//layout(set = 1, binding = 1) uniform samplerCube texEnvMapIrradiance;
-//layout(set = 1, binding = 2) uniform sampler2D texBdrfLut;
-
-struct MaterialConstants {
-    uint16_t albedo_tex_index;
-    uint16_t metal_rough_tex_index;
-    uint16_t normal_tex_index;
-    uint16_t emissive_tex_index;
-    uint16_t occlusion_tex_index;
-    uint textureFlags;
-
-    vec4 albedo_factor;
-    vec2 metal_rough_factor;
-    float occlusionStrength;
-    float alpha_cutoff;
-    vec3 emissiveColor;
-    float emissiveStrength; 
-};
-
-layout(std430, set = 1, binding = 4) readonly buffer MaterialData {
-    MaterialConstants materialData[256];
-};
+layout(set = 1, binding = 0) uniform samplerCube texEnvMap;
+layout(set = 1, binding = 1) uniform samplerCube texEnvMapIrradiance;
+layout(set = 1, binding = 2) uniform sampler2D texBdrfLut;
 
 #include "pbr.glsl"
 #include "shadow_mapping.glsl"
@@ -140,7 +120,7 @@ void main() {
 
 	vec4 Kd = vec4(albedoMetal.rgb, 1.0);
 
-	vec3 n = SignedOctDecode(normalRough.rgb);
+	vec3 n = normalRough.rgb; //SignedOctDecode(normalRough.rgb);
 
 	vec4 Ke = vec4(emissiveOcclusion.rgb, 1.0);
 	
@@ -169,7 +149,7 @@ void main() {
 	calculatePBRInputsMetallicRoughness(Kd, n, viewPos.xyz, worldPos, MeR, materialInfo);
 
 	// Calculate lighting contribution from image based lighting source (IBL)
-	/*
+	
 	if (params.ibl_mode == 0) {
 		materialInfo.f_diffuse_ibl += getIBLRadianceLambertian(materialInfo, texBdrfLut, texEnvMapIrradiance);
 		materialInfo.f_specular_ibl += getIBLRadianceGGX(materialInfo, texBdrfLut, texEnvMap);
@@ -177,7 +157,7 @@ void main() {
 		materialInfo.f_diffuse_ibl += getIBLRadianceLambertian(materialInfo, texBdrfLut, texEnvMapIrradiance);
 	} else if (params.ibl_mode == 2) {
 		materialInfo.f_specular_ibl += getIBLRadianceGGX(materialInfo, texBdrfLut, texEnvMap);
-	}*/
+	}
 
 	// directional light contribution
 	if (params.shading_mode == 0 || params.shading_mode == 1) {
@@ -286,7 +266,6 @@ void main() {
 		outColor = vec4(normalize(normalizedLightSpacePos) * 0.5 + 0.5, 1.0);
 	}
 
-	//outColor = vec4(ao.rrr * 0.5 * Kd.rgb * max(shadow, 0.1), 1.0);
 	imageStore(outputImage, pixel_coord, outColor);
 
 }

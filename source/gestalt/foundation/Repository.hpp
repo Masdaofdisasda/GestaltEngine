@@ -138,6 +138,12 @@ namespace gestalt::foundation {
 
       TextureHandleOld error_checkerboard_image;
       std::shared_ptr<ImageInstance> error_checkerboard_image_instance;
+
+      std::vector<VkSampler> get_samplers() {
+        return {color_sampler, metallic_roughness_sampler, normal_sampler, emissive_sampler,
+                occlusion_sampler};
+      }
+
     } default_material_ = {};
 
     std::unique_ptr<MaterialBuffers> material_buffers = std::make_unique<MaterialBuffers>();
