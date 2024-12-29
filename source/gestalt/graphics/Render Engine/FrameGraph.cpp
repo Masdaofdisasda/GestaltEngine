@@ -98,7 +98,9 @@ namespace gestalt::graphics::fg {
       }
     }
 
-    print_graph();
+    // for debugging:
+    //print_graph();
+
     topological_sort();
 
     for (const auto& node : sorted_nodes_) {

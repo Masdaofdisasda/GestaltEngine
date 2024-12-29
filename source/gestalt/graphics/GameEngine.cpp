@@ -42,8 +42,7 @@ namespace gestalt {
                          descriptor_layout_builder_.get(), repository_.get(), frame_provider_.get());
 
     render_pipeline_ = std::make_unique<graphics::RenderEngine>();
-    render_pipeline_->init(gpu_.get(), window_.get(), resource_manager_.get(),
-                           resource_allocator_.get(), repository_.get(),
+    render_pipeline_->init(gpu_.get(), window_.get(), resource_allocator_.get(), repository_.get(),
                            imgui_.get(), frame_provider_.get());
 
     register_gui_actions();

@@ -65,6 +65,10 @@ namespace gestalt::graphics {
       pipeline_barrier2(dependencyInfo);
     }
 
+    void blit_image_2(const VkBlitImageInfo2& blit_image_info) const {
+      vkCmdBlitImage2(cmd, &blit_image_info);
+    }
+
     void bind_descriptor_buffers_ext(const uint32_t buffer_count,
                                      const VkDescriptorBufferBindingInfoEXT* binding_infos) const {
       vkCmdBindDescriptorBuffersEXT(cmd, buffer_count, binding_infos);

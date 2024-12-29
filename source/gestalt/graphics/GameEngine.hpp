@@ -8,6 +8,7 @@
 #include "ECS/ECSManager.hpp"
 #include "FrameProvider.hpp"
 #include "ResourceAllocator.hpp"
+#include "ResourceManager.hpp"
 #include "TmeTrackingService.hpp"
 #include "Utils/vk_descriptors.hpp"
 
