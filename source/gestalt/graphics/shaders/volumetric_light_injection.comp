@@ -34,9 +34,9 @@ layout(push_constant) uniform constants
 
 layout (local_size_x = FROXEL_DISPATCH_X, local_size_y = FROXEL_DISPATCH_Y, local_size_z = FROXEL_DISPATCH_Z) in;
 
-layout(binding = 0) uniform sampler2D blue_noise;
-layout(binding = 1) uniform sampler3D volumetric_noise_texture;
-layout(binding = 2) writeonly uniform image3D froxel_data_texture;
+layout(set = 0, binding = 0) uniform sampler2D blue_noise;
+layout(set = 0, binding = 1) uniform sampler3D volumetric_noise_texture;
+layout(set = 0, binding = 2, rgba16f) writeonly uniform image3D froxel_data_texture;
 
 void main() {
     ivec3 froxel_coord = ivec3(gl_GlobalInvocationID.xyz);
@@ -80,6 +80,6 @@ void main() {
 
         scattering_extinction += scattering_extinction_from_color_density( box_fog_color.rgb, PushConstants.box_fog_density * fog_noise, PushConstants.scattering_factor);
     }
-
+    
     imageStore( froxel_data_texture, froxel_coord.xyz, scattering_extinction );
 }

@@ -44,9 +44,12 @@ namespace gestalt::graphics::fg {
     std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> descriptor_buffers_;
     VkPipelineLayout pipeline_layout_ = nullptr;
     VkPipeline pipeline_ = nullptr;
-    std::unordered_map<uint32, VkDescriptorSetLayout> descriptor_set_layouts_;
+    std::map<uint32, VkDescriptorSetLayout> descriptor_set_layouts_;
     std::unordered_map<VkShaderStageFlagBits, VkPipelineShaderStageCreateInfo> shader_stages_;
     std::unordered_map<VkShaderStageFlagBits, VkShaderModule> shader_modules_;
+
+    uint32 image_array_set = 0;
+    std::optional<ResourceBinding<ImageArrayInstance>> image_array_binding_;
 
     void create_descriptor_layout(
         std::map<uint32, std::map<uint32, VkDescriptorSetLayoutBinding>>&&
@@ -219,11 +222,11 @@ namespace gestalt::graphics::fg {
               image_infos.push_back({material.config.textures.albedo_sampler,
                                      material.config.textures.albedo_image.imageView,
                                      VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
-              image_infos.push_back({material.config.textures.normal_sampler,
-                                     material.config.textures.normal_image.imageView,
-                                     VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
               image_infos.push_back({material.config.textures.metal_rough_sampler,
                                      material.config.textures.metal_rough_image.imageView,
+                                     VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
+              image_infos.push_back({material.config.textures.normal_sampler,
+                                     material.config.textures.normal_image.imageView,
                                      VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
                   image_infos.push_back({material.config.textures.occlusion_sampler,
                                      material.config.textures.occlusion_image.imageView,
@@ -234,6 +237,8 @@ namespace gestalt::graphics::fg {
             }
               descriptor_buffer->write_image_array(info.binding_index, info.descriptor_type,
                                                    image_infos);
+            image_array_set = info.set_index;
+            image_array_binding_ = binding;
           }
         }
 
@@ -282,6 +287,32 @@ namespace gestalt::graphics::fg {
 
     void bind_descriptors(const CommandBuffer cmd,
                           const VkPipelineBindPoint bind_point) {
+
+        if (image_array_binding_.has_value()) {
+        std::vector<VkDescriptorImageInfo> image_infos;
+        const auto& info = image_array_binding_.value().info;
+        for (const auto& material : image_array_binding_.value().resource->get_materials()) {
+          image_infos.push_back({material.config.textures.albedo_sampler,
+                                 material.config.textures.albedo_image.imageView,
+                                 VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
+          image_infos.push_back({material.config.textures.metal_rough_sampler,
+                                 material.config.textures.metal_rough_image.imageView,
+                                 VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
+          image_infos.push_back({material.config.textures.normal_sampler,
+                                 material.config.textures.normal_image.imageView,
+                                 VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
+          image_infos.push_back({material.config.textures.occlusion_sampler,
+                                 material.config.textures.occlusion_image.imageView,
+                                 VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
+          image_infos.push_back({material.config.textures.emissive_sampler,
+                                 material.config.textures.emissive_image.imageView,
+                                 VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
+        }
+        descriptor_buffers_.at(image_array_set)
+            ->write_image_array(info.binding_index, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_infos)
+            .update();
+        }
+
 
         std::vector<VkDescriptorBufferBindingInfoEXT> buffer_bindings;
         buffer_bindings.reserve(descriptor_buffers_.size());

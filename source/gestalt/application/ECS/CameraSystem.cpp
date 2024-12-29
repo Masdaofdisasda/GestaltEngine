@@ -31,27 +31,6 @@ namespace gestalt::application {
                                 | VK_SHADER_STAGE_FRAGMENT_BIT)
               .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
 
-    for (int i = 0; i < getFramesInFlight(); ++i) {
-      per_frame_data_buffers->uniform_buffers[i] = resource_allocator_->create_buffer(
-          BufferTemplate("per_frame_data_buffer", sizeof(PerFrameData),
-                         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU));
-
-
-      per_frame_data_buffers->descriptor_buffers[i]
-          = resource_manager_->create_descriptor_buffer(descriptor_layout, 1, 0);
-
-      VkBufferDeviceAddressInfo deviceAdressInfo{
-          .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-          .buffer = per_frame_data_buffers->uniform_buffers[i]->get_buffer_handle()};
-      const VkDeviceAddress per_frame_data_buffer_address
-          = vkGetBufferDeviceAddress(gpu_->getDevice(), &deviceAdressInfo);
-
-      per_frame_data_buffers->descriptor_buffers[i]
-          ->write_buffer(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, per_frame_data_buffer_address,
-                         sizeof(PerFrameData))
-          .update();
-    }
-
     per_frame_data_buffers->uniform_buffers_instance
         = resource_allocator_->create_buffer(BufferTemplate(
             "per Frame Buffer", sizeof(PerFrameData),
@@ -127,14 +106,14 @@ namespace gestalt::application {
             if constexpr (std::is_same_v<T, PerspectiveProjectionData>) {
               near = projection_data.near;
               far = projection_data.far;
-              return glm::perspective(projection_data.fov, aspect_ratio_,
-                                           projection_data.near, projection_data.far);
+              return glm::perspective(projection_data.fov, aspect_ratio_, projection_data.near,
+                                      projection_data.far);
             } else if constexpr (std::is_same_v<T, OrthographicProjectionData>) {
               near = projection_data.near;
               far = projection_data.far;
               return glm::orthoRH_ZO(projection_data.left, projection_data.right,
-                                     projection_data.bottom,
-                                projection_data.top, projection_data.near, projection_data.far);
+                                     projection_data.bottom, projection_data.top,
+                                     projection_data.near, projection_data.far);
             } else {
               return glm::mat4(1.0f);
             }
@@ -167,7 +146,7 @@ namespace gestalt::application {
         buffers->data[frame].frustum[5] = NormalizePlane(projection_t[3] - projection_t[2]);
       }
 
-      if (false) {
+      if constexpr (false) {
         const glm::mat4 view_matrix = repository_->light_view_projections.get(0).view;
         glm::mat4 projection = repository_->light_view_projections.get(0).proj;
 
@@ -196,20 +175,11 @@ namespace gestalt::application {
       }
 
       void* mapped_data;
-      const VmaAllocation allocation = buffers->uniform_buffers[frame]->get_allocation();
+      const VmaAllocation allocation = buffers->uniform_buffers_instance->get_allocation();
       VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation, &mapped_data));
       const auto scene_uniform_data = static_cast<PerFrameData*>(mapped_data);
       *scene_uniform_data = buffers->data[frame];
-      vmaUnmapMemory(gpu_->getAllocator(), buffers->uniform_buffers[frame]->get_allocation());
-
-      {
-        void* mapped_data;
-        const VmaAllocation allocation = buffers->uniform_buffers_instance->get_allocation();
-        VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation, &mapped_data));
-        const auto scene_uniform_data = static_cast<PerFrameData*>(mapped_data);
-        *scene_uniform_data = buffers->data[frame];
-        vmaUnmapMemory(gpu_->getAllocator(), allocation);
-      }
+      vmaUnmapMemory(gpu_->getAllocator(), allocation);
 
       // TODO
       meshlet_push_constants.pyramidWidth = 0;
@@ -222,10 +192,10 @@ namespace gestalt::application {
 
       const auto& buffers = repository_->per_frame_data_buffers;
 
-      for (int i = 0; i < 2; ++i) {
+      for (int i = 0; i < kDefaultFramesInFlight; ++i) {
         resource_manager_->destroy_descriptor_buffer(buffers->descriptor_buffers[i]);
-        resource_allocator_->destroy_buffer(buffers->uniform_buffers[i]);
       }
+      resource_allocator_->destroy_buffer(buffers->uniform_buffers_instance);
 
     }
 

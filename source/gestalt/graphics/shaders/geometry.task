@@ -65,8 +65,8 @@ void main()
     bool visible = valid;
 
     // backface cone culling
-    //TODO blender spheres cause bugs with cone culling
-    visible = visible && !coneCull(center, radius, cone_axis, cone_cutoff, vec3(0, 0, 0));
+    //TODO spheres cause bugs with cone culling
+    //visible = visible && !coneCull(center, radius, cone_axis, cone_cutoff, vec3(0, 0, 0));
     
     // view frustum culling
     if (PushConstants.cullFlags == 1) {

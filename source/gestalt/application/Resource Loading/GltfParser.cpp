@@ -68,7 +68,7 @@ namespace gestalt::application {
     std::vector<Vertex> vertices = extract_vertices(gltf, primitive);
 
     MeshProcessor::optimize_mesh(vertices, indices);
-    MeshProcessor::simplify_mesh(vertices, indices, 8192);
+    //MeshProcessor::simplify_mesh(vertices, indices, 8192);
 
     auto [vertex_positions, vertex_data] = MeshProcessor::compress_vertex_data(vertices);
 

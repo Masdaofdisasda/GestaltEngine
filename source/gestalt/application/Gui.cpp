@@ -582,7 +582,7 @@ namespace gestalt::application {
 
     void Gui::sky_settings() {
       if (ImGui::Begin("Sky & Atmosphere")) {
-        auto& [rayleighScattering, unused1, ozoneAbsorption, unused2, mieScattering, unused3]
+        auto& [rayleighScattering, showSkybox, ozoneAbsorption, unused2, mieScattering, unused3]
             = actions_.get_render_config().skybox;
 
         // Rayleigh Scattering Coefficients
@@ -593,6 +593,14 @@ namespace gestalt::application {
                            ImGuiSliderFlags_Logarithmic);
         ImGui::SliderFloat("Rayleigh Blue", &rayleighScattering.z, 0.0f, 1e-5f, "%.8f",
                            ImGuiSliderFlags_Logarithmic);
+
+        const char* sky_box_options[] = {"Atmosphere", "Environment Map"};
+        int current_shadow_mode = showSkybox;
+        if (ImGui::Combo("Shadow Mode", &current_shadow_mode, sky_box_options,
+                         IM_ARRAYSIZE(sky_box_options))) {
+          showSkybox = current_shadow_mode;
+        }
+
 
         // Ozone Absorption Coefficients
         ImGui::Text("Ozone Absorption");
@@ -684,8 +692,9 @@ namespace gestalt::application {
           ImGui::SliderFloat("Jitter Scale", &params.temporal_reprojection_jitter_scale, 0.0f, 1.0f,
                              "%.2f");
 
-          // Density Modifier (controls overall fog density, typical range [0.1, 5.0])
-          ImGui::SliderFloat("Density Modifier", &params.density_modifier, 0.1f, 5.0f, "%.2f");
+          // Density Modifier (controls overall fog density, typical range [0.0001, 5.0])
+          ImGui::SliderFloat("Density Modifier", &params.density_modifier, 0.0001f, 5.0f, "%.4f",
+                             ImGuiSliderFlags_Logarithmic);
 
           // Noise Scale (scales noise for fog, typical range [0.1, 10.0])
           ImGui::SliderFloat("Noise Scale", &params.noise_scale, 0.1f, 10.0f, "%.2f");
@@ -703,19 +712,20 @@ namespace gestalt::application {
                              0.0f, 10.0f, "%.2f");
 
           // Height Fog Density (controls fog density along the Y-axis, range [0.0, 1.0])
-          ImGui::SliderFloat("Height Fog Density", &params.height_fog_density, 0.0f, 1.0f, "%.3f",
+          ImGui::SliderFloat("Height Fog Density", &params.height_fog_density, 0.0001f, 5.0f, "%.4f",
                              ImGuiSliderFlags_Logarithmic);
 
           // Height Fog Falloff (range [0.1, 10.0] for how quickly fog density falls off with
           // height)
-          ImGui::SliderFloat("Height Fog Falloff", &params.height_fog_falloff, 0.f, 2.0f, "%.2f",
+          ImGui::SliderFloat("Height Fog Falloff", &params.height_fog_falloff, 0.0001f, 2.0f, "%.2f",
                              ImGuiSliderFlags_Logarithmic);
 
           // Box Position (world-space position of the fog box, wide range)
           ImGui::SliderFloat3("Box Position", &params.box_position.x, -100.0f, 100.0f, "%.2f");
 
           // Box Fog Density (density of the fog within the box, range [0.0, 1.0])
-          ImGui::SliderFloat("Box Fog Density", &params.box_fog_density, 0.0f, 1.0f, "%.3f");
+          ImGui::SliderFloat("Box Fog Density", &params.box_fog_density, 0.0001f, 5.0f, "%.4f",
+                             ImGuiSliderFlags_Logarithmic);
 
           // Box Size (size of the fog box in world-space units, typical range [1.0, 100.0])
           ImGui::SliderFloat3("Box Size", &params.box_size.x, 1.0f, 100.0f, "%.2f");

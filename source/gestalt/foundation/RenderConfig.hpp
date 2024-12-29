@@ -21,11 +21,11 @@ namespace gestalt::foundation {
 
       struct SkyboxParams {
         glm::vec3 betaR = glm::vec3(5.22e-6, 9.19e-6, 33.1e-6);
-        float32 pad1;
+        uint32 showEnviromentMap{1};
         glm::vec3 betaA = glm::vec3(0.000425, 0.001881, 0.000085);
         float32 pad2;
         glm::vec3 betaM = glm::vec3(5.61e-6, 2.1e-5, 2.1e-5);
-        float pad3;
+        float32 pad3;
       } skybox{};
 
       bool enable_ssao{true};
@@ -78,14 +78,14 @@ namespace gestalt::foundation {
       struct VolumetricLightingParams {
         glm::vec2 halton_xy{0.f, 0.f};  // no jitter
         float32 temporal_reprojection_jitter_scale{0.f};
-        float32 density_modifier{1.f};
+        float32 density_modifier{0.0001f};
 
         float32 noise_scale{0.1f};
         uint32 noise_type{0};
 
         float32 volumetric_noise_position_multiplier{1.f};
         float32 volumetric_noise_speed_multiplier{1.f};
-        float32 height_fog_density{0.3f};
+        float32 height_fog_density{0.01f};
         float32 height_fog_falloff{0.7f};
 
         glm::vec3 box_position{0.f};
@@ -94,8 +94,8 @@ namespace gestalt::foundation {
         int32 enable_spatial_filter{1};
 
         glm::vec3 box_size{10.f};
-        float32 scattering_factor{0.05f};
-        float32 phase_anisotropy{2.f};
+        float32 scattering_factor{0.01f};
+        float32 phase_anisotropy{5.4f};
         uint32 phase_type{3};
       } volumetric_lighting;
 

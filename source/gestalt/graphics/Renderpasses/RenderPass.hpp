@@ -735,7 +735,8 @@ namespace gestalt::graphics::fg {
   public:
     VolumetricLightingSpatialFilterPass(
         const std::shared_ptr<ImageInstance>& light_scattering,
-        const std::shared_ptr<ImageInstance>& froxel_data, const VkSampler post_process_sampler,
+        const std::shared_ptr<ImageInstance>& light_scattering_filtered,
+        const VkSampler post_process_sampler,
         const std::function<RenderConfig::VolumetricLightingParams()>& push_constant_provider,
         IGpu* gpu)
         : RenderPass("Volumetric Lighting Spatial Filter Pass"),
@@ -744,7 +745,7 @@ namespace gestalt::graphics::fg {
                   .add_binding(0, 0, light_scattering, post_process_sampler, ResourceUsage::READ,
                                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                VK_SHADER_STAGE_COMPUTE_BIT)
-                  .add_binding(0, 1, froxel_data, nullptr, ResourceUsage::WRITE,
+                  .add_binding(0, 1, light_scattering_filtered, nullptr, ResourceUsage::WRITE,
                                VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT)
                   .add_push_constant(sizeof(VolumetricLightingSpatialFilterPassConstants),
                                      VK_SHADER_STAGE_COMPUTE_BIT))),
@@ -795,7 +796,7 @@ namespace gestalt::graphics::fg {
 
   public:
     VolumetricLightingIntegrationPass(
-        const std::shared_ptr<ImageInstance>& froxel_data,
+        const std::shared_ptr<ImageInstance>& light_scattering_filtered,
         const std::shared_ptr<ImageInstance>& light_integrated,
         const VkSampler post_process_sampler,
         const std::function<RenderConfig::VolumetricLightingParams()>& push_constant_provider,
@@ -804,7 +805,8 @@ namespace gestalt::graphics::fg {
         : RenderPass("Volumetric Lighting Integration Pass"),
           resources_(std::move(
               ResourceComponentBindings()
-                  .add_binding(0, 0, froxel_data, post_process_sampler, ResourceUsage::READ,
+                  .add_binding(0, 0, light_scattering_filtered, post_process_sampler,
+                               ResourceUsage::READ,
                                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                VK_SHADER_STAGE_COMPUTE_BIT)
                   .add_binding(0, 1, light_integrated, nullptr, ResourceUsage::WRITE,
@@ -814,7 +816,7 @@ namespace gestalt::graphics::fg {
           compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
                             resources_.get_buffer_bindings(), resources_.get_image_array_bindings(),
                             resources_.get_push_constant_range(),
-                            "volumetric_light_spatial_filter.comp.spv"),
+                            "volumetric_light_integration.comp.spv"),
           push_constant_provider_(push_constant_provider),
           frame_provider_(frame_provider),
           camera_provider_(camera_provider)
@@ -845,7 +847,7 @@ namespace gestalt::graphics::fg {
       cmd.push_constants(compute_pipeline_.get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
                          sizeof(VolumetricLightingIntegrationPassConstants), &push_constants);
       const auto [width, height, _] = resources_.get_image_binding(0, 1).resource->get_extent();
-      cmd.dispatch(static_cast<uint32>(ceil(width / 8)), static_cast<uint32>(ceil(height / 8)), 128);
+      cmd.dispatch(static_cast<uint32>(ceil(width / 8)), static_cast<uint32>(ceil(height / 8)), 1);
     }
   };
 
@@ -883,7 +885,7 @@ namespace gestalt::graphics::fg {
     void execute(const CommandBuffer cmd) override {
       compute_pipeline_.bind(cmd);
 const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get_extent();
-      cmd.dispatch(static_cast<uint32>(ceil(width / 8)), static_cast<uint32>(ceil(height / 8)), 128);
+      cmd.dispatch(static_cast<uint32>(ceil(width / 8)), static_cast<uint32>(ceil(height / 8)), 64);
     }
   };
 
@@ -911,7 +913,8 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
                  const std::shared_ptr<ImageInstance>& integrated_light_scattering,
                  const std::shared_ptr<ImageInstance>& ambient_occlusion,
                  const std::shared_ptr<ImageInstance>& scene_lit,
-                 const VkSampler post_process_sampler, IGpu* gpu,
+                 const VkSampler post_process_sampler,
+                 const VkSampler cube_map_sampler, IGpu* gpu,
                  const std::function<RenderConfig::LightingParams()>& push_constant_provider,
                  const std::function<PerFrameData()>& camera_provider,
                  const std::function<uint32()>& dir_light_count_provider,
@@ -925,7 +928,7 @@ const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get
                   .add_binding(1, 0, tex_env_map, post_process_sampler, ResourceUsage::READ,
                                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                VK_SHADER_STAGE_COMPUTE_BIT)
-                  .add_binding(1, 1, tex_env_map_irradiance, post_process_sampler, ResourceUsage::READ,
+                  .add_binding(1, 1, tex_env_map_irradiance, cube_map_sampler, ResourceUsage::READ,
                                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                VK_SHADER_STAGE_COMPUTE_BIT)
                   .add_binding(1, 2, tex_bdrf_lut, post_process_sampler, ResourceUsage::READ,

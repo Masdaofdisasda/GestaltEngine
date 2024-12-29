@@ -128,7 +128,7 @@ namespace gestalt::graphics {
       return staging_buffer;
     }
 
-    void load_cubemap(const HdrImageData& image_data, VkImage image);
+    void load_cubemap(const HdrImageData& image_data, VkImage image, bool mipmap);
     void load_image(const ImageData& image_data, VkImage image);
 
   public:
@@ -153,7 +153,7 @@ namespace gestalt::graphics {
       VK_CHECK(vkCreateFence(gpu_->getDevice(), &fenceInfo, nullptr, &flushFence));
     }
 
-    void add_image(const std::filesystem::path& path, VkImage image, bool is_cubemap = false);
+    void add_image(const std::filesystem::path& path, VkImage image, bool is_cubemap = false, bool mipmap = false);
     void add_image(std::vector<unsigned char>& data, VkImage image, VkExtent3D extent);
 
     void enqueue(const std::function<void()>& task) {
@@ -212,7 +212,7 @@ namespace gestalt::graphics {
 
       [[nodiscard]] AllocatedImage allocate_image(std::string_view name, VkFormat format,
                                                   VkImageUsageFlags usage_flags, VkExtent3D extent,
-                                                VkImageAspectFlags aspect_flags, ImageType image_type) const;
+                                                VkImageAspectFlags aspect_flags, ImageType image_type, bool mipmap = false) const;
       [[nodiscard]] AllocatedBuffer allocate_buffer(std::string_view name, VkDeviceSize size,
                                                     VkBufferUsageFlags usage_flags,
                                                     VmaMemoryUsage memory_usage) const;
@@ -220,7 +220,6 @@ namespace gestalt::graphics {
     public:
       explicit ResourceAllocator(IGpu* gpu) : gpu_(gpu), task_queue_(gpu) {}
 
-      AllocatedImage load_and_create_cubemap(const std::filesystem::path& file_path);
       std::shared_ptr<ImageInstance> create_image(ImageTemplate&& image_template) override;
 
     std::shared_ptr<BufferInstance> create_buffer(

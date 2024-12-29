@@ -128,7 +128,9 @@ namespace gestalt::graphics::fg {
       };
 
       cmd.begin_debug_utils_label_ext(label_info);
+      cmd.global_barrier(); //TODO remove when 2 frames in flight is removed
       node->render_pass->execute(cmd);
+      cmd.global_barrier();
       cmd.end_debug_utils_label_ext();
     }
   }

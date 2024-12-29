@@ -86,14 +86,14 @@ namespace gestalt::graphics {
                               ImageType::kImage3D)
               .set_image_size(128, 128, 128)
               .build());
-      auto froxel_data_filtered = frame_graph_->add_resource(
-          ImageTemplate("Froxel Data Filtered")
+      auto light_scattering = frame_graph_->add_resource(
+          ImageTemplate("Light Scattering Texture")
               .set_image_type(TextureType::kColor, VK_FORMAT_R16G16B16A16_SFLOAT,
                               ImageType::kImage3D)
               .set_image_size(128, 128, 128)
               .build());
-      auto light_scattering = frame_graph_->add_resource(
-          ImageTemplate("Light Scattering Texture")
+      auto light_scattering_filtered = frame_graph_->add_resource(
+          ImageTemplate("Light Scattering Filtered")
               .set_image_type(TextureType::kColor, VK_FORMAT_R16G16B16A16_SFLOAT,
                               ImageType::kImage3D)
               .set_image_size(128, 128, 128)
@@ -121,6 +121,8 @@ namespace gestalt::graphics {
           .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
           .anisotropyEnable = VK_FALSE,
       });
+
+      auto cube_map_sampler = repository_->material_buffers->cube_map_sampler;
 
       // camera
       auto camera_buffer = frame_graph_->add_resource(
@@ -241,11 +243,11 @@ namespace gestalt::graphics {
           [&] { return repository_->point_lights.size(); }, gpu_);
 
       frame_graph_->add_pass<fg::VolumetricLightingSpatialFilterPass>(
-          light_scattering, froxel_data_filtered, post_process_sampler,
+          light_scattering, light_scattering_filtered, post_process_sampler,
           [&] { return resource_registry_->config_.volumetric_lighting; }, gpu_);
 
       frame_graph_->add_pass<fg::VolumetricLightingIntegrationPass>(
-          froxel_data_filtered, integrated_light_scattering, post_process_sampler,
+          light_scattering_filtered, integrated_light_scattering, post_process_sampler,
           [&] { return resource_registry_->config_.volumetric_lighting; },
           [&] { return frame_->get_current_frame_number(); },
           [&] {
@@ -256,7 +258,7 @@ namespace gestalt::graphics {
       frame_graph_->add_pass<fg::LightingPass>(
           camera_buffer, texEnvMap, texIrradianceMap, brdf_lut, light_matrices, directional_light, point_light,
           g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth, shadow_map,
-          integrated_light_scattering, ambient_occlusion_texture, scene_lit, post_process_sampler,
+          integrated_light_scattering, ambient_occlusion_texture, scene_lit, post_process_sampler, cube_map_sampler,
           gpu_, [&] { return resource_registry_->config_.lighting; },
           [&] {
             return repository_->per_frame_data_buffers->data.at(frame_->get_current_frame_index());

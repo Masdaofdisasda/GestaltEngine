@@ -35,23 +35,6 @@ namespace gestalt::graphics {
     }
   }
 
-  AllocatedImage ResourceAllocator::load_and_create_cubemap(
-      const std::filesystem::path& file_path) {
-
-    const ImageInfo image_info(file_path);
-    uint32 face_length = image_info.get_extent().width / 2;
-
-    const auto cube_map_face_size = VkExtent3D{face_length, face_length, 1};
-
-    const auto allocated_image
-        = allocate_image(file_path.filename().string(), VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT,
-                         cube_map_face_size,
-                         VK_IMAGE_ASPECT_COLOR_BIT, ImageType::kCubeMap);
-
-    task_queue_.add_image(file_path, allocated_image.image_handle, true);
-    return allocated_image;
-  }
-
   std::shared_ptr<ImageInstance> ResourceAllocator::create_image(ImageTemplate&& image_template) {
     if (image_template.get_format() == VK_FORMAT_UNDEFINED) {
       throw std::runtime_error("Image format must be specified.");
@@ -85,9 +68,9 @@ namespace gestalt::graphics {
         const auto allocated_image
             = allocate_image(path.filename().string(), VK_FORMAT_R32G32B32A32_SFLOAT,
                              usage_flags, cube_map_face_size,
-                             VK_IMAGE_ASPECT_COLOR_BIT, ImageType::kCubeMap);
+                             VK_IMAGE_ASPECT_COLOR_BIT, ImageType::kCubeMap, true);
 
-        task_queue_.add_image(path, allocated_image.image_handle, true);
+        task_queue_.add_image(path, allocated_image.image_handle, true, true);
         return std::make_unique<ImageInstance>(std::move(image_template), allocated_image, extent);
       }
 
@@ -128,6 +111,8 @@ namespace gestalt::graphics {
     if (!stbi_info(path.string().c_str(), &width, &height, &channels)) {
       throw std::runtime_error("Failed to read image info from file: " + path.string());
     }
+
+    channels = 4;
     isEncodedData = true;
   }
 
@@ -153,6 +138,7 @@ namespace gestalt::graphics {
     if (!decoded_data) {
       throw std::runtime_error("Failed to load image from file: " + path.string());
     }
+
     image_info.channels = 4;
 
     const size_t data_size = static_cast<size_t>(image_info.width) * image_info.height * image_info.
@@ -208,7 +194,7 @@ namespace gestalt::graphics {
     }
   }
 
-  void TaskQueue::load_cubemap(const HdrImageData& image_data, const VkImage image) {
+  void TaskQueue::load_cubemap(const HdrImageData& image_data, const VkImage image, bool mipmap) {
     auto [w, h, d] = image_data.get_extent();
     std::vector<float> img32(w * h * 4);
     float24to32(w, h, image_data.get_data(), img32.data());  // Convert HDR format as needed
@@ -222,7 +208,7 @@ namespace gestalt::graphics {
     size_t faceWidth = cube.w_;
     size_t faceHeight = cube.h_;
     size_t numChannels = 4;  // Assuming RGBA
-    size_t bytesPerFloat = sizeof(float);
+    size_t bytesPerFloat = sizeof(float32);
 
     size_t faceSizeBytes = faceWidth * faceHeight * numChannels * bytesPerFloat;
     size_t totalCubemapSizeBytes = faceSizeBytes * 6;
@@ -256,32 +242,140 @@ namespace gestalt::graphics {
     vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
                          0, nullptr, 0, nullptr, 1, &barrier_to_transfer);
 
-    for (int i = 0; i < 6; ++i) {
-      VkBufferImageCopy copyRegion = {};
-      copyRegion.bufferOffset = faceSizeBytes * i;
-      copyRegion.bufferRowLength = 0;
-      copyRegion.bufferImageHeight = 0;
+    for (int face = 0; face < 6; ++ face) {
+      VkBufferImageCopy copy_region = {};
+      copy_region.bufferOffset = faceSizeBytes * face;
+      copy_region.bufferRowLength = 0;
+      copy_region.bufferImageHeight = 0;
 
-      copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-      copyRegion.imageSubresource.mipLevel = 0;
-      copyRegion.imageSubresource.baseArrayLayer = i;  // Specify the face index
-      copyRegion.imageSubresource.layerCount = 1;
-      copyRegion.imageExtent = extend;
+      copy_region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+      copy_region.imageSubresource.mipLevel = 0;
+      copy_region.imageSubresource.baseArrayLayer = face;  // Specify the face index
+      copy_region.imageSubresource.layerCount = 1;
+      copy_region.imageExtent = extend;
 
-      vkCmdCopyBufferToImage(cmd, buffer, image,
-                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+      vkCmdCopyBufferToImage(cmd, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+                             &copy_region);
     }
 
-    // Transition the image to the shader-readable layout
-    VkImageMemoryBarrier barrier_to_shader_read = barrier_to_transfer;
-    barrier_to_shader_read.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    barrier_to_shader_read.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    barrier_to_shader_read.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    barrier_to_shader_read.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    barrier_to_shader_read.subresourceRange = subresource_range;
+    if (mipmap) {
+      uint32_t mipWidth = faceWidth;
+      uint32_t mipHeight = faceHeight;
 
-    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                         0, 0, nullptr, 0, nullptr, 1, &barrier_to_shader_read);
+      uint32 mip_levels
+          = static_cast<uint32_t>(std::floor(std::log2(std::max(faceWidth, faceHeight)))) + 1;
+
+        // Transition this mip level (for all faces) to TRANSFER_DST_OPTIMAL
+      VkImageSubresourceRange subresourceRangeDst = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                                                     .baseMipLevel = 0,
+                                                     .levelCount = 1,
+                                                     .baseArrayLayer = 0,
+                                                     .layerCount = 6};
+
+      VkImageMemoryBarrier barrierMipToDst = {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                                              .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+                                              .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+                                              .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                              .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                                              .image = image,
+                                              .subresourceRange = subresourceRangeDst};
+
+      vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                           0, 0, nullptr, 0, nullptr, 1, &barrierMipToDst);
+
+
+      for (uint32_t mip = 1; mip < mip_levels; mip++) {
+        // The previous mip is source
+        uint32_t prevMip = mip - 1;
+
+        // Transition this mip level (for all faces) to TRANSFER_DST_OPTIMAL
+        VkImageSubresourceRange subresourceRangeDst = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                                                       .baseMipLevel = mip,
+                                                       .levelCount = 1,
+                                                       .baseArrayLayer = 0,
+                                                       .layerCount = 6};
+
+        VkImageMemoryBarrier barrierMipToDst = {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                                                .srcAccessMask = 0,
+                                                .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+                                                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                                                .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                                .image = image,
+                                                .subresourceRange = subresourceRangeDst};
+
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             0, 0, nullptr, 0, nullptr, 1, &barrierMipToDst);
+
+        // Mip dimensions
+        uint32_t newMipWidth = (mipWidth > 1) ? mipWidth / 2 : 1;
+        uint32_t newMipHeight = (mipHeight > 1) ? mipHeight / 2 : 1;
+
+        // We'll blit with a single call per face
+        for (uint32_t face = 0; face < 6; face++) {
+          // Region for blit
+          VkImageBlit blitRegion = {};
+          blitRegion.srcSubresource = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                                       .mipLevel = prevMip,
+                                       .baseArrayLayer = face,
+                                       .layerCount = 1};
+          blitRegion.srcOffsets[0] = {0, 0, 0};
+          blitRegion.srcOffsets[1]
+              = {static_cast<int32_t>(mipWidth), static_cast<int32_t>(mipHeight), 1};
+
+          blitRegion.dstSubresource = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                                       .mipLevel = mip,
+                                       .baseArrayLayer = face,
+                                       .layerCount = 1};
+          blitRegion.dstOffsets[0] = {0, 0, 0};
+          blitRegion.dstOffsets[1]
+              = {.x= static_cast<int32_t>(newMipWidth), .y= static_cast<int32_t>(newMipHeight), .z=
+                 1};
+
+          vkCmdBlitImage(cmd, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image,
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blitRegion,
+                         VK_FILTER_LINEAR  // or VK_FILTER_CUBIC_EXT if supported
+              );
+        }
+
+        // Transition the current mip level to TRANSFER_SRC_OPTIMAL if we still have more mips to
+        // generate, otherwise transition to SHADER_READ_ONLY_OPTIMAL if this is the last one.
+        VkAccessFlags dstAccessMask
+            = (mip + 1 < mip_levels) ? VK_ACCESS_TRANSFER_READ_BIT : VK_ACCESS_SHADER_READ_BIT;
+        VkImageMemoryBarrier barrierMipToSrc
+            = {.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+               .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+               .dstAccessMask = dstAccessMask,
+               .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+               .newLayout = (mip + 1 < mip_levels) ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+                                                  : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+               .image = image,
+               .subresourceRange = subresourceRangeDst};
+
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             (mip + 1 < mip_levels) ? VK_PIPELINE_STAGE_TRANSFER_BIT
+                                                   : VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                             0, 0, nullptr, 0, nullptr, 1, &barrierMipToSrc);
+
+        // Update for next iteration
+        mipWidth = newMipWidth;
+        mipHeight = newMipHeight;
+      }
+
+
+    } else {
+      // Transition the image to the shader-readable layout
+      VkImageMemoryBarrier barrier_to_shader_read = barrier_to_transfer;
+      barrier_to_shader_read.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+      barrier_to_shader_read.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+      barrier_to_shader_read.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+      barrier_to_shader_read.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+      barrier_to_shader_read.subresourceRange = subresource_range;
+
+      // note: did not test this code path
+       vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1,
+                        &barrier_to_shader_read);
+    }
 
   }
 
@@ -345,11 +439,11 @@ namespace gestalt::graphics {
                            &barrier_to_shader_read);
   }
 
-  void TaskQueue::add_image(const std::filesystem::path& path, VkImage image, bool is_cubemap) {
+  void TaskQueue::add_image(const std::filesystem::path& path, VkImage image, bool is_cubemap, bool mipmap) {
     if (is_cubemap) {
-      enqueue([this, path, image]() {
+      enqueue([this, path, image, mipmap]() {
         const HdrImageData image_data(path);
-        load_cubemap(image_data, image);
+        load_cubemap(image_data, image, mipmap);
       });
       return;
     }
@@ -369,7 +463,8 @@ namespace gestalt::graphics {
   AllocatedImage ResourceAllocator::allocate_image(const std::string_view name, VkFormat format,
                                                    VkImageUsageFlags usage_flags, VkExtent3D extent,
                                                    VkImageAspectFlags aspect_flags,
-                                                   ImageType image_type) const {
+                                                   ImageType image_type,
+                                                   bool mipmap) const {
     // 1) Create the default VkImageCreateInfo
     VkImageCreateInfo img_info;
     if (image_type == ImageType::kCubeMap) {
@@ -401,6 +496,11 @@ namespace gestalt::graphics {
         img_info.arrayLayers = 6;
         img_info.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
         break;
+    }
+    if (mipmap) {
+      img_info.mipLevels
+          = static_cast<uint32_t>(std::floor(std::log2(std::max(extent.width, extent.height)))) + 1;
+      img_info.usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     }
 
     // 3) Set up the memory allocation info

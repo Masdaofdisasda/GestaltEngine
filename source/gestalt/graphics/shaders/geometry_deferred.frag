@@ -64,18 +64,12 @@ vec3 SignedOctEncode(vec3 n) {
 
 void main() {
 
-/*
 	uint16_t albedoIndex =			materialData[nonuniformEXT(inMaterialIndex)].albedo_tex_index;
 	uint16_t metalicRoughIndex =	materialData[nonuniformEXT(inMaterialIndex)].metal_rough_tex_index;
 	uint16_t normalIndex =			materialData[nonuniformEXT(inMaterialIndex)].normal_tex_index;
 	uint16_t emissiveIndex =		materialData[nonuniformEXT(inMaterialIndex)].emissive_tex_index;
 	uint16_t occlusionIndex =		materialData[nonuniformEXT(inMaterialIndex)].occlusion_tex_index;
-	*/
-	uint16_t albedoIndex =			uint16_t(0);
-	uint16_t metalicRoughIndex =	uint16_t(1);
-	uint16_t normalIndex =			uint16_t(2);
-	uint16_t emissiveIndex =		uint16_t(3);
-	uint16_t occlusionIndex =		uint16_t(4);
+	
 
 	uint textureFlags = materialData[nonuniformEXT(inMaterialIndex)].textureFlags;
 
@@ -88,7 +82,7 @@ void main() {
     vec2 UV = inUV;
 	vec3 inNormal = normalize(inNormal_BiTanX.xyz);
 	vec3 inTangent = normalize(inTangent_BiTanY.xyz);
-	vec3 inBiTangent = normalize(inPosition_BiTanZ.xyz);
+	vec3 inBiTangent = normalize(vec3(inNormal_BiTanX.w, inTangent_BiTanY.w, inPosition_BiTanZ.w));
 	vec3 inPosition = inPosition_BiTanZ.xyz;
 
 	vec4 Kd = materialData[nonuniformEXT(inMaterialIndex)].albedo_factor;
@@ -107,7 +101,7 @@ void main() {
 	vec3 viewPos = -normalize(vec3(view[0][2], view[1][2], view[2][2]));
 	if(hasNormalTexture) {
 		vec3 normal_sample = texture(nonuniformEXT(textures[normalIndex]), UV).rgb;
-		n = perturbNormal(n, normalize(viewPos - inPosition), normal_sample, UV);
+		n = perturbNormal(n, inPosition, normal_sample, UV);
 	}
 
 	vec4 Ke = vec4(materialData[nonuniformEXT(inMaterialIndex)].emissiveColor, 1.0);

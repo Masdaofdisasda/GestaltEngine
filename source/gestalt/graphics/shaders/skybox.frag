@@ -48,7 +48,7 @@ layout( push_constant ) uniform constants
 {
     //float earthRadius;
     //float atmosphereRadius;
-    vec3 betaR; float pad1;
+    vec3 betaR; uint showEnviromentMap;
     vec3 betaA; float pad2;
     vec3 betaM; float pad3;
     //float Hr;
@@ -98,31 +98,30 @@ vec3 computeScattering(vec3 dir, vec3 lightDir, vec3 betaR, vec3 betaM, vec3 sun
 }
 
 void main() {
-#if 0
+
     vec3 dir = normalize(TexCoords);
 
-    // Sunlight intensity and direction
-    vec3 lightDir = normalize(dirLight[0].direction);
-    vec3 sunIntensity = dirLight[0].color * dirLight[0].intensity;
+    if (params.showEnviromentMap == 0) {
 
-    // Compute scattering
-    vec3 scattering = computeScattering(dir, lightDir, params.betaR, params.betaM, sunIntensity);
+        // Sunlight intensity and direction
+        vec3 lightDir = normalize(dirLight[0].direction);
+        vec3 sunIntensity = dirLight[0].color * dirLight[0].intensity;
 
-    // Absorption
-    scattering -= params.betaA * 0.002;
+        // Compute scattering
+        vec3 scattering = computeScattering(dir, lightDir, params.betaR, params.betaM, sunIntensity);
 
-    // Output the final sky color
-    FragColor = vec4(scattering, 1.0);
+        // Absorption
+        scattering -= params.betaA * 0.002;
 
-#else
-    
-    // Normalize the incoming direction (TexCoords)
-    vec3 dir = normalize(TexCoords);
+        // Output the final sky color
+        FragColor = vec4(scattering, 1.0);
 
-    // Sample the environment texture using the normalized direction
-    vec4 envColor = texture(texEnvMap, dir);
+    } else {
 
-    // Output the sampled color directly for debugging
-    FragColor = envColor;
-#endif
+        // Sample the environment texture using the normalized direction
+        vec4 envColor = texture(texEnvMap, dir);
+
+        // Output the sampled color directly for debugging
+        FragColor = envColor;
+    }
 }

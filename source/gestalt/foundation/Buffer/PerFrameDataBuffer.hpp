@@ -14,14 +14,13 @@ namespace gestalt::foundation {
   struct PerFrameDataBuffers final : BufferCollection {
     std::array<PerFrameData, getFramesInFlight()> data;
     bool freezeCullCamera = false;
-    std::array<std::shared_ptr<BufferInstance>, getFramesInFlight()> uniform_buffers;
 
     std::shared_ptr<BufferInstance> uniform_buffers_instance;
 
     std::array<std::shared_ptr<DescriptorBuffer>, getFramesInFlight()> descriptor_buffers;
 
     std::vector<std::shared_ptr<BufferInstance>> get_buffers(int16 frame_index) const override {
-      return {uniform_buffers[frame_index]};
+      return {uniform_buffers_instance};
     }
 
     std::shared_ptr<DescriptorBuffer> get_descriptor_buffer(

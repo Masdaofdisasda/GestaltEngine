@@ -6,7 +6,7 @@
 namespace gestalt::foundation {
 
   // Compile time configuration
-  constexpr uint32 kDefaultFramesInFlight = 2;
+  constexpr uint32 kDefaultFramesInFlight = 1;
   constexpr uint32 kDefaultMaxMaterials = 256;
   constexpr uint32 kDefaultPbrMaterialTextures = 5;  // albedo, normal, metallic, roughness, ao
   constexpr uint32 kDefaultMaxTextures = kDefaultMaxMaterials * kDefaultPbrMaterialTextures;

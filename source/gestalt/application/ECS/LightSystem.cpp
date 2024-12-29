@@ -44,21 +44,6 @@ namespace gestalt::application {
         descriptor_layout, 3, 0);
     vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layout, nullptr);
 
-    // for each directional light we need a view and a projection matrix
-    light_data->view_proj_matrices = resource_allocator_->create_buffer(std::move(BufferTemplate(
-        "view_proj_matrices", sizeof(GpuProjViewData) * GetMaxViewProjMatrices(),
-        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VMA_MEMORY_USAGE_CPU_TO_GPU)));
-    light_data->dir_light_buffer = resource_allocator_->create_buffer(std::move(BufferTemplate(
-        "dir_light_buffer",
-        sizeof(GpuDirectionalLight) * getMaxDirectionalLights(),
-        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VMA_MEMORY_USAGE_CPU_TO_GPU)));
-    light_data->point_light_buffer = resource_allocator_->create_buffer(std::move(BufferTemplate(
-        "point_light_buffer", sizeof(GpuPointLight) * getMaxPointLights(),
-        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VMA_MEMORY_USAGE_CPU_TO_GPU)));
-
     light_data->dir_light_buffer_instance
         = resource_allocator_->create_buffer(std::move(BufferTemplate(
             "Directional Light Buffer Instance", sizeof(GpuDirectionalLight) * getMaxDirectionalLights(),
@@ -82,11 +67,11 @@ namespace gestalt::application {
 
     light_data->descriptor_buffer
         ->write_buffer(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       light_data->view_proj_matrices->get_address(),
+                       light_data->view_proj_matrices_instance->get_address(),
                        sizeof(GpuProjViewData) * GetMaxViewProjMatrices())
-        .write_buffer(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, light_data->dir_light_buffer->get_address(),
+        .write_buffer(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, light_data->dir_light_buffer_instance->get_address(),
                       sizeof(GpuDirectionalLight) * getMaxDirectionalLights())
-        .write_buffer(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, light_data->point_light_buffer->get_address(),
+        .write_buffer(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, light_data->point_light_buffer_instance->get_address(),
                       sizeof(GpuPointLight) * getMaxPointLights())
         .update();
   }
@@ -226,30 +211,7 @@ namespace gestalt::application {
     }
     
     auto& light_data = repository_->light_buffers;
-    
-    void* directional_light_data;
-    VK_CHECK(vmaMapMemory(gpu_->getAllocator(), light_data->dir_light_buffer->get_allocation(),
-                          &directional_light_data));
-    memcpy(directional_light_data, repository_->directional_lights.data().data(),
-           sizeof(GpuDirectionalLight) * repository_->directional_lights.size());
-    vmaUnmapMemory(gpu_->getAllocator(), light_data->dir_light_buffer->get_allocation());
 
-    void* point_light_data;
-    VK_CHECK(vmaMapMemory(gpu_->getAllocator(), light_data->point_light_buffer->get_allocation(),
-                          &point_light_data));
-    memcpy(point_light_data, repository_->point_lights.data().data(),
-           sizeof(GpuPointLight) * repository_->point_lights.size());
-    vmaUnmapMemory(gpu_->getAllocator(), light_data->point_light_buffer->get_allocation());
-
-    // changes in the scene graph can affect the light view-projection matrices
-    void* view_matrix_data;
-    VK_CHECK(vmaMapMemory(gpu_->getAllocator(), light_data->view_proj_matrices->get_allocation(),
-                          &view_matrix_data));
-    memcpy(view_matrix_data, repository_->light_view_projections.data().data(),
-           sizeof(GpuProjViewData) * repository_->light_view_projections.size());
-    vmaUnmapMemory(gpu_->getAllocator(), light_data->view_proj_matrices->get_allocation());
-
-    {
       void* directional_light_data;
       VK_CHECK(vmaMapMemory(gpu_->getAllocator(), light_data->dir_light_buffer_instance->get_allocation(),
                             &directional_light_data));
@@ -273,7 +235,6 @@ namespace gestalt::application {
              sizeof(GpuProjViewData) * repository_->light_view_projections.size());
       vmaUnmapMemory(gpu_->getAllocator(),
                      light_data->view_proj_matrices_instance->get_allocation());
-    }
   }
 
   void LightSystem::cleanup() {
@@ -283,9 +244,9 @@ namespace gestalt::application {
 
     const auto& light_buffers = repository_->light_buffers;
     resource_manager_->destroy_descriptor_buffer(light_buffers->descriptor_buffer);
-    resource_allocator_->destroy_buffer(light_buffers->dir_light_buffer);
-    resource_allocator_->destroy_buffer(light_buffers->point_light_buffer);
-    resource_allocator_->destroy_buffer(light_buffers->view_proj_matrices);
+    resource_allocator_->destroy_buffer(light_buffers->dir_light_buffer_instance);
+    resource_allocator_->destroy_buffer(light_buffers->point_light_buffer_instance);
+    resource_allocator_->destroy_buffer(light_buffers->view_proj_matrices_instance);
 
   }
 
