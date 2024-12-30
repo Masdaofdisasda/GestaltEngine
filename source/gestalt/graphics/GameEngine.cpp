@@ -38,16 +38,14 @@ namespace gestalt {
     resource_allocator_
         = std::make_unique<graphics::ResourceAllocator>(gpu_.get());
 
-    scene_manager_->init(gpu_.get(), resource_manager_.get(), resource_allocator_.get(),
-                         descriptor_layout_builder_.get(), repository_.get(), frame_provider_.get());
+    scene_manager_->init(gpu_.get(), resource_manager_.get(), resource_allocator_.get(), repository_.get(), frame_provider_.get());
 
     render_pipeline_ = std::make_unique<graphics::RenderEngine>();
     render_pipeline_->init(gpu_.get(), window_.get(), resource_allocator_.get(), repository_.get(),
                            imgui_.get(), frame_provider_.get());
 
     register_gui_actions();
-    imgui_->init(gpu_.get(), window_.get(), render_pipeline_->get_swapchain_format(), repository_.get(),
-                 descriptor_layout_builder_.get(), gui_actions_);
+    imgui_->init(gpu_.get(), window_.get(), render_pipeline_->get_swapchain_format(), repository_.get(),  gui_actions_);
 
     is_initialized_ = true;
     fmt::print("Engine initialized\n");
@@ -62,9 +60,6 @@ namespace gestalt {
     };
     gui_actions_.get_render_config
         = [this]() -> graphics::RenderConfig& { return render_pipeline_->get_config(); };
-    gui_actions_.get_debug_image = [this]() -> std::shared_ptr<foundation::TextureHandleOld> {
-      return render_pipeline_->get_debug_image();
-    };
     gui_actions_.set_active_camera
         = [this](const foundation::Entity camera) { scene_manager_->set_active_camera(camera); };
     gui_actions_.get_active_camera
@@ -131,7 +126,6 @@ namespace gestalt {
       imgui_->cleanup();
       scene_manager_->cleanup();
       render_pipeline_->cleanup();
-      resource_manager_->cleanup();
       gpu_->cleanup();
       window_->cleanup();
     }

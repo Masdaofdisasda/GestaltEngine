@@ -1,7 +1,5 @@
 ﻿#include "CameraSystem.hpp"
 
-#include <EngineConfiguration.hpp>
-
 #include "RenderConfig.hpp"
 #include "VulkanCheck.hpp"
 
@@ -11,7 +9,6 @@
 #include "Cameras/FirstPersonCamera.hpp"
 #include "Cameras/FreeFlyCamera.hpp"
 #include "Cameras/OrbitCamera.hpp"
-#include "Interface/IDescriptorLayoutBuilder.hpp"
 #include "Interface/IGpu.hpp"
 #include "Interface/IResourceAllocator.hpp"
 #include "Interface/IResourceManager.hpp"
@@ -22,22 +19,11 @@ namespace gestalt::application {
 
     const auto& per_frame_data_buffers = repository_->per_frame_data_buffers;
 
-    descriptor_layout_builder_->clear();
-    const auto descriptor_layout
-        = descriptor_layout_builder_
-              ->add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT
-                                | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT
-                                | VK_SHADER_STAGE_FRAGMENT_BIT)
-              .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
-
     per_frame_data_buffers->uniform_buffers_instance
         = resource_allocator_->create_buffer(BufferTemplate(
             "per Frame Buffer", sizeof(PerFrameData),
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VMA_MEMORY_USAGE_CPU_TO_GPU));
-
-    vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layout, nullptr);
   }
 
     inline glm::vec4 NormalizePlane(glm::vec4 p) { return p / length(glm::vec3(p)); }
@@ -191,10 +177,6 @@ namespace gestalt::application {
       repository_->camera_components.clear();
 
       const auto& buffers = repository_->per_frame_data_buffers;
-
-      for (int i = 0; i < kDefaultFramesInFlight; ++i) {
-        resource_manager_->destroy_descriptor_buffer(buffers->descriptor_buffers[i]);
-      }
       resource_allocator_->destroy_buffer(buffers->uniform_buffers_instance);
 
     }

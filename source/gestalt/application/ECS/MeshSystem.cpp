@@ -5,7 +5,6 @@
 #include "VulkanCheck.hpp"
 
 #include "FrameProvider.hpp"
-#include "Interface/IDescriptorLayoutBuilder.hpp"
 #include "Interface/IGpu.hpp"
 #include "Interface/IResourceManager.hpp"
 #include "Interface/IResourceAllocator.hpp"
@@ -29,7 +28,6 @@ namespace gestalt::application {
 
   void MeshSystem::prepare() {
     create_buffers();
-    fill_descriptors();
   }
 
   void MeshSystem::upload_mesh() {
@@ -178,28 +176,6 @@ namespace gestalt::application {
   void MeshSystem::create_buffers() {
     const auto& mesh_buffers = repository_->mesh_buffers;
 
-    descriptor_layout_builder_->clear();
-    constexpr auto geometry_stages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT
-                                     | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT;
-    const auto descriptor_layout
-        = descriptor_layout_builder_
-              ->add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
-              .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
-              .add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
-              .add_binding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
-              .add_binding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
-              .add_binding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
-              .add_binding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
-              .add_binding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, geometry_stages)
-              .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
-
-        for (int i = 0; i < getFramesInFlight(); i++) {
-      mesh_buffers->descriptor_buffers[i] = resource_manager_->create_descriptor_buffer(
-          descriptor_layout, 8, 0);
-    }
-
-    vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layout, nullptr);
-
     // Create vertex buffer
     mesh_buffers->vertex_position_buffer = resource_allocator_->create_buffer(BufferTemplate(
         "vertex_position_buffer", kMaxVertexPositionBufferSize,
@@ -319,38 +295,6 @@ namespace gestalt::application {
           VMA_MEMORY_USAGE_GPU_ONLY));
   }
 
-  void MeshSystem::fill_descriptors() {
-    const auto& mesh_buffers = repository_->mesh_buffers;
-
-    for (int i = 0; i < getFramesInFlight(); i++) {
-      mesh_buffers->descriptor_buffers[i]
-          ->write_buffer(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                         mesh_buffers->vertex_position_buffer->get_address(),
-                         sizeof(GpuVertexPosition) * getMaxVertices())
-          .write_buffer(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                        mesh_buffers->vertex_data_buffer->get_address(),
-                        sizeof(GpuVertexData) * getMaxVertices())
-          .write_buffer(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                        mesh_buffers->meshlet_buffer->get_address(),
-                        sizeof(Meshlet) * getMaxMeshlets())
-          .write_buffer(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                        mesh_buffers->meshlet_vertices->get_address(),
-                        sizeof(uint32) * getMaxVertices())
-          .write_buffer(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                        mesh_buffers->meshlet_triangles->get_address(),
-                        sizeof(uint8) * getMaxIndices())
-          .write_buffer(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                        mesh_buffers->meshlet_task_commands_buffer[i]->get_address(),
-                        sizeof(MeshTaskCommand) * getMaxMeshlets())
-          .write_buffer(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                        mesh_buffers->mesh_draw_buffer[i]->get_address(),
-                        sizeof(MeshDraw) * getMaxMeshes())
-          .write_buffer(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                        mesh_buffers->draw_count_buffer[i]->get_address(), 4 * sizeof(uint32))
-          .update();
-    }
-  }
-
   void MeshSystem::update(float delta_time, const UserInput& movement, float aspect) {
     if (repository_->meshes.size() != meshes_) {
       meshes_ = repository_->meshes.size();
@@ -452,10 +396,6 @@ namespace gestalt::application {
 
   void MeshSystem::cleanup() {
     const auto& mesh_buffers = repository_->mesh_buffers;
-
-    for (int i = 0; i < getFramesInFlight(); i++) {
-      resource_manager_->destroy_descriptor_buffer(mesh_buffers->descriptor_buffers[i]);
-    }
     resource_allocator_->destroy_buffer(mesh_buffers->vertex_position_buffer);
     resource_allocator_->destroy_buffer(mesh_buffers->vertex_data_buffer);
     resource_allocator_->destroy_buffer(mesh_buffers->index_buffer);

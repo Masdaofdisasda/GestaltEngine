@@ -1,6 +1,7 @@
 ﻿#pragma once 
 #include <VulkanTypes.hpp>
 #include <algorithm>
+#include <fstream>
 #include <map>
 #include <memory>
 #include <optional>
@@ -13,7 +14,6 @@
 #include "VulkanCheck.hpp"
 #include "common.hpp"
 #include "vk_initializers.hpp"
-#include "vk_pipelines.hpp"
 #include "Interface/IGpu.hpp"
 #include "Material/Material.hpp"
 #include "Resources/ResourceTypes.hpp"
@@ -116,11 +116,52 @@ namespace gestalt::graphics::fg {
       }
     }
 
-    void add_shader(const std::string&& source_file, VkShaderStageFlagBits shader_stage) {
-      const std::string& shader_path = "../shaders/" + source_file;
+    [[nodiscard]] VkShaderModule load_shader_module(const std::filesystem::path& file_path,
+                                                    const VkDevice device) {
+      // 1. Open the file in binary mode, cursor at the end
+      std::ifstream file(file_path, std::ios::ate | std::ios::binary);
+      if (!file.is_open()) {
+        throw std::runtime_error(
+            fmt::format("Error: Could not open shader file: {}", file_path.string()));
+      }
 
-      VkShaderModule shader_module;
-      vkutil::load_shader_module(shader_path.c_str(), gpu_->getDevice(), &shader_module);
+      // 2. Get the file size in bytes
+      const auto fileSize = file.tellg();
+      if (fileSize < 0) {
+        throw std::runtime_error(
+            fmt::format("Error: Failed to read file size: {}", file_path.string()));
+      }
+
+      // 3. Create a buffer big enough for the entire file
+      std::vector<std::uint32_t> buffer(fileSize / sizeof(std::uint32_t));
+
+      // 4. Reset cursor to beginning and read the file into the buffer
+      file.seekg(0, std::ios::beg);
+      file.read(reinterpret_cast<char*>(buffer.data()), fileSize);
+      file.close();
+
+      // 5. Set up the shader module create info
+      VkShaderModuleCreateInfo createInfo{};
+      createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+      createInfo.pNext = nullptr;
+      createInfo.codeSize = buffer.size() * sizeof(std::uint32_t);
+      createInfo.pCode = buffer.data();
+
+      // 6. Create the shader module
+      VkShaderModule shaderModule{};
+      if (const VkResult result = vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule);
+          result != VK_SUCCESS) {
+        throw std::runtime_error(
+            fmt::format("Error: Failed to create shader module for file: {}", file_path.string()));
+      }
+
+      return shaderModule;
+    }
+
+    void add_shader(const std::string&& source_file, VkShaderStageFlagBits shader_stage) {
+      const auto shader_path = std::filesystem::current_path() / "../shaders/" / source_file;
+
+      VkShaderModule shader_module = load_shader_module(shader_path, gpu_->getDevice());
       shader_modules_.emplace(shader_stage, shader_module);
 
       gpu_->set_debug_name(source_file, VK_OBJECT_TYPE_SHADER_MODULE,
@@ -220,19 +261,19 @@ namespace gestalt::graphics::fg {
               const auto& info = binding.info;
             for (const auto& material : binding.resource->get_materials()) {
               image_infos.push_back({material.config.textures.albedo_sampler,
-                                     material.config.textures.albedo_image.imageView,
+                                     material.config.textures.albedo_image->get_image_view(),
                                      VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
               image_infos.push_back({material.config.textures.metal_rough_sampler,
-                                     material.config.textures.metal_rough_image.imageView,
+                                     material.config.textures.metal_rough_image->get_image_view(),
                                      VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
               image_infos.push_back({material.config.textures.normal_sampler,
-                                     material.config.textures.normal_image.imageView,
+                                     material.config.textures.normal_image->get_image_view(),
                                      VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
                   image_infos.push_back({material.config.textures.occlusion_sampler,
-                                     material.config.textures.occlusion_image.imageView,
+                                     material.config.textures.occlusion_image->get_image_view(),
                                      VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
               image_infos.push_back({material.config.textures.emissive_sampler,
-                                     material.config.textures.emissive_image.imageView,
+                                         material.config.textures.emissive_image->get_image_view(),
                                      VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
             }
               descriptor_buffer->write_image_array(info.binding_index, info.descriptor_type,
@@ -293,19 +334,19 @@ namespace gestalt::graphics::fg {
         const auto& info = image_array_binding_.value().info;
         for (const auto& material : image_array_binding_.value().resource->get_materials()) {
           image_infos.push_back({material.config.textures.albedo_sampler,
-                                 material.config.textures.albedo_image.imageView,
+                                 material.config.textures.albedo_image->get_image_view(),
                                  VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
           image_infos.push_back({material.config.textures.metal_rough_sampler,
-                                 material.config.textures.metal_rough_image.imageView,
+                                 material.config.textures.metal_rough_image->get_image_view(),
                                  VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
           image_infos.push_back({material.config.textures.normal_sampler,
-                                 material.config.textures.normal_image.imageView,
+                                 material.config.textures.normal_image->get_image_view(),
                                  VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
           image_infos.push_back({material.config.textures.occlusion_sampler,
-                                 material.config.textures.occlusion_image.imageView,
+                                 material.config.textures.occlusion_image->get_image_view(),
                                  VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
           image_infos.push_back({material.config.textures.emissive_sampler,
-                                 material.config.textures.emissive_image.imageView,
+                                 material.config.textures.emissive_image->get_image_view(),
                                  VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL});
         }
         descriptor_buffers_.at(image_array_set)

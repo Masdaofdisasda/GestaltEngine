@@ -1,10 +1,10 @@
 ﻿#pragma once
 #include <memory>
 
+#include "EngineConfiguration.hpp"
 #include "FrameGraph.hpp"
 #include "Swapchain.hpp"
 #include "common.hpp"
-#include "Utils/vk_descriptors.hpp"
 
 namespace gestalt::application {
   class Gui;
@@ -22,6 +22,25 @@ namespace gestalt::graphics {
 
   class ResourceAllocator;
   class VkSwapchain;
+
+  class FrameData {
+  public:
+    struct FrameResources {
+      VkSemaphore swapchain_semaphore, render_semaphore;
+      VkFence render_fence;
+
+      VkCommandPool command_pool;
+      VkCommandBuffer main_command_buffer;
+    };
+
+    void init(VkDevice device, uint32 graphics_queue_family_index, FrameProvider& frame);
+    void cleanup(VkDevice device);
+    FrameResources& get_current_frame();
+
+  private:
+    std::array<FrameResources, getFramesInFlight()> frames_{};
+    FrameProvider* frame_ = nullptr;
+  };
 
   class RenderEngine : public NonCopyable<RenderEngine> {
     IGpu* gpu_ = nullptr;

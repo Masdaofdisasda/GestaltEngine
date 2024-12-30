@@ -30,11 +30,11 @@ namespace gestalt::application {
       ComponentFactory* component_factory_ = nullptr;
 
       std::optional<fastgltf::Asset> parse_gltf(const std::filesystem::path& file_path);
-      std::pair<TextureHandleOld, std::shared_ptr<ImageInstance>> load_image(fastgltf::Asset& asset,
+      std::shared_ptr<ImageInstance> load_image(fastgltf::Asset& asset,
                                               fastgltf::Image& image) const;
       void import_textures(fastgltf::Asset& gltf) const;
       size_t create_material(const PbrMaterial& config, const std::string& name) const;
-      TextureHandleOld get_textures(const fastgltf::Asset& gltf,
+      std::shared_ptr<ImageInstance> get_textures(const fastgltf::Asset& gltf,
                                                         const size_t& texture_index,
                                                         const size_t& image_offset) const;
       void import_albedo(const fastgltf::Asset& gltf,

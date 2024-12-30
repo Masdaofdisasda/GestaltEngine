@@ -12,12 +12,49 @@
 
 #include "FrameProvider.hpp"
 #include "ResourceAllocator.hpp"
-#include "ResourceManager.hpp"
-#include "Utils/vk_images.hpp"
 #include "vk_initializers.hpp"
 #include "Interface/IGpu.hpp"
 
 namespace gestalt::graphics {
+
+  void FrameData::init(VkDevice device, uint32 graphics_queue_family_index, FrameProvider& frame) {
+    frame_ = &frame;
+
+    VkCommandPoolCreateInfo commandPoolInfo = vkinit::command_pool_create_info(
+        graphics_queue_family_index, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    VkCommandBufferAllocateInfo cmdAllocInfo
+        = vkinit::command_buffer_allocate_info(VK_NULL_HANDLE, 1);
+    VkFenceCreateInfo fenceCreateInfo = vkinit::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
+    VkSemaphoreCreateInfo semaphoreCreateInfo = vkinit::semaphore_create_info();
+
+    for (auto& frame : frames_) {
+      // Initialize Command Pool and Command Buffer
+      VK_CHECK(vkCreateCommandPool(device, &commandPoolInfo, nullptr, &frame.command_pool));
+      cmdAllocInfo.commandPool = frame.command_pool;
+      VK_CHECK(vkAllocateCommandBuffers(device, &cmdAllocInfo, &frame.main_command_buffer));
+
+      // Initialize Fences and Semaphores
+      VK_CHECK(vkCreateFence(device, &fenceCreateInfo, nullptr, &frame.render_fence));
+      VK_CHECK(
+          vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &frame.swapchain_semaphore));
+      VK_CHECK(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &frame.render_semaphore));
+
+      // Initialize Descriptor Pool
+    }
+  }
+
+  void FrameData::cleanup(const VkDevice device) {
+    for (auto& frame : frames_) {
+      vkDestroyCommandPool(device, frame.command_pool, nullptr);
+      vkDestroyFence(device, frame.render_fence, nullptr);
+      vkDestroySemaphore(device, frame.swapchain_semaphore, nullptr);
+      vkDestroySemaphore(device, frame.render_semaphore, nullptr);
+    }
+  }
+
+  FrameData::FrameResources& FrameData::get_current_frame() {
+    return frames_[frame_->get_current_frame_index()];
+  }
 
   inline std::filesystem::path asset(const std::string& asset_name) {
     return std::filesystem::current_path() / "../../assets" / asset_name;
@@ -113,7 +150,15 @@ namespace gestalt::graphics {
           .anisotropyEnable = VK_FALSE,
       });
 
-      auto cube_map_sampler = repository_->material_buffers->cube_map_sampler;
+      VkSampler cube_map_sampler;
+      VkSamplerCreateInfo sampl
+          = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO, .pNext = nullptr};
+      sampl.maxLod = VK_LOD_CLAMP_NONE;
+      sampl.minLod = 0;
+      sampl.magFilter = VK_FILTER_LINEAR;
+      sampl.minFilter = VK_FILTER_LINEAR;
+      sampl.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+      vkCreateSampler(gpu_->getDevice(), &sampl, nullptr, &cube_map_sampler);
 
       // camera
       auto camera_buffer = frame_graph_->add_resource(
@@ -249,7 +294,8 @@ namespace gestalt::graphics {
       frame_graph_->add_pass<fg::LightingPass>(
           camera_buffer, texEnvMap, texIrradianceMap, brdf_lut, light_matrices, directional_light, point_light,
           g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth, shadow_map,
-          integrated_light_scattering, ambient_occlusion_texture, scene_lit, post_process_sampler, cube_map_sampler, gpu_, [&] { return config_.lighting; },
+          integrated_light_scattering, ambient_occlusion_texture, scene_lit, post_process_sampler,
+          cube_map_sampler, gpu_, [&] { return config_.lighting; },
           [&] {
             return repository_->per_frame_data_buffers->data.at(frame_->get_current_frame_index());
           },
@@ -272,11 +318,10 @@ namespace gestalt::graphics {
 
   bool RenderEngine::acquire_next_image() {
     VK_CHECK(vkWaitForFences(gpu_->getDevice(), 1, &frame().render_fence, VK_TRUE, UINT64_MAX));
-    vkDeviceWaitIdle(gpu_->getDevice()); // TODO fix synchronization issues!!!
 
     VK_CHECK(vkResetFences(gpu_->getDevice(), 1, &frame().render_fence));
 
-    VkResult e
+    const VkResult e
         = vkAcquireNextImageKHR(gpu_->getDevice(), swapchain_->swapchain, UINT64_MAX,
                                 frame().swapchain_semaphore, nullptr, &swapchain_image_index_);
     if (e == VK_ERROR_OUT_OF_DATE_KHR) {
@@ -353,7 +398,7 @@ namespace gestalt::graphics {
           .dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
           .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
           .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-          .image = swapchain_image->image,
+          .image = swapchain_image.get_image(),
           .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
       };
       auto dependency_info = VkDependencyInfo{
@@ -394,8 +439,8 @@ namespace gestalt::graphics {
           },
           .dstOffsets = {
               {0, 0, 0}, // dstOffset[0]
-              {static_cast<int32_t>(swapchain_image->getExtent2D().width), 
-               static_cast<int32_t>(swapchain_image->getExtent2D().height), 
+              {static_cast<int32_t>(swapchain_image.get_extent().width), 
+               static_cast<int32_t>(swapchain_image.get_extent().height), 
                1}, // dstOffset[1]
           },
       };
@@ -406,7 +451,7 @@ namespace gestalt::graphics {
           .pNext = nullptr,
           .srcImage = scene_final_->get_image_handle(),
           .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-          .dstImage = swapchain_image->image,
+          .dstImage = swapchain_image.get_image(),
           .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
           .regionCount = 1,
           .pRegions = &blitRegion,
@@ -425,7 +470,7 @@ namespace gestalt::graphics {
           .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
           .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
           .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-          .image = swapchain_image->image,
+          .image = swapchain_image.get_image(),
           .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
       };
       auto dependency_info = VkDependencyInfo{
@@ -442,7 +487,7 @@ namespace gestalt::graphics {
     }
 
     // Render ImGui overlay
-    imgui_->draw(cmd.get(), swapchain_image);
+    imgui_->draw(cmd.get(), swapchain_image.get_image_view(), swapchain_image.get_extent());
 
     {
       // Transition swapchain_image to PRESENT_SRC_KHR for presentation
@@ -454,7 +499,7 @@ namespace gestalt::graphics {
           .dstAccessMask = 0,
           .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
           .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-          .image = swapchain_image->image,
+          .image = swapchain_image.get_image(),
           .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
       };
       auto dependency_info = VkDependencyInfo{

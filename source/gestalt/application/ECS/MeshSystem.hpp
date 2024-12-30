@@ -11,7 +11,6 @@ namespace gestalt::application {
       void upload_mesh();
 
       void create_buffers();
-      void fill_descriptors();
 
     public:
       void prepare() override;

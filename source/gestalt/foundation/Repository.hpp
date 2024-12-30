@@ -26,7 +26,6 @@
 #include "Resources/GpuProjViewData.hpp"
 #include "Resources/GpuVertexData.hpp"
 #include "Resources/GpuVertexPosition.hpp"
-#include "Resources/TextureHandleOld.hpp"
 
 namespace gestalt::foundation {
 
@@ -116,27 +115,21 @@ namespace gestalt::foundation {
   public:
 
     struct default_material {
-      TextureHandleOld color_image;
       std::shared_ptr<ImageInstance> color_image_instance;
       VkSampler color_sampler;
 
-      TextureHandleOld metallic_roughness_image;
       std::shared_ptr<ImageInstance> metallic_roughness_image_instance;
        VkSampler metallic_roughness_sampler;
 
-      TextureHandleOld normal_image;
       std::shared_ptr<ImageInstance> normal_image_instance;
       VkSampler normal_sampler;
 
-      TextureHandleOld emissive_image;
       std::shared_ptr<ImageInstance> emissive_image_instance;
       VkSampler emissive_sampler;
 
-      TextureHandleOld occlusion_image;
       std::shared_ptr<ImageInstance> occlusion_image_instance;
       VkSampler occlusion_sampler;
 
-      TextureHandleOld error_checkerboard_image;
       std::shared_ptr<ImageInstance> error_checkerboard_image_instance;
 
       std::vector<VkSampler> get_samplers() {
@@ -160,7 +153,6 @@ namespace gestalt::foundation {
     GpuDataContainer<GpuProjViewData> light_view_projections;
     GpuDataContainer<GpuDirectionalLight> directional_lights;
     GpuDataContainer<GpuPointLight> point_lights;
-    GpuDataContainer<TextureHandleOld> textures_old;
     GpuDataContainer<std::shared_ptr<ImageInstance>> textures;
     GpuDataContainer<Material> materials;
     GpuDataContainer<Mesh> meshes;

@@ -49,7 +49,6 @@ namespace gestalt::application {
       void init(IGpu* gpu,
                 IResourceManager* resource_manager,
                 IResourceAllocator* resource_allocator,
-                IDescriptorLayoutBuilder* builder,
                 Repository* repository, FrameProvider* frame);
       void cleanup() const;
 

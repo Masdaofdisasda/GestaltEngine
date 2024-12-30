@@ -4,7 +4,6 @@
 
 #include "VulkanCheck.hpp"
 #include "Camera/AnimationCameraData.hpp"
-#include "Interface/IDescriptorLayoutBuilder.hpp"
 #include "Interface/IGpu.hpp"
 #include "Interface/IResourceAllocator.hpp"
 #include "Interface/IResourceManager.hpp"
@@ -16,33 +15,10 @@ namespace gestalt::application {
 
   void LightSystem::prepare() {
       create_buffers();
-    fill_buffers();
   }
 
   void LightSystem::create_buffers() {
     const auto& light_data = repository_->light_buffers;
-
-    descriptor_layout_builder_->clear();
-    const auto descriptor_layout
-        = descriptor_layout_builder_
-              ->add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT
-                                | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT
-                                | VK_SHADER_STAGE_FRAGMENT_BIT)
-              .add_binding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT
-                               | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT
-                               | VK_SHADER_STAGE_FRAGMENT_BIT)
-              .add_binding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT
-                               | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT
-                               | VK_SHADER_STAGE_FRAGMENT_BIT)
-              .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
-
-
-    light_data->descriptor_buffer = resource_manager_->create_descriptor_buffer(
-        descriptor_layout, 3, 0);
-    vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layout, nullptr);
 
     light_data->dir_light_buffer_instance
         = resource_allocator_->create_buffer(std::move(BufferTemplate(
@@ -60,20 +36,6 @@ namespace gestalt::application {
             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
             VMA_MEMORY_USAGE_CPU_TO_GPU)));
 
-  }
-
-  void LightSystem::fill_buffers() {
-    const auto& light_data = repository_->light_buffers;
-
-    light_data->descriptor_buffer
-        ->write_buffer(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                       light_data->view_proj_matrices_instance->get_address(),
-                       sizeof(GpuProjViewData) * GetMaxViewProjMatrices())
-        .write_buffer(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, light_data->dir_light_buffer_instance->get_address(),
-                      sizeof(GpuDirectionalLight) * getMaxDirectionalLights())
-        .write_buffer(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, light_data->point_light_buffer_instance->get_address(),
-                      sizeof(GpuPointLight) * getMaxPointLights())
-        .update();
   }
 
   glm::mat4 LightSystem::calculate_directional_light_view_matrix(const glm::vec3 direction) const {
@@ -96,7 +58,8 @@ namespace gestalt::application {
     return glm::lookAt(lightPosition, center, up);
   }
 
-  glm::mat4 LightSystem::calculate_directional_light_proj_matrix(const glm::mat4& light_view) const {
+  glm::mat4 LightSystem::calculate_directional_light_proj_matrix(const glm::mat4& light_view,
+                                                                 glm::mat4 inv_cam) const {
 
     const glm::vec4 ndc_corners[8] = {
       {-1, -1, 0, 1},
@@ -108,11 +71,6 @@ namespace gestalt::application {
       {1, 1, 1, 1},
       {-1, 1, 1, 1}};
 
-    // Compute the corners of the camera frustum in world space
-    // TODO uses last frames inv_viewProj, should be updated to use the current frame
-    glm::mat4 inv_cam = repository_->per_frame_data_buffers.get()
-                            ->data.at(frame_->get_current_frame_index())
-                            .inv_viewProj;
     glm::vec3 world_corners[8];
     for (int i = 0; i < 8; ++i) {
       glm::vec4 world_pos = inv_cam * ndc_corners[i];
@@ -181,7 +139,11 @@ namespace gestalt::application {
 
         dir_light_data.light_view_projection = repository_->light_view_projections.size();
         auto view = calculate_directional_light_view_matrix(direction);
-        auto proj = calculate_directional_light_proj_matrix(view);
+        // TODO fix this
+        glm::mat4 inv_cam = repository_->per_frame_data_buffers
+                                       ->data.at(frame_->get_current_frame_index())
+                                       .inv_viewProj;
+        auto proj = calculate_directional_light_proj_matrix(view, inv_cam);
         repository_->light_view_projections.add({view, proj});
 
         GpuDirectionalLight dir_light = {};
@@ -243,7 +205,6 @@ namespace gestalt::application {
     repository_->light_view_projections.clear();
 
     const auto& light_buffers = repository_->light_buffers;
-    resource_manager_->destroy_descriptor_buffer(light_buffers->descriptor_buffer);
     resource_allocator_->destroy_buffer(light_buffers->dir_light_buffer_instance);
     resource_allocator_->destroy_buffer(light_buffers->point_light_buffer_instance);
     resource_allocator_->destroy_buffer(light_buffers->view_proj_matrices_instance);

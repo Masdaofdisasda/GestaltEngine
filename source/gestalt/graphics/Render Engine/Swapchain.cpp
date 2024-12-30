@@ -3,7 +3,8 @@
 #include <VkBootstrap.h>
 #include <EngineConfiguration.hpp>
 #include <Interface/IGpu.hpp>
-#include "Resources/TextureHandleOld.hpp"
+
+#include "ResourceAllocator.hpp"
 
 namespace gestalt::graphics {
   void VkSwapchain::init(IGpu* gpu, const VkExtent3D& extent) {
@@ -40,20 +41,16 @@ namespace gestalt::graphics {
     // store swapchain and its related images
     swapchain = vkbSwapchain.swapchain;
 
-    for (const auto& _swapchainImage : vkbSwapchain.get_images().value()) {
-      TextureHandleOld handle{};
-      handle.image = _swapchainImage;
-      handle.setFormat(swapchain_image_format);
-      handle.setLayout(VK_IMAGE_LAYOUT_UNDEFINED);
-      handle.imageExtent = {swapchain_extent.width, swapchain_extent.height, 1};
-
-      swapchain_images.push_back(std::make_shared<TextureHandleOld>(handle));
+    for (const auto& swapchain_image : vkbSwapchain.get_images().value()) {
+      swapchain_images.emplace_back(
+          SwapchainImage(swapchain_image, swapchain_image_format,
+                         {swapchain_extent.width, swapchain_extent.height}));
     }
 
     const auto views = vkbSwapchain.get_image_views().value();
 
     for (size_t i = 0; i < views.size(); i++) {
-      swapchain_images[i]->imageView = views[i];
+      swapchain_images[i].set_image_view(views[i]);
     }
   }
 
@@ -71,8 +68,8 @@ namespace gestalt::graphics {
     vkDestroySwapchainKHR(gpu_->getDevice(), swapchain, nullptr);
 
     // destroy swapchain resources
-    for (auto& _swapchainImage : swapchain_images) {
-      vkDestroyImageView(gpu_->getDevice(), _swapchainImage->imageView, nullptr);
+    for (auto& swapchain_image : swapchain_images) {
+      swapchain_image.destroy(gpu_->getDevice());
     }
   }
 

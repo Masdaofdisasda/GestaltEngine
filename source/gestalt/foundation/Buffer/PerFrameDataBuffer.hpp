@@ -7,7 +7,6 @@
 #include "EngineConfiguration.hpp"
 #include "PerFrameData.hpp"
 #include "common.hpp"
-#include "Descriptor/DescriptorBuffer.hpp"
 
 namespace gestalt::foundation {
 
@@ -17,15 +16,8 @@ namespace gestalt::foundation {
 
     std::shared_ptr<BufferInstance> uniform_buffers_instance;
 
-    std::array<std::shared_ptr<DescriptorBuffer>, getFramesInFlight()> descriptor_buffers;
-
     std::vector<std::shared_ptr<BufferInstance>> get_buffers(int16 frame_index) const override {
       return {uniform_buffers_instance};
-    }
-
-    std::shared_ptr<DescriptorBuffer> get_descriptor_buffer(
-        int16 frame_index) const override {
-      return descriptor_buffers[frame_index];
     }
   };
 }  // namespace gestalt

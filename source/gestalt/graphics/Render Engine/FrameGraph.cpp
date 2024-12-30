@@ -118,6 +118,25 @@ namespace gestalt::graphics::fg {
     // TODO bind one global descriptor buffer
     //cmd.bind_descriptor_buffers_ext(static_cast<uint32>(descriptor_buffer_bindings_.size()), descriptor_buffer_bindings_.data());
 
+    VkMemoryBarrier2 memory_barrier = {};
+    memory_barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
+    memory_barrier.srcStageMask = VK_PIPELINE_STAGE_2_HOST_BIT;
+    memory_barrier.srcAccessMask = VK_ACCESS_2_HOST_WRITE_BIT;
+    memory_barrier.dstStageMask
+        = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_MESH_SHADER_BIT_EXT
+          | VK_PIPELINE_STAGE_2_TASK_SHADER_BIT_EXT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT
+          | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    memory_barrier.dstAccessMask
+        = VK_ACCESS_2_UNIFORM_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
+
+    VkDependencyInfo dependency_info = {};
+    dependency_info.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    dependency_info.memoryBarrierCount = 1;
+    dependency_info.pMemoryBarriers = &memory_barrier;
+
+    cmd.pipeline_barrier2(dependency_info);
+
+
     for (const auto& node : sorted_nodes_) {
       const auto name = std::string(node->render_pass->get_name());
       //fmt::println("executing: {}", name);

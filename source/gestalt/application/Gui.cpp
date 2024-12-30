@@ -16,7 +16,6 @@
 
 #include "vk_initializers.hpp"
 #include "ECS/ComponentFactory.hpp"
-#include "Interface/IDescriptorLayoutBuilder.hpp"
 #include "Interface/IGpu.hpp"
 #include "Mesh/MeshSurface.hpp"
 
@@ -35,9 +34,8 @@ namespace gestalt::application {
     }
 
     void Gui::init(IGpu* gpu, Window* window,
-                   VkFormat swapchainFormat,
+                   VkFormat swapchain_format,
                    Repository* repository,
-                   IDescriptorLayoutBuilder* builder,
                    const GuiCapabilities& actions) {
       gpu_ = gpu;
       window_ = window;
@@ -68,14 +66,6 @@ namespace gestalt::application {
       gpu_->set_debug_name("ImGui Descriptor Pool", VK_OBJECT_TYPE_DESCRIPTOR_POOL,
                            reinterpret_cast<uint64_t>(imguiPool_));
 
-
-      builder->clear();
-      descriptor_set_layout_ = builder
-                                   ->
-                                   add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                                VK_SHADER_STAGE_FRAGMENT_BIT)
-                                   .build(gpu_->getDevice());
-
       // 2: initialize imgui library
 
       // this initializes the core structures of imgui
@@ -93,7 +83,7 @@ namespace gestalt::application {
       VkPipelineRenderingCreateInfoKHR pipelineRenderingCreateInfo = {
           .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
           .colorAttachmentCount = 1,
-          .pColorAttachmentFormats = &swapchainFormat,
+          .pColorAttachmentFormats = &swapchain_format,
       };
 
       // this initializes imgui for Vulkan
@@ -124,11 +114,6 @@ namespace gestalt::application {
       ImGui_ImplSDL2_Shutdown();
       ImGui::DestroyContext();
 
-      if (descriptor_set_layout_ != VK_NULL_HANDLE) {
-        vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_set_layout_, nullptr);
-        descriptor_set_layout_ = VK_NULL_HANDLE;
-      }
-
       // Destroy ImGui descriptor pool
       if (imguiPool_ != VK_NULL_HANDLE) {
         vkDestroyDescriptorPool(gpu_->getDevice(), imguiPool_, nullptr);
@@ -136,11 +121,11 @@ namespace gestalt::application {
       }
     }
 
-    void Gui::draw(VkCommandBuffer cmd, const std::shared_ptr<TextureHandleOld>& swapchain) {
+    void Gui::draw(VkCommandBuffer cmd, const VkImageView swapchain_view, const VkExtent2D swapchain_extent) {
       VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(
-          swapchain->imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+          swapchain_view, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
       VkRenderingInfo renderInfo
-          = vkinit::rendering_info(swapchain->getExtent2D(), &colorAttachment, nullptr);
+          = vkinit::rendering_info(swapchain_extent, &colorAttachment, nullptr);
 
       vkCmdBeginRendering(cmd, &renderInfo);
 
@@ -511,14 +496,6 @@ namespace gestalt::application {
       }
 
       menu_bar();
-
-      const auto debugImg = actions_.get_debug_image();
-      if (debugImg != nullptr) {
-        const auto extend = actions_.get_debug_image()->getExtent2D();
-        ImGui::Begin("Texture Window");
-        ImGui::Image(descriptor_set_, ImVec2(extend.width, extend.height));
-        ImGui::End();
-      }
 
       if (show_scene_hierarchy_) {
         scene_graph();

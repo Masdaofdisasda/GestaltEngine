@@ -6,7 +6,6 @@
 #include "BufferCollection.hpp"
 #include "EngineConfiguration.hpp"
 #include "common.hpp"
-#include "Descriptor/DescriptorBuffer.hpp"
 
 namespace gestalt::foundation {
 
@@ -38,7 +37,6 @@ namespace gestalt::foundation {
     std::shared_ptr<BufferInstance> group_count_buffer_instance;
 
 
-  std::array<std::shared_ptr<DescriptorBuffer>, getFramesInFlight()> descriptor_buffers;
 
   std::vector<std::shared_ptr<BufferInstance>> get_buffers(int16 frame_index) const override {
     return {index_buffer,
@@ -52,9 +50,5 @@ namespace gestalt::foundation {
             draw_count_buffer[frame_index]};
   }
 
-  std::shared_ptr<DescriptorBuffer> get_descriptor_buffer(
-      int16 frame_index) const override {
-    return descriptor_buffers[frame_index];
-  }
 };
 }  // namespace gestalt

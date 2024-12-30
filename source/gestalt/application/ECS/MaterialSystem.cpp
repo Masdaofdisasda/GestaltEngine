@@ -1,7 +1,6 @@
 ﻿#include "MaterialSystem.hpp"
 
 #include "VulkanCheck.hpp"
-#include "Interface/IDescriptorLayoutBuilder.hpp"
 #include "Interface/IGpu.hpp"
 #include "Interface/IResourceManager.hpp"
 #include "Interface/IResourceAllocator.hpp"
@@ -29,29 +28,10 @@ namespace gestalt::application {
     create_default_material();
 
     fill_uniform_buffer();
-    fill_images_buffer();
   }
 
   void MaterialSystem::create_buffers() {
     const auto& mat_buffers = repository_->material_buffers;
-
-    descriptor_layout_builder_->clear();
-    const auto descriptor_layout
-        = descriptor_layout_builder_
-              ->add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                            VK_SHADER_STAGE_FRAGMENT_BIT)
-              .add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                           VK_SHADER_STAGE_FRAGMENT_BIT)
-              .add_binding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                           VK_SHADER_STAGE_FRAGMENT_BIT)
-              .add_binding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                           VK_SHADER_STAGE_FRAGMENT_BIT, false, getMaxTextures())
-                  .add_binding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
-              .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
-
-    mat_buffers->descriptor_buffer
-        = resource_manager_->create_descriptor_buffer(descriptor_layout, 5);
-    vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layout, nullptr);
 
     mat_buffers->material_buffer = resource_allocator_->create_buffer(BufferTemplate(
         "Material Buffer", sizeof(PbrMaterial::PbrConstants) * getMaxMaterials(),
@@ -64,9 +44,6 @@ namespace gestalt::application {
 
     auto& default_mat = repository_->default_material_;
 
-    default_mat.color_image = resource_manager_->create_image(
-        (void*)&kWhite, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-    repository_->textures_old.add(default_mat.color_image);
 
     default_mat.color_image_instance = resource_allocator_->create_image(
         ImageTemplate("Default Color Image")
@@ -74,43 +51,29 @@ namespace gestalt::application {
         .set_initial_value(kWhiteData.data(), kWhiteData.size()).build());
     repository_->textures.add(default_mat.color_image_instance);
 
-    default_mat.metallic_roughness_image
-        = resource_manager_->create_image((void*)&kDefaultMetallicRoughness, VkExtent3D{1, 1, 1},
-                                          VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
     default_mat.metallic_roughness_image_instance = resource_allocator_->create_image(
         ImageTemplate("Default Metallic Roughness Image")
         .set_image_size(1, 1).set_image_type(TextureType::kColor, VK_FORMAT_R8G8B8A8_UNORM)
         .set_initial_value(kDefaultMetallicRoughnessData.data(),
                            kDefaultMetallicRoughnessData.size()).build());
-    repository_->textures_old.add(default_mat.metallic_roughness_image);
     repository_->textures.add(default_mat.metallic_roughness_image_instance);
 
-    default_mat.normal_image
-        = resource_manager_->create_image((void*)&kFlatNormal, VkExtent3D{1, 1, 1},
-                                          VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
     default_mat.normal_image_instance = resource_allocator_->create_image(
         ImageTemplate("Default Normal Image")
         .set_image_size(1, 1).set_image_type(TextureType::kColor, VK_FORMAT_R8G8B8A8_UNORM)
         .set_initial_value(kFlatNormalData.data(), kFlatNormalData.size()).build());
-    repository_->textures_old.add(default_mat.normal_image);
     repository_->textures.add(default_mat.normal_image_instance);
 
-    default_mat.emissive_image = resource_manager_->create_image(
-        (void*)&kBlack, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
     default_mat.emissive_image_instance = resource_allocator_->create_image(
         ImageTemplate("Default Emissive Image")
         .set_image_size(1, 1).set_image_type(TextureType::kColor, VK_FORMAT_R8G8B8A8_UNORM)
         .set_initial_value(kBlackData.data(), kBlackData.size()).build());
-    repository_->textures_old.add(default_mat.emissive_image);
     repository_->textures.add(default_mat.emissive_image_instance);
 
-    default_mat.occlusion_image = resource_manager_->create_image(
-        (void*)&kWhite, VkExtent3D{1, 1, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
     default_mat.occlusion_image_instance = resource_allocator_->create_image(
         ImageTemplate("Default Occlusion Image")
         .set_image_size(1, 1).set_image_type(TextureType::kColor, VK_FORMAT_R8G8B8A8_UNORM)
         .set_initial_value(kWhiteData.data(), kWhiteData.size()).build());
-    repository_->textures_old.add(default_mat.occlusion_image);
     repository_->textures.add(default_mat.occlusion_image_instance);
 
     // checkerboard image for error textures and testing
@@ -150,13 +113,10 @@ namespace gestalt::application {
     }
     }
 
-    default_mat.error_checkerboard_image = resource_manager_->create_image(
-        pixels.data(), VkExtent3D{16, 16, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
     default_mat.error_checkerboard_image_instance = resource_allocator_->create_image(
         ImageTemplate("Error Checkerboard Image")
         .set_image_size(16, 16).set_image_type(TextureType::kColor, VK_FORMAT_R8G8B8A8_UNORM)
         .set_initial_value(checkerboard.data(), checkerboard.size()).build());
-    repository_->textures_old.add(default_mat.error_checkerboard_image);
     repository_->textures.add(default_mat.error_checkerboard_image_instance);
 
     default_mat.color_sampler = repository_->get_sampler();
@@ -172,15 +132,15 @@ namespace gestalt::application {
     PbrMaterial pbr_mat{};
 
     // default the material textures
-    pbr_mat.textures.albedo_image = default_mat.color_image;
+    pbr_mat.textures.albedo_image = default_mat.color_image_instance;
     pbr_mat.textures.albedo_sampler = default_mat.color_sampler;
-    pbr_mat.textures.metal_rough_image = default_mat.metallic_roughness_image;
+    pbr_mat.textures.metal_rough_image = default_mat.metallic_roughness_image_instance;
     pbr_mat.textures.metal_rough_sampler = default_mat.metallic_roughness_sampler;
-    pbr_mat.textures.normal_image = default_mat.normal_image;
+    pbr_mat.textures.normal_image = default_mat.normal_image_instance;
     pbr_mat.textures.normal_sampler = default_mat.normal_sampler;
-    pbr_mat.textures.emissive_image = default_mat.emissive_image;
+    pbr_mat.textures.emissive_image = default_mat.emissive_image_instance;
     pbr_mat.textures.emissive_sampler = default_mat.emissive_sampler;
-    pbr_mat.textures.occlusion_image = default_mat.occlusion_image;
+    pbr_mat.textures.occlusion_image = default_mat.occlusion_image_instance;
     pbr_mat.textures.occlusion_sampler = default_mat.occlusion_sampler;
 
     // build material
@@ -188,8 +148,6 @@ namespace gestalt::application {
     const std::string key = "default_material";
     repository_->materials.add(Material{.name = key, .config = pbr_mat});
     fmt::print("creating material {}, mat_id {}\n", key, material_id);
-    
-    resource_manager_->load_and_process_cubemap(R"(..\..\assets\san_giuseppe_bridge_4k.hdr)");
   }
 
   void MaterialSystem::fill_uniform_buffer() {
@@ -204,37 +162,6 @@ namespace gestalt::application {
            sizeof(PbrMaterial::PbrConstants) * getMaxMaterials());
 
     vmaUnmapMemory(gpu_->getAllocator(), constant_buffer->get_allocation());
-
-    repository_->material_buffers->descriptor_buffer
-        ->write_buffer(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, constant_buffer->get_address(),
-                       sizeof(PbrMaterial::PbrConstants) * getMaxMaterials())
-        .update();
-  }
-
-  void MaterialSystem::fill_images_buffer() {
-    const auto& mat_buffers = repository_->material_buffers;
-    const auto& default_mat = repository_->default_material_;
-
-    std::vector<VkDescriptorImageInfo> image_infos;
-    image_infos.reserve(getMaxTextures());
-
-    for (int i = 0; i < getMaxMaterials(); ++i) {
-      image_infos.push_back({default_mat.color_sampler, default_mat.color_image.imageView,
-                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
-      image_infos.push_back({default_mat.metallic_roughness_sampler,
-                             default_mat.metallic_roughness_image.imageView,
-                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
-      image_infos.push_back({default_mat.normal_sampler, default_mat.normal_image.imageView,
-                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
-      image_infos.push_back({default_mat.emissive_sampler, default_mat.emissive_image.imageView,
-                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
-      image_infos.push_back({default_mat.occlusion_sampler, default_mat.occlusion_image.imageView,
-                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL});
-    }
-
-    mat_buffers->descriptor_buffer
-        ->write_image_array(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_infos)
-        .update();
   }
 
   void MaterialSystem::update(float delta_time, const UserInput& movement, float aspect) {
@@ -261,16 +188,6 @@ namespace gestalt::application {
 
   void MaterialSystem::cleanup() {
     const auto& material_buffers = repository_->material_buffers;
-    resource_manager_->destroy_descriptor_buffer(material_buffers->descriptor_buffer);
-    resource_manager_->destroy_image(material_buffers->bdrf_lut);
-    resource_manager_->destroy_image(material_buffers->environment_irradiance_map);
-    resource_manager_->destroy_image(material_buffers->environment_map);
-    vkDestroySampler(gpu_->getDevice(), material_buffers->cube_map_sampler, nullptr);
-
-    for (auto texture : repository_->textures_old.data()) {
-      resource_manager_->destroy_image(texture);
-    }
-    repository_->textures_old.clear();
 
     repository_->materials.clear();
 
@@ -288,28 +205,8 @@ namespace gestalt::application {
       throw std::runtime_error("Material ID exceeds maximum materials");
     }
 
-    const auto& mat_buffers = repository_->material_buffers;
-
-    // Create VkDescriptorImageInfo for each texture of the material
-    std::vector<VkDescriptorImageInfo> image_infos
-        = {{material.textures.albedo_sampler, material.textures.albedo_image.imageView,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-           {material.textures.metal_rough_sampler, material.textures.metal_rough_image.imageView,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-           {material.textures.normal_sampler, material.textures.normal_image.imageView,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-           {material.textures.emissive_sampler, material.textures.emissive_image.imageView,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
-           {material.textures.occlusion_sampler, material.textures.occlusion_image.imageView,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
-
     // Calculate the start offset in the descriptor buffer
     const uint32_t texture_start = getPbrMaterialTextures() * material_id;
-
-    mat_buffers->descriptor_buffer
-        ->write_image_array(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, image_infos,
-                            texture_start)
-        .update();
 
     if (material.constants.albedo_tex_index != kUnusedTexture) {
       material.constants.albedo_tex_index = texture_start;

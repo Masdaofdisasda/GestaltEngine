@@ -2,15 +2,15 @@
 
 #include "common.hpp"
 #include "VulkanTypes.hpp"
-#include "Resources/TextureHandleOld.hpp"
 #include "MaterialFlags.hpp"
 #include "glm/vec2.hpp"
 #include "glm/vec3.hpp"
 #include "glm/vec4.hpp"
 
 namespace gestalt::foundation {
+  class ImageInstance;
 
-    struct PbrMaterial {
+  struct PbrMaterial {
       bool double_sided{false};
       bool transparent{false};
 
@@ -31,15 +31,15 @@ namespace gestalt::foundation {
       } constants;
 
       struct PbrTextures {
-        TextureHandleOld albedo_image;
+        std::shared_ptr<ImageInstance> albedo_image;
         VkSampler albedo_sampler;
-        TextureHandleOld metal_rough_image;
+        std::shared_ptr<ImageInstance> metal_rough_image;
         VkSampler metal_rough_sampler;
-        TextureHandleOld normal_image;
+        std::shared_ptr<ImageInstance> normal_image;
         VkSampler normal_sampler;
-        TextureHandleOld emissive_image;
+        std::shared_ptr<ImageInstance> emissive_image;
         VkSampler emissive_sampler;
-        TextureHandleOld occlusion_image;
+        std::shared_ptr<ImageInstance> occlusion_image;
         VkSampler occlusion_sampler;
       } textures;
     };
