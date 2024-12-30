@@ -4,8 +4,7 @@
 
 inline void vk_check(const VkResult result, const char* expr) {
   if (result != VK_SUCCESS) {
-    fmt::println("Detected Vulkan error: {} in expression: {}", string_VkResult(result), expr);
-    std::abort();
+    throw std::runtime_error(fmt::format("Detected Vulkan error: {} in expression: {}", string_VkResult(result), expr));
   }
 }
 

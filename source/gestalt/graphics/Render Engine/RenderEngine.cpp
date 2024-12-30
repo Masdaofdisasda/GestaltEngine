@@ -162,30 +162,30 @@ namespace gestalt::graphics {
 
       // camera
       auto camera_buffer = frame_graph_->add_resource(
-          repository->per_frame_data_buffers->uniform_buffers_instance);
+          repository->per_frame_data_buffers->camera_buffer);
 
       // geometry
       auto index_buffer = frame_graph_->add_resource(
-          repository->mesh_buffers->index_buffer_instance, fg::CreationType::EXTERNAL);
+          repository->mesh_buffers->index_buffer, fg::CreationType::EXTERNAL);
       auto vertex_position_buffer
-          = frame_graph_->add_resource(repository->mesh_buffers->vertex_position_buffer_instance);
+          = frame_graph_->add_resource(repository->mesh_buffers->vertex_position_buffer);
       auto vertex_data_buffer
-          = frame_graph_->add_resource(repository->mesh_buffers->vertex_data_buffer_instance);
+          = frame_graph_->add_resource(repository->mesh_buffers->vertex_data_buffer);
 
       auto meshlet_buffer
-          = frame_graph_->add_resource(repository->mesh_buffers->meshlet_buffer_instance);
+          = frame_graph_->add_resource(repository->mesh_buffers->meshlet_buffer);
       auto meshlet_vertices
-          = frame_graph_->add_resource(repository->mesh_buffers->meshlet_vertices_instance);
+          = frame_graph_->add_resource(repository->mesh_buffers->meshlet_vertices);
       auto meshlet_triangles
-          = frame_graph_->add_resource(repository->mesh_buffers->meshlet_triangles_instance);
+          = frame_graph_->add_resource(repository->mesh_buffers->meshlet_triangles);
       auto meshlet_task_commands_buffer = frame_graph_->add_resource(
-          repository->mesh_buffers->meshlet_task_commands_buffer_instance);
+          repository->mesh_buffers->meshlet_task_commands_buffer);
       auto mesh_draw_buffer
-          = frame_graph_->add_resource(repository->mesh_buffers->mesh_draw_buffer_instance);
+          = frame_graph_->add_resource(repository->mesh_buffers->mesh_draw_buffer);
       auto command_count_buffer
-          = frame_graph_->add_resource(repository->mesh_buffers->command_count_buffer_instance);
+          = frame_graph_->add_resource(repository->mesh_buffers->command_count_buffer);
       auto group_count_buffer
-          = frame_graph_->add_resource(repository->mesh_buffers->group_count_buffer_instance);
+          = frame_graph_->add_resource(repository->mesh_buffers->group_count_buffer);
 
       // Material
       
@@ -220,11 +220,11 @@ namespace gestalt::graphics {
 
       // Light
       auto directional_light
-          = frame_graph_->add_resource(repository->light_buffers->dir_light_buffer_instance);
+          = frame_graph_->add_resource(repository->light_buffers->dir_light_buffer);
       auto point_light
-          = frame_graph_->add_resource(repository->light_buffers->point_light_buffer_instance);
+          = frame_graph_->add_resource(repository->light_buffers->point_light_buffer);
       auto light_matrices
-          = frame_graph_->add_resource(repository->light_buffers->view_proj_matrices_instance);
+          = frame_graph_->add_resource(repository->light_buffers->view_proj_matrices);
 
       // Shader Passes
       frame_graph_->add_pass<fg::DrawCullDirectionalDepthPass>(

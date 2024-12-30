@@ -160,19 +160,27 @@ namespace gestalt::foundation {
   };
 
   class BufferTemplate final : public ResourceTemplate {
-    size_t size_;
-    VkBufferUsageFlags usage_;
-    VmaMemoryUsage memory_usage_;
+    size_t size_;                              // Size of the buffer
+    VkBufferUsageFlags usage_;                 // Vulkan buffer usage flags
+    VmaMemoryUsage memory_usage_;              // Memory usage flags
+    VmaAllocationCreateFlags alloc_flags_;     // Allocation creation flags
+    VkMemoryPropertyFlags memory_properties_;  // Explicit memory property flags
+    VkBufferCreateFlags buffer_create_flags_;  // Additional Vulkan buffer creation flags
 
   public:
 
-    BufferTemplate(std::string name, const size_t size,
-                           const VkBufferUsageFlags usage, const VmaMemoryUsage memory_usage)
-      : ResourceTemplate(std::move(name)),
-        size_(size),
-        usage_(usage),
-        memory_usage_(memory_usage) {
-    }
+    BufferTemplate(std::string name, const size_t size, const VkBufferUsageFlags usage,
+                   const VmaAllocationCreateFlags alloc_flags,
+                   const VmaMemoryUsage memory_usage = VMA_MEMORY_USAGE_AUTO,
+                   const VkMemoryPropertyFlags memory_properties = 0,
+                   const VkBufferCreateFlags buffer_create_flags = 0)
+        : ResourceTemplate(std::move(name)),
+          size_(size),
+          usage_(usage),
+          memory_usage_(memory_usage),
+          alloc_flags_(alloc_flags),
+          memory_properties_(memory_properties),
+          buffer_create_flags_(buffer_create_flags) {}
 
     BufferTemplate(const BufferTemplate&) = delete;
     BufferTemplate& operator=(const BufferTemplate&) = delete;
@@ -185,6 +193,11 @@ namespace gestalt::foundation {
     [[nodiscard]] size_t get_size() const { return size_; }
     [[nodiscard]] VkBufferUsageFlags get_usage() const { return usage_; }
     [[nodiscard]] VmaMemoryUsage get_memory_usage() const { return memory_usage_; }
+    [[nodiscard]] VmaAllocationCreateFlags get_alloc_flags() const { return alloc_flags_; }
+    [[nodiscard]] VkMemoryPropertyFlags get_memory_properties() const { return memory_properties_; }
+    [[nodiscard]] VkBufferCreateFlags get_buffer_create_flags() const {
+      return buffer_create_flags_;
+    }
   };
 
     class BufferInstance;

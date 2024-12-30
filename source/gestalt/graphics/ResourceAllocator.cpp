@@ -542,20 +542,27 @@ namespace gestalt::graphics {
   }
 
 
-  AllocatedBuffer ResourceAllocator::allocate_buffer(const std::string_view name, const size_t size,
-                                                       VkBufferUsageFlags usage_flags,
-                                                       const VmaMemoryUsage memory_usage) const {
+  AllocatedBuffer ResourceAllocator::allocate_buffer(
+      const std::string_view name, const VkDeviceSize size, VkBufferUsageFlags usage_flags,
+      const VkBufferCreateFlags create_flags, const VkMemoryPropertyFlags memory_property_flags,
+      const VmaAllocationCreateFlags allocation_flags, const VmaMemoryUsage memory_usage) const {
     usage_flags |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
-    const VkBufferCreateInfo buffer_info = {
+    // Define the buffer create info structure
+    VkBufferCreateInfo buffer_info = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = create_flags,
         .size = size,
         .usage = usage_flags,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
     };
 
-    const VmaAllocationCreateInfo allocation_info = {
-        .flags = VMA_ALLOCATION_CREATE_MAPPED_BIT,
+    // Define the allocation create info structure
+    VmaAllocationCreateInfo allocation_info = {
+        .flags = allocation_flags,
         .usage = memory_usage,
+        .requiredFlags = memory_property_flags,
     };
 
     AllocatedBuffer buffer;
@@ -564,8 +571,11 @@ namespace gestalt::graphics {
     gpu_->set_debug_name(name, VK_OBJECT_TYPE_BUFFER,
                          reinterpret_cast<uint64_t>(buffer.buffer_handle));
 
-    const VkBufferDeviceAddressInfo device_address_info
-        = {.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = buffer.buffer_handle};
+    // Get the device address for the buffer
+    const VkBufferDeviceAddressInfo device_address_info{
+        .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+        .buffer = buffer.buffer_handle,
+    };
     buffer.address = vkGetBufferDeviceAddress(gpu_->getDevice(), &device_address_info);
 
     return buffer;
@@ -573,9 +583,10 @@ namespace gestalt::graphics {
 
   std::shared_ptr<BufferInstance> ResourceAllocator::create_buffer(
       BufferTemplate&& buffer_template) const {
-    auto allocated_buffer = allocate_buffer(buffer_template.get_name(), buffer_template.get_size(),
-                                            buffer_template.get_usage(),
-                                            buffer_template.get_memory_usage());
+    auto allocated_buffer = allocate_buffer(
+        buffer_template.get_name(), buffer_template.get_size(), buffer_template.get_usage(),
+        buffer_template.get_buffer_create_flags(), buffer_template.get_memory_properties(),
+        buffer_template.get_alloc_flags(), buffer_template.get_memory_usage());
 
     return std::make_shared<BufferInstance>(std::move(buffer_template), allocated_buffer);
   }

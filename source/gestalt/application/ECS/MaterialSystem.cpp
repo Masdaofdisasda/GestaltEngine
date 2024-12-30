@@ -34,9 +34,10 @@ namespace gestalt::application {
     const auto& mat_buffers = repository_->material_buffers;
 
     mat_buffers->material_buffer = resource_allocator_->create_buffer(BufferTemplate(
-        "Material Buffer", sizeof(PbrMaterial::PbrConstants) * getMaxMaterials(),
-        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VMA_MEMORY_USAGE_CPU_TO_GPU));
+        "Material Storage Buffer", sizeof(PbrMaterial::PbrConstants) * getMaxMaterials(),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
+        VMA_MEMORY_USAGE_AUTO,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
   }
 
   void MaterialSystem::create_default_material() {

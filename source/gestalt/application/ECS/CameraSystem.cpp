@@ -19,11 +19,13 @@ namespace gestalt::application {
 
     const auto& per_frame_data_buffers = repository_->per_frame_data_buffers;
 
-    per_frame_data_buffers->uniform_buffers_instance
+    per_frame_data_buffers->camera_buffer
         = resource_allocator_->create_buffer(BufferTemplate(
-            "per Frame Buffer", sizeof(PerFrameData),
-            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-            VMA_MEMORY_USAGE_CPU_TO_GPU));
+            "Camera Uniform Buffer", sizeof(PerFrameData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
+            VMA_MEMORY_USAGE_AUTO,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+            ));
   }
 
     inline glm::vec4 NormalizePlane(glm::vec4 p) { return p / length(glm::vec3(p)); }
@@ -161,7 +163,7 @@ namespace gestalt::application {
       }
 
       void* mapped_data;
-      const VmaAllocation allocation = buffers->uniform_buffers_instance->get_allocation();
+      const VmaAllocation allocation = buffers->camera_buffer->get_allocation();
       VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation, &mapped_data));
       const auto scene_uniform_data = static_cast<PerFrameData*>(mapped_data);
       *scene_uniform_data = buffers->data[frame];
@@ -177,7 +179,7 @@ namespace gestalt::application {
       repository_->camera_components.clear();
 
       const auto& buffers = repository_->per_frame_data_buffers;
-      resource_allocator_->destroy_buffer(buffers->uniform_buffers_instance);
+      resource_allocator_->destroy_buffer(buffers->camera_buffer);
 
     }
 

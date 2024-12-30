@@ -329,7 +329,7 @@ namespace gestalt::graphics::fg {
     void bind_descriptors(const CommandBuffer cmd,
                           const VkPipelineBindPoint bind_point) {
 
-        if (image_array_binding_.has_value()) {
+        if (image_array_binding_.has_value() && image_array_binding_.value().resource->should_rebuild_descriptors()) {
         std::vector<VkDescriptorImageInfo> image_infos;
         const auto& info = image_array_binding_.value().info;
         for (const auto& material : image_array_binding_.value().resource->get_materials()) {

@@ -78,10 +78,12 @@ namespace gestalt::application {
     }
 
     const auto staging = resource_allocator_->create_buffer(std::move(
-        BufferTemplate("staging",
+        BufferTemplate("Mesh Staging",
                        vertex_position_buffer_size + vertex_data_buffer_size + index_buffer_size
                            + meshlet_buffer_size + meshlet_vertices_size + meshlet_triangles_size,
-                       VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY)));
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
+        VMA_MEMORY_USAGE_AUTO,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)));
 
     void* data;
     VK_CHECK(vmaMapMemory(gpu_->getAllocator(), staging->get_allocation(), &data));
@@ -132,11 +134,11 @@ namespace gestalt::application {
       copy_regions[5].srcOffset = copy_regions[4].srcOffset + copy_regions[4].size;
       copy_regions[5].size = meshlet_triangles_size;
 
-      vkCmdCopyBuffer(cmd, staging->get_buffer_handle(), mesh_buffers->vertex_position_buffer->get_buffer_handle(), 1,
+      vkCmdCopyBuffer(cmd, staging->get_buffer_handle(),
+                      mesh_buffers->vertex_position_buffer->get_buffer_handle(), 1,
                       &copy_regions[0]);
       vkCmdCopyBuffer(cmd, staging->get_buffer_handle(),
-                      mesh_buffers->vertex_data_buffer->get_buffer_handle(),
-                      1,
+                      mesh_buffers->vertex_data_buffer->get_buffer_handle(), 1,
                       &copy_regions[1]);
       vkCmdCopyBuffer(cmd, staging->get_buffer_handle(),
                       mesh_buffers->index_buffer->get_buffer_handle(), 1,
@@ -150,25 +152,6 @@ namespace gestalt::application {
       vkCmdCopyBuffer(cmd, staging->get_buffer_handle(),
                       mesh_buffers->meshlet_triangles->get_buffer_handle(), 1,
                       &copy_regions[5]);
-
-      vkCmdCopyBuffer(cmd, staging->get_buffer_handle(),
-                      mesh_buffers->vertex_position_buffer_instance->get_buffer_handle(), 1,
-                      &copy_regions[0]);
-      vkCmdCopyBuffer(cmd, staging->get_buffer_handle(),
-                      mesh_buffers->vertex_data_buffer_instance->get_buffer_handle(), 1,
-                      &copy_regions[1]);
-      vkCmdCopyBuffer(cmd, staging->get_buffer_handle(),
-                      mesh_buffers->index_buffer_instance->get_buffer_handle(), 1,
-                      &copy_regions[2]);
-      vkCmdCopyBuffer(cmd, staging->get_buffer_handle(),
-                      mesh_buffers->meshlet_buffer_instance->get_buffer_handle(), 1,
-                      &copy_regions[3]);
-      vkCmdCopyBuffer(cmd, staging->get_buffer_handle(),
-                      mesh_buffers->meshlet_vertices_instance->get_buffer_handle(), 1,
-                      &copy_regions[4]);
-      vkCmdCopyBuffer(cmd, staging->get_buffer_handle(),
-                      mesh_buffers->meshlet_triangles_instance->get_buffer_handle(), 1,
-                      &copy_regions[5]);
     });
     resource_allocator_->destroy_buffer(staging);
   }
@@ -176,123 +159,52 @@ namespace gestalt::application {
   void MeshSystem::create_buffers() {
     const auto& mesh_buffers = repository_->mesh_buffers;
 
-    // Create vertex buffer
-    mesh_buffers->vertex_position_buffer = resource_allocator_->create_buffer(BufferTemplate(
-        "vertex_position_buffer", kMaxVertexPositionBufferSize,
-        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
-            | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VMA_MEMORY_USAGE_GPU_ONLY));
-    mesh_buffers->vertex_data_buffer = resource_allocator_->create_buffer(BufferTemplate(
-        "vertex_data_buffer", kMaxVertexDataBufferSize,
-        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
-            | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VMA_MEMORY_USAGE_GPU_ONLY));
+    mesh_buffers->vertex_position_buffer = resource_allocator_->create_buffer(
+        BufferTemplate("Vertex Positions Storage Buffer", kMaxVertexPositionBufferSize,
+                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
+                           | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                       0, VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
+    mesh_buffers->vertex_data_buffer = resource_allocator_->create_buffer(
+        BufferTemplate("Vertex Data Storage Buffer", kMaxVertexDataBufferSize,
+                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
+                           | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                       0, VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
 
-    // Create index buffer
     mesh_buffers->index_buffer = resource_allocator_->create_buffer(
-        BufferTemplate("index_buffer", kMaxIndexBufferSize,
-                       VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
-                           | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                       VMA_MEMORY_USAGE_GPU_ONLY));
+        BufferTemplate("Index Storage Buffer", kMaxIndexBufferSize,
+                       VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
+                       VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
 
-    // Create meshlet buffers
     mesh_buffers->meshlet_buffer = resource_allocator_->create_buffer(
-        BufferTemplate("meshlet_buffer_instance", kMaxMeshletBufferSize,
-                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_TRANSFER_DST_BIT
-                           | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                       VMA_MEMORY_USAGE_GPU_ONLY));
+        BufferTemplate("Meshlet Storage Buffer", kMaxMeshletBufferSize,
+                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
+                       VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
     mesh_buffers->meshlet_vertices = resource_allocator_->create_buffer(
-        BufferTemplate("meshlet_vertices", kMaxMeshletVertexBufferSize,
-                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_TRANSFER_DST_BIT
-                           | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                       VMA_MEMORY_USAGE_GPU_ONLY));
+        BufferTemplate("Meshlet Vertex Storage Buffer", kMaxMeshletVertexBufferSize,
+                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
+                       VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
     mesh_buffers->meshlet_triangles = resource_allocator_->create_buffer(
-        BufferTemplate("meshlet_triangles_instance", kMaxMeshletIndexBufferSize,
-                       VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_TRANSFER_DST_BIT
-                           | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                       VMA_MEMORY_USAGE_GPU_ONLY));
+        BufferTemplate("Meshlet Triangle Storage Buffer", kMaxMeshletIndexBufferSize,
+                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
+                       VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
 
-    // Create mesh task commands and draw buffers
-    for (int i = 0; i < getFramesInFlight(); i++) {
-      mesh_buffers->meshlet_task_commands_buffer[i] = resource_allocator_->create_buffer(
-          BufferTemplate("meshlet_task_commands_buffer", kMaxMeshletTaskCommandsBufferSize,
-                         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
-                             | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                         VMA_MEMORY_USAGE_GPU_ONLY));
-      mesh_buffers->mesh_draw_buffer[i] = resource_allocator_->create_buffer(BufferTemplate(
-          "mesh_draw_buffer", kMaxMeshDrawBufferSize,
-          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-          VMA_MEMORY_USAGE_CPU_TO_GPU));
-      mesh_buffers->draw_count_buffer[i] = resource_allocator_->create_buffer(BufferTemplate(
-          "draw_count_buffer", kMaxDrawCountBufferSize,
-          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
-              | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-          VMA_MEMORY_USAGE_GPU_ONLY));
-    }
-      
-    // TODO
-      mesh_buffers->vertex_position_buffer_instance
-          = resource_allocator_->create_buffer(BufferTemplate(
-              "vertex_position_buffer_instance", kMaxVertexPositionBufferSize,
-              VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
-                  | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-            VMA_MEMORY_USAGE_GPU_ONLY));
-      mesh_buffers->vertex_data_buffer_instance
-          = resource_allocator_->create_buffer(BufferTemplate(
-          "vertex_data_buffer_instance", kMaxVertexDataBufferSize,
-          VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
-              | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-          VMA_MEMORY_USAGE_GPU_ONLY));
-
-      mesh_buffers->index_buffer_instance
-          = resource_allocator_->create_buffer(BufferTemplate(
-              "index_buffer_instance", kMaxIndexBufferSize,
-                         VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
-                             | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                         VMA_MEMORY_USAGE_GPU_ONLY));
-
-      mesh_buffers->meshlet_buffer_instance
-          = resource_allocator_->create_buffer(BufferTemplate(
-          "meshlet_buffer_instance", kMaxMeshletBufferSize,
-                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_TRANSFER_DST_BIT
-                             | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                         VMA_MEMORY_USAGE_GPU_ONLY));
-      mesh_buffers->meshlet_vertices_instance
-          = resource_allocator_->create_buffer(BufferTemplate(
-          "meshlet_vertices_instance", kMaxMeshletVertexBufferSize,
-                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_TRANSFER_DST_BIT
-                             | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                         VMA_MEMORY_USAGE_GPU_ONLY));
-      mesh_buffers->meshlet_triangles_instance
-          = resource_allocator_->create_buffer(BufferTemplate(
-          "meshlet_triangles_instance", kMaxMeshletIndexBufferSize,
-                         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER | VK_BUFFER_USAGE_TRANSFER_DST_BIT
-                             | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                         VMA_MEMORY_USAGE_GPU_ONLY));
-
-      mesh_buffers->meshlet_task_commands_buffer_instance
-          = resource_allocator_->create_buffer(BufferTemplate(
-              "meshlet_task_commands_buffer_instance", kMaxMeshletTaskCommandsBufferSize,
-                         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
-                             | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                         VMA_MEMORY_USAGE_GPU_ONLY));
-      mesh_buffers->mesh_draw_buffer_instance
-          = resource_allocator_->create_buffer(BufferTemplate(
-          "mesh_draw_buffer_instance", kMaxMeshDrawBufferSize,
-          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-              VMA_MEMORY_USAGE_CPU_TO_GPU));
-      mesh_buffers->command_count_buffer_instance
-          = resource_allocator_->create_buffer(BufferTemplate(
-          "draw_count_buffer_instance", kMaxDrawCountBufferSize,
-          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
-              | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-          VMA_MEMORY_USAGE_GPU_ONLY));
-      mesh_buffers->group_count_buffer_instance
-          = resource_allocator_->create_buffer(BufferTemplate(
-          "draw_count_buffer_instance", kMaxDrawCountBufferSize,
-          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
-              | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-          VMA_MEMORY_USAGE_GPU_ONLY));
+    mesh_buffers->meshlet_task_commands_buffer = resource_allocator_->create_buffer(
+        BufferTemplate("Meshlet Task Commands Storage Buffer", kMaxMeshletTaskCommandsBufferSize,
+                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, 0,
+                       VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
+    mesh_buffers->mesh_draw_buffer = resource_allocator_->create_buffer(BufferTemplate(
+        "Mesh Draws Storage Buffer", kMaxMeshDrawBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
+    mesh_buffers->command_count_buffer = resource_allocator_->create_buffer(
+        BufferTemplate("Draw Command Count Storage Buffer", kMaxDrawCountBufferSize,
+                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
+                       VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
+    mesh_buffers->group_count_buffer = resource_allocator_->create_buffer(
+        BufferTemplate("Group Count Storage Buffer", kMaxDrawCountBufferSize,
+                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
+                           | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                       0, VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
   }
 
   void MeshSystem::update(float delta_time, const UserInput& movement, float aspect) {
@@ -328,23 +240,14 @@ namespace gestalt::application {
 
     if (kMaxMeshDrawBufferSize < mesh_draw_buffer_size) {
       fmt::println("mesh_draw_buffer size needs to be increased by {}",
-                   mesh_draw_buffer_size - mesh_buffers->mesh_draw_buffer[frame]->get_size());
+                   mesh_draw_buffer_size - mesh_buffers->mesh_draw_buffer->get_size());
     }
     void* mapped_data;
-    const VmaAllocation allocation = mesh_buffers->mesh_draw_buffer[frame]->get_allocation();
+    const VmaAllocation allocation = mesh_buffers->mesh_draw_buffer->get_allocation();
     VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation, &mapped_data));
     const auto mesh_draw_data = static_cast<MeshDraw*>(mapped_data);
     std::memcpy(mesh_draw_data, mesh_draws.data().data(), mesh_draws.size() * sizeof(MeshDraw));
-    vmaUnmapMemory(gpu_->getAllocator(), mesh_buffers->mesh_draw_buffer[frame]->get_allocation());
-
-    {
-      void* mapped_data;
-      const VmaAllocation allocation = mesh_buffers->mesh_draw_buffer_instance->get_allocation();
-      VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation, &mapped_data));
-      const auto mesh_draw_data = static_cast<MeshDraw*>(mapped_data);
-      std::memcpy(mesh_draw_data, mesh_draws.data().data(), mesh_draws.size() * sizeof(MeshDraw));
-      vmaUnmapMemory(gpu_->getAllocator(), allocation);
-    }
+    vmaUnmapMemory(gpu_->getAllocator(), mesh_buffers->mesh_draw_buffer->get_allocation());
 
   }
 
@@ -402,11 +305,12 @@ namespace gestalt::application {
     resource_allocator_->destroy_buffer(mesh_buffers->meshlet_buffer);
     resource_allocator_->destroy_buffer(mesh_buffers->meshlet_vertices);
     resource_allocator_->destroy_buffer(mesh_buffers->meshlet_triangles);
-    for (int i = 0; i < getFramesInFlight(); i++) {
-      resource_allocator_->destroy_buffer(mesh_buffers->meshlet_task_commands_buffer[i]);
-      resource_allocator_->destroy_buffer(mesh_buffers->mesh_draw_buffer[i]);
-      resource_allocator_->destroy_buffer(mesh_buffers->draw_count_buffer[i]);
-    }
+
+      resource_allocator_->destroy_buffer(mesh_buffers->meshlet_task_commands_buffer);
+      resource_allocator_->destroy_buffer(mesh_buffers->mesh_draw_buffer);
+      resource_allocator_->destroy_buffer(mesh_buffers->command_count_buffer);
+      resource_allocator_->destroy_buffer(mesh_buffers->group_count_buffer);
+
     repository_->vertex_data.clear();
     repository_->vertex_positions.clear();
     repository_->indices.clear();

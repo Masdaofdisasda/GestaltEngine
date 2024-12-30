@@ -213,9 +213,10 @@ namespace gestalt::graphics {
       [[nodiscard]] AllocatedImage allocate_image(std::string_view name, VkFormat format,
                                                   VkImageUsageFlags usage_flags, VkExtent3D extent,
                                                 VkImageAspectFlags aspect_flags, ImageType image_type, bool mipmap = false) const;
-      [[nodiscard]] AllocatedBuffer allocate_buffer(std::string_view name, VkDeviceSize size,
-                                                    VkBufferUsageFlags usage_flags,
-                                                    VmaMemoryUsage memory_usage) const;
+    [[nodiscard]] AllocatedBuffer allocate_buffer(
+        std::string_view name, VkDeviceSize size, VkBufferUsageFlags usage_flags,
+        VkBufferCreateFlags create_flags, VkMemoryPropertyFlags memory_property_flags,
+        VmaAllocationCreateFlags allocation_flags, VmaMemoryUsage memory_usage) const;
 
     public:
       explicit ResourceAllocator(IGpu* gpu) : gpu_(gpu), task_queue_(gpu) {}
