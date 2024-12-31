@@ -276,7 +276,7 @@ namespace gestalt::graphics {
           [&] {
             return repository_->per_frame_data_buffers->data.at(frame_->get_current_frame_index());
           },
-          [&] { return repository_->point_lights.size(); }, gpu_);
+          [&] { return static_cast<uint32>(repository_->point_lights.size()); }, gpu_);
 
       frame_graph_->add_pass<fg::VolumetricLightingSpatialFilterPass>(
           light_scattering, light_scattering_filtered, post_process_sampler,
@@ -299,8 +299,8 @@ namespace gestalt::graphics {
           [&] {
             return repository_->per_frame_data_buffers->data.at(frame_->get_current_frame_index());
           },
-          [&] { return repository_->directional_lights.size(); },
-          [&] { return repository_->point_lights.size(); });
+          [&] { return static_cast<uint32>(repository_->directional_lights.size()); },
+          [&] { return static_cast<uint32>(repository_->point_lights.size()); });
 
       frame_graph_->add_pass<fg::SkyboxPass>(
           camera_buffer, directional_light, scene_lit, texEnvMap, scene_skybox, g_buffer_depth, post_process_sampler,
