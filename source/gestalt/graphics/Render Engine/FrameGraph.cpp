@@ -1,20 +1,10 @@
 ﻿#include "Render Engine/FrameGraph.hpp"
 
 #include "ResourceAllocator.hpp"
+#include "SynchronizationManager.hpp"
+#include "ResourceRegistry.hpp"
 
 namespace gestalt::graphics::fg {
-  std::shared_ptr<ImageInstance> ResourceRegistry::add_template(ImageTemplate&& image_template) {
-    const auto image = resource_factory_->create_image(std::move(image_template));
-    
-    return add_resource(image);
-  }
-
-  std::shared_ptr<BufferInstance> ResourceRegistry::add_template(BufferTemplate&& buffer_template) {
-    const auto buffer = resource_factory_->create_buffer(std::move(buffer_template));
-    
-    return add_resource(buffer);
-  }
-
 
   void FrameGraph::print_graph() const {
     for (const auto& node : nodes_) {

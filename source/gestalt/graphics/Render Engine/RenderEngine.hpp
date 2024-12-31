@@ -3,6 +3,7 @@
 
 #include "EngineConfiguration.hpp"
 #include "FrameGraph.hpp"
+#include "RenderConfig.hpp"
 #include "Swapchain.hpp"
 #include "common.hpp"
 
@@ -12,7 +13,6 @@ namespace gestalt::application {
 }
 
 namespace gestalt::foundation {
-  struct RenderConfig;
   struct FrameProvider;
   class Repository;
   class IGpu;

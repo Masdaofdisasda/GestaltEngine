@@ -14,6 +14,13 @@
 #include "ResourceAllocator.hpp"
 #include "vk_initializers.hpp"
 #include "Interface/IGpu.hpp"
+#include "Renderpasses/LightingPasses.hpp"
+#include "Renderpasses/MeshPasses.hpp"
+#include "Renderpasses/ShadowPasses.hpp"
+#include "Renderpasses/SkyBox.hpp"
+#include "Renderpasses/SsaoPasses.hpp"
+#include "Renderpasses/ToneMapping.hpp"
+#include "Renderpasses/VolumetricLight.hpp"
 
 namespace gestalt::graphics {
 
