@@ -64,15 +64,15 @@ namespace gestalt::graphics {
     }
   }
 
-  FrameGraph::FrameGraph(ResourceAllocator* resource_allocator) {
+  FrameGraph::FrameGraph(ResourceAllocator* resource_allocator)
+      : resource_registry_(resource_allocator)
+  {
     nodes_.reserve(25);
-    synchronization_manager_ = std::make_unique<SynchronizationManager>();
-    resource_registry_ = std::make_unique<ResourceRegistry>(resource_allocator);
   }
 
   std::shared_ptr<ImageInstance> FrameGraph::add_resource(ImageTemplate&& image_template,
       CreationType creation_type) {
-    auto resource = resource_registry_->add_template(std::move(image_template));
+    auto resource = resource_registry_.add_template(std::move(image_template));
     const uint64 handle = resource->handle();
     if (handle == -1) {
       throw std::runtime_error("Invalid resource handle!");
@@ -89,7 +89,7 @@ namespace gestalt::graphics {
 
   std::shared_ptr<BufferInstance> FrameGraph::add_resource(BufferTemplate&& buffer_template,
                                                CreationType creation_type) {
-    auto resource = resource_registry_->add_template(std::move(buffer_template));
+    auto resource = resource_registry_.add_template(std::move(buffer_template));
     const uint64 handle = resource->handle();
     if (handle == -1) {
       throw std::runtime_error("Invalid resource handle!");
@@ -137,7 +137,7 @@ namespace gestalt::graphics {
     }
   }
 
-  void FrameGraph::execute(const CommandBuffer cmd) const {
+  void FrameGraph::execute(const CommandBuffer cmd) {
 
     // TODO bind one global descriptor buffer
     //cmd.bind_descriptor_buffers_ext(static_cast<uint32>(descriptor_buffer_bindings_.size()), descriptor_buffer_bindings_.data());
@@ -164,7 +164,7 @@ namespace gestalt::graphics {
     for (const auto& node : sorted_nodes_) {
       const auto name = std::string(node->render_pass->get_name());
       //fmt::println("executing: {}", name);
-      synchronization_manager_->synchronize_resources(node, cmd);
+      synchronization_manager_.synchronize_resources(node, cmd);
 
       VkDebugUtilsLabelEXT label_info = {
           .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,

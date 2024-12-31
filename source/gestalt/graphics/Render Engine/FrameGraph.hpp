@@ -67,8 +67,8 @@ namespace gestalt::graphics {
 
     std::vector<VkDescriptorBufferBindingInfoEXT> descriptor_buffer_bindings_;
 
-    std::unique_ptr<SynchronizationManager> synchronization_manager_;
-    std::unique_ptr<ResourceRegistry> resource_registry_;
+    SynchronizationManager synchronization_manager_;
+    ResourceRegistry resource_registry_;
 
     void add_render_pass(std::shared_ptr<RenderPass>&& pass);
 
@@ -99,7 +99,7 @@ namespace gestalt::graphics {
         throw std::runtime_error("Resource instance cannot be null!");
       }
 
-      auto resource = resource_registry_->add_resource(resource_instance);
+      auto resource = resource_registry_.add_resource(resource_instance);
       if (resource == nullptr) {
         throw std::runtime_error("Failed to add resource to the registry!");
       }
@@ -121,7 +121,7 @@ namespace gestalt::graphics {
 
     void compile();
 
-    void execute(CommandBuffer cmd) const;
+    void execute(CommandBuffer cmd);
   }; 
 
 }  // namespace gestalt::graphics::fg

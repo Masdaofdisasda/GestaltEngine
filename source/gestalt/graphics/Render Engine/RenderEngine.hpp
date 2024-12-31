@@ -72,7 +72,7 @@ namespace gestalt::graphics {
     public:
       void init(IGpu* gpu, Window* window,
                 ResourceAllocator* resource_allocator,
-                Repository* repository, Gui* imgui_gui, FrameProvider* frame);
+                   Repository* repository, Gui* imgui_gui, FrameProvider* frame);
       void execute_passes();
 
       void cleanup();
