@@ -154,5 +154,25 @@ namespace gestalt::graphics::fg {
       cmd.global_barrier();
       cmd.end_debug_utils_label_ext();
     }
+
+    // Ensure all shader stages reading buffers complete before host writes
+    memory_barrier.srcStageMask
+        = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_MESH_SHADER_BIT_EXT
+          | VK_PIPELINE_STAGE_2_TASK_SHADER_BIT_EXT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT
+          | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    memory_barrier.srcAccessMask
+        = VK_ACCESS_2_UNIFORM_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
+
+    // Allow host write after GPU completes
+    memory_barrier.dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT;
+    memory_barrier.dstAccessMask = VK_ACCESS_2_HOST_WRITE_BIT;
+
+    dependency_info = {};
+    dependency_info.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    dependency_info.memoryBarrierCount = 1;
+    dependency_info.pMemoryBarriers = &memory_barrier;
+
+    // Submit the barrier
+    cmd.pipeline_barrier2(dependency_info);
   }
 }  // namespace gestalt::graphics::fg

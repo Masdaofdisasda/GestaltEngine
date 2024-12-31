@@ -36,6 +36,8 @@ namespace gestalt::graphics {
     void init(VkDevice device, uint32 graphics_queue_family_index, FrameProvider& frame);
     void cleanup(VkDevice device);
     FrameResources& get_current_frame();
+    bool acquire_next_image(VkDevice device, VkSwapchainKHR& swapchain, uint32& swapchain_image_index) const;
+    bool present(CommandBuffer cmd, VkQueue graphics_queue, VkSwapchainKHR& swapchain, uint32& swapchain_image_index) const;
 
   private:
     std::array<FrameResources, getFramesInFlight()> frames_{};
@@ -61,11 +63,9 @@ namespace gestalt::graphics {
 
       bool resize_requested_{false};
       uint32 swapchain_image_index_{0};
-      FrameData frames_{};
-      bool acquire_next_image();
-      void present(CommandBuffer cmd);
+      FrameData frame_data_{};
 
-      auto& frame() { return frames_.get_current_frame(); }
+      auto& frame() { return frame_data_.get_current_frame(); }
 
       CommandBuffer start_draw();
 

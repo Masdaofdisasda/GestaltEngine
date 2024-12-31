@@ -61,70 +61,104 @@ namespace gestalt::application {
     return glm::lookAt(lightPosition, center, up);
   }
 
-  glm::mat4 LightSystem::calculate_directional_light_proj_matrix(const glm::mat4& light_view,
-                                                                 glm::mat4 inv_cam) const {
+  glm::mat4 LightSystem::calculate_directional_light_proj_matrix_scene_only(
+      const glm::mat4& light_view) const {
+    // Retrieve scene min/max
+    auto& [scene_min, scene_max, dirty]
+        = repository_->scene_graph.get(root_entity).value().get().bounds;
 
-    const glm::vec4 ndc_corners[8] = {
-      {-1, -1, 0, 1},
-      {1, -1, 0, 1},
-      {1, 1, 0, 1},
-      {-1, 1, 0, 1},
-      {-1, -1, 1, 1},
-      {1, -1, 1, 1},
-      {1, 1, 1, 1},
-      {-1, 1, 1, 1}};
+    // Step 1: Compute 8 corners of the scene bounding box
+    glm::vec3 corners[8] = {scene_min,
+                            {scene_max.x, scene_min.y, scene_min.z},
+                            {scene_min.x, scene_max.y, scene_min.z},
+                            {scene_max.x, scene_max.y, scene_min.z},
+                            {scene_min.x, scene_min.y, scene_max.z},
+                            {scene_max.x, scene_min.y, scene_max.z},
+                            {scene_min.x, scene_max.y, scene_max.z},
+                            scene_max};
 
-    glm::vec3 world_corners[8];
-    for (int i = 0; i < 8; ++i) {
-      glm::vec4 world_pos = inv_cam * ndc_corners[i];
-      world_corners[i] = glm::vec3(world_pos) / world_pos.w;
+    // Step 2: Transform corners into light space
+    glm::mat4 light_view_inv = glm::inverse(light_view);
+    glm::vec3 light_space_min = glm::vec3(std::numeric_limits<float>::max());
+    glm::vec3 light_space_max = glm::vec3(std::numeric_limits<float>::lowest());
+
+    for (const auto& c : corners) {
+      glm::vec4 light_pos = light_view_inv * glm::vec4(c, 1.0f);
+      glm::vec3 lpos3 = glm::vec3(light_pos);
+
+      light_space_min = glm::min(light_space_min, lpos3);
+      light_space_max = glm::max(light_space_max, lpos3);
     }
 
-    // extend the frustum to include the scene bounds
-    // this ensures that the shadow map covers the entire scene, even occluders that are outside the
-    // view frustum
-    auto& [scene_min, scene_max, dirty] = repository_->scene_graph.get(root_entity).value().get().bounds;
+    // Step 3: Construct orthographic projection
+    // Note: using orthoRH_ZO or orthoLH_ZO depends on your convention
+    return glm::orthoRH_ZO(light_space_min.x, light_space_max.x, light_space_min.y,
+                           light_space_max.y, light_space_min.z, light_space_max.z);
+  }
+
+  glm::mat4 LightSystem::calculate_directional_light_proj_matrix_camera_only(
+      const glm::mat4& light_view, const glm::mat4& inv_cam,
+      float ndc_min_z = -1.f) {
+    // 1. Define NDC corners with extended behind-camera near plane
+    //    Here, we let z range from ndc_min_z to 1.0f
+    //    for a total of 8 corners.
+    glm::vec4 ndc_corners[8] = {
+        // near plane (extended behind camera)
+        {-1.f, -1.f, ndc_min_z, 1.f},
+        {1.f, -1.f, ndc_min_z, 1.f},
+        {1.f, 1.f, ndc_min_z, 1.f},
+        {-1.f, 1.f, ndc_min_z, 1.f},
+
+        // far plane
+        {-1.f, -1.f, 1.f, 1.f},
+        {1.f, -1.f, 1.f, 1.f},
+        {1.f, 1.f, 1.f, 1.f},
+        {-1.f, 1.f, 1.f, 1.f},
+    };
+
+    // 2. Transform these NDC corners to world space via inv_cam
+    glm::vec3 frustum_corners_world[8];
+    for (int i = 0; i < 8; ++i) {
+      glm::vec4 world_pos = inv_cam * ndc_corners[i];
+      frustum_corners_world[i] = glm::vec3(world_pos) / world_pos.w;
+    }
+
+    // 3. Compute the bounding box in world space
     glm::vec3 extended_min = glm::vec3(std::numeric_limits<float>::max());
     glm::vec3 extended_max = glm::vec3(std::numeric_limits<float>::lowest());
 
-    for (auto world_corner : world_corners) {
-      extended_min = glm::min(extended_min, world_corner);
-      extended_max = glm::max(extended_max, world_corner);
+    for (auto& corner : frustum_corners_world) {
+      extended_min = glm::min(extended_min, corner);
+      extended_max = glm::max(extended_max, corner);
     }
 
-    extended_min = glm::min(extended_min, scene_min);
-    extended_max = glm::max(extended_max, scene_max);
-
-    // transform the corners to light space
+    // 4. Transform bounding box into light space
     glm::mat4 light_view_inv = glm::inverse(light_view);
 
-    glm::vec3 light_space_min_corner = glm::vec3(std::numeric_limits<float>::max());
-    glm::vec3 light_space_max_corner = glm::vec3(std::numeric_limits<float>::lowest());
+    glm::vec3 light_space_min = glm::vec3(std::numeric_limits<float>::max());
+    glm::vec3 light_space_max = glm::vec3(std::numeric_limits<float>::lowest());
 
-    for (glm::vec3 world_corners[8] = {
-             extended_min,                                              // Bottom-left-near
-             glm::vec3(extended_max.x, extended_min.y, extended_min.z), // Bottom-right-near
-             glm::vec3(extended_min.x, extended_max.y, extended_min.z), // Top-left-near
-             glm::vec3(extended_max.x, extended_max.y, extended_min.z), // Top-right-near
-             glm::vec3(extended_min.x, extended_min.y, extended_max.z), // Bottom-left-far
-             glm::vec3(extended_max.x, extended_min.y, extended_max.z), // Bottom-right-far
-             glm::vec3(extended_min.x, extended_max.y, extended_max.z), // Top-left-far
-             extended_max                                               // Top-right-far
-         }; auto world_corner : world_corners) {
-      glm::vec4 light_pos = light_view_inv * glm::vec4(world_corner, 1.0);
-      light_space_min_corner = glm::min(light_space_min_corner, glm::vec3(light_pos));
-      light_space_max_corner = glm::max(light_space_max_corner, glm::vec3(light_pos));
+    // Build the 8 corners of that bounding box
+    glm::vec3 corners[8] = {extended_min,
+                            {extended_max.x, extended_min.y, extended_min.z},
+                            {extended_min.x, extended_max.y, extended_min.z},
+                            {extended_max.x, extended_max.y, extended_min.z},
+                            {extended_min.x, extended_min.y, extended_max.z},
+                            {extended_max.x, extended_min.y, extended_max.z},
+                            {extended_min.x, extended_max.y, extended_max.z},
+                            extended_max};
+
+    for (const auto& c : corners) {
+      glm::vec4 light_pos = light_view_inv * glm::vec4(c, 1.0f);
+      glm::vec3 lpos3 = glm::vec3(light_pos);
+
+      light_space_min = glm::min(light_space_min, lpos3);
+      light_space_max = glm::max(light_space_max, lpos3);
     }
 
-    return glm::orthoRH_ZO(light_space_min_corner.x, light_space_max_corner.x,  // Left, right
-                           light_space_min_corner.y, light_space_max_corner.y,  // Bottom, top
-                           light_space_min_corner.z, light_space_max_corner.z   // Near, far
-    );
-
-    /*
-    const glm::vec3 ndc_test = lightProjection * lightView * glm::vec4(center, 1.0f);
-    assert(ndc_test.x  >= 0 && ndc_test.x <= 1 && ndc_test.y >= 0 && ndc_test.y <= 1 && ndc_test.z
-    >= 0 && ndc_test.z <= 1);*/
+    // 5. Construct the orthographic projection from these bounds
+    return glm::orthoRH_ZO(light_space_min.x, light_space_max.x, light_space_min.y,
+                           light_space_max.y, light_space_min.z, light_space_max.z);
   }
 
   void LightSystem::update(float delta_time, const UserInput& movement, float aspect) {
@@ -146,7 +180,7 @@ namespace gestalt::application {
         glm::mat4 inv_cam = repository_->per_frame_data_buffers
                                        ->data.at(frame_->get_current_frame_index())
                                        .inv_viewProj;
-        auto proj = calculate_directional_light_proj_matrix(view, inv_cam);
+        auto proj = calculate_directional_light_proj_matrix_camera_only(view, inv_cam);
         repository_->light_view_projections.add({view, proj});
 
         GpuDirectionalLight dir_light = {};

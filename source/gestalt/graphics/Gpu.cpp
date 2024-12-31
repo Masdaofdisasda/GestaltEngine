@@ -18,7 +18,7 @@ namespace gestalt::graphics {
     // make the vulkan instance, with basic debug features
     auto inst_ret = builder.set_app_name("Gestalt Application")
                         .request_validation_layers(useValidationLayers())
-                        //.add_validation_feature_enable(VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT)
+                        .add_validation_feature_enable(VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT)
                         //.add_validation_feature_enable(VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT)
                         .enable_extension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME)
                         .use_default_debug_messenger()
@@ -60,6 +60,7 @@ namespace gestalt::graphics {
            .shaderStorageBufferArrayNonUniformIndexing = VK_TRUE,
            .descriptorBindingVariableDescriptorCount = VK_TRUE,
            .runtimeDescriptorArray = VK_TRUE,
+          .timelineSemaphore = VK_TRUE,
            .bufferDeviceAddress = VK_TRUE
         };
 

@@ -313,24 +313,24 @@ namespace gestalt::graphics {
       frame_graph_->compile();
     }
 
-    frames_.init(gpu_->getDevice(), gpu_->getGraphicsQueueFamily(), *frame_);
+    frame_data_.init(gpu_->getDevice(), gpu_->getGraphicsQueueFamily(), *frame_);
   }
 
-  bool RenderEngine::acquire_next_image() {
-    VK_CHECK(vkWaitForFences(gpu_->getDevice(), 1, &frame().render_fence, VK_TRUE, UINT64_MAX));
+  bool FrameData::acquire_next_image(const VkDevice device, VkSwapchainKHR& swapchain,
+                                     uint32& swapchain_image_index) const {
+    const auto frame = frames_[frame_->get_current_frame_index()];
+    VK_CHECK(vkWaitForFences(device, 1, &frame.render_fence, VK_TRUE, UINT64_MAX));
 
-    VK_CHECK(vkResetFences(gpu_->getDevice(), 1, &frame().render_fence));
+    VK_CHECK(vkResetFences(device, 1, &frame.render_fence));
 
     const VkResult e
-        = vkAcquireNextImageKHR(gpu_->getDevice(), swapchain_->swapchain, UINT64_MAX,
-                                frame().swapchain_semaphore, nullptr, &swapchain_image_index_);
+        = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, frame.swapchain_semaphore, nullptr, &swapchain_image_index);
     if (e == VK_ERROR_OUT_OF_DATE_KHR) {
-      resize_requested_ = true;
       return true;
     }
     VK_CHECK(e);
 
-    VK_CHECK(vkResetCommandBuffer(frame().main_command_buffer, 0));
+    VK_CHECK(vkResetCommandBuffer(frame.main_command_buffer, 0));
 
     return false;
   }
@@ -351,7 +351,7 @@ namespace gestalt::graphics {
       resize_requested_ = false;
     }
 
-    if (acquire_next_image()) {
+    if (frame_data_.acquire_next_image(gpu_->getDevice(), swapchain_->swapchain, swapchain_image_index_)) {
       return;
     }
 
@@ -510,37 +510,39 @@ namespace gestalt::graphics {
       cmd.pipeline_barrier2(dependency_info);
     }
 
-    present(cmd);
+    resize_requested_ = frame_data_.present(cmd, gpu_->getGraphicsQueue(), swapchain_->swapchain, swapchain_image_index_);
   }
 
   void RenderEngine::cleanup() {
-    frames_.cleanup(gpu_->getDevice());
+    frame_data_.cleanup(gpu_->getDevice());
     swapchain_->destroy_swapchain();
   }
 
-  void RenderEngine::present(CommandBuffer cmd) {
+  bool FrameData::present(const CommandBuffer cmd, const VkQueue graphics_queue, VkSwapchainKHR& swapchain, uint32& swapchain_image_index) const {
+    const auto frame = frames_[frame_->get_current_frame_index()];
     VK_CHECK(vkEndCommandBuffer(cmd.get()));
 
     VkCommandBufferSubmitInfo cmd_info = vkinit::command_buffer_submit_info(cmd.get());
     VkSemaphoreSubmitInfo wait_info = vkinit::semaphore_submit_info(
-        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, frame().swapchain_semaphore);
+        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, frame.swapchain_semaphore);
     VkSemaphoreSubmitInfo signal_info = vkinit::semaphore_submit_info(
-        VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, frame().render_semaphore);
+        VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, frame.render_semaphore);
 
     const VkSubmitInfo2 submit = vkinit::submit_info(&cmd_info, &signal_info, &wait_info);
 
-    VK_CHECK(vkQueueSubmit2(gpu_->getGraphicsQueue(), 1, &submit, frame().render_fence));
-    VkPresentInfoKHR presentInfo = vkinit::present_info();
-    presentInfo.pSwapchains = &swapchain_->swapchain;
-    presentInfo.swapchainCount = 1;
-    presentInfo.pWaitSemaphores = &frame().render_semaphore;
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pImageIndices = &swapchain_image_index_;
+    VK_CHECK(vkQueueSubmit2(graphics_queue, 1, &submit, frame.render_fence));
+    VkPresentInfoKHR present_info = vkinit::present_info();
+    present_info.pSwapchains = &swapchain;
+    present_info.swapchainCount = 1;
+    present_info.pWaitSemaphores = &frame.render_semaphore;
+    present_info.waitSemaphoreCount = 1;
+    present_info.pImageIndices = &swapchain_image_index;
 
-    VkResult presentResult = vkQueuePresentKHR(gpu_->getGraphicsQueue(), &presentInfo);
+    VkResult presentResult = vkQueuePresentKHR(graphics_queue, &present_info);
     if (presentResult == VK_ERROR_OUT_OF_DATE_KHR) {
-      resize_requested_ = true;
+      return true;
     }
+    return false;
   }
 
 }  // namespace gestalt::graphics
