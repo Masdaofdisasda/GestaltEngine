@@ -21,7 +21,8 @@ namespace gestalt::application {
 
     per_frame_data_buffers->camera_buffer
         = resource_allocator_->create_buffer(BufferTemplate(
-            "Camera Uniform Buffer", sizeof(PerFrameData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        "Camera Uniform Buffer", sizeof(PerFrameData),
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
             VMA_MEMORY_USAGE_AUTO,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
@@ -161,13 +162,27 @@ namespace gestalt::application {
         buffers->data[frame].frustum[4] = NormalizePlane(projection_t[3] + projection_t[2]);
         buffers->data[frame].frustum[5] = NormalizePlane(projection_t[3] - projection_t[2]);
       }
+      
+    const auto staging = resource_allocator_->create_buffer(std::move(BufferTemplate(
+          "Camera Staging",
+          sizeof(PerFrameData),
+          VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
+          VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)));
 
       void* mapped_data;
-      const VmaAllocation allocation = buffers->camera_buffer->get_allocation();
-      VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation, &mapped_data));
-      const auto scene_uniform_data = static_cast<PerFrameData*>(mapped_data);
-      *scene_uniform_data = buffers->data[frame];
-      vmaUnmapMemory(gpu_->getAllocator(), allocation);
+      VK_CHECK(vmaMapMemory(gpu_->getAllocator(), staging->get_allocation(), &mapped_data));
+      memcpy(mapped_data, &buffers->data[frame], sizeof(PerFrameData));
+      vmaUnmapMemory(gpu_->getAllocator(), staging->get_allocation());
+
+    gpu_->immediateSubmit([&](VkCommandBuffer cmd) {
+        VkBufferCopy copy_region;
+        copy_region.size = sizeof(PerFrameData);
+        copy_region.srcOffset = 0;
+        copy_region.dstOffset = 0;
+        vkCmdCopyBuffer(cmd, staging->get_buffer_handle(),
+                        buffers->camera_buffer->get_buffer_handle(), 1, &copy_region);
+      });
+      resource_allocator_->destroy_buffer(staging);
 
       // TODO
       meshlet_push_constants.pyramidWidth = 0;
