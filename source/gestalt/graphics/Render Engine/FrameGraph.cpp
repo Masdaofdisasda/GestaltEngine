@@ -4,7 +4,7 @@
 #include "SynchronizationManager.hpp"
 #include "ResourceRegistry.hpp"
 
-namespace gestalt::graphics::fg {
+namespace gestalt::graphics {
 
   void FrameGraph::print_graph() const {
     for (const auto& node : nodes_) {
@@ -68,6 +68,40 @@ namespace gestalt::graphics::fg {
     nodes_.reserve(25);
     synchronization_manager_ = std::make_unique<SynchronizationManager>();
     resource_registry_ = std::make_unique<ResourceRegistry>(resource_allocator);
+  }
+
+  std::shared_ptr<ImageInstance> FrameGraph::add_resource(ImageTemplate&& image_template,
+      CreationType creation_type) {
+    auto resource = resource_registry_->add_template(std::move(image_template));
+    const uint64 handle = resource->handle();
+    if (handle == -1) {
+      throw std::runtime_error("Invalid resource handle!");
+    }
+
+    auto inserted = edges_.emplace(
+        handle, std::make_shared<FrameGraphEdge>(std::move(resource), creation_type));
+    if (!inserted.second) {
+      throw std::runtime_error("Failed to insert edge into edges map!");
+    }
+
+    return std::static_pointer_cast<ImageInstance>(inserted.first->second->resource);
+  }
+
+  std::shared_ptr<BufferInstance> FrameGraph::add_resource(BufferTemplate&& buffer_template,
+                                               CreationType creation_type) {
+    auto resource = resource_registry_->add_template(std::move(buffer_template));
+    const uint64 handle = resource->handle();
+    if (handle == -1) {
+      throw std::runtime_error("Invalid resource handle!");
+    }
+
+    auto inserted = edges_.emplace(
+        handle, std::make_shared<FrameGraphEdge>(std::move(resource), creation_type));
+    if (!inserted.second) {
+      throw std::runtime_error("Failed to insert edge into edges map!");
+    }
+
+    return std::static_pointer_cast<BufferInstance>(inserted.first->second->resource);
   }
 
   void FrameGraph::add_render_pass(std::shared_ptr<RenderPass>&& pass) {

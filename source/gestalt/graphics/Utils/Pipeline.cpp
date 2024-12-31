@@ -5,7 +5,7 @@
 #include "common.hpp"
 #include "VulkanCheck.hpp"
 
-namespace gestalt::graphics::fg {
+namespace gestalt::graphics {
   void PipelineTool::create_descriptor_layout(
       std::map<uint32, std::map<uint32, VkDescriptorSetLayoutBinding>>&&
       sets) {

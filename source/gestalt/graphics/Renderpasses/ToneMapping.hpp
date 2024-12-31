@@ -7,7 +7,7 @@
 #include "RenderPass.hpp"
 
 
-namespace gestalt::graphics::fg {
+namespace gestalt::graphics {
   class ToneMapPass final : public RenderPass {
     ResourceComponent resources_;
     ComputePipeline compute_pipeline_;

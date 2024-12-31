@@ -1,7 +1,7 @@
 #pragma once
 
 
-namespace gestalt::graphics::fg {
+namespace gestalt::graphics {
 	
   class RenderPass : Moveable<RenderPass> {
     std::string name_;

@@ -5,7 +5,7 @@
 #include "PushDescriptor.hpp"
 #include "Resources/ResourceTypes.hpp"
 
-namespace gestalt::graphics::fg {
+namespace gestalt::graphics {
 
 
   struct ResourceComponentBindings {

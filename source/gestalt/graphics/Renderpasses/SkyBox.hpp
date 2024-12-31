@@ -7,7 +7,7 @@
 #include "RenderPass.hpp"
 
 
-namespace gestalt::graphics::fg {
+namespace gestalt::graphics {
 
   class SkyboxPass final : public RenderPass {
     ResourceComponent resources_;

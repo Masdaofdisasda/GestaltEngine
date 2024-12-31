@@ -5,7 +5,7 @@
 
 #include "RenderPass.hpp"
 
-namespace gestalt::graphics::fg {
+namespace gestalt::graphics {
 	
   class DrawCullDirectionalDepthPass : public RenderPass {
     // TODO

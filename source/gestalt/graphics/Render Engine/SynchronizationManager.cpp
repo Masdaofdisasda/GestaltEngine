@@ -1,7 +1,7 @@
 ﻿#include "SynchronizationManager.hpp"
 #include "FrameGraph.hpp"
 
-namespace gestalt::graphics::fg {
+namespace gestalt::graphics {
   VkPipelineStageFlags2 SynchronizationManager::SynchronizationVisitor::get_dst_stage_mask(
       const VkShaderStageFlags shader_stage) {
     VkPipelineStageFlags2 dst_stage_mask = 0;

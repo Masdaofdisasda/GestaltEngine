@@ -35,7 +35,7 @@ namespace gestalt::graphics {
       return;
     }
     
-      fmt::print("Failed to read image metadata from memory. Using extent as fallback\n");
+      //fmt::print("Failed to read image metadata from memory. Using extent as fallback\n");
       width = extent.width;
       height = extent.height;
       channels = 4;

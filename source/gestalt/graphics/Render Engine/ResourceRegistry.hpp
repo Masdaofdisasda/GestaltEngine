@@ -12,7 +12,7 @@ namespace gestalt::graphics {
   class ResourceAllocator;
 }
 
-namespace gestalt::graphics::fg {
+namespace gestalt::graphics {
   struct FrameGraphNode;
 
   class ResourceRegistry {

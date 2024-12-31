@@ -8,7 +8,7 @@
 #include "RenderPass.hpp"
 
 
-namespace gestalt::graphics::fg {
+namespace gestalt::graphics {
 
   class LightingPass final : public RenderPass {
     ResourceComponent resources_;

@@ -56,7 +56,7 @@ namespace gestalt::graphics {
 
       std::unique_ptr<VkSwapchain> swapchain_;
 
-    std::unique_ptr<fg::FrameGraph> frame_graph_;
+    std::unique_ptr<FrameGraph> frame_graph_;
       std::shared_ptr<ImageInstance> scene_final_;
 
       std::shared_ptr<TextureHandleOld> debug_texture_;

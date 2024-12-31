@@ -19,7 +19,7 @@ namespace gestalt::graphics {
   class ResourceAllocator;
 }
 
-namespace gestalt::graphics::fg {
+namespace gestalt::graphics {
   struct FrameGraphNode;
 
   // defines if the resource is used internal or external
@@ -85,39 +85,11 @@ namespace gestalt::graphics::fg {
 
     std::shared_ptr<ImageInstance> add_resource(ImageTemplate&& image_template,
                                                 CreationType creation_type
-                                                    = CreationType::INTERNAL) {
-      auto resource = resource_registry_->add_template(std::move(image_template));
-      const uint64 handle = resource->handle();
-      if (handle == -1) {
-        throw std::runtime_error("Invalid resource handle!");
-      }
-
-      auto inserted = edges_.emplace(
-          handle, std::make_shared<FrameGraphEdge>(std::move(resource), creation_type));
-      if (!inserted.second) {
-        throw std::runtime_error("Failed to insert edge into edges map!");
-      }
-
-      return std::static_pointer_cast<ImageInstance>(inserted.first->second->resource);
-    }
+                                                    = CreationType::INTERNAL);
 
     std::shared_ptr<BufferInstance> add_resource(BufferTemplate&& buffer_template,
                                                  CreationType creation_type
-                                                 = CreationType::INTERNAL) {
-      auto resource = resource_registry_->add_template(std::move(buffer_template));
-      const uint64 handle = resource->handle();
-      if (handle == -1) {
-        throw std::runtime_error("Invalid resource handle!");
-      }
-
-      auto inserted = edges_.emplace(
-          handle, std::make_shared<FrameGraphEdge>(std::move(resource), creation_type));
-      if (!inserted.second) {
-        throw std::runtime_error("Failed to insert edge into edges map!");
-      }
-
-      return std::static_pointer_cast<BufferInstance>(inserted.first->second->resource);
-    }
+                                                 = CreationType::INTERNAL);
 
 
     template <typename ResourceInstanceType>

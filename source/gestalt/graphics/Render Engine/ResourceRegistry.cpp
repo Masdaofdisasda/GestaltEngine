@@ -1,7 +1,7 @@
 ﻿#include "ResourceRegistry.hpp"
 #include "ResourceAllocator.hpp"
 
-namespace gestalt::graphics::fg {
+namespace gestalt::graphics {
   std::shared_ptr<ImageInstance> ResourceRegistry::add_template(ImageTemplate&& image_template) {
     const auto image = resource_factory_->create_image(std::move(image_template));
 

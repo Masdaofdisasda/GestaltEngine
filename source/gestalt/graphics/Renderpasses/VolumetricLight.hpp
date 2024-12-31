@@ -7,7 +7,7 @@
 #include "Utils/Pipeline.hpp"
 #include "Utils/ResourceBindings.hpp"
 
-    namespace gestalt::graphics::fg {
+    namespace gestalt::graphics {
 
   class VolumetricLightingInjectionPass final : public RenderPass {
     struct alignas(16) VolumetricLightingInjectionPassConstants {

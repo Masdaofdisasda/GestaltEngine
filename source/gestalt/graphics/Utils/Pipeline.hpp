@@ -18,7 +18,7 @@
 #include "Material/Material.hpp"
 #include "Resources/ResourceTypes.hpp"
 
-namespace gestalt::graphics::fg {
+namespace gestalt::graphics {
   struct ResourceBindingInfo {
     uint32 set_index;
     uint32 binding_index;

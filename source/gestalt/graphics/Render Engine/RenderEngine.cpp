@@ -80,7 +80,7 @@ namespace gestalt::graphics {
     swapchain_ = std::make_unique<VkSwapchain>();
     swapchain_->init(gpu_, {window_->extent.width, window_->extent.height, 1});
 
-    frame_graph_ = std::make_unique<fg::FrameGraph>(resource_allocator);
+    frame_graph_ = std::make_unique<FrameGraph>(resource_allocator);
 
     {
       auto shadow_map = frame_graph_->add_resource(
@@ -103,7 +103,7 @@ namespace gestalt::graphics {
           = frame_graph_->add_resource(ImageTemplate("Rotation Pattern Texture")
                                            .set_initial_value(asset("rot_texture.bmp"))
                                            .build(),
-                                       fg::CreationType::EXTERNAL);
+                                       CreationType::EXTERNAL);
       auto ambient_occlusion_texture = frame_graph_->add_resource(
           ImageTemplate("Ambient Occlusion Texture")
               .set_image_type(TextureType::kColor, VK_FORMAT_R16_SFLOAT)
@@ -114,7 +114,7 @@ namespace gestalt::graphics {
           = frame_graph_->add_resource(ImageTemplate("Blue Noise Texture")
                                            .set_initial_value(asset("blue_noise_512_512.png"))
                                            .build(),
-                                       fg::CreationType::EXTERNAL);
+                                       CreationType::EXTERNAL);
       auto froxel_data = frame_graph_->add_resource(
           ImageTemplate("Froxel Data 0")
               .set_image_type(TextureType::kColor, VK_FORMAT_R16G16B16A16_SFLOAT,
@@ -173,7 +173,7 @@ namespace gestalt::graphics {
 
       // geometry
       auto index_buffer = frame_graph_->add_resource(
-          repository->mesh_buffers->index_buffer, fg::CreationType::EXTERNAL);
+          repository->mesh_buffers->index_buffer, CreationType::EXTERNAL);
       auto vertex_position_buffer
           = frame_graph_->add_resource(repository->mesh_buffers->vertex_position_buffer);
       auto vertex_data_buffer
@@ -198,20 +198,20 @@ namespace gestalt::graphics {
       
       auto brdf_lut = frame_graph_->add_resource(
           ImageTemplate("BRDF LUT Texture").set_initial_value(asset("bdrf_lut.png")).build(),
-          fg::CreationType::EXTERNAL);
+          CreationType::EXTERNAL);
       auto texEnvMap = frame_graph_->add_resource(
           ImageTemplate("Environment Map Texture")
               .set_initial_value(asset("san_giuseppe_bridge_4k_environment.hdr"))
               .set_image_type(TextureType::kColor, VK_FORMAT_R32G32B32A32_SFLOAT, ImageType::kCubeMap)
               .build(),
-          fg::CreationType::EXTERNAL);
+          CreationType::EXTERNAL);
       auto texIrradianceMap = frame_graph_->add_resource(
           ImageTemplate("Irradiance Map Texture")
               .set_initial_value(asset("san_giuseppe_bridge_4k_irradiance.hdr"))
               .set_image_type(TextureType::kColor, VK_FORMAT_R32G32B32A32_SFLOAT,
                               ImageType::kCubeMap)
               .build(),
-          fg::CreationType::EXTERNAL);
+          CreationType::EXTERNAL);
           
       auto material_buffer
           = frame_graph_->add_resource(repository->material_buffers->material_buffer);
@@ -223,7 +223,7 @@ namespace gestalt::graphics {
                                              return repository_->materials.data();
                                            },
                                            getMaxTextures()),
-                                       fg::CreationType::EXTERNAL);
+                                       CreationType::EXTERNAL);
 
       // Light
       auto directional_light
@@ -234,39 +234,39 @@ namespace gestalt::graphics {
           = frame_graph_->add_resource(repository->light_buffers->view_proj_matrices);
 
       // Shader Passes
-      frame_graph_->add_pass<fg::DrawCullDirectionalDepthPass>(
+      frame_graph_->add_pass<DrawCullDirectionalDepthPass>(
           camera_buffer, meshlet_task_commands_buffer, mesh_draw_buffer, command_count_buffer, gpu_,
           [&]() { return static_cast<int32>(repository_->mesh_draws.size()); });
 
-      frame_graph_->add_pass<fg::TaskSubmitDirectionalDepthPass>(
+      frame_graph_->add_pass<TaskSubmitDirectionalDepthPass>(
           meshlet_task_commands_buffer, command_count_buffer, group_count_buffer, gpu_);
 
-      frame_graph_->add_pass<fg::MeshletDirectionalDepthPass>(
+      frame_graph_->add_pass<MeshletDirectionalDepthPass>(
           camera_buffer, light_matrices, directional_light, point_light, vertex_position_buffer,
           vertex_data_buffer, meshlet_buffer, meshlet_vertices, meshlet_triangles,
           meshlet_task_commands_buffer, mesh_draw_buffer, group_count_buffer, shadow_map, gpu_);
 
       // mesh shading
-      frame_graph_->add_pass<fg::DrawCullPass>(
+      frame_graph_->add_pass<DrawCullPass>(
           camera_buffer, meshlet_task_commands_buffer, mesh_draw_buffer, command_count_buffer, gpu_,
           [&] { return static_cast<int32>(repository_->mesh_draws.size()); });
 
-      frame_graph_->add_pass<fg::TaskSubmitPass>(meshlet_task_commands_buffer, command_count_buffer,
+      frame_graph_->add_pass<TaskSubmitPass>(meshlet_task_commands_buffer, command_count_buffer,
                                                  group_count_buffer, gpu_);
 
-      frame_graph_->add_pass<fg::MeshletPass>(
+      frame_graph_->add_pass<MeshletPass>(
           camera_buffer, material_buffer, material_textures, vertex_position_buffer,
           vertex_data_buffer, meshlet_buffer, meshlet_vertices, meshlet_triangles,
           meshlet_task_commands_buffer, mesh_draw_buffer, group_count_buffer, g_buffer_1,
           g_buffer_2, g_buffer_3, g_buffer_depth, gpu_);
 
-      frame_graph_->add_pass<fg::SsaoPass>(
+      frame_graph_->add_pass<SsaoPass>(
           camera_buffer, g_buffer_depth, g_buffer_2, rotation_texture, ambient_occlusion_texture,
           post_process_sampler, gpu_, [&] { return config_.ssao; });
 
-      frame_graph_->add_pass<fg::VolumetricLightingNoisePass>(volumetric_noise, gpu_);
+      frame_graph_->add_pass<VolumetricLightingNoisePass>(volumetric_noise, gpu_);
 
-      frame_graph_->add_pass<fg::VolumetricLightingInjectionPass>(
+      frame_graph_->add_pass<VolumetricLightingInjectionPass>(
           blue_noise, volumetric_noise, froxel_data, post_process_sampler,
           [&] { return config_.volumetric_lighting; },
           [&] { return frame_->get_current_frame_number(); },
@@ -275,7 +275,7 @@ namespace gestalt::graphics {
           },
           gpu_);
 
-      frame_graph_->add_pass<fg::VolumetricLightingScatteringPass>(
+      frame_graph_->add_pass<VolumetricLightingScatteringPass>(
           camera_buffer, light_matrices, directional_light, point_light, blue_noise, froxel_data,
           shadow_map, light_scattering, post_process_sampler,
           [&] { return config_.volumetric_lighting; },
@@ -285,11 +285,11 @@ namespace gestalt::graphics {
           },
           [&] { return static_cast<uint32>(repository_->point_lights.size()); }, gpu_);
 
-      frame_graph_->add_pass<fg::VolumetricLightingSpatialFilterPass>(
+      frame_graph_->add_pass<VolumetricLightingSpatialFilterPass>(
           light_scattering, light_scattering_filtered, post_process_sampler,
           [&] { return config_.volumetric_lighting; }, gpu_);
 
-      frame_graph_->add_pass<fg::VolumetricLightingIntegrationPass>(
+      frame_graph_->add_pass<VolumetricLightingIntegrationPass>(
           light_scattering_filtered, integrated_light_scattering, post_process_sampler,
           [&] { return config_.volumetric_lighting; },
           [&] { return frame_->get_current_frame_number(); },
@@ -298,7 +298,7 @@ namespace gestalt::graphics {
           },
           gpu_);
 
-      frame_graph_->add_pass<fg::LightingPass>(
+      frame_graph_->add_pass<LightingPass>(
           camera_buffer, texEnvMap, texIrradianceMap, brdf_lut, light_matrices, directional_light, point_light,
           g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth, shadow_map,
           integrated_light_scattering, ambient_occlusion_texture, scene_lit, post_process_sampler,
@@ -309,11 +309,11 @@ namespace gestalt::graphics {
           [&] { return static_cast<uint32>(repository_->directional_lights.size()); },
           [&] { return static_cast<uint32>(repository_->point_lights.size()); });
 
-      frame_graph_->add_pass<fg::SkyboxPass>(
+      frame_graph_->add_pass<SkyboxPass>(
           camera_buffer, directional_light, scene_lit, texEnvMap, scene_skybox, g_buffer_depth, post_process_sampler,
                                              gpu_, [&] { return config_.skybox; });
 
-      frame_graph_->add_pass<fg::ToneMapPass>(scene_final, scene_lit, scene_skybox,
+      frame_graph_->add_pass<ToneMapPass>(scene_final, scene_lit, scene_skybox,
                                               post_process_sampler, gpu_,
                                               [&] { return config_.hdr; });
 
