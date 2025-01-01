@@ -17,7 +17,6 @@
 #include "Components/TransformComponent.hpp"
 #include "Components/PhysicsComponent.hpp"
 #include "Material/Material.hpp"
-#include "Material/SamplerConfig.hpp"
 #include "Mesh/Mesh.hpp"
 #include "Mesh/MeshDraw.hpp"
 #include "Mesh/Meshlet.hpp"
@@ -116,26 +115,21 @@ namespace gestalt::foundation {
 
     struct default_material {
       std::shared_ptr<ImageInstance> color_image_instance;
-      VkSampler color_sampler;
+      std::unique_ptr<SamplerInstance> color_sampler;
 
       std::shared_ptr<ImageInstance> metallic_roughness_image_instance;
-       VkSampler metallic_roughness_sampler;
+      std::unique_ptr<SamplerInstance> metallic_roughness_sampler;
 
       std::shared_ptr<ImageInstance> normal_image_instance;
-      VkSampler normal_sampler;
+      std::unique_ptr<SamplerInstance> normal_sampler;
 
       std::shared_ptr<ImageInstance> emissive_image_instance;
-      VkSampler emissive_sampler;
+      std::unique_ptr<SamplerInstance> emissive_sampler;
 
       std::shared_ptr<ImageInstance> occlusion_image_instance;
-      VkSampler occlusion_sampler;
+      std::unique_ptr<SamplerInstance> occlusion_sampler;
 
       std::shared_ptr<ImageInstance> error_checkerboard_image_instance;
-
-      std::vector<VkSampler> get_samplers() {
-        return {color_sampler, metallic_roughness_sampler, normal_sampler, emissive_sampler,
-                occlusion_sampler};
-      }
 
     } default_material_ = {};
 
@@ -157,14 +151,6 @@ namespace gestalt::foundation {
     GpuDataContainer<Material> materials;
     GpuDataContainer<Mesh> meshes;
     GpuDataContainer<MeshDraw> mesh_draws;
-    std::unordered_map<SamplerConfig, VkSampler, SamplerConfigHash> sampler_cache;
-
-    VkSampler get_sampler(const SamplerConfig& config = {}) {
-      if (const auto it = sampler_cache.find(config); it != sampler_cache.end()) {
-        return it->second;
-      }
-      return nullptr;
-    }
 
     ComponentContainer<NodeComponent> scene_graph;
     ComponentContainer<MeshComponent> mesh_components;

@@ -11,7 +11,6 @@
 #include "Cameras/OrbitCamera.hpp"
 #include "Interface/IGpu.hpp"
 #include "Interface/IResourceAllocator.hpp"
-#include "Interface/IResourceManager.hpp"
 
 namespace gestalt::application {
 

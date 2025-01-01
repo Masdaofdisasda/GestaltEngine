@@ -94,7 +94,7 @@ namespace gestalt::graphics {
     return std::make_unique<ImageInstance>(std::move(image_template), allocated_image, extent);
   }
 
-  AllocatedImage ResourceAllocator::allocate_image(const std::string_view name, VkFormat format,
+  AllocatedImage ResourceAllocator::allocate_image(const std::string& name, VkFormat format,
                                                    VkImageUsageFlags usage_flags, VkExtent3D extent,
                                                    VkImageAspectFlags aspect_flags,
                                                    ImageType image_type,
@@ -171,7 +171,7 @@ namespace gestalt::graphics {
 
     VK_CHECK(vkCreateImageView(gpu_->getDevice(), &view_info, nullptr, &image.image_view));
 
-    gpu_->set_debug_name(name, VK_OBJECT_TYPE_IMAGE_VIEW,
+    gpu_->set_debug_name(std::string(name + " View"), VK_OBJECT_TYPE_IMAGE_VIEW,
                          reinterpret_cast<uint64_t>(image.image_view));
 
     return image;

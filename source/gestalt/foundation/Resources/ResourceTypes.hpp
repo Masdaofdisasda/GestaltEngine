@@ -200,6 +200,57 @@ namespace gestalt::foundation {
     }
   };
 
+
+  class SamplerTemplate final : public ResourceTemplate {
+
+    VkSamplerCreateInfo create_info_;
+
+  public:
+    SamplerTemplate(std::string name, const VkFilter mag_filter, const VkFilter min_filter,
+                    const VkSamplerMipmapMode mipmap_mode,
+                    const VkSamplerAddressMode address_mode_u,
+                    const VkSamplerAddressMode address_mode_v,
+                    const VkSamplerAddressMode address_mode_w, const VkBool32 anisotropy_enable,
+                    const float32 mip_lod_bias = 0.0f, const float32 min_lod = 0.0f,
+                    const float32 max_lod = VK_LOD_CLAMP_NONE, const float32 max_anisotropy = 16.0f,
+                    VkBool32 compare_enable = VK_FALSE,
+                    const VkCompareOp compare_op = VK_COMPARE_OP_NEVER,
+                    const VkBorderColor border_color = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK)
+        : ResourceTemplate(std::move(name)) {
+      create_info_ = {
+          .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+          .pNext = nullptr,
+          .flags = 0,
+          .magFilter = mag_filter,
+          .minFilter = min_filter,
+          .mipmapMode = mipmap_mode,
+          .addressModeU = address_mode_u,
+          .addressModeV = address_mode_v,
+          .addressModeW = address_mode_w,
+          .mipLodBias = mip_lod_bias,
+          .anisotropyEnable = anisotropy_enable,
+          .maxAnisotropy = max_anisotropy,
+          .compareEnable = compare_enable,
+          .compareOp = compare_op,
+          .minLod = min_lod,
+          .maxLod = max_lod,
+          .borderColor = border_color,
+          .unnormalizedCoordinates = VK_FALSE,
+      };
+    }
+
+    SamplerTemplate(const SamplerTemplate&) = delete;
+    SamplerTemplate& operator=(const SamplerTemplate&) = delete;
+
+    SamplerTemplate(SamplerTemplate&&) noexcept = default;
+    SamplerTemplate& operator=(SamplerTemplate&&) noexcept = default;
+
+    [[nodiscard]] VkSamplerCreateInfo get_create_info() const { return create_info_; }
+
+    ~SamplerTemplate() override = default;
+  };
+
+
     class BufferInstance;
     class ImageInstance;
   class ImageArrayInstance;
@@ -372,6 +423,42 @@ namespace gestalt::foundation {
 
     [[nodiscard]] VkPipelineStageFlags2 get_current_stage() const { return current_stage_; }
     void set_current_stage(const VkPipelineStageFlags2 stage) { current_stage_ = stage; }
+  };
+
+  
+class SamplerInstance final : public ResourceInstance {
+    SamplerTemplate sampler_template_;
+    VkSampler sampler_ = VK_NULL_HANDLE;
+    VkDevice device_ = VK_NULL_HANDLE;
+
+  public:
+    SamplerInstance(SamplerTemplate&& sampler_template, const VkDevice device)
+        : ResourceInstance(sampler_template.get_name()),
+          sampler_template_(std::move(sampler_template)), device_(device) {
+      const auto create_info = sampler_template_.get_create_info();
+      VK_CHECK(vkCreateSampler(device_, &create_info, nullptr, &sampler_));
+    }
+
+    SamplerInstance(const SamplerInstance&) = delete;
+    SamplerInstance& operator=(const SamplerInstance&) = delete;
+
+    SamplerInstance(SamplerInstance&&) noexcept = default;
+    SamplerInstance& operator=(SamplerInstance&&) noexcept = default;
+
+    ~SamplerInstance() override {
+      /*
+      if (sampler_ != VK_NULL_HANDLE) {
+        vkDestroySampler(device_, sampler_, nullptr);
+        sampler_ = VK_NULL_HANDLE;
+      }*/
+    }
+
+    void accept(ResourceVisitor& visitor, const ResourceUsage usage,
+                const VkShaderStageFlags shader_stage) override {
+      // do nothing
+    }
+
+    [[nodiscard]] VkSampler get_sampler_handle() const { return sampler_; }
   };
     
   class DescriptorBufferInstance {

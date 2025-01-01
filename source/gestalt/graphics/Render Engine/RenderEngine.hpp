@@ -59,7 +59,9 @@ namespace gestalt::graphics {
     std::unique_ptr<FrameGraph> frame_graph_;
       std::shared_ptr<ImageInstance> scene_final_;
 
-      std::shared_ptr<TextureHandleOld> debug_texture_;
+    std::unique_ptr<SamplerInstance> post_process_sampler_;
+      std::unique_ptr<SamplerInstance> cube_map_sampler_;
+
 
       bool resize_requested_{false};
       uint32 swapchain_image_index_{0};
@@ -79,7 +81,6 @@ namespace gestalt::graphics {
 
       RenderConfig& get_config() { return config_; }
       VkFormat get_swapchain_format() const { return swapchain_->swapchain_image_format; }
-      std::shared_ptr<TextureHandleOld> get_debug_image() const { return debug_texture_; }
     };
 
 }  // namespace gestalt

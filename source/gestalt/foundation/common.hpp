@@ -46,7 +46,6 @@ namespace gestalt {
 
   namespace foundation {
     enum class TextureType;
-    class TextureHandleOld;
   }  // namespace foundation
 
   namespace application {

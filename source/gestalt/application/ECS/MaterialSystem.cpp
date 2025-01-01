@@ -2,7 +2,6 @@
 
 #include "VulkanCheck.hpp"
 #include "Interface/IGpu.hpp"
-#include "Interface/IResourceManager.hpp"
 #include "Interface/IResourceAllocator.hpp"
 
 #include <ranges>
@@ -120,29 +119,57 @@ namespace gestalt::application {
         .set_initial_value(checkerboard.data(), checkerboard.size()).build());
     repository_->textures.add(default_mat.error_checkerboard_image_instance);
 
-    default_mat.color_sampler = repository_->get_sampler();
-    default_mat.metallic_roughness_sampler
-        = repository_->get_sampler({.magFilter = VK_FILTER_NEAREST,
-                                    .minFilter = VK_FILTER_NEAREST, .anisotropyEnable = VK_FALSE});
-    default_mat.normal_sampler = repository_->get_sampler();
-    default_mat.emissive_sampler = repository_->get_sampler();
-    default_mat.occlusion_sampler = repository_->get_sampler({.magFilter = VK_FILTER_NEAREST,
-                                    .minFilter = VK_FILTER_NEAREST, .anisotropyEnable = VK_FALSE
-  });
+    default_mat.color_sampler = std::make_unique<SamplerInstance>(
+        SamplerTemplate("Albedo Sampler", VK_FILTER_LINEAR, VK_FILTER_LINEAR,
+                        VK_SAMPLER_MIPMAP_MODE_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT,
+                        VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_TRUE,
+                        0.0f, 0.0f, VK_LOD_CLAMP_NONE, 16.0f, VK_FALSE, VK_COMPARE_OP_NEVER,
+                        VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK),
+        gpu_->getDevice());       
+    default_mat.metallic_roughness_sampler = std::make_unique<SamplerInstance>(
+        SamplerTemplate("Metal Rough Sampler", VK_FILTER_LINEAR, VK_FILTER_LINEAR,
+                        VK_SAMPLER_MIPMAP_MODE_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT,
+                        VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_FALSE,
+                        0.0f, 0.0f, VK_LOD_CLAMP_NONE, 1.0f, VK_FALSE, VK_COMPARE_OP_NEVER,
+                        VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK),
+        gpu_->getDevice());
+    default_mat.normal_sampler = std::make_unique<SamplerInstance>(
+        SamplerTemplate("NormalMapSampler", VK_FILTER_LINEAR, VK_FILTER_LINEAR,
+                        VK_SAMPLER_MIPMAP_MODE_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT,
+                        VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_FALSE,
+                        0.0f, 0.0f, VK_LOD_CLAMP_NONE, 1.0f, VK_FALSE, VK_COMPARE_OP_NEVER,
+                        VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK),
+        gpu_->getDevice());
+    default_mat.emissive_sampler = std::make_unique<SamplerInstance>(
+        SamplerTemplate("EmissiveSampler", VK_FILTER_LINEAR, VK_FILTER_LINEAR,
+                        VK_SAMPLER_MIPMAP_MODE_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT,
+                        VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_FALSE,
+                        0.0f, 0.0f, VK_LOD_CLAMP_NONE, 1.0f, VK_FALSE, VK_COMPARE_OP_NEVER,
+                        VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK),
+        gpu_->getDevice());
+    default_mat.occlusion_sampler = std::make_unique<SamplerInstance>(
+        SamplerTemplate("Ao Sampler", VK_FILTER_LINEAR, VK_FILTER_LINEAR,
+                        VK_SAMPLER_MIPMAP_MODE_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT,
+                        VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_SAMPLER_ADDRESS_MODE_REPEAT,
+                        VK_FALSE, 
+                        0.0f, 0.0f, VK_LOD_CLAMP_NONE, 1.0f, VK_FALSE, VK_COMPARE_OP_NEVER,
+                        VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK),
+        gpu_->getDevice());
 
     PbrMaterial pbr_mat{};
 
     // default the material textures
     pbr_mat.textures.albedo_image = default_mat.color_image_instance;
-    pbr_mat.textures.albedo_sampler = default_mat.color_sampler;
+    pbr_mat.textures.albedo_sampler = default_mat.color_sampler->get_sampler_handle();
     pbr_mat.textures.metal_rough_image = default_mat.metallic_roughness_image_instance;
-    pbr_mat.textures.metal_rough_sampler = default_mat.metallic_roughness_sampler;
+    pbr_mat.textures.metal_rough_sampler
+        = default_mat.metallic_roughness_sampler->get_sampler_handle();
     pbr_mat.textures.normal_image = default_mat.normal_image_instance;
-    pbr_mat.textures.normal_sampler = default_mat.normal_sampler;
+    pbr_mat.textures.normal_sampler = default_mat.normal_sampler->get_sampler_handle();
     pbr_mat.textures.emissive_image = default_mat.emissive_image_instance;
-    pbr_mat.textures.emissive_sampler = default_mat.emissive_sampler;
+    pbr_mat.textures.emissive_sampler = default_mat.emissive_sampler->get_sampler_handle();
     pbr_mat.textures.occlusion_image = default_mat.occlusion_image_instance;
-    pbr_mat.textures.occlusion_sampler = default_mat.occlusion_sampler;
+    pbr_mat.textures.occlusion_sampler = default_mat.occlusion_sampler->get_sampler_handle();
 
     // build material
     const size_t material_id = repository_->materials.size();
@@ -194,11 +221,6 @@ namespace gestalt::application {
 
     resource_allocator_->destroy_buffer(material_buffers->material_buffer);
 
-    for (const auto& sampler : repository_->sampler_cache | std::views::values) {
-      vkDestroySampler(gpu_->getDevice(), sampler, nullptr);
-    }
-
-    repository_->sampler_cache.clear();
   }
 
   void MaterialSystem::write_material(PbrMaterial& material, const uint32 material_id) {

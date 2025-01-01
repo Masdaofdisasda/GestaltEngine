@@ -16,7 +16,7 @@ namespace gestalt::graphics {
       IGpu* gpu_ = nullptr;
     TaskQueue task_queue_;
 
-      [[nodiscard]] AllocatedImage allocate_image(std::string_view name, VkFormat format,
+      [[nodiscard]] AllocatedImage allocate_image(const std::string& name, VkFormat format,
                                                   VkImageUsageFlags usage_flags, VkExtent3D extent,
                                                 VkImageAspectFlags aspect_flags, ImageType image_type, bool mipmap = false) const;
     [[nodiscard]] AllocatedBuffer allocate_buffer(

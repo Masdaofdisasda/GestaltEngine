@@ -6,7 +6,6 @@
 
 #include "FrameProvider.hpp"
 #include "Interface/IGpu.hpp"
-#include "Interface/IResourceManager.hpp"
 #include "Interface/IResourceAllocator.hpp"
 #include "Mesh/MeshSurface.hpp"
 #include "Mesh/MeshTaskCommand.hpp"

@@ -34,11 +34,10 @@ namespace gestalt {
 
     gpu_->init(window_.get());
 
-    resource_manager_->init(gpu_.get(), repository_.get());
     resource_allocator_
         = std::make_unique<graphics::ResourceAllocator>(gpu_.get());
 
-    scene_manager_->init(gpu_.get(), resource_manager_.get(), resource_allocator_.get(), repository_.get(), frame_provider_.get());
+    scene_manager_->init(gpu_.get(), resource_allocator_.get(), repository_.get(), frame_provider_.get());
 
     render_pipeline_ = std::make_unique<graphics::RenderEngine>();
     render_pipeline_->init(gpu_.get(), window_.get(), resource_allocator_.get(), repository_.get(),

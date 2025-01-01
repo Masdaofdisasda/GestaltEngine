@@ -232,9 +232,7 @@ namespace gestalt::application {
       }
     }
 
-    void ComponentFactory::init(IResourceManager* resource_manager,
-                                         Repository* repository) {
-      resource_manager_ = resource_manager;
+    void ComponentFactory::init( Repository* repository) {
       repository_ = repository;
 
       auto [entity, root_node] = create_entity();

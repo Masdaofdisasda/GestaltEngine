@@ -8,7 +8,6 @@
 #include "ECS/ECSManager.hpp"
 #include "FrameProvider.hpp"
 #include "ResourceAllocator.hpp"
-#include "ResourceManager.hpp"
 #include "TmeTrackingService.hpp"
 
 namespace gestalt {
@@ -39,8 +38,6 @@ namespace gestalt {
     // utility services
     application::TimeTrackingService time_tracking_service_;
     application::InputSystem input_system_;
-    std::unique_ptr<graphics::ResourceManager> resource_manager_
-        = std::make_unique<graphics::ResourceManager>();
     std::unique_ptr<graphics::ResourceAllocator> resource_allocator_;
 
     uint64 frame_number{0};

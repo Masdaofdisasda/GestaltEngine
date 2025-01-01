@@ -16,14 +16,12 @@
 #include "Animation/InterpolationType.hpp"
 #include "ECS/ComponentFactory.hpp"
 #include "Interface/IResourceAllocator.hpp"
-#include "Interface/IResourceManager.hpp"
 #include "Mesh/MeshSurface.hpp"
 
 namespace gestalt::application {
-  void AssetLoader::init(IResourceManager* resource_manager, IResourceAllocator* resource_allocator,
+  void AssetLoader::init(IResourceAllocator* resource_allocator,
                          ComponentFactory* component_factory,
                          Repository* repository) {
-    resource_manager_ = resource_manager;
     resource_allocator_ = resource_allocator;
     repository_ = repository;
     component_factory_ = component_factory;
@@ -387,15 +385,15 @@ namespace gestalt::application {
     auto& default_material = repository_->default_material_;
 
     pbr_config.textures = {.albedo_image = default_material.color_image_instance,
-                           .albedo_sampler = default_material.color_sampler,
+                           .albedo_sampler = default_material.color_sampler->get_sampler_handle(),
                            .metal_rough_image = default_material.metallic_roughness_image_instance,
-                           .metal_rough_sampler = default_material.metallic_roughness_sampler,
+           .metal_rough_sampler = default_material.metallic_roughness_sampler->get_sampler_handle(),
                            .normal_image = default_material.normal_image_instance,
-                           .normal_sampler = default_material.normal_sampler,
+           .normal_sampler = default_material.normal_sampler->get_sampler_handle(),
                            .emissive_image = default_material.emissive_image_instance,
-                           .emissive_sampler = default_material.emissive_sampler,
+           .emissive_sampler = default_material.emissive_sampler->get_sampler_handle(),
                            .occlusion_image = default_material.occlusion_image_instance,
-                           .occlusion_sampler = default_material.occlusion_sampler};
+           .occlusion_sampler = default_material.occlusion_sampler->get_sampler_handle()};
 
     // grab textures from gltf file
     import_albedo(gltf, image_offset, mat, pbr_config);

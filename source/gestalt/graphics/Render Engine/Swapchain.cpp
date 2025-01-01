@@ -13,8 +13,8 @@ namespace gestalt::graphics {
     create_swapchain(extent.width, extent.height);
   }
 
-  void VkSwapchain::create_swapchain(const uint32_t width, const uint32_t height) {
-    vkb::SwapchainBuilder swapchainBuilder{gpu_->getPhysicalDevice(), gpu_->getDevice(),
+  void VkSwapchain::create_swapchain(const uint32 width, const uint32 height) {
+    vkb::SwapchainBuilder swapchain_builder{gpu_->getPhysicalDevice(), gpu_->getDevice(),
                                            gpu_->getSurface()};
 
     swapchain_image_format = VK_FORMAT_B8G8R8A8_UNORM;
@@ -26,7 +26,7 @@ namespace gestalt::graphics {
       desired_present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
     }
 
-    vkb::Swapchain vkbSwapchain = swapchainBuilder
+    vkb::Swapchain vkb_swapchain = swapchain_builder
                                       .set_desired_format(VkSurfaceFormatKHR{
                                           .format = swapchain_image_format,
                                           .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
@@ -37,19 +37,23 @@ namespace gestalt::graphics {
                                       .build()
                                       .value();
 
-    swapchain_extent = vkbSwapchain.extent;
+    swapchain_extent = vkb_swapchain.extent;
     // store swapchain and its related images
-    swapchain = vkbSwapchain.swapchain;
+    swapchain = vkb_swapchain.swapchain;
+    gpu_->set_debug_name("Swapchain", VK_OBJECT_TYPE_SWAPCHAIN_KHR,
+                         reinterpret_cast<uint64_t>(swapchain));
 
-    for (const auto& swapchain_image : vkbSwapchain.get_images().value()) {
+    for (const auto& swapchain_image : vkb_swapchain.get_images().value()) {
       swapchain_images.emplace_back(
           SwapchainImage(swapchain_image, swapchain_image_format,
                          {swapchain_extent.width, swapchain_extent.height}));
     }
 
-    const auto views = vkbSwapchain.get_image_views().value();
+    const auto views = vkb_swapchain.get_image_views().value();
 
     for (size_t i = 0; i < views.size(); i++) {
+      gpu_->set_debug_name("Swapchain Image View " + std::to_string(i), VK_OBJECT_TYPE_IMAGE_VIEW,
+                           reinterpret_cast<uint64_t>(views[i]));
       swapchain_images[i].set_image_view(views[i]);
     }
   }

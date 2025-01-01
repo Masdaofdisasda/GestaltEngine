@@ -18,13 +18,11 @@ namespace fastgltf {
 namespace gestalt::foundation {
   struct PbrMaterial;
   class Repository;
-  class IResourceManager;
 }
 
 namespace gestalt::application {
 
     class AssetLoader : public NonCopyable<AssetLoader> {
-      IResourceManager* resource_manager_ = nullptr;
       IResourceAllocator* resource_allocator_ = nullptr;
       Repository* repository_ = nullptr;
       ComponentFactory* component_factory_ = nullptr;
@@ -59,7 +57,7 @@ namespace gestalt::application {
       void import_meshes(fastgltf::Asset& gltf, size_t material_offset) const;
 
     public:
-      void init(IResourceManager* resource_manager, IResourceAllocator* resource_allocator,
+      void init(IResourceAllocator* resource_allocator,
                 ComponentFactory* component_factory,
                 Repository* repository);
       void import_nodes(fastgltf::Asset& gltf) const;
