@@ -47,13 +47,13 @@ namespace gestalt::foundation {
 
   class EngineConfiguration {
   public:
-    static EngineConfiguration& getInstance();
+    static EngineConfiguration& get_instance();
 
-    void loadFromFile(const std::string& filename = "../config.json");
+    void load_from_file(const std::string& filename = "../config.json");
 
-    Config& getConfig() { return config_; }
+    Config& get_config() { return config_; }
 
-    void setConfig(const Config& newConfig) { config_ = newConfig; }
+    void set_config(const Config& new_config) { config_ = new_config; }
 
     EngineConfiguration(const EngineConfiguration&) = delete;
     EngineConfiguration& operator=(const EngineConfiguration&) = delete;
@@ -81,39 +81,39 @@ namespace gestalt::foundation {
   constexpr uint32 getMaxMeshlets() { return kDefaultMaxMeshlets; }
 
   inline uint32 getMaxDirectionalLights() {
-    return EngineConfiguration::getInstance().getConfig().max_directional_lights;
+    return EngineConfiguration::get_instance().get_config().max_directional_lights;
   }
 
   inline uint32 getMaxPointLights() {
-    return EngineConfiguration::getInstance().getConfig().maxPointLights;
+    return EngineConfiguration::get_instance().get_config().maxPointLights;
   }
 
   inline uint32 getMaxSpotLights() {
-    return EngineConfiguration::getInstance().getConfig().maxSpotLights;
+    return EngineConfiguration::get_instance().get_config().maxSpotLights;
   }
 
-  inline uint32 getMaxLights() { return EngineConfiguration::getInstance().getConfig().maxLights; }
+  inline uint32 getMaxLights() { return EngineConfiguration::get_instance().get_config().maxLights; }
 
   inline uint32 getWindowedWidth() {
-    return EngineConfiguration::getInstance().getConfig().windowedWidth;
+    return EngineConfiguration::get_instance().get_config().windowedWidth;
   }
 
   inline uint32 getWindowedHeight() {
-    return EngineConfiguration::getInstance().getConfig().windowedHeight;
+    return EngineConfiguration::get_instance().get_config().windowedHeight;
   }
 
   inline std::string& getApplicationName() {
-    return EngineConfiguration::getInstance().getConfig().applicationName;
+    return EngineConfiguration::get_instance().get_config().applicationName;
   }
 
   inline bool useValidationLayers() {
-    return EngineConfiguration::getInstance().getConfig().useValidationLayers;
+    return EngineConfiguration::get_instance().get_config().useValidationLayers;
   }
 
-  inline bool useVsync() { return EngineConfiguration::getInstance().getConfig().useVsync; }
+  inline bool useVsync() { return EngineConfiguration::get_instance().get_config().useVsync; }
 
   inline bool useFullscreen() {
-    return EngineConfiguration::getInstance().getConfig().useFullscreen;
+    return EngineConfiguration::get_instance().get_config().useFullscreen;
   }
 
 }  // namespace gestalt::foundation

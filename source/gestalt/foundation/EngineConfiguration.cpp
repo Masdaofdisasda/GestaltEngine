@@ -7,12 +7,12 @@
 #include "fmt/compile.h"
 
 namespace gestalt::foundation {
-  EngineConfiguration& EngineConfiguration::getInstance() {
+  EngineConfiguration& EngineConfiguration::get_instance() {
     static EngineConfiguration instance;
     return instance;
   }
 
-  void EngineConfiguration::loadFromFile(const std::string& filename) {
+  void EngineConfiguration::load_from_file(const std::string& filename) {
     std::ifstream config_file(filename);
 
     // If the file doesn't exist, create it with default values

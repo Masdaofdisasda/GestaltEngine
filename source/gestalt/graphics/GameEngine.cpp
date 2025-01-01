@@ -25,10 +25,10 @@ namespace gestalt {
     assert(engine == nullptr);
     engine = this;
 
-    foundation::EngineConfiguration::getInstance().loadFromFile();
-    auto config = foundation::EngineConfiguration::getInstance().getConfig();
-    config.useValidationLayers = true;
-    foundation::EngineConfiguration::getInstance().setConfig(config);
+    foundation::EngineConfiguration::get_instance().load_from_file();
+    auto config = foundation::EngineConfiguration::get_instance().get_config();
+    //config.useValidationLayers = true;
+    foundation::EngineConfiguration::get_instance().set_config(config);
 
     window_->init();
 

@@ -33,8 +33,8 @@ namespace gestalt::graphics {
     VkExtent3D extent = {};
     if (std::holds_alternative<RelativeImageSize>(image_size)) {
       const auto scale = std::get<RelativeImageSize>(image_size).scale;
-      extent = {static_cast<uint32>(getWindowedWidth() * scale),
-                static_cast<uint32>(getWindowedHeight() * scale), 1};
+      extent = {.width= static_cast<uint32>(getWindowedWidth() * scale),
+                .height= static_cast<uint32>(getWindowedHeight() * scale), .depth= 1};
     } else if (std::holds_alternative<AbsoluteImageSize>(image_size)) {
       extent = std::get<AbsoluteImageSize>(image_size).extent;
     } else {
