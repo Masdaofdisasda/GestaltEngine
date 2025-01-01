@@ -71,7 +71,6 @@ layout(set = 2, binding = 2) readonly buffer PointLightBuffer
 	PointLight pointLight[];
 };
 
-
 const mat4 biasMat = mat4( 
 	0.5, 0.0, 0.0, 0.0,
 	0.0, 0.5, 0.0, 0.0,
@@ -106,7 +105,7 @@ void main() {
     
 	vec3 camera_position = -normalize(vec3(view[0][2], view[1][2], view[2][2]));
 
-    if ( extinction >= 0.01f ) {
+    if ( extinction >= 0.0000001f ) {
         vec3 V = normalize(camera_position.xyz - world_position);
 
         // TODO : Add point lights & support second directional light
@@ -125,9 +124,14 @@ void main() {
 		vec3 L = normalize(pointToLight);
        
         // Convert illuminance to radiance
-        const float luminousEfficacy = 93.0; // lm/W
-        float L_e = direction_light.intensity / (PI * luminousEfficacy);
-        vec3 L_i = direction_light.color * L_e;
+        vec3 L_i;
+        if (false) {
+            const float luminousEfficacy = 93.0; // lm/W
+            float L_e = direction_light.intensity / (PI * luminousEfficacy);
+            L_i = direction_light.color * L_e;
+        } else  {
+            L_i = direction_light.color * direction_light.intensity;
+        }
 
         lighting += L_i * shadow * phase_function(V, -L, PushConstants.phase_anisotropy, PushConstants.phase_type);
 

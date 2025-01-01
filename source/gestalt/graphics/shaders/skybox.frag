@@ -41,11 +41,14 @@ layout(set = 1, binding = 2) readonly buffer PointLightBuffer
 	PointLight pointLight[];
 };
 
+layout(set = 2, binding = 0) uniform sampler2D scene_lit;
+layout(set = 2, binding = 1) uniform samplerCube texEnvMap;
+
 layout( push_constant ) uniform constants
 {
     //float earthRadius;
     //float atmosphereRadius;
-    vec3 betaR; float pad1;
+    vec3 betaR; uint showEnviromentMap;
     vec3 betaA; float pad2;
     vec3 betaM; float pad3;
     //float Hr;
@@ -53,9 +56,6 @@ layout( push_constant ) uniform constants
 } params;
 
 // based on https://www.scratchapixel.com/lessons/procedural-generation-virtual-worlds/simulating-sky/simulating-colors-of-the-sky.html
-
-    vec3 sunDirection = vec3(-0.216, 0.941, -0.257);
-    vec3 sunIntensity = vec3(2000000.0);
 
 const float PI = 3.141592653589793;
 
@@ -68,28 +68,60 @@ float miePhase(float cosTheta, float g) {
     return 3.0 / (8.0 * PI) * ((1.0 - g2) * (1.0 + cosTheta * cosTheta)) / (2.0 + g2) / pow(1.0 + g2 - 2.0 * g * cosTheta, 1.5);
 }
 
-// Simplified atmospheric scattering computation
+const float EARTH_RADIUS = 6360e3;     // Earth's radius in meters
+const float ATMOSPHERE_RADIUS = 6460e3; // Atmosphere's top radius in meters
+const float Hr = 8e3;                 // Rayleigh scale height (meters)
+const float Hm = 1.2e3;               // Mie scale height (meters)
+
+// Density function
+float density(float height, float scaleHeight) {
+    return exp(-height / scaleHeight);
+}
+
+// Calculate optical depth
+float opticalDepth(float height, float scaleHeight, vec3 dir) {
+    float H = max(0.0, height);
+    return density(H, scaleHeight) * length(dir);
+}
+
+// Compute scattering contributions
+vec3 computeScattering(vec3 dir, vec3 lightDir, vec3 betaR, vec3 betaM, vec3 sunIntensity) {
+    float height = length(dir) - EARTH_RADIUS;
+    float rayleighDepth = opticalDepth(height, Hr, dir);
+    float mieDepth = opticalDepth(height, Hm, dir);
+
+    float cosTheta = dot(dir, lightDir);
+    vec3 rayleigh = betaR * rayleighPhase(cosTheta) * rayleighDepth;
+    vec3 mie = betaM * miePhase(cosTheta, 0.76) * mieDepth;
+
+    return sunIntensity * (rayleigh + mie);
+}
+
 void main() {
 
     vec3 dir = normalize(TexCoords);
-    float cosTheta = dot(dir, normalize(dirLight[0].direction));
-    vec3 betaRTheta = params.betaR * rayleighPhase(cosTheta);
-    vec3 betaMTheta = params.betaM * miePhase(cosTheta, 0.76); // Assuming g=0.76
 
-    // Here, we simplify the atmospheric scattering equations for real-time purposes
-    
-    vec3 L_i = dirLight[0].color * 1e6;
+    if (params.showEnviromentMap == 0) {
 
-    vec3 L = L_i * (betaRTheta + betaMTheta);
-    
-    vec3 L_multiscatter = L * 0.5; // This is a simplification
- 
-    L -= params.betaA * 0.002; // This reduces the intensity based on absorption
+        // Sunlight intensity and direction
+        vec3 lightDir = normalize(dirLight[0].direction);
+        vec3 sunIntensity = dirLight[0].color * dirLight[0].intensity;
 
-    L = L + L_multiscatter;
+        // Compute scattering
+        vec3 scattering = computeScattering(dir, lightDir, params.betaR, params.betaM, sunIntensity);
 
-    // Apply simple exposure and gamma correction
-    vec3 color = vec3(1.0) - exp(-L * 0.004);
+        // Absorption
+        scattering -= params.betaA * 0.002;
 
-    FragColor = vec4(color, 1.0);
+        // Output the final sky color
+        FragColor = vec4(scattering, 1.0);
+
+    } else {
+
+        // Sample the environment texture using the normalized direction
+        vec4 envColor = texture(texEnvMap, dir);
+
+        // Output the sampled color directly for debugging
+        FragColor = envColor;
+    }
 }

@@ -288,9 +288,6 @@ vec3 apply_volumetric_fog( vec2 screen_uv, float raw_depth, vec3 color, float ne
     vec4 scattering_transmittance = texture(fog_texture, froxel_uvw);
 
     //const float scattering_modifier = enable_volumetric_fog_opacity_anti_aliasing() ? max( 1 - scattering_transmittance.a, 0.00000001f ) : 1.0f;
-    const float scattering_modifier = 1.0f;
-
-    color.rgb = color.rgb * scattering_transmittance.a + scattering_transmittance.rgb * scattering_modifier;
-
-    return color;
+    
+    return color.rgb * scattering_transmittance.a + scattering_transmittance.rgb;
 }

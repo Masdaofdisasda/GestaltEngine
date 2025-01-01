@@ -19,7 +19,6 @@ namespace gestalt::application {
       std::function<void(const std::filesystem::path&)> load_gltf;
       std::function<ComponentFactory&()> get_component_factory;
       std::function<RenderConfig&()> get_render_config;
-      std::function<std::shared_ptr<TextureHandle>()> get_debug_image;
       std::function<void(Entity)> set_active_camera;
       std::function<Entity()> get_active_camera;
     };
@@ -67,16 +66,15 @@ namespace gestalt::application {
 
     public:
       VkDescriptorSet descriptor_set_;
-      VkDescriptorSetLayout descriptor_set_layout_;
 
       void set_debug_texture(VkImageView image_view, VkSampler sampler);
 
-      void init(IGpu* gpu, Window* window, VkFormat swapchainFormat, Repository* repository,
-                IDescriptorLayoutBuilder* builder, const GuiCapabilities& actions);
+      void init(IGpu* gpu, Window* window, VkFormat swapchain_format, Repository* repository, const GuiCapabilities& actions);
 
       void cleanup();
 
-      void draw(VkCommandBuffer cmd, const std::shared_ptr<TextureHandle>& swapchain);
+      void draw(VkCommandBuffer cmd, const VkImageView swapchain_view,
+                const VkExtent2D swapchain_extent);
 
       void update(const SDL_Event& e);
 

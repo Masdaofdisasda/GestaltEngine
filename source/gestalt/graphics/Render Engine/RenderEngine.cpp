@@ -1,31 +1,78 @@
 ﻿#include "RenderEngine.hpp"
 
 #include <queue>
-#include <set>
 
 #include <tracy/Tracy.hpp>
 
 #include "Gui.hpp"
-#include "Renderpasses/RenderPassTypes.hpp"
 #include "Repository.hpp"
 #include <VkBootstrap.h>
 
 #include "VulkanCheck.hpp"
 
 #include "FrameProvider.hpp"
-#include "RenderPassBase.hpp"
-#include "ResourceManager.hpp"
-#include "Utils/vk_images.hpp"
+#include "ResourceAllocator.hpp"
 #include "vk_initializers.hpp"
 #include "Interface/IGpu.hpp"
+#include "Renderpasses/LightingPasses.hpp"
+#include "Renderpasses/MeshPasses.hpp"
+#include "Renderpasses/ShadowPasses.hpp"
+#include "Renderpasses/SkyBox.hpp"
+#include "Renderpasses/SsaoPasses.hpp"
+#include "Renderpasses/ToneMapping.hpp"
+#include "Renderpasses/VolumetricLight.hpp"
+
+static std::filesystem::path asset(const std::string& asset_name) {
+  return std::filesystem::current_path() / "../../assets" / asset_name;
+}
 
 namespace gestalt::graphics {
-  void RenderEngine::init(IGpu* gpu, Window* window,
-                            ResourceManager* resource_manager,
-                            Repository* repository, Gui* imgui_gui, FrameProvider* frame) {
+
+  void FrameData::init(VkDevice device, uint32 graphics_queue_family_index, FrameProvider& frame) {
+    frame_ = &frame;
+
+    VkCommandPoolCreateInfo commandPoolInfo = vkinit::command_pool_create_info(
+        graphics_queue_family_index, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    VkCommandBufferAllocateInfo cmdAllocInfo
+        = vkinit::command_buffer_allocate_info(VK_NULL_HANDLE, 1);
+    VkFenceCreateInfo fenceCreateInfo = vkinit::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
+    VkSemaphoreCreateInfo semaphoreCreateInfo = vkinit::semaphore_create_info();
+
+    for (auto& frame : frames_) {
+      // Initialize Command Pool and Command Buffer
+      VK_CHECK(vkCreateCommandPool(device, &commandPoolInfo, nullptr, &frame.command_pool));
+      cmdAllocInfo.commandPool = frame.command_pool;
+      VK_CHECK(vkAllocateCommandBuffers(device, &cmdAllocInfo, &frame.main_command_buffer));
+
+      // Initialize Fences and Semaphores
+      VK_CHECK(vkCreateFence(device, &fenceCreateInfo, nullptr, &frame.render_fence));
+      VK_CHECK(
+          vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &frame.swapchain_semaphore));
+      VK_CHECK(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &frame.render_semaphore));
+
+      // Initialize Descriptor Pool
+    }
+  }
+
+  void FrameData::cleanup(const VkDevice device) {
+    for (auto& frame : frames_) {
+      vkDestroyCommandPool(device, frame.command_pool, nullptr);
+      vkDestroyFence(device, frame.render_fence, nullptr);
+      vkDestroySemaphore(device, frame.swapchain_semaphore, nullptr);
+      vkDestroySemaphore(device, frame.render_semaphore, nullptr);
+    }
+  }
+
+  FrameData::FrameResources& FrameData::get_current_frame() {
+    return frames_[frame_->get_current_frame_index()];
+  }
+
+  void RenderEngine::init(IGpu* gpu, Window* window, ResourceAllocator* resource_allocator,
+                             Repository* repository, Gui* imgui_gui, FrameProvider* frame) {
+
     gpu_ = gpu;
     window_ = window;
-    resource_manager_ = resource_manager;
+    resource_allocator_ = resource_allocator;
     repository_ = repository;
     imgui_ = imgui_gui;
     frame_ = frame;
@@ -33,314 +80,490 @@ namespace gestalt::graphics {
     swapchain_ = std::make_unique<VkSwapchain>();
     swapchain_->init(gpu_, {window_->extent.width, window_->extent.height, 1});
 
-    resource_registry_ = std::make_unique<ResourceRegistry>();
-    resource_registry_->init(gpu_, repository_);
+    frame_graph_ = std::make_unique<FrameGraph>(resource_allocator);
 
-    render_passes_.push_back(std::make_shared<DrawCullDirectionalDepthPass>());
-    render_passes_.push_back(std::make_shared<TaskSubmitDirectionalDepthPass>());
-    render_passes_.push_back(std::make_shared<MeshletDirectionalDepthPass>());
+    auto shadow_map = frame_graph_->add_resource(
+        ImageTemplate("Shadow Map")
+        .set_image_type(TextureType::kDepth, VK_FORMAT_D32_SFLOAT)
+        .set_image_size(2048 * 4, 2048 * 4)
+        .build());
+    auto g_buffer_1 = frame_graph_->add_resource(ImageTemplate("G Buffer 1"));
+    auto g_buffer_2 = frame_graph_->add_resource(ImageTemplate("G Buffer 2"));
+    auto g_buffer_3 = frame_graph_->add_resource(ImageTemplate("G Buffer 3"));
+    auto g_buffer_depth = frame_graph_->add_resource(
+        ImageTemplate("G Buffer Depth")
+        .set_image_type(TextureType::kDepth, VK_FORMAT_D32_SFLOAT)
+        .build());
+    auto scene_lit = frame_graph_->add_resource(ImageTemplate("Scene Lit"));
+    auto scene_skybox = frame_graph_->add_resource(ImageTemplate("Scene Skybox"));
+    auto scene_final = frame_graph_->add_resource(ImageTemplate("Scene Final"));
+    scene_final_ = scene_final;
+    auto rotation_texture
+        = frame_graph_->add_resource(ImageTemplate("Rotation Pattern Texture")
+                                     .set_initial_value(asset("rot_texture.bmp"))
+                                     .build(),
+                                     CreationType::EXTERNAL);
+    auto ambient_occlusion_texture = frame_graph_->add_resource(
+        ImageTemplate("Ambient Occlusion Texture")
+        .set_image_type(TextureType::kColor, VK_FORMAT_R16_SFLOAT)
+        .set_image_size(0.5f)
+        .build());
 
-    render_passes_.push_back(std::make_shared<DrawCullPass>());
-    render_passes_.push_back(std::make_shared<TaskSubmitPass>());
-    render_passes_.push_back(std::make_unique<MeshletPass>());
+    auto blue_noise
+        = frame_graph_->add_resource(ImageTemplate("Blue Noise Texture")
+                                     .set_initial_value(asset("blue_noise_512_512.png"))
+                                     .build(),
+                                     CreationType::EXTERNAL);
+    auto froxel_data = frame_graph_->add_resource(
+        ImageTemplate("Froxel Data 0")
+        .set_image_type(TextureType::kColor, VK_FORMAT_R16G16B16A16_SFLOAT,
+                        ImageType::kImage3D)
+        .set_image_size(128, 128, 128)
+        .build());
+    auto light_scattering = frame_graph_->add_resource(
+        ImageTemplate("Light Scattering Texture")
+        .set_image_type(TextureType::kColor, VK_FORMAT_R16G16B16A16_SFLOAT,
+                        ImageType::kImage3D)
+        .set_image_size(128, 128, 128)
+        .build());
+    auto light_scattering_filtered = frame_graph_->add_resource(
+        ImageTemplate("Light Scattering Filtered")
+        .set_image_type(TextureType::kColor, VK_FORMAT_R16G16B16A16_SFLOAT,
+                        ImageType::kImage3D)
+        .set_image_size(128, 128, 128)
+        .build());
+    auto integrated_light_scattering = frame_graph_->add_resource(
+        ImageTemplate("Integrated Light Scattering Texture")
+        .set_image_type(TextureType::kColor, VK_FORMAT_R16G16B16A16_SFLOAT,
+                        ImageType::kImage3D)
+        .set_image_size(128, 128, 128)
+        .build());
+    auto volumetric_noise = frame_graph_->add_resource(
+        ImageTemplate("Volumetric Noise Texture")
+        .set_image_type(TextureType::kColor, VK_FORMAT_R8_UNORM, ImageType::kImage3D)
+        .set_image_size(64, 64, 64)
+        .set_initial_value({1.f, 0.f, 0.f, 1.f})
+        .build());
 
-    render_passes_.push_back(std::make_shared<SsaoPass>());
-    render_passes_.push_back(std::make_shared<SsaoBlurPass>());
+    post_process_sampler_ = std::make_unique<SamplerInstance>(SamplerTemplate(
+        "Post Process Sampler",
+        /* mag_filter       */ VK_FILTER_LINEAR,
+        /* min_filter       */ VK_FILTER_LINEAR,
+        /* mipmap_mode      */ VK_SAMPLER_MIPMAP_MODE_LINEAR,
+        /* address_mode_u   */ VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        /* address_mode_v   */ VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        /* address_mode_w   */ VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        /* anisotropy_enable*/ VK_FALSE,
+        /* mip_lod_bias     */ 0.0f,
+        /* min_lod          */ 0.0f,
+        /* max_lod          */ VK_LOD_CLAMP_NONE,
+        /* max_anisotropy   */ 1.0f,
+        /* compare_enable   */ VK_FALSE,
+        /* compare_op       */ VK_COMPARE_OP_NEVER,
+        /* border_color     */ VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK), gpu_->getDevice());
 
-    render_passes_.push_back(std::make_shared<VolumetricLightingNoisePass>());
-    render_passes_.push_back(std::make_shared<VolumetricLightingInjectionPass>());
-    render_passes_.push_back(std::make_shared<VolumetricLightingScatteringPass>());
-    render_passes_.push_back(std::make_shared<VolumetricLightingSpatialFilterPass>());
-    render_passes_.push_back(std::make_shared<VolumetricLightingIntegrationPass>());
+            cube_map_sampler_ = std::make_unique<SamplerInstance>(
+        SamplerTemplate("Environment Cubemap Sampler",
+                        VK_FILTER_LINEAR,                       // mag
+                        VK_FILTER_LINEAR,                       // min
+                        VK_SAMPLER_MIPMAP_MODE_LINEAR,          // mipmap mode
+                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,  // address U
+                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,  // address V
+                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,  // address W
+                        VK_FALSE,                               // anisotropy enable
+                        0.0f,                                   // mipBias
+                        0.0f,                                   // minLod
+                        VK_LOD_CLAMP_NONE,                      // maxLod
+                        1.0f,      // maxAnisotropy (ignored if anisotropyEnable=VK_FALSE)
+                        VK_FALSE,  // compare enable
+                        VK_COMPARE_OP_NEVER, VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK),
+        gpu_->getDevice());
 
-    render_passes_.push_back(std::make_shared<LightingPass>());
-    render_passes_.push_back(std::make_shared<SkyboxPass>());
+    // camera
+    auto camera_buffer = frame_graph_->add_resource(
+        repository->per_frame_data_buffers->camera_buffer);
 
-    render_passes_.push_back(std::make_shared<LuminancePass>());
-    render_passes_.push_back(std::make_shared<LuminanceDownscalePass>());
-    render_passes_.push_back(std::make_shared<LightAdaptationPass>());
-    render_passes_.push_back(std::make_shared<BrightPass>());
-    render_passes_.push_back(std::make_shared<BloomBlurPass>());
-    render_passes_.push_back(std::make_shared<InfiniteGridPass>());
-    render_passes_.push_back(std::make_shared<AabbBvhDebugPass>());
-    render_passes_.push_back(std::make_shared<BoundingSphereDebugPass>());
-    render_passes_.push_back(std::make_shared<TonemapPass>());
+    // geometry
+    auto index_buffer = frame_graph_->add_resource(
+        repository->mesh_buffers->index_buffer, CreationType::EXTERNAL);
+    auto vertex_position_buffer
+        = frame_graph_->add_resource(repository->mesh_buffers->vertex_position_buffer);
+    auto vertex_data_buffer
+        = frame_graph_->add_resource(repository->mesh_buffers->vertex_data_buffer);
 
-    frames_.init(gpu_->getDevice(), gpu_->getGraphicsQueueFamily(), *frame_);
+    auto meshlet_buffer
+        = frame_graph_->add_resource(repository->mesh_buffers->meshlet_buffer);
+    auto meshlet_vertices
+        = frame_graph_->add_resource(repository->mesh_buffers->meshlet_vertices);
+    auto meshlet_triangles
+        = frame_graph_->add_resource(repository->mesh_buffers->meshlet_triangles);
+    auto meshlet_task_commands_buffer = frame_graph_->add_resource(
+        repository->mesh_buffers->meshlet_task_commands_buffer);
+    auto mesh_draw_buffer
+        = frame_graph_->add_resource(repository->mesh_buffers->mesh_draw_buffer);
+    auto command_count_buffer
+        = frame_graph_->add_resource(repository->mesh_buffers->command_count_buffer);
+    auto group_count_buffer
+        = frame_graph_->add_resource(repository->mesh_buffers->group_count_buffer);
 
-    create_resources();
+    // Material
+      
+    auto brdf_lut = frame_graph_->add_resource(
+        ImageTemplate("BRDF LUT Texture").set_initial_value(asset("bdrf_lut.png")).build(),
+        CreationType::EXTERNAL);
+    auto texEnvMap = frame_graph_->add_resource(
+        ImageTemplate("Environment Map Texture")
+        .set_initial_value(asset("san_giuseppe_bridge_4k_environment.hdr"))
+        .set_image_type(TextureType::kColor, VK_FORMAT_R32G32B32A32_SFLOAT, ImageType::kCubeMap)
+        .build(),
+        CreationType::EXTERNAL);
+    auto texIrradianceMap = frame_graph_->add_resource(
+        ImageTemplate("Irradiance Map Texture")
+        .set_initial_value(asset("san_giuseppe_bridge_4k_irradiance.hdr"))
+        .set_image_type(TextureType::kColor, VK_FORMAT_R32G32B32A32_SFLOAT,
+                        ImageType::kCubeMap)
+        .build(),
+        CreationType::EXTERNAL);
+          
+    auto material_buffer
+        = frame_graph_->add_resource(repository->material_buffers->material_buffer);
 
-    for (const auto& pass : render_passes_) {
-      pass->init(gpu_, resource_manager_, resource_registry_.get(), repository_, frame_);
-    }
+    auto material_textures
+        = frame_graph_->add_resource(std::make_shared<ImageArrayInstance>(
+                                         "PBR Textures",
+                                         [this]() -> std::vector<Material> {
+                                           return repository_->materials.data();
+                                         },
+                                         getMaxTextures()),
+                                     CreationType::EXTERNAL);
 
-    resource_registry_->clear_shader_cache();
+    // Light
+    auto directional_light
+        = frame_graph_->add_resource(repository->light_buffers->dir_light_buffer);
+    auto point_light
+        = frame_graph_->add_resource(repository->light_buffers->point_light_buffer);
+    auto light_matrices
+        = frame_graph_->add_resource(repository->light_buffers->view_proj_matrices);
+
+    // Shader Passes
+    frame_graph_->add_pass<DrawCullDirectionalDepthPass>(
+        camera_buffer, meshlet_task_commands_buffer, mesh_draw_buffer, command_count_buffer, gpu_,
+        [&]() { return static_cast<int32>(repository_->mesh_draws.size()); });
+
+    frame_graph_->add_pass<TaskSubmitDirectionalDepthPass>(
+        meshlet_task_commands_buffer, command_count_buffer, group_count_buffer, gpu_);
+
+    frame_graph_->add_pass<MeshletDirectionalDepthPass>(
+        camera_buffer, light_matrices, directional_light, point_light, vertex_position_buffer,
+        vertex_data_buffer, meshlet_buffer, meshlet_vertices, meshlet_triangles,
+        meshlet_task_commands_buffer, mesh_draw_buffer, group_count_buffer, shadow_map, gpu_);
+
+    // mesh shading
+    frame_graph_->add_pass<DrawCullPass>(
+        camera_buffer, meshlet_task_commands_buffer, mesh_draw_buffer, command_count_buffer, gpu_,
+        [&] { return static_cast<int32>(repository_->mesh_draws.size()); });
+
+    frame_graph_->add_pass<TaskSubmitPass>(meshlet_task_commands_buffer, command_count_buffer,
+                                           group_count_buffer, gpu_);
+
+    frame_graph_->add_pass<MeshletPass>(
+        camera_buffer, material_buffer, material_textures, vertex_position_buffer,
+        vertex_data_buffer, meshlet_buffer, meshlet_vertices, meshlet_triangles,
+        meshlet_task_commands_buffer, mesh_draw_buffer, group_count_buffer, g_buffer_1,
+        g_buffer_2, g_buffer_3, g_buffer_depth, gpu_);
+
+    frame_graph_->add_pass<SsaoPass>(
+        camera_buffer, g_buffer_depth, g_buffer_2, rotation_texture, ambient_occlusion_texture,
+        post_process_sampler_->get_sampler_handle(), gpu_, [&] { return config_.ssao; });
+
+    frame_graph_->add_pass<VolumetricLightingNoisePass>(volumetric_noise, gpu_);
+
+    frame_graph_->add_pass<VolumetricLightingInjectionPass>(
+        blue_noise, volumetric_noise, froxel_data, post_process_sampler_->get_sampler_handle(),
+        [&] { return config_.volumetric_lighting; },
+        [&] { return frame_->get_current_frame_number(); },
+        [&] {
+          return repository_->per_frame_data_buffers->data.at(frame_->get_current_frame_index());
+        },
+        gpu_);
+
+    frame_graph_->add_pass<VolumetricLightingScatteringPass>(
+        camera_buffer, light_matrices, directional_light, point_light, blue_noise, froxel_data,
+        shadow_map, light_scattering, post_process_sampler_->get_sampler_handle(),
+        [&] { return config_.volumetric_lighting; },
+        [&] { return frame_->get_current_frame_number(); },
+        [&] {
+          return repository_->per_frame_data_buffers->data.at(frame_->get_current_frame_index());
+        },
+        [&] { return static_cast<uint32>(repository_->point_lights.size()); }, gpu_);
+
+    frame_graph_->add_pass<VolumetricLightingSpatialFilterPass>(
+        light_scattering, light_scattering_filtered, post_process_sampler_->get_sampler_handle(),
+        [&] { return config_.volumetric_lighting; }, gpu_);
+
+    frame_graph_->add_pass<VolumetricLightingIntegrationPass>(
+        light_scattering_filtered, integrated_light_scattering,
+        post_process_sampler_->get_sampler_handle(),
+        [&] { return config_.volumetric_lighting; },
+        [&] { return frame_->get_current_frame_number(); },
+        [&] {
+          return repository_->per_frame_data_buffers->data.at(frame_->get_current_frame_index());
+        },
+        gpu_);
+
+    frame_graph_->add_pass<LightingPass>(
+        camera_buffer, texEnvMap, texIrradianceMap, brdf_lut, light_matrices, directional_light, point_light,
+        g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth, shadow_map,
+        integrated_light_scattering, ambient_occlusion_texture, scene_lit,
+        post_process_sampler_->get_sampler_handle(),
+        cube_map_sampler_->get_sampler_handle(), gpu_, [&] { return config_.lighting; },
+        [&] {
+          return repository_->per_frame_data_buffers->data.at(frame_->get_current_frame_index());
+        },
+        [&] { return static_cast<uint32>(repository_->directional_lights.size()); },
+        [&] { return static_cast<uint32>(repository_->point_lights.size()); });
+
+    frame_graph_->add_pass<SkyboxPass>(
+        camera_buffer, directional_light, scene_lit, texEnvMap, scene_skybox, g_buffer_depth,
+        post_process_sampler_->get_sampler_handle(),
+        gpu_, [&] { return config_.skybox; });
+
+    frame_graph_->add_pass<ToneMapPass>(scene_final, scene_lit, scene_skybox,
+                                        post_process_sampler_->get_sampler_handle(), gpu_,
+                                        [&] { return config_.hdr; });
+
+    frame_graph_->compile();
+
+    frame_data_.init(gpu_->getDevice(), gpu_->getGraphicsQueueFamily(), *frame_);
   }
 
-  void RenderEngine::create_resources() const {
-    resource_manager_->flush_loader();
+  bool FrameData::acquire_next_image(const VkDevice device, VkSwapchainKHR& swapchain,
+                                     uint32& swapchain_image_index) const {
+    const auto frame = frames_[frame_->get_current_frame_index()];
+    VK_CHECK(vkWaitForFences(device, 1, &frame.render_fence, VK_TRUE, UINT64_MAX));
 
-    gpu_->immediateSubmit([&](VkCommandBuffer cmd) {
-      for (auto& image_attachment : resource_registry_->attachment_list_) {
-        if (image_attachment.extent.width == 0 && image_attachment.extent.height == 0) {
-          image_attachment.image->imageExtent
-              = {static_cast<uint32_t>(window_->extent.width * image_attachment.scale),
-                 static_cast<uint32_t>(window_->extent.height * image_attachment.scale), 0};
-        } else {
-          image_attachment.image->imageExtent = image_attachment.extent;
-        }
+    VK_CHECK(vkResetFences(device, 1, &frame.render_fence));
 
-        if (image_attachment.extent.depth != 0) {
-          resource_manager_->create_3D_image(
-              image_attachment.image, image_attachment.extent,
-                                             image_attachment.format,
-                                             VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, image_attachment.name);
-        } else {
-
-         resource_manager_->create_frame_buffer(image_attachment.image, image_attachment.name, image_attachment.format);
-        }
-
-        if (image_attachment.image->getType() == TextureType::kColor) {
-          vkutil::TransitionImage(image_attachment.image)
-              .to(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
-              .withSource(VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0)
-              .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
-              .andSubmitTo(cmd);
-
-          VkImageSubresourceRange clearRange = {};
-          clearRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-          clearRange.baseMipLevel = 0;
-          clearRange.levelCount = 1;
-          clearRange.baseArrayLayer = 0;
-          clearRange.layerCount = 1;
-          vkCmdClearColorImage(cmd, image_attachment.image->image,
-                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                               &image_attachment.initial_value.color, 1, &clearRange);
-
-        } else if (image_attachment.image->getType() == TextureType::kDepth) {
-          vkutil::TransitionImage(image_attachment.image)
-              .to(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
-              .withSource(VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0)
-              .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
-              .andSubmitTo(cmd);
-
-          VkImageSubresourceRange clearRange = {};
-          clearRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-          if (image_attachment.image->getFormat() == VK_FORMAT_D32_SFLOAT_S8_UINT
-              || image_attachment.image->getFormat() == VK_FORMAT_D24_UNORM_S8_UINT) {
-            clearRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-          }
-          clearRange.baseMipLevel = 0;
-          clearRange.levelCount = 1;
-          clearRange.baseArrayLayer = 0;
-          clearRange.layerCount = 1;
-          vkCmdClearDepthStencilImage(cmd, image_attachment.image->image,
-                                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                      &image_attachment.initial_value.depthStencil, 1, &clearRange);
-        }
-      }
-    });
-  }
-
-  void RenderEngine::execute(const std::shared_ptr<RenderPassBase>& render_pass,
-                               VkCommandBuffer cmd) {
-    auto renderDependencies = render_pass->get_dependencies();
-
-    for (auto& dependency : renderDependencies.image_attachments) {
-      switch (dependency.usage) {
-        case ImageUsageType::kRead:
-          vkutil::TransitionImage(dependency.attachment.image).toLayoutRead().andSubmitTo(cmd);
-          break;
-        case ImageUsageType::kWrite:
-          vkutil::TransitionImage(dependency.attachment.image).toLayoutWrite().andSubmitTo(cmd);
-          dependency.attachment.version++;
-          break;
-        case ImageUsageType::kStore:
-          vkutil::TransitionImage(dependency.attachment.image).toLayoutStore().andSubmitTo(cmd);
-          dependency.attachment.version++;
-          break;
-        case ImageUsageType::kDepthStencilRead:
-          vkutil::TransitionImage(dependency.attachment.image).toLayoutWrite().andSubmitTo(cmd);
-          break;
-        case ImageUsageType::kCombined:
-          dependency.attachment.version++;
-          break;
-      }
-    }
-
-    for (auto& dependency : renderDependencies.buffer_dependencies) {
-      switch (dependency.usage) {
-        case BufferUsageType::kRead:
-          for (auto& resource :
-               dependency.resource.buffer->get_buffers(frame_->get_current_frame_index()))
-            vkutil::TransitionBuffer(resource).waitForRead().andSubmitTo(cmd);
-          break;
-        case BufferUsageType::kWrite:
-          for (auto& resource : dependency.resource.buffer->get_buffers(frame_->get_current_frame_index()))
-            vkutil::TransitionBuffer(resource).waitForWrite().andSubmitTo(cmd);
-          break;
-      }
-    }
-
-    //fmt::print("Executing {}\n", render_pass->get_name());
-    render_pass->execute(cmd);
-
-    if (false && render_pass->get_name() == "Bloom Blur Pass") {
-      if (debug_texture_ != nullptr) return;
-
-      const auto copyImg = resource_registry_->resources_.bright_pass;
-      debug_texture_ = std::make_shared<TextureHandle>(copyImg.image->getType());
-      debug_texture_->imageExtent = copyImg.image->imageExtent;
-      resource_manager_->create_frame_buffer(debug_texture_, "debug_texture");
-
-      vkutil::TransitionImage(copyImg.image)
-          .to(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
-          .withSource(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-                      VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)
-          .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
-          .andSubmitTo(cmd);
-      vkutil::TransitionImage(debug_texture_)
-          .to(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
-          .withSource(VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0)
-          .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
-          .andSubmitTo(cmd);
-
-      vkutil::CopyImage(copyImg.image).toImage(debug_texture_).andSubmitTo(cmd);
-
-      vkutil::TransitionImage(debug_texture_)
-          .toLayoutRead()
-          .withSource(VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-                      VK_ACCESS_2_TRANSFER_WRITE_BIT)  // Wait for the copy to finish
-          .andSubmitTo(cmd);
-
-      imgui_->set_debug_texture(copyImg.image->imageView,
-                                repository_->default_material_.color_sampler);
-    }
-  }
-
-  bool RenderEngine::acquire_next_image() {
-    VK_CHECK(vkWaitForFences(gpu_->getDevice(), 1, &frame().render_fence, true, UINT64_MAX));
-    vkDeviceWaitIdle(gpu_->getDevice()); // TODO fix synchronization issues!!!
-
-    VkResult e
-        = vkAcquireNextImageKHR(gpu_->getDevice(), swapchain_->swapchain, UINT64_MAX,
-                                frame().swapchain_semaphore, nullptr, &swapchain_image_index_);
+    const VkResult e
+        = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, frame.swapchain_semaphore, nullptr, &swapchain_image_index);
     if (e == VK_ERROR_OUT_OF_DATE_KHR) {
-      resize_requested_ = true;
       return true;
     }
+    VK_CHECK(e);
 
-    VK_CHECK(vkResetFences(gpu_->getDevice(), 1, &frame().render_fence));
-    VK_CHECK(vkResetCommandBuffer(frame().main_command_buffer, 0));
+    VK_CHECK(vkResetCommandBuffer(frame.main_command_buffer, 0));
 
     return false;
   }
 
-  VkCommandBuffer RenderEngine::start_draw() {
-    VkCommandBuffer cmd = frame().main_command_buffer;
-    VkCommandBufferBeginInfo cmdBeginInfo
+  CommandBuffer RenderEngine::start_draw() {
+    const VkCommandBuffer cmd = frame().main_command_buffer;
+    const VkCommandBufferBeginInfo cmd_begin_info
         = vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
-    VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
+    VK_CHECK(vkBeginCommandBuffer(cmd, &cmd_begin_info));
 
-    return cmd;
+    return CommandBuffer(cmd);
   }
 
   void RenderEngine::execute_passes() {
-
     if (resize_requested_) {
       swapchain_->resize_swapchain(window_);
       resize_requested_ = false;
     }
 
-    if (acquire_next_image()) {
+    if (frame_data_.acquire_next_image(gpu_->getDevice(), swapchain_->swapchain, swapchain_image_index_)) {
       return;
     }
 
-    VkCommandBuffer cmd = start_draw();
+    auto cmd = start_draw();
 
-    for (auto& renderpass : render_passes_) {
-      ZoneScopedN("Execute Pass");
-      execute(renderpass, cmd);
-    }
+    resource_allocator_->flush();
+    cmd.global_barrier();
+    frame_graph_->execute(cmd);
 
-    const auto color_image = resource_registry_->resources_.final_color.image;
     const auto swapchain_image = swapchain_->swapchain_images[swapchain_image_index_];
 
-    vkutil::TransitionImage(color_image)
-        .to(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
-        .withSource(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)
-        .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
-        .andSubmitTo(cmd);
-    vkutil::TransitionImage(swapchain_image)
-        .to(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
-        .withSource(VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, 0)
-        .withDestination(VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT)
-        .andSubmitTo(cmd);
+    {
+      // Transition color_image to TRANSFER_SRC_OPTIMAL
+      auto image_barrier = VkImageMemoryBarrier2{
+          .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+          .srcStageMask = scene_final_->get_current_stage(),
+          .srcAccessMask = scene_final_->get_current_access(),
+          .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+          .dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT,
+          .oldLayout = scene_final_->get_layout(),
+          .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+          .image = scene_final_->get_image_handle(),
+          .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+      };
+      auto dependency_info = VkDependencyInfo{
+          .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+          .imageMemoryBarrierCount = 1,
+          .pImageMemoryBarriers = &image_barrier,
+      };
+      cmd.pipeline_barrier2(dependency_info);
 
-    vkutil::CopyImage(color_image).toImage(swapchain_image).andSubmitTo(cmd);
+      scene_final_->set_layout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+      scene_final_->set_current_access(VK_ACCESS_2_TRANSFER_READ_BIT);
+      scene_final_->set_current_stage(VK_PIPELINE_STAGE_2_TRANSFER_BIT);
+    }
 
-    vkutil::TransitionImage(swapchain_image)
-        .to(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
-        .withSource(VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-                    VK_ACCESS_2_TRANSFER_WRITE_BIT)  // Wait for the copy to finish
-        .withDestination(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-                         VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)
-        .andSubmitTo(cmd);
+    {
+      // Transition swapchain_image to TRANSFER_DST_OPTIMAL
+      auto image_barrier = VkImageMemoryBarrier2{
+          .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+          .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+          .srcAccessMask = 0,
+          .dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+          .dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+          .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+          .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+          .image = swapchain_image.get_image(),
+          .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+      };
+      auto dependency_info = VkDependencyInfo{
+          .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+          .imageMemoryBarrierCount = 1,
+          .pImageMemoryBarriers = &image_barrier,
+      };
+      cmd.pipeline_barrier2(dependency_info);
+    }
 
-    imgui_->draw(cmd, swapchain_image);
+    {
+      // Insert a global barrier to ensure all transitions complete
+      cmd.global_barrier();
+    }
 
-    vkutil::TransitionImage(swapchain_image)
-        .to(VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
-        .withSource(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)
-        .withDestination(VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, 0)
-        .andSubmitTo(cmd);
-    swapchain_image->setFormat(VK_FORMAT_UNDEFINED);
+    {
+      // Copy color_image to swapchain_image
+      VkImageBlit2 blitRegion = {
+          .sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2,
+          .pNext = nullptr,
+          .srcSubresource = {
+              .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+              .mipLevel = 0,
+              .baseArrayLayer = 0,
+              .layerCount = 1,
+          },
+          .srcOffsets = {
+              {0, 0, 0}, // srcOffset[0]
+              {static_cast<int32_t>(scene_final_->get_extent().width), 
+               static_cast<int32_t>(scene_final_->get_extent().height), 
+               1}, // srcOffset[1]
+          },
+          .dstSubresource = {
+              .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+              .mipLevel = 0,
+              .baseArrayLayer = 0,
+              .layerCount = 1,
+          },
+          .dstOffsets = {
+              {0, 0, 0}, // dstOffset[0]
+              {static_cast<int32_t>(swapchain_image.get_extent().width), 
+               static_cast<int32_t>(swapchain_image.get_extent().height), 
+               1}, // dstOffset[1]
+          },
+      };
 
-    present(cmd);
+      // Blit the image
+      VkBlitImageInfo2 blitInfo = {
+          .sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2,
+          .pNext = nullptr,
+          .srcImage = scene_final_->get_image_handle(),
+          .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+          .dstImage = swapchain_image.get_image(),
+          .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+          .regionCount = 1,
+          .pRegions = &blitRegion,
+          .filter = VK_FILTER_LINEAR,  // Use VK_FILTER_LINEAR or VK_FILTER_NEAREST
+      };
+      cmd.blit_image_2(blitInfo);
+    }
+
+    {
+      // Transition swapchain_image back to COLOR_ATTACHMENT_OPTIMAL for ImGui rendering
+      auto image_barrier = VkImageMemoryBarrier2{
+          .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+          .srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+          .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+          .dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+          .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+          .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+          .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+          .image = swapchain_image.get_image(),
+          .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+      };
+      auto dependency_info = VkDependencyInfo{
+          .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+          .imageMemoryBarrierCount = 1,
+          .pImageMemoryBarriers = &image_barrier,
+      };
+      cmd.pipeline_barrier2(dependency_info);
+    }
+
+    {
+      // Insert another global barrier to ensure everything is synchronized before presenting
+      cmd.global_barrier();
+    }
+
+    // Render ImGui overlay
+    imgui_->draw(cmd.get(), swapchain_image.get_image_view(), swapchain_image.get_extent());
+
+    {
+      // Transition swapchain_image to PRESENT_SRC_KHR for presentation
+      auto image_barrier = VkImageMemoryBarrier2{
+          .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+          .srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+          .srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT ,
+          .dstStageMask = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
+          .dstAccessMask = 0,
+          .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+          .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+          .image = swapchain_image.get_image(),
+          .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+      };
+      auto dependency_info = VkDependencyInfo{
+          .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+          .imageMemoryBarrierCount = 1,
+          .pImageMemoryBarriers = &image_barrier,
+      };
+      cmd.pipeline_barrier2(dependency_info);
+    }
+
+    resize_requested_ = frame_data_.present(cmd, gpu_->getGraphicsQueue(), swapchain_->swapchain, swapchain_image_index_);
   }
 
   void RenderEngine::cleanup() {
-    for (auto& attachment : resource_registry_->attachment_list_) {
-      resource_manager_->destroy_image(*attachment.image.get());
-    }
-    resource_registry_->attachment_list_.clear();
-
-    frames_.cleanup(gpu_->getDevice());
-
-    for (const auto& pass : render_passes_) {
-      pass->cleanup();
-    }
-    render_passes_.clear();
-
+    frame_data_.cleanup(gpu_->getDevice());
     swapchain_->destroy_swapchain();
   }
 
-  void RenderEngine::present(VkCommandBuffer cmd) {
-    VK_CHECK(vkEndCommandBuffer(cmd));
+  bool FrameData::present(const CommandBuffer cmd, const VkQueue graphics_queue, VkSwapchainKHR& swapchain, uint32& swapchain_image_index) const {
+    const auto frame = frames_[frame_->get_current_frame_index()];
+    VK_CHECK(vkEndCommandBuffer(cmd.get()));
 
-    VkCommandBufferSubmitInfo cmdinfo = vkinit::command_buffer_submit_info(cmd);
-    VkSemaphoreSubmitInfo waitInfo = vkinit::semaphore_submit_info(
-        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR, frame().swapchain_semaphore);
-    VkSemaphoreSubmitInfo signalInfo = vkinit::semaphore_submit_info(
-        VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, frame().render_semaphore);
+    VkCommandBufferSubmitInfo cmd_info = vkinit::command_buffer_submit_info(cmd.get());
+    VkSemaphoreSubmitInfo wait_info = vkinit::semaphore_submit_info(
+        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, frame.swapchain_semaphore);
+    VkSemaphoreSubmitInfo signal_info = vkinit::semaphore_submit_info(
+        VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, frame.render_semaphore);
 
-    VkSubmitInfo2 submit = vkinit::submit_info(&cmdinfo, &signalInfo, &waitInfo);
+    const VkSubmitInfo2 submit = vkinit::submit_info(&cmd_info, &signal_info, &wait_info);
 
-    VK_CHECK(vkQueueSubmit2(gpu_->getGraphicsQueue(), 1, &submit, frame().render_fence));
-    VkPresentInfoKHR presentInfo = vkinit::present_info();
-    presentInfo.pSwapchains = &swapchain_->swapchain;
-    presentInfo.swapchainCount = 1;
-    presentInfo.pWaitSemaphores = &frame().render_semaphore;
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pImageIndices = &swapchain_image_index_;
+    VK_CHECK(vkQueueSubmit2(graphics_queue, 1, &submit, frame.render_fence));
+    VkPresentInfoKHR present_info = vkinit::present_info();
+    present_info.pSwapchains = &swapchain;
+    present_info.swapchainCount = 1;
+    present_info.pWaitSemaphores = &frame.render_semaphore;
+    present_info.waitSemaphoreCount = 1;
+    present_info.pImageIndices = &swapchain_image_index;
 
-    VkResult presentResult = vkQueuePresentKHR(gpu_->getGraphicsQueue(), &presentInfo);
+    VkResult presentResult = vkQueuePresentKHR(graphics_queue, &present_info);
     if (presentResult == VK_ERROR_OUT_OF_DATE_KHR) {
-      resize_requested_ = true;
+      return true;
     }
+    return false;
   }
 
 }  // namespace gestalt::graphics

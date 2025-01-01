@@ -21,10 +21,17 @@ namespace gestalt::application {
                                   SDL_WINDOWPOS_UNDEFINED, 0,
                                   0, window_flags);
         update_window_size();
+
+        //TODO improve this:
+        EngineConfiguration::get_instance().load_from_file();
+        auto config = EngineConfiguration::get_instance().get_config();
+        config.windowedHeight = extent.height;
+        config.windowedWidth = extent.width;
+        EngineConfiguration::get_instance().set_config(config);
         return;
       }
 
-      extent = {getWindowedWidth(), getWindowedHeight()};
+      extent = {.width= getWindowedWidth(), .height= getWindowedHeight()};
 
 
       constexpr auto window_flags = static_cast<SDL_WindowFlags>(
@@ -51,7 +58,6 @@ namespace gestalt::application {
     void Window::release_mouse() const {
       SDL_SetRelativeMouseMode(SDL_FALSE);
     }
-
 
     void Window::cleanup() const { SDL_DestroyWindow(handle); }
 

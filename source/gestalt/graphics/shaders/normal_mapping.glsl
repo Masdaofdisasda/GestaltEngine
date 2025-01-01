@@ -25,6 +25,7 @@ mat3 cotangentFrame( vec3 N, vec3 p, vec2 uv )
 
 	return mat3( T * invmax, B * invmax, N );
 }
+
 vec3 perturbNormal(vec3 n, vec3 v, vec3 normalSample, vec2 uv)
 {
 	vec3 map = normalize( 2.0 * normalSample - vec3(1.0) );

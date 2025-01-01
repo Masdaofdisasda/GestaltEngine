@@ -15,14 +15,14 @@
 #include "ECS/ECSManager.hpp"
 #include "Animation/InterpolationType.hpp"
 #include "ECS/ComponentFactory.hpp"
-#include "Interface/IResourceManager.hpp"
+#include "Interface/IResourceAllocator.hpp"
 #include "Mesh/MeshSurface.hpp"
 
 namespace gestalt::application {
-
-  void AssetLoader::init(IResourceManager* resource_manager, ComponentFactory* component_factory,
+  void AssetLoader::init(IResourceAllocator* resource_allocator,
+                         ComponentFactory* component_factory,
                          Repository* repository) {
-    resource_manager_ = resource_manager;
+    resource_allocator_ = resource_allocator;
     repository_ = repository;
     component_factory_ = component_factory;
   }
@@ -202,39 +202,35 @@ namespace gestalt::application {
     return std::nullopt;
   }
 
-  std::optional<TextureHandle> AssetLoader::load_image(fastgltf::Asset& asset,
+  std::shared_ptr<ImageInstance> AssetLoader::load_image(
+      fastgltf::Asset& asset,
                                                        fastgltf::Image& image) const {
-    TextureHandle newImage = {};
-    int width = 0, height = 0, nr_channels = 0;
 
-    const std::function<void(unsigned char*)> create_image = [&](unsigned char* data) {
-      if (data) {
-        newImage = resource_manager_->create_image(
-            data, VkExtent3D{static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1},
-            VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, true);
-
-        stbi_image_free(data);
-      }
-    };
+    std::string image_name = image.name.c_str();
+    if (image_name.empty()) {
+      image_name = "Image " + std::to_string(asset.images.size());
+    }
+    ImageTemplate image_template(image_name);
 
     const std::function<void(fastgltf::sources::URI&)> create_image_from_file
         = [&](fastgltf::sources::URI& file_path) {
             fmt::print("Loading image from file: {}\n", file_path.uri.string());
-            assert(file_path.fileByteOffset == 0);  // We don't support offsets with stbi.
-            assert(file_path.uri.isLocalPath());    // We're only capable of loading local files.
+            if (file_path.uri.string().empty()) {
+              throw std::runtime_error("Empty file path");
+            }
+            if (file_path.fileByteOffset != 0 || !file_path.uri.isLocalPath()) {
+              throw std::runtime_error("Image file offsets and external files are not supported!");
+            }
 
-            const std::string filename(file_path.uri.path().begin(), file_path.uri.path().end());
-            unsigned char* data = stbi_load(filename.c_str(), &width, &height, &nr_channels, 4);
-            create_image(data);
+            const auto image_path = std::filesystem::path(file_path.uri.path().begin(),
+                                                          file_path.uri.path().end());
+            image_template.set_initial_value(image_path);
           };
 
     const std::function<void(fastgltf::sources::Array&)> create_image_from_vector
         = [&](fastgltf::sources::Array& vector) {
-            unsigned char* data
-                = stbi_load_from_memory(vector.bytes.data(), static_cast<int>(vector.bytes.size()),
-                                        &width, &height, &nr_channels, 4);
-            create_image(data);
-          };
+      image_template.set_initial_value(vector.bytes.data(), vector.bytes.size());
+                };
 
     const std::function<void(fastgltf::sources::BufferView&)> create_image_from_buffer_view
         = [&](fastgltf::sources::BufferView& view) {
@@ -243,11 +239,9 @@ namespace gestalt::application {
 
             std::visit(fastgltf::visitor{[](auto& arg) {},
                                          [&](fastgltf::sources::Array& vector) {
-                                           unsigned char* data = stbi_load_from_memory(
+                                           image_template.set_initial_value(
                                                vector.bytes.data() + buffer_view.byteOffset,
-                                               static_cast<int>(buffer_view.byteLength), &width,
-                                               &height, &nr_channels, 4);
-                                           create_image(data);
+                                               buffer_view.byteLength);
                                          }},
                        buffer.data);
           };
@@ -261,23 +255,22 @@ namespace gestalt::application {
         },
         image.data);
 
-    if (newImage.image == VK_NULL_HANDLE) {
-      return {};
-    }
-    return newImage;
+    auto image_instance = resource_allocator_->create_image(std::move(image_template));
+
+    return image_instance;
   }
 
   void AssetLoader::import_textures(fastgltf::Asset& gltf) const {
     fmt::print("importing textures\n");
     for (fastgltf::Image& image : gltf.images) {
-      std::optional<TextureHandle> img = load_image(gltf, image);
+      auto img = load_image(gltf, image);
 
-      if (img.has_value()) {
-        size_t image_id = repository_->textures.add(img.value());
+      if (img->get_image_handle() != VK_NULL_HANDLE) {
+        size_t image_id = repository_->textures.add(img);
         fmt::print("loaded texture {}, image_id {}\n", image.name, image_id);
       } else {
         fmt::print("gltf failed to load texture {}\n", image.name);
-        repository_->textures.add(repository_->default_material_.error_checkerboard_image);
+        repository_->textures.add(repository_->default_material_.error_checkerboard_image_instance);
       }
     }
   }
@@ -293,7 +286,8 @@ namespace gestalt::application {
     return material_id;
   }
 
-  TextureHandle AssetLoader::get_textures(const fastgltf::Asset& gltf, const size_t& texture_index,
+  std::shared_ptr<ImageInstance> AssetLoader::get_textures(const fastgltf::Asset& gltf,
+                                                           const size_t& texture_index,
                                           const size_t& image_offset) const {
     const size_t image_index = gltf.textures[texture_index].imageIndex.value();
     const size_t sampler_index = gltf.textures[texture_index].samplerIndex.value();
@@ -328,7 +322,6 @@ namespace gestalt::application {
           gltf, mat.pbrData.metallicRoughnessTexture.value().textureIndex, image_offset);
 
       pbr_config.textures.metal_rough_image = image;
-      assert(image.image != repository_->default_material_.error_checkerboard_image.image);
     } else {
       pbr_config.constants.metal_rough_factor
           = glm::vec2(mat.pbrData.roughnessFactor,
@@ -391,16 +384,16 @@ namespace gestalt::application {
 
     auto& default_material = repository_->default_material_;
 
-    pbr_config.textures = {.albedo_image = default_material.color_image,
-                           .albedo_sampler = default_material.color_sampler,
-                           .metal_rough_image = default_material.metallic_roughness_image,
-                           .metal_rough_sampler = default_material.metallic_roughness_sampler,
-                           .normal_image = default_material.normal_image,
-                           .normal_sampler = default_material.normal_sampler,
-                           .emissive_image = default_material.emissive_image,
-                           .emissive_sampler = default_material.emissive_sampler,
-                           .occlusion_image = default_material.occlusion_image,
-                           .occlusion_sampler = default_material.occlusion_sampler};
+    pbr_config.textures = {.albedo_image = default_material.color_image_instance,
+                           .albedo_sampler = default_material.color_sampler->get_sampler_handle(),
+                           .metal_rough_image = default_material.metallic_roughness_image_instance,
+           .metal_rough_sampler = default_material.metallic_roughness_sampler->get_sampler_handle(),
+                           .normal_image = default_material.normal_image_instance,
+           .normal_sampler = default_material.normal_sampler->get_sampler_handle(),
+                           .emissive_image = default_material.emissive_image_instance,
+           .emissive_sampler = default_material.emissive_sampler->get_sampler_handle(),
+                           .occlusion_image = default_material.occlusion_image_instance,
+           .occlusion_sampler = default_material.occlusion_sampler->get_sampler_handle()};
 
     // grab textures from gltf file
     import_albedo(gltf, image_offset, mat, pbr_config);

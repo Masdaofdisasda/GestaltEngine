@@ -13,10 +13,10 @@
 
 
 namespace gestalt::foundation {
+  class IResourceAllocator;
   struct UserInput;
   class IDescriptorLayoutBuilder;
   class IGpu;
-  class IResourceManager;
 }
 
 namespace gestalt::application {
@@ -26,7 +26,7 @@ namespace gestalt::application {
      */
     class ECSManager : public NonCopyable<ECSManager> {
       IGpu* gpu_ = nullptr;
-      IResourceManager* resource_manager_ = nullptr;
+      IResourceAllocator* resource_allocator_ = nullptr;
       Repository* repository_ = nullptr;
 
       std::unique_ptr<AssetLoader> asset_loader_;
@@ -45,8 +45,7 @@ namespace gestalt::application {
 
     public:
       void init(IGpu* gpu,
-                IResourceManager* resource_manager,
-                IDescriptorLayoutBuilder* builder,
+                IResourceAllocator* resource_allocator,
                 Repository* repository, FrameProvider* frame);
       void cleanup() const;
 

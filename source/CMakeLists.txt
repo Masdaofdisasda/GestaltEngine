@@ -70,7 +70,7 @@ foreach(GLSL ${GLSL_COMPILE_FILES})
   set(SPIRV "${SHADER_BINARY_DIR}/${FILE_NAME}.spv")
   add_custom_command(
     OUTPUT ${SPIRV}
-    COMMAND ${GLSL_VALIDATOR} -V --target-env vulkan1.3 ${GLSL} -o ${SPIRV} -g
+    COMMAND ${GLSL_VALIDATOR} -V --target-env vulkan1.3 ${GLSL} -o ${SPIRV} -gVS
     DEPENDS ${GLSL}
   )
   list(APPEND SPIRV_BINARY_FILES ${SPIRV})

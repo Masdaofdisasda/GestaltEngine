@@ -4,6 +4,11 @@
 #include "common.hpp"
 #include "ECS/ComponentFactory.hpp"
 
+namespace gestalt::foundation {
+  class ImageInstance;
+  class IResourceAllocator;
+}
+
 namespace fastgltf {
   struct Material;
   struct Image;
@@ -13,22 +18,21 @@ namespace fastgltf {
 namespace gestalt::foundation {
   struct PbrMaterial;
   class Repository;
-  class IResourceManager;
 }
 
 namespace gestalt::application {
 
     class AssetLoader : public NonCopyable<AssetLoader> {
-      IResourceManager* resource_manager_ = nullptr;
+      IResourceAllocator* resource_allocator_ = nullptr;
       Repository* repository_ = nullptr;
       ComponentFactory* component_factory_ = nullptr;
 
       std::optional<fastgltf::Asset> parse_gltf(const std::filesystem::path& file_path);
-      std::optional<TextureHandle> load_image(fastgltf::Asset& asset,
+      std::shared_ptr<ImageInstance> load_image(fastgltf::Asset& asset,
                                               fastgltf::Image& image) const;
       void import_textures(fastgltf::Asset& gltf) const;
       size_t create_material(const PbrMaterial& config, const std::string& name) const;
-      TextureHandle get_textures(const fastgltf::Asset& gltf,
+      std::shared_ptr<ImageInstance> get_textures(const fastgltf::Asset& gltf,
                                                         const size_t& texture_index,
                                                         const size_t& image_offset) const;
       void import_albedo(const fastgltf::Asset& gltf,
@@ -53,7 +57,7 @@ namespace gestalt::application {
       void import_meshes(fastgltf::Asset& gltf, size_t material_offset) const;
 
     public:
-      void init(IResourceManager* resource_manager,
+      void init(IResourceAllocator* resource_allocator,
                 ComponentFactory* component_factory,
                 Repository* repository);
       void import_nodes(fastgltf::Asset& gltf) const;

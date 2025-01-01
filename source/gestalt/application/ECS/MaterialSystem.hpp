@@ -11,7 +11,6 @@ namespace gestalt::application {
       void create_buffers();
       void create_default_material();
       void fill_uniform_buffer();
-      void fill_images_buffer();
       void write_material(PbrMaterial& material, uint32 material_id);
 
     public:

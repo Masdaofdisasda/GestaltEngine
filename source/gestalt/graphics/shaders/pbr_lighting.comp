@@ -3,17 +3,19 @@
 #extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_GOOGLE_include_directive : require
 #extension GL_EXT_shader_16bit_storage : require
+
+layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
 // set 0
 #include "per_frame_structs.glsl"
 // set 1
-#include "input_structures.glsl"
+layout(set = 1, binding = 0) uniform samplerCube texEnvMap;
+layout(set = 1, binding = 1) uniform samplerCube texEnvMapIrradiance;
+layout(set = 1, binding = 2) uniform sampler2D texBdrfLut;
+
 #include "pbr.glsl"
 #include "shadow_mapping.glsl"
 #include "volumetric_light_util.glsl"
-
-layout(location = 0) in vec2 texCoord;
-
-layout (location = 0) out vec4 outFragColor;
 
 struct ViewProjData {
 	mat4 view;
@@ -56,6 +58,7 @@ layout(set = 3, binding = 3) uniform sampler2D depthBuffer;
 layout(set = 3, binding = 4) uniform sampler2D shadowMap;
 layout(set = 3, binding = 5) uniform sampler3D integrated_light_scattering_texture;
 layout(set = 3, binding = 6) uniform sampler2D texAo;
+layout(set = 3, binding = 7, rgba16f) writeonly uniform image2D outputImage;
 
 layout( push_constant ) uniform constants
 {	
@@ -102,16 +105,22 @@ const mat4 biasMat = mat4(
 
 void main() {
 
-    vec2 UV = texCoord;
 
-	vec4 albedoMetal = texture(gbuffer1, UV);
-	vec4 normalRough = texture(gbuffer2, UV);
-	vec4 emissiveOcclusion  = texture(gbuffer3, UV);
-	float ssao = texture(texAo, UV).r;
+	ivec2 texSize = imageSize(outputImage);
+	ivec2 pixel_coord = ivec2(gl_GlobalInvocationID.xy);
+	if (gl_GlobalInvocationID.x >= texSize.x || gl_GlobalInvocationID.y >= texSize.y) {
+		return;
+	}
+    vec2 uv = vec2(pixel_coord) / texSize;
+
+	vec4 albedoMetal = texture(gbuffer1, uv);
+	vec4 normalRough = texture(gbuffer2, uv);
+	vec4 emissiveOcclusion  = texture(gbuffer3, uv);
+	float ssao = texture(texAo, uv).r;
 
 	vec4 Kd = vec4(albedoMetal.rgb, 1.0);
 
-	vec3 n = SignedOctDecode(normalRough.rgb);
+	vec3 n = normalRough.rgb; //SignedOctDecode(normalRough.rgb);
 
 	vec4 Ke = vec4(emissiveOcclusion.rgb, 1.0);
 	
@@ -120,7 +129,6 @@ void main() {
 					albedoMetal.a,
 					1.0);
 
-	vec2 uv = UV;
     float depth = texture(depthBuffer, uv).r;
     vec3 worldPos = ReconstructWorldPos(depth, uv, params.invViewProj);
 	vec3 viewPos = -normalize(vec3(view[0][2], view[1][2], view[2][2]));
@@ -149,6 +157,7 @@ void main() {
 	} else if (params.ibl_mode == 2) {
 		materialInfo.f_specular_ibl += getIBLRadianceGGX(materialInfo, texBdrfLut, texEnvMap);
 	}
+
 
 	// directional light contribution
 	if (params.shading_mode == 0 || params.shading_mode == 1) {
@@ -220,43 +229,43 @@ void main() {
 
 	materialInfo.f_emissive = Ke.rgb;
 
-	float ao = MeR.r + ssao;
+	float ao = clamp(MeR.r * ssao, 0.0, 1.0);
 	vec3 diffuse = materialInfo.f_diffuse + materialInfo.f_diffuse_ibl * ao;
 	vec3 specular = materialInfo.f_specular + materialInfo.f_specular_ibl * ao * shadow;
 
 	vec3 color = materialInfo.f_emissive + diffuse + specular;
 
-	vec2 uv_inv = vec2(UV.x, 1.0 - UV.y); // TODO : fog volume is somehow flipped
+	vec2 uv_inv = vec2(uv.x, 1.0 - uv.y); // TODO : fog volume is somehow flipped
 	color = apply_volumetric_fog( uv_inv, depth, color, znear, zfar, integrated_light_scattering_texture );
 
+	vec4 outColor;
+
 	if (params.debugMode == 0) {
-		outFragColor = vec4(color, 1.0);
+		outColor = vec4(color, 1.0);
 	} else if (params.debugMode == 1) {
-		outFragColor = vec4(Kd.rgb, 1.0);
+		outColor = vec4(Kd.rgb, 1.0);
 	} else if (params.debugMode == 2) {
-		outFragColor = vec4(n * 0.5 + 0.5, 1.0);
+		outColor = vec4(n * 0.5 + 0.5, 1.0);
 	} else if (params.debugMode == 3) {
-		outFragColor = vec4(Ke.rgb, 1.0);
+		outColor = vec4(Ke.rgb, 1.0);
 	} else if (params.debugMode == 4) {
-		outFragColor = vec4(MeR.rgb, 1.0);
+		outColor = vec4(MeR.rgb, 1.0);
 	} else if (params.debugMode == 5) {
-		outFragColor = vec4(ao.rrr, 1.0);
+		outColor = vec4(ao.rrr, 1.0);
 	} else if (params.debugMode == 6) {
-		outFragColor = vec4(0.0, MeR.g, 0.0, 1.0);
+		outColor = vec4(0.0, MeR.g, 0.0, 1.0);
 	} else if (params.debugMode == 7) {
-		outFragColor = vec4(0.0, 0.0, MeR.b, 1.0);
+		outColor = vec4(0.0, 0.0, MeR.b, 1.0);
 	} else if (params.debugMode == 8) {
-		outFragColor = vec4(normalize(worldPos) * 0.5 + 0.5, 1.0);
+		outColor = vec4(normalize(worldPos) * 0.5 + 0.5, 1.0);
 	} else if (params.debugMode == 9) {
 		float normalizedDepth = depth * 2.0 - 1.0; // Assuming depth is in [0,1], map it to [-1,1]
-		outFragColor = vec4(vec3(normalizedDepth), 1.0); // Visualize depth as grayscale color
+		outColor = vec4(vec3(normalizedDepth), 1.0); // Visualize depth as grayscale color
 	} else if (params.debugMode == 10) {
 		vec3 normalizedLightSpacePos = lightSpacePos.xyz / lightSpacePos.w;
-		outFragColor = vec4(normalize(normalizedLightSpacePos) * 0.5 + 0.5, 1.0);
+		outColor = vec4(normalize(normalizedLightSpacePos) * 0.5 + 0.5, 1.0);
 	}
 
-
-
-
+	imageStore(outputImage, pixel_coord, outColor);
 
 }

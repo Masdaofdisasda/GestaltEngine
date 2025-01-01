@@ -16,7 +16,6 @@
 
 #include "vk_initializers.hpp"
 #include "ECS/ComponentFactory.hpp"
-#include "Interface/IDescriptorLayoutBuilder.hpp"
 #include "Interface/IGpu.hpp"
 #include "Mesh/MeshSurface.hpp"
 
@@ -35,9 +34,8 @@ namespace gestalt::application {
     }
 
     void Gui::init(IGpu* gpu, Window* window,
-                   VkFormat swapchainFormat,
+                   VkFormat swapchain_format,
                    Repository* repository,
-                   IDescriptorLayoutBuilder* builder,
                    const GuiCapabilities& actions) {
       gpu_ = gpu;
       window_ = window;
@@ -65,14 +63,8 @@ namespace gestalt::application {
       pool_info.pPoolSizes = pool_sizes;
 
       VK_CHECK(vkCreateDescriptorPool(gpu_->getDevice(), &pool_info, nullptr, &imguiPool_));
-
-
-      builder->clear();
-      descriptor_set_layout_ = builder
-                                   ->
-                                   add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                                VK_SHADER_STAGE_FRAGMENT_BIT)
-                                   .build(gpu_->getDevice());
+      gpu_->set_debug_name("ImGui Descriptor Pool", VK_OBJECT_TYPE_DESCRIPTOR_POOL,
+                           reinterpret_cast<uint64_t>(imguiPool_));
 
       // 2: initialize imgui library
 
@@ -91,7 +83,7 @@ namespace gestalt::application {
       VkPipelineRenderingCreateInfoKHR pipelineRenderingCreateInfo = {
           .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
           .colorAttachmentCount = 1,
-          .pColorAttachmentFormats = &swapchainFormat,
+          .pColorAttachmentFormats = &swapchain_format,
       };
 
       // this initializes imgui for Vulkan
@@ -122,11 +114,6 @@ namespace gestalt::application {
       ImGui_ImplSDL2_Shutdown();
       ImGui::DestroyContext();
 
-      if (descriptor_set_layout_ != VK_NULL_HANDLE) {
-        vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_set_layout_, nullptr);
-        descriptor_set_layout_ = VK_NULL_HANDLE;
-      }
-
       // Destroy ImGui descriptor pool
       if (imguiPool_ != VK_NULL_HANDLE) {
         vkDestroyDescriptorPool(gpu_->getDevice(), imguiPool_, nullptr);
@@ -134,11 +121,11 @@ namespace gestalt::application {
       }
     }
 
-    void Gui::draw(VkCommandBuffer cmd, const std::shared_ptr<TextureHandle>& swapchain) {
+    void Gui::draw(VkCommandBuffer cmd, const VkImageView swapchain_view, const VkExtent2D swapchain_extent) {
       VkRenderingAttachmentInfo colorAttachment = vkinit::attachment_info(
-          swapchain->imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+          swapchain_view, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
       VkRenderingInfo renderInfo
-          = vkinit::rendering_info(swapchain->getExtent2D(), &colorAttachment, nullptr);
+          = vkinit::rendering_info(swapchain_extent, &colorAttachment, nullptr);
 
       vkCmdBeginRendering(cmd, &renderInfo);
 
@@ -510,14 +497,6 @@ namespace gestalt::application {
 
       menu_bar();
 
-      const auto debugImg = actions_.get_debug_image();
-      if (debugImg != nullptr) {
-        const auto extend = actions_.get_debug_image()->getExtent2D();
-        ImGui::Begin("Texture Window");
-        ImGui::Image(descriptor_set_, ImVec2(extend.width, extend.height));
-        ImGui::End();
-      }
-
       if (show_scene_hierarchy_) {
         scene_graph();
       }
@@ -580,7 +559,7 @@ namespace gestalt::application {
 
     void Gui::sky_settings() {
       if (ImGui::Begin("Sky & Atmosphere")) {
-        auto& [rayleighScattering, unused1, ozoneAbsorption, unused2, mieScattering, unused3]
+        auto& [rayleighScattering, showSkybox, ozoneAbsorption, unused2, mieScattering, unused3]
             = actions_.get_render_config().skybox;
 
         // Rayleigh Scattering Coefficients
@@ -591,6 +570,14 @@ namespace gestalt::application {
                            ImGuiSliderFlags_Logarithmic);
         ImGui::SliderFloat("Rayleigh Blue", &rayleighScattering.z, 0.0f, 1e-5f, "%.8f",
                            ImGuiSliderFlags_Logarithmic);
+
+        const char* sky_box_options[] = {"Atmosphere", "Environment Map"};
+        int current_shadow_mode = showSkybox;
+        if (ImGui::Combo("Shadow Mode", &current_shadow_mode, sky_box_options,
+                         IM_ARRAYSIZE(sky_box_options))) {
+          showSkybox = current_shadow_mode;
+        }
+
 
         // Ozone Absorption Coefficients
         ImGui::Text("Ozone Absorption");
@@ -682,8 +669,9 @@ namespace gestalt::application {
           ImGui::SliderFloat("Jitter Scale", &params.temporal_reprojection_jitter_scale, 0.0f, 1.0f,
                              "%.2f");
 
-          // Density Modifier (controls overall fog density, typical range [0.1, 5.0])
-          ImGui::SliderFloat("Density Modifier", &params.density_modifier, 0.1f, 5.0f, "%.2f");
+          // Density Modifier (controls overall fog density, typical range [0.0001, 5.0])
+          ImGui::SliderFloat("Density Modifier", &params.density_modifier, 0.0001f, 5.0f, "%.4f",
+                             ImGuiSliderFlags_Logarithmic);
 
           // Noise Scale (scales noise for fog, typical range [0.1, 10.0])
           ImGui::SliderFloat("Noise Scale", &params.noise_scale, 0.1f, 10.0f, "%.2f");
@@ -701,19 +689,20 @@ namespace gestalt::application {
                              0.0f, 10.0f, "%.2f");
 
           // Height Fog Density (controls fog density along the Y-axis, range [0.0, 1.0])
-          ImGui::SliderFloat("Height Fog Density", &params.height_fog_density, 0.0f, 1.0f, "%.3f",
+          ImGui::SliderFloat("Height Fog Density", &params.height_fog_density, 0.0001f, 5.0f, "%.4f",
                              ImGuiSliderFlags_Logarithmic);
 
           // Height Fog Falloff (range [0.1, 10.0] for how quickly fog density falls off with
           // height)
-          ImGui::SliderFloat("Height Fog Falloff", &params.height_fog_falloff, 0.f, 2.0f, "%.2f",
+          ImGui::SliderFloat("Height Fog Falloff", &params.height_fog_falloff, 0.0001f, 2.0f, "%.2f",
                              ImGuiSliderFlags_Logarithmic);
 
           // Box Position (world-space position of the fog box, wide range)
           ImGui::SliderFloat3("Box Position", &params.box_position.x, -100.0f, 100.0f, "%.2f");
 
           // Box Fog Density (density of the fog within the box, range [0.0, 1.0])
-          ImGui::SliderFloat("Box Fog Density", &params.box_fog_density, 0.0f, 1.0f, "%.3f");
+          ImGui::SliderFloat("Box Fog Density", &params.box_fog_density, 0.0001f, 5.0f, "%.4f",
+                             ImGuiSliderFlags_Logarithmic);
 
           // Box Size (size of the fog box in world-space units, typical range [1.0, 100.0])
           ImGui::SliderFloat3("Box Size", &params.box_size.x, 1.0f, 100.0f, "%.2f");

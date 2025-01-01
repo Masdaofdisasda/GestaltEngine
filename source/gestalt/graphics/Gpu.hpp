@@ -3,7 +3,7 @@
 #include "VulkanTypes.hpp"
 #include "Window.hpp"
 
-#include <vma/vk_mem_alloc.h>
+#include <vk_mem_alloc.h>
 
 #include <functional>
 
@@ -52,6 +52,8 @@ namespace gestalt::graphics {
       [[nodiscard]] VkPhysicalDeviceProperties2 getPhysicalDeviceProperties2() const override;
       [[nodiscard]] VkPhysicalDeviceDescriptorBufferPropertiesEXT getDescriptorBufferProperties()
           const override;
+      void set_debug_name(std::string_view name, VkObjectType type,
+                                             uint64 handle) const override;
       void immediateSubmit(std::function<void(VkCommandBuffer cmd)> function) const override;
     };
 

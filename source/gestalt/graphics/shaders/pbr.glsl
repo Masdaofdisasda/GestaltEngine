@@ -68,12 +68,13 @@ const float M_PI = 3.141592653589793;
 
 vec3 getIBLRadianceGGX(MaterialInfo materialInfo, sampler2D texBdrfLut, samplerCube texEnvMap)
 {
-    float lod = 0; //roughness * float(u_MipCount - 1); Todo
-	float intensity = 0.007;
+    //float lod = 0; //roughness * float(u_MipCount - 1); Todo
+    float mipmapLevel = 9; //textureQueryLod(texEnvMap, materialInfo.reflection).x;
+    float lod = materialInfo.perceptualRoughness * mipmapLevel-1;
 
     vec2 brdfSamplePoint = clamp(vec2(materialInfo.NdotV, materialInfo.perceptualRoughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
     vec2 f_ab = texture(texBdrfLut, brdfSamplePoint).rg;
-    vec4 specularSample = textureLod(texEnvMap, materialInfo.reflection, lod) * intensity;
+    vec4 specularSample = textureLod(texEnvMap, materialInfo.reflection, lod);
 
     vec3 specularLight = specularSample.rgb;
 
@@ -89,11 +90,10 @@ vec3 getIBLRadianceGGX(MaterialInfo materialInfo, sampler2D texBdrfLut, samplerC
 // specularWeight is introduced with KHR_materials_specular
 vec3 getIBLRadianceLambertian(MaterialInfo materialInfo, sampler2D texBdrfLut, samplerCube texEnvMapIrradiance)
 {
+
+    vec3 diffuseIrradiance = texture(texEnvMapIrradiance, materialInfo.n).rgb;
     vec2 brdfSamplePoint = clamp(vec2(materialInfo.NdotV, materialInfo.perceptualRoughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
     vec2 f_ab = texture(texBdrfLut, brdfSamplePoint).rg;
-	float intensity = 0.007;
-
-    vec3 irradiance = texture(texEnvMapIrradiance, materialInfo.n).rgb * intensity;
 
     // see https://bruop.github.io/ibl/#single_scattering_results at Single Scattering Results
     // Roughness dependent fresnel, from Fdez-Aguera
@@ -107,8 +107,8 @@ vec3 getIBLRadianceLambertian(MaterialInfo materialInfo, sampler2D texBdrfLut, s
     vec3 F_avg = materialInfo.specularWeight * (materialInfo.f0 + (1.0 - materialInfo.f0) / 21.0);
     vec3 FmsEms = Ems * FssEss * F_avg / (1.0 - F_avg * Ems);
     vec3 k_D = materialInfo.c_diff * (1.0 - FssEss + FmsEms); // we use +FmsEms as indicated by the formula in the blog post (might be a typo in the implementation)
-
-    return (FmsEms + k_D) * irradiance;
+    
+    return diffuseIrradiance * k_D;
 }
 
 void calculatePBRInputsMetallicRoughness( vec4 albedo, vec3 normal, vec3 cameraPos, vec3 worldPos, vec4 mrSample, out MaterialInfo materialInfo)
@@ -252,80 +252,6 @@ float D_GGX(float NdotH, float alphaRoughness)
     float alphaRoughnessSq = alphaRoughness * alphaRoughness;
     float f = (NdotH * NdotH) * (alphaRoughnessSq - 1.0) + 1.0;
     return alphaRoughnessSq / (M_PI * f * f);
-}
-
-
-// Disney Implementation of diffuse from Physically-Based Shading at Disney by Brent Burley. See Section 5.3.
-// http://blog.selfshadow.com/publications/s2012-shading-course/burley/s2012_pbs_disney_brdf_notes_v3.pdf
-vec3 diffuseBurley(MaterialInfo materialInfo)
-{
-	float f90 = 2.0 * materialInfo.LdotH * materialInfo.LdotH * materialInfo.alphaRoughness - 0.5;
-
-	return (materialInfo.f_diffuse / M_PI) * (1.0 + f90 * pow((1.0 - materialInfo.NdotL), 5.0)) * (1.0 + f90 * pow((1.0 - materialInfo.NdotV), 5.0));
-}
-
-// The following equation models the Fresnel reflectance term of the spec equation (aka F())
-// Implementation of fresnel from [4], Equation 15
-vec3 specularReflection(MaterialInfo materialInfo)
-{
-	return materialInfo.reflectance0 + (materialInfo.reflectance90 - materialInfo.reflectance0) * pow(clamp(1.0 - materialInfo.VdotH, 0.0, 1.0), 5.0);
-}
-
-// This calculates the specular geometric attenuation (aka G()),
-// where rougher material will reflect less light back to the viewer.
-// This implementation is based on [1] Equation 4, and we adopt their modifications to
-// alphaRoughness as input as originally proposed in [2].
-float geometricOcclusion(MaterialInfo materialInfo)
-{
-	float NdotL = materialInfo.NdotL;
-	float NdotV = materialInfo.NdotV;
-	float rSqr = materialInfo.alphaRoughness * materialInfo.alphaRoughness;
-
-	float attenuationL = 2.0 * NdotL / (NdotL + sqrt(rSqr + (1.0 - rSqr) * (NdotL * NdotL)));
-	float attenuationV = 2.0 * NdotV / (NdotV + sqrt(rSqr + (1.0 - rSqr) * (NdotV * NdotV)));
-	return attenuationL * attenuationV;
-}
-
-// The following equation(s) model the distribution of microfacet normals across the area being drawn (aka D())
-// Implementation from "Average Irregularity Representation of a Roughened Surface for Ray Reflection" by T. S. Trowbridge, and K. P. Reitz
-// Follows the distribution function recommended in the SIGGRAPH 2013 course notes from EPIC Games [1], Equation 3.
-float microfacetDistribution(MaterialInfo materialInfo)
-{
-	float roughnessSq = materialInfo.alphaRoughness * materialInfo.alphaRoughness;
-	float f = (materialInfo.NdotH * roughnessSq - materialInfo.NdotH) * materialInfo.NdotH + 1.0;
-	return roughnessSq / (M_PI * f * f);
-}
-
-vec3 calculatePBRLightContributionDir( inout MaterialInfo materialInfo, vec3 lightColor, vec3 lightDir, float lightIntensity)
-{
-	vec3 n = materialInfo.n;
-	vec3 v = materialInfo.v;
-	vec3 l = normalize(lightDir);	// Vector from surface point to light
-	vec3 h = normalize(l+v);					// Half vector between both l and v
-
-	float NdotV = materialInfo.NdotV;
-	float NdotL = clamp(dot(n, l), 0.001, 1.0);
-	float NdotH = clamp(dot(n, h), 0.0, 1.0);
-	float LdotH = clamp(dot(l, h), 0.0, 1.0);
-	float VdotH = clamp(dot(v, h), 0.0, 1.0);
-
-	materialInfo.NdotL = NdotL;
-	materialInfo.NdotH = NdotH;
-	materialInfo.LdotH = LdotH;
-	materialInfo.VdotH = VdotH;
-
-	// Calculate the shading terms for the microfacet specular shading model
-	vec3 F = specularReflection(materialInfo);
-	float G = geometricOcclusion(materialInfo);
-	float D = microfacetDistribution(materialInfo);
-
-	// Calculation of analytical lighting contribution
-	vec3 diffuseContrib = (1.0 - F) * diffuseBurley(materialInfo);
-	vec3 specContrib = F * G * D / (4.0 * NdotL * NdotV);
-	// Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
-	vec3 color = NdotL * lightColor * lightIntensity * 3.0f * (diffuseContrib + specContrib);
-
-	return color;
 }
 
 //https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB

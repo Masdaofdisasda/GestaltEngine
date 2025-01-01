@@ -17,7 +17,6 @@
 #include "Components/TransformComponent.hpp"
 #include "Components/PhysicsComponent.hpp"
 #include "Material/Material.hpp"
-#include "Material/SamplerConfig.hpp"
 #include "Mesh/Mesh.hpp"
 #include "Mesh/MeshDraw.hpp"
 #include "Mesh/Meshlet.hpp"
@@ -26,7 +25,6 @@
 #include "Resources/GpuProjViewData.hpp"
 #include "Resources/GpuVertexData.hpp"
 #include "Resources/GpuVertexPosition.hpp"
-#include "Resources/TextureHandle.hpp"
 
 namespace gestalt::foundation {
 
@@ -48,6 +46,7 @@ namespace gestalt::foundation {
       if (it != components_.end()) {
         return it->second;
       }
+      throw std::runtime_error("Component not found");
     }
 
     // NOTE: this does not check if the entity exists
@@ -115,18 +114,23 @@ namespace gestalt::foundation {
   public:
 
     struct default_material {
-      TextureHandle color_image;
-      VkSampler color_sampler;
-      TextureHandle metallic_roughness_image;
-       VkSampler metallic_roughness_sampler;
-      TextureHandle normal_image;
-      VkSampler normal_sampler;
-      TextureHandle emissive_image;
-      VkSampler emissive_sampler;
-      TextureHandle occlusion_image;
-      VkSampler occlusion_sampler;
+      std::shared_ptr<ImageInstance> color_image_instance;
+      std::unique_ptr<SamplerInstance> color_sampler;
 
-      TextureHandle error_checkerboard_image;
+      std::shared_ptr<ImageInstance> metallic_roughness_image_instance;
+      std::unique_ptr<SamplerInstance> metallic_roughness_sampler;
+
+      std::shared_ptr<ImageInstance> normal_image_instance;
+      std::unique_ptr<SamplerInstance> normal_sampler;
+
+      std::shared_ptr<ImageInstance> emissive_image_instance;
+      std::unique_ptr<SamplerInstance> emissive_sampler;
+
+      std::shared_ptr<ImageInstance> occlusion_image_instance;
+      std::unique_ptr<SamplerInstance> occlusion_sampler;
+
+      std::shared_ptr<ImageInstance> error_checkerboard_image_instance;
+
     } default_material_ = {};
 
     std::unique_ptr<MaterialBuffers> material_buffers = std::make_unique<MaterialBuffers>();
@@ -143,18 +147,10 @@ namespace gestalt::foundation {
     GpuDataContainer<GpuProjViewData> light_view_projections;
     GpuDataContainer<GpuDirectionalLight> directional_lights;
     GpuDataContainer<GpuPointLight> point_lights;
-    GpuDataContainer<TextureHandle> textures;
+    GpuDataContainer<std::shared_ptr<ImageInstance>> textures;
     GpuDataContainer<Material> materials;
     GpuDataContainer<Mesh> meshes;
     GpuDataContainer<MeshDraw> mesh_draws;
-    std::unordered_map<SamplerConfig, VkSampler, SamplerConfigHash> sampler_cache;
-
-    VkSampler get_sampler(const SamplerConfig& config = {}) {
-      if (const auto it = sampler_cache.find(config); it != sampler_cache.end()) {
-        return it->second;
-      }
-      return nullptr;
-    }
 
     ComponentContainer<NodeComponent> scene_graph;
     ComponentContainer<MeshComponent> mesh_components;

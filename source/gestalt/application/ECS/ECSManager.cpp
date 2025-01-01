@@ -8,27 +8,27 @@
 #include "MeshSystem.hpp"
 #include "PhysicSystem.hpp"
 #include "TransformSystem.hpp"
-#include "Interface/IResourceManager.hpp"
+#include "Interface/IResourceAllocator.hpp"
 #include "Resource Loading/AssetLoader.hpp"
 
 namespace gestalt::application {
 
-    void ECSManager::init(IGpu* gpu, IResourceManager* resource_manager,
-                           IDescriptorLayoutBuilder* builder, Repository* repository,
+    void ECSManager::init(IGpu* gpu, IResourceAllocator* resource_allocator,  Repository* repository,
                            FrameProvider* frame) {
     gpu_ = gpu;
-    resource_manager_ = resource_manager;
+    resource_allocator_ = resource_allocator;
     repository_ = repository;
 
       asset_loader_ = std::make_unique<AssetLoader>();
     component_factory_ = std::make_unique<ComponentFactory>();
 
 
-    component_factory_->init(resource_manager_, repository_);
-    asset_loader_->init(resource_manager_, component_factory_.get(), repository_);
+    component_factory_->init(repository_);
+    asset_loader_->init(resource_allocator_, component_factory_.get(),
+                        repository_);
 
     component_factory_->create_directional_light(
-        glm::vec3(1.f, 0.957f, 0.917f), 5.f, glm::vec3(-0.216, 0.941, -0.257));
+        glm::vec3(1.f, 0.957f, 0.917f), 100000.f, glm::vec3(-0.216, 0.941, -0.257));
     component_factory_->create_point_light(glm::vec3(1.0f), 5.0f, glm ::vec3(0.0, 6.0, 0.0), 100.f);
 
     auto [main_cam, main_cam_node] = component_factory_->create_entity("Editor Camera");
@@ -49,22 +49,24 @@ namespace gestalt::application {
                                                    BoxCollider{glm::vec3(1000.f, 0.1f, 1000.f)});
 
     material_system_ = std::make_unique<MaterialSystem>();
-    material_system_->init(gpu_, resource_manager_, builder, repository_,frame);
-    light_system_ = std::make_unique<LightSystem>();
-    light_system_->init(gpu_, resource_manager_, builder, repository_,
-                        frame);
+    material_system_->init(gpu_, resource_allocator, repository_,frame);
     camera_system_ = std::make_unique<CameraSystem>();
-    camera_system_->init(gpu_, resource_manager_, builder, repository_,
+    camera_system_->init(gpu_, resource_allocator, repository_,
                          frame);
+    light_system_ = std::make_unique<LightSystem>();
+    light_system_->init(gpu_,  resource_allocator, repository_,
+                        frame);
     transform_system_ = std::make_unique<TransformSystem>();
-    transform_system_->init(gpu_, resource_manager_, builder, repository_,frame);
+    transform_system_->init(gpu_,  resource_allocator, repository_,
+                            frame);
     animation_system_ = std::make_unique<AnimationSystem>();
-    animation_system_->init(gpu_, resource_manager_, builder, repository_,frame);
+    animation_system_->init(gpu_, resource_allocator, repository_,
+                            frame);
     mesh_system_ = std::make_unique<MeshSystem>();
-    mesh_system_->init(gpu_, resource_manager_, builder, repository_,
+    mesh_system_->init(gpu_,  resource_allocator, repository_,
                        frame);
     physics_system_ = std::make_unique<PhysicSystem>();
-    physics_system_->init(gpu_, resource_manager_, builder, repository_, frame);
+    physics_system_->init(gpu_, resource_allocator, repository_, frame);
   }
 
   void ECSManager::set_active_camera(const Entity camera) const {
@@ -104,12 +106,11 @@ namespace gestalt::application {
         asset_loader_->load_scene_from_gltf(scene_path_);
         scene_path_.clear();
       }
-      resource_manager_->flush_loader();
 
       physics_system_->update(delta_time, movement, aspect);
       material_system_->update(delta_time, movement, aspect);
-      light_system_->update(delta_time, movement, aspect);
       camera_system_->update(delta_time, movement, aspect);
+      light_system_->update(delta_time, movement, aspect);
       transform_system_->update(delta_time, movement, aspect);
       mesh_system_->update(delta_time, movement, aspect);
       animation_system_->update(delta_time, movement, aspect);

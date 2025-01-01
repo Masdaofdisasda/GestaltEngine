@@ -15,12 +15,20 @@ layout(set = 0, binding = 5) buffer TaskCommands
 	MeshTaskCommand taskCommands[];
 };
 
-layout(set = 0, binding = 7) buffer CommandCount
+layout(set = 0, binding = 7) readonly buffer CommandCount
 {
 	uint commandCount;
+	uint pad1;
+	uint pad2;
+	uint pad3;
+};
+
+layout(set = 0, binding = 8) writeonly buffer GroupCount
+{
 	uint groupCountX;
 	uint groupCountY;
 	uint groupCountZ;
+	uint pad4;
 };
 
 void main()

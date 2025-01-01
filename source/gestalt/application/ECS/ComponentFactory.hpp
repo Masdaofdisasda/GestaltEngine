@@ -15,7 +15,6 @@ namespace gestalt::foundation {
   struct MeshSurface;
   struct NodeComponent;
   class Repository;
-  class IResourceManager;
 }
 
 namespace gestalt::application {
@@ -23,7 +22,6 @@ namespace gestalt::application {
     constexpr float32 kDefaultFov = 1.22173f;  // 70 degrees
 
     class ComponentFactory : public NonCopyable<ComponentFactory> {
-      IResourceManager* resource_manager_ = nullptr;
       Repository* repository_ = nullptr;
 
       Entity next_entity_id_{0};
@@ -34,7 +32,7 @@ namespace gestalt::application {
                                       const float& scale = 1.f) const;
 
     public:
-      void init(IResourceManager* resource_manager, Repository* repository);
+      void init(Repository* repository);
 
       std::pair<Entity, std::reference_wrapper<NodeComponent>> create_entity(
           std::string node_name = "", const glm::vec3& position = glm::vec3(0.f),

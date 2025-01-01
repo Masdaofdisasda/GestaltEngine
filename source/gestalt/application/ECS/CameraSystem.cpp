@@ -1,7 +1,5 @@
 ﻿#include "CameraSystem.hpp"
 
-#include <EngineConfiguration.hpp>
-
 #include "RenderConfig.hpp"
 #include "VulkanCheck.hpp"
 
@@ -11,9 +9,8 @@
 #include "Cameras/FirstPersonCamera.hpp"
 #include "Cameras/FreeFlyCamera.hpp"
 #include "Cameras/OrbitCamera.hpp"
-#include "Interface/IDescriptorLayoutBuilder.hpp"
 #include "Interface/IGpu.hpp"
-#include "Interface/IResourceManager.hpp"
+#include "Interface/IResourceAllocator.hpp"
 
 namespace gestalt::application {
 
@@ -21,36 +18,14 @@ namespace gestalt::application {
 
     const auto& per_frame_data_buffers = repository_->per_frame_data_buffers;
 
-    descriptor_layout_builder_->clear();
-    const auto descriptor_layout
-        = descriptor_layout_builder_
-              ->add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT
-                                | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT
-                                | VK_SHADER_STAGE_FRAGMENT_BIT)
-              .build(gpu_->getDevice(), VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
-
-    for (int i = 0; i < getFramesInFlight(); ++i) {
-      per_frame_data_buffers->uniform_buffers[i] = resource_manager_->create_buffer(
-          sizeof(PerFrameData),
-          VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-          VMA_MEMORY_USAGE_CPU_TO_GPU, "perFrameBuffer");
-      per_frame_data_buffers->descriptor_buffers[i]
-          = resource_manager_->create_descriptor_buffer(descriptor_layout, 1, 0);
-
-      VkBufferDeviceAddressInfo deviceAdressInfo{
-          .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-          .buffer = per_frame_data_buffers->uniform_buffers[i]->buffer};
-      const VkDeviceAddress per_frame_data_buffer_address
-          = vkGetBufferDeviceAddress(gpu_->getDevice(), &deviceAdressInfo);
-
-      per_frame_data_buffers->descriptor_buffers[i]
-          ->write_buffer(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, per_frame_data_buffer_address,
-                         sizeof(PerFrameData))
-          .update();
-    }
-
-    vkDestroyDescriptorSetLayout(gpu_->getDevice(), descriptor_layout, nullptr);
+    per_frame_data_buffers->camera_buffer
+        = resource_allocator_->create_buffer(BufferTemplate(
+        "Camera Uniform Buffer", sizeof(PerFrameData),
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
+            VMA_MEMORY_USAGE_AUTO,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+            ));
   }
 
     inline glm::vec4 NormalizePlane(glm::vec4 p) { return p / length(glm::vec3(p)); }
@@ -119,14 +94,14 @@ namespace gestalt::application {
             if constexpr (std::is_same_v<T, PerspectiveProjectionData>) {
               near = projection_data.near;
               far = projection_data.far;
-              return glm::perspective(projection_data.fov, aspect_ratio_,
-                                           projection_data.near, projection_data.far);
+              return glm::perspective(projection_data.fov, aspect_ratio_, projection_data.near,
+                                      projection_data.far);
             } else if constexpr (std::is_same_v<T, OrthographicProjectionData>) {
               near = projection_data.near;
               far = projection_data.far;
               return glm::orthoRH_ZO(projection_data.left, projection_data.right,
-                                     projection_data.bottom,
-                                projection_data.top, projection_data.near, projection_data.far);
+                                     projection_data.bottom, projection_data.top,
+                                     projection_data.near, projection_data.far);
             } else {
               return glm::mat4(1.0f);
             }
@@ -159,7 +134,7 @@ namespace gestalt::application {
         buffers->data[frame].frustum[5] = NormalizePlane(projection_t[3] - projection_t[2]);
       }
 
-      if (false) {
+      if constexpr (false) {
         const glm::mat4 view_matrix = repository_->light_view_projections.get(0).view;
         glm::mat4 projection = repository_->light_view_projections.get(0).proj;
 
@@ -186,13 +161,27 @@ namespace gestalt::application {
         buffers->data[frame].frustum[4] = NormalizePlane(projection_t[3] + projection_t[2]);
         buffers->data[frame].frustum[5] = NormalizePlane(projection_t[3] - projection_t[2]);
       }
+      
+    const auto staging = resource_allocator_->create_buffer(std::move(BufferTemplate(
+          "Camera Staging",
+          sizeof(PerFrameData),
+          VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
+          VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)));
 
       void* mapped_data;
-      const VmaAllocation allocation = buffers->uniform_buffers[frame]->allocation;
-      VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation, &mapped_data));
-      const auto scene_uniform_data = static_cast<PerFrameData*>(mapped_data);
-      *scene_uniform_data = buffers->data[frame];
-      vmaUnmapMemory(gpu_->getAllocator(), buffers->uniform_buffers[frame]->allocation);
+      VK_CHECK(vmaMapMemory(gpu_->getAllocator(), staging->get_allocation(), &mapped_data));
+      memcpy(mapped_data, &buffers->data[frame], sizeof(PerFrameData));
+      vmaUnmapMemory(gpu_->getAllocator(), staging->get_allocation());
+
+    gpu_->immediateSubmit([&](VkCommandBuffer cmd) {
+        VkBufferCopy copy_region;
+        copy_region.size = sizeof(PerFrameData);
+        copy_region.srcOffset = 0;
+        copy_region.dstOffset = 0;
+        vkCmdCopyBuffer(cmd, staging->get_buffer_handle(),
+                        buffers->camera_buffer->get_buffer_handle(), 1, &copy_region);
+      });
+      resource_allocator_->destroy_buffer(staging);
 
       // TODO
       meshlet_push_constants.pyramidWidth = 0;
@@ -204,11 +193,7 @@ namespace gestalt::application {
       repository_->camera_components.clear();
 
       const auto& buffers = repository_->per_frame_data_buffers;
-
-      for (int i = 0; i < 2; ++i) {
-        resource_manager_->destroy_descriptor_buffer(buffers->descriptor_buffers[i]);
-        resource_manager_->destroy_buffer(buffers->uniform_buffers[i]);
-      }
+      resource_allocator_->destroy_buffer(buffers->camera_buffer);
 
     }
 
