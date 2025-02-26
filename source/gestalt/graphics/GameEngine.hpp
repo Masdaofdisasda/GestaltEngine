@@ -36,11 +36,10 @@ namespace gestalt {
     foundation::FrameProvider frame_provider_;
     graphics::ResourceAllocator resource_allocator_;
     application::ECSManager ecs_;
-
-    std::unique_ptr<graphics::RenderEngine> render_pipeline_;
+    std::unique_ptr<application::Gui> imgui_;
+    graphics::RenderEngine render_engine_;
 
     application::GuiCapabilities gui_actions_;
-    std::unique_ptr<application::Gui> imgui_ = std::make_unique<application::Gui>();
     void register_gui_actions();
 
     // utility services

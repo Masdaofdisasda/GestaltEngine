@@ -20,7 +20,7 @@ namespace gestalt::graphics {
              const std::shared_ptr<ImageInstance>& g_buffer_2,
              const std::shared_ptr<ImageInstance>& rotation_texture,
              const std::shared_ptr<ImageInstance>& ambient_occlusion,
-             const VkSampler post_process_sampler, IGpu* gpu,
+             const VkSampler post_process_sampler, IGpu& gpu,
              const std::function<RenderConfig::SsaoParams()>& push_constant_provider)
         : RenderPass("Ssao Pass"),
           resources_(std::move(
@@ -40,7 +40,7 @@ namespace gestalt::graphics {
                                VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT)
                   .add_push_constant(sizeof(RenderConfig::SsaoParams),
                                      VK_SHADER_STAGE_COMPUTE_BIT))),
-          compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
+          compute_pipeline_(&gpu, get_name(), resources_.get_image_bindings(),
                             resources_.get_buffer_bindings(), resources_.get_image_array_bindings(),
                             resources_.get_push_constant_range(),
                             "ssao_filter.comp.spv"),

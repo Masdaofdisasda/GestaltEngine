@@ -12,17 +12,13 @@ namespace gestalt {
       : gpu_(window_),
         frame_provider_(&frame_number_),
         resource_allocator_(gpu_),
-        ecs_(gpu_, resource_allocator_, repository_, frame_provider_) {
-    ecs_.update_scene(
-        time_tracking_service_.get_delta_time(), input_system_.get_movement(),
-        static_cast<float>(window_.get_width()) / static_cast<float>(window_.get_height()));
-    render_pipeline_ = std::make_unique<graphics::RenderEngine>();
-    render_pipeline_->init(&gpu_, &window_, &resource_allocator_, &repository_, imgui_.get(),
-                           &frame_provider_);
+        ecs_(gpu_, resource_allocator_, repository_, frame_provider_),
+        render_engine_(gpu_, window_, resource_allocator_, repository_, imgui_.get(), frame_provider_)
+  {
 
     register_gui_actions();
-    imgui_->init(&gpu_, &window_, render_pipeline_->get_swapchain_format(), &repository_,
-                 gui_actions_);
+    imgui_ = std::make_unique<application::Gui>(
+        gpu_, window_, render_engine_.get_swapchain_format(), repository_, gui_actions_);
 
     is_initialized_ = true;
     fmt::print("Engine initialized\n");
@@ -35,7 +31,7 @@ namespace gestalt {
     gui_actions_.get_component_factory
         = [this]() -> application::ComponentFactory& { return ecs_.get_component_factory(); };
     gui_actions_.get_render_config
-        = [this]() -> graphics::RenderConfig& { return render_pipeline_->get_config(); };
+        = [this]() -> graphics::RenderConfig& { return render_engine_.get_config(); };
     gui_actions_.set_active_camera
         = [this](const foundation::Entity camera) { ecs_.set_active_camera(camera); };
     gui_actions_.get_active_camera
@@ -81,14 +77,14 @@ namespace gestalt {
       imgui_->new_frame();
 
       time_tracking_service_.update_timer();
-      render_pipeline_->get_config().luminance_params.time_coeff
+      render_engine_.get_config().luminance_params.time_coeff
           = time_tracking_service_.get_delta_time();
 
       ecs_.update_scene(
           time_tracking_service_.get_delta_time(), input_system_.get_movement(),
           static_cast<float>(window_.get_width()) / static_cast<float>(window_.get_height()));
 
-      render_pipeline_->execute_passes();
+      render_engine_.execute_passes();
 
       frame_number_++;
       FrameMark;
@@ -99,9 +95,6 @@ namespace gestalt {
     fmt::print("Engine shutting down\n");
     if (is_initialized_) {
       vkDeviceWaitIdle(gpu_.getDevice());
-
-      imgui_->cleanup();
-      render_pipeline_->cleanup();
     }
   }
 }  // namespace gestalt

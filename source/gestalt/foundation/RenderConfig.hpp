@@ -45,15 +45,16 @@ namespace gestalt::foundation {
 
       bool enable_hdr{true};
       int bloom_quality{3};
-      struct HdrParams {
+      struct alignas(32) HdrParams {
         float exposure{1.f};
         float maxWhite{1.35f};
         float bloomStrength{0.01f};
         float padding{1.f};
+
         glm::vec4 lift{0.f, 0.f, 0.f, 0.f};
         glm::vec4 gamma{1.0f, 1.f, 1.f, 1.f};
         glm::vec4 gain{1.f, 1.f, 1.f, 1.f};
-        bool show_bright_pass = false;
+        int show_bright_pass{0};
         int toneMappingOption{4};
         float vignette_radius{2.f};
         float vignette_softness{0.f};
@@ -64,7 +65,7 @@ namespace gestalt::foundation {
         float exposureCompensation = 0.0f;  // EV comp
 
         float saturation{1.0f};
-        float contrast{1.1f};
+        float contrast{1.0f};
       } hdr{};
 
       struct LuminanceParams {

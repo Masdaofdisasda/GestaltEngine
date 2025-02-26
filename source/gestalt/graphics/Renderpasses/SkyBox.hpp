@@ -23,7 +23,7 @@ namespace gestalt::graphics {
                 const std::shared_ptr<ImageInstance>& g_buffer_depth, 
         const VkSampler post_process_sampler,
         const VkSampler cube_map_sampler,
-        IGpu* gpu, const std::function<RenderConfig::SkyboxParams()>& push_constant_provider
+        IGpu& gpu, const std::function<RenderConfig::SkyboxParams()>& push_constant_provider
     )
         : RenderPass("Skybox Pass"),
           resources_(std::move(
@@ -43,7 +43,7 @@ namespace gestalt::graphics {
                   .add_attachment(scene_skybox)
                   .add_attachment(g_buffer_depth))),
           graphics_pipeline_(
-              gpu, get_name(), resources_.get_image_bindings(), resources_.get_buffer_bindings(),
+              &gpu, get_name(), resources_.get_image_bindings(), resources_.get_buffer_bindings(),
               resources_.get_image_array_bindings(), resources_.get_push_constant_range(),
               "skybox.vert.spv", "skybox.frag.spv",
               GraphicsPipelineBuilder()
@@ -93,7 +93,7 @@ namespace gestalt::graphics {
         const std::shared_ptr<ImageInstance>& scene_skybox,
                      const std::shared_ptr<ImageInstance>& scene_composed,
                      const VkSampler post_process_sampler,
-        IGpu* gpu)
+        IGpu& gpu)
         : RenderPass("Compose Scene Pass"),
           resources_(std::move(ResourceComponentBindings()
                             .add_binding(0, 0, scene_lit, nullptr, ResourceUsage::READ,
@@ -105,7 +105,7 @@ namespace gestalt::graphics {
                             .add_binding(0, 2, scene_composed, nullptr, ResourceUsage::WRITE,
                                                 VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
                                                 VK_SHADER_STAGE_COMPUTE_BIT))),
-          compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
+          compute_pipeline_(&gpu, get_name(), resources_.get_image_bindings(),
                             resources_.get_buffer_bindings(), resources_.get_image_array_bindings(),
                             resources_.get_push_constant_range(), "compose_image.comp.spv") {}
 

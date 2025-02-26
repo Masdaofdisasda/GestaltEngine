@@ -14,9 +14,6 @@
 namespace gestalt::application {
 
   void RayTracingSystem::prepare() {
-    if (!isVulkanRayTracingEnabled()) {
-      return;
-    }
   }
 
   void RayTracingSystem::build_tlas() {
@@ -34,7 +31,6 @@ namespace gestalt::application {
     std::vector<VkAccelerationStructureInstanceKHR> tlasInstances;
     collect_tlas_instance_data(root_entity, root_transform, tlasInstances);
 
-#pragma region "TLAS Build"
     if (repository_->tlas != nullptr) {
       vkDestroyAccelerationStructureKHR(gpu_->getDevice(),
                                         repository_->tlas->acceleration_structure, nullptr);
@@ -151,7 +147,6 @@ namespace gestalt::application {
   };
     auto tlasAddress = vkGetAccelerationStructureDeviceAddressKHR(gpu_->getDevice(), &tlasAddressInfo);
     repository_->tlas->address = tlasAddress;
-#pragma endregion
   }
 
   void RayTracingSystem::build_blas() {

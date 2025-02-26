@@ -17,9 +17,6 @@
 
 namespace gestalt::graphics {
   class ResourceAllocator;
-}
-
-namespace gestalt::graphics {
   struct FrameGraphNode;
 
   // defines if the resource is used internal or external

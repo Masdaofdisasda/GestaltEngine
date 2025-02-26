@@ -49,7 +49,7 @@
         const std::shared_ptr<ImageInstance>& froxel_data, const VkSampler post_process_sampler,
         const std::function<RenderConfig::VolumetricLightingParams()>& push_constant_provider,
         const std::function<uint32()>& frame_provider,
-        const std::function<PerFrameData()>& camera_provider, IGpu* gpu)
+        const std::function<PerFrameData()>& camera_provider, IGpu& gpu)
         : RenderPass("Volumetric Lighting Injection Pass"),
           resources_(std::move(
               ResourceComponentBindings()
@@ -63,7 +63,7 @@
                                VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT)
                   .add_push_constant(sizeof(VolumetricLightingInjectionPassConstants),
                                      VK_SHADER_STAGE_COMPUTE_BIT))),
-          compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
+          compute_pipeline_(&gpu, get_name(), resources_.get_image_bindings(),
                             resources_.get_buffer_bindings(), resources_.get_image_array_bindings(),
                             resources_.get_push_constant_range(),
                             "volumetric_light_injection.comp.spv"),
@@ -158,7 +158,7 @@
         const std::function<uint32()>& frame_provider,
         const std::function<PerFrameData()>& camera_provider,
         const std::function<uint32()>& point_light_count_provider,
-        const std::function<uint32()>& spot_light_count_provider, IGpu* gpu)
+        const std::function<uint32()>& spot_light_count_provider, IGpu& gpu)
         : RenderPass("Volumetric Lighting Scattering Pass"),
           resources_(std::move(
               ResourceComponentBindings()
@@ -187,7 +187,7 @@
                                VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
                   .add_push_constant(sizeof(VolumetricLightingScatteringPassConstants),
                                      VK_SHADER_STAGE_COMPUTE_BIT))),
-          compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
+          compute_pipeline_(&gpu, get_name(), resources_.get_image_bindings(),
                             resources_.get_buffer_bindings(), resources_.get_image_array_bindings(),
                             resources_.get_push_constant_range(),
                             "volumetric_light_scattering.comp.spv"),
@@ -247,7 +247,7 @@
         const std::shared_ptr<ImageInstance>& light_scattering_filtered,
         const VkSampler post_process_sampler,
         const std::function<RenderConfig::VolumetricLightingParams()>& push_constant_provider,
-        IGpu* gpu)
+        IGpu& gpu)
         : RenderPass("Volumetric Lighting Spatial Filter Pass"),
           resources_(std::move(
               ResourceComponentBindings()
@@ -258,7 +258,7 @@
                                VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT)
                   .add_push_constant(sizeof(VolumetricLightingSpatialFilterPassConstants),
                                      VK_SHADER_STAGE_COMPUTE_BIT))),
-          compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
+          compute_pipeline_(&gpu, get_name(), resources_.get_image_bindings(),
                             resources_.get_buffer_bindings(), resources_.get_image_array_bindings(),
                             resources_.get_push_constant_range(),
                             "volumetric_light_spatial_filter.comp.spv"),
@@ -311,7 +311,7 @@
         const VkSampler post_process_sampler,
         const std::function<RenderConfig::VolumetricLightingParams()>& push_constant_provider,
         const std::function<uint32()>& frame_provider,
-        const std::function<PerFrameData()>& camera_provider, IGpu* gpu)
+        const std::function<PerFrameData()>& camera_provider, IGpu& gpu)
         : RenderPass("Volumetric Lighting Integration Pass"),
           resources_(std::move(
               ResourceComponentBindings()
@@ -322,7 +322,7 @@
                                VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT)
                   .add_push_constant(sizeof(VolumetricLightingIntegrationPassConstants),
                                      VK_SHADER_STAGE_COMPUTE_BIT))),
-          compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
+          compute_pipeline_(&gpu, get_name(), resources_.get_image_bindings(),
                             resources_.get_buffer_bindings(), resources_.get_image_array_bindings(),
                             resources_.get_push_constant_range(),
                             "volumetric_light_integration.comp.spv"),
@@ -368,12 +368,12 @@
 
   public:
     VolumetricLightingNoisePass(const std::shared_ptr<ImageInstance>& volumetric_noise_texture,
-                                IGpu* gpu)
+                                IGpu& gpu)
         : RenderPass("Volumetric Lighting Noise Pass"),
           resources_(std::move(ResourceComponentBindings().add_binding(
               0, 0, volumetric_noise_texture, nullptr, ResourceUsage::WRITE,
               VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT))),
-          compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
+          compute_pipeline_(&gpu, get_name(), resources_.get_image_bindings(),
                             resources_.get_buffer_bindings(), resources_.get_image_array_bindings(),
                             resources_.get_push_constant_range(),
                             "volumetric_light_noise.comp.spv") {}

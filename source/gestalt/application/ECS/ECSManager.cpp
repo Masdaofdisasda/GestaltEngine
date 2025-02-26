@@ -10,6 +10,7 @@
 #include "PhysicSystem.hpp"
 #include "RayTracingSystem.hpp"
 #include "TransformSystem.hpp"
+#include "UserInput.hpp"
 #include "Interface/IResourceAllocator.hpp"
 #include "Resource Loading/AssetLoader.hpp"
 
@@ -56,6 +57,11 @@ namespace gestalt::application {
     physics_system_->init(&gpu_, &resource_allocator, &repository_, &frame);
     raytracing_system_ = std::make_unique<RayTracingSystem>();
     raytracing_system_->init(&gpu_, &resource_allocator, &repository_, &frame);
+
+    // TODO: find out how to create initial TLAS and update it instead of this hack
+    UserInput movement;
+    update_scene(0.f, movement, 0.f);
+
   }
 
   ECSManager::~ECSManager() {

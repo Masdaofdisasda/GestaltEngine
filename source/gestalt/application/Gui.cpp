@@ -24,24 +24,10 @@ namespace gestalt::application {
 
   constexpr int kMaxPoolElements = 128;
 
-    void Gui::set_debug_texture(VkImageView image_view, VkSampler sampler) {
-
-      if (descriptor_set_ != nullptr) {
-        ImGui_ImplVulkan_RemoveTexture(descriptor_set_);
-      }
-
-      descriptor_set_ = ImGui_ImplVulkan_AddTexture(sampler, image_view,
-                                                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    }
-
-    void Gui::init(IGpu* gpu, Window* window,
-                   VkFormat swapchain_format,
-                   Repository* repository,
-                   const GuiCapabilities& actions) {
-      gpu_ = gpu;
-      window_ = window;
-      repository_ = repository;
-      actions_ = actions;
+    Gui::Gui(IGpu& gpu, Window& window, VkFormat swapchain_format, Repository& repository,
+             GuiCapabilities actions)
+        : gpu_(gpu), window_(window), repository_(repository), actions_(actions)
+      {
 
       // 1: create descriptor pool for IMGUI
       VkDescriptorPoolSize pool_sizes[] = {{VK_DESCRIPTOR_TYPE_SAMPLER, kMaxPoolElements},
@@ -63,8 +49,8 @@ namespace gestalt::application {
       pool_info.poolSizeCount = static_cast<uint32>(std::size(pool_sizes));
       pool_info.pPoolSizes = pool_sizes;
 
-      VK_CHECK(vkCreateDescriptorPool(gpu_->getDevice(), &pool_info, nullptr, &imguiPool_));
-      gpu_->set_debug_name("ImGui Descriptor Pool", VK_OBJECT_TYPE_DESCRIPTOR_POOL,
+      VK_CHECK(vkCreateDescriptorPool(gpu_.getDevice(), &pool_info, nullptr, &imguiPool_));
+      gpu_.set_debug_name("ImGui Descriptor Pool", VK_OBJECT_TYPE_DESCRIPTOR_POOL,
                            reinterpret_cast<uint64_t>(imguiPool_));
 
       // 2: initialize imgui library
@@ -73,13 +59,13 @@ namespace gestalt::application {
       ImGui::CreateContext();
 
       // this initializes imgui for SDL
-      ImGui_ImplSDL2_InitForVulkan(window_->get_handle());
+      ImGui_ImplSDL2_InitForVulkan(window_.get_handle());
 
       ImGui_ImplVulkan_LoadFunctions(
           [](const char* function_name, void* user_data) -> PFN_vkVoidFunction {
             return vkGetInstanceProcAddr((VkInstance)user_data, function_name);
           },
-          gpu_->getInstance());
+          gpu_.getInstance());
 
       VkPipelineRenderingCreateInfoKHR pipelineRenderingCreateInfo = {
           .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
@@ -89,10 +75,10 @@ namespace gestalt::application {
 
       // this initializes imgui for Vulkan
       ImGui_ImplVulkan_InitInfo init_info = {};
-      init_info.Instance = gpu_->getInstance();
-      init_info.PhysicalDevice = gpu_->getPhysicalDevice();
-      init_info.Device = gpu_->getDevice();
-      init_info.Queue = gpu_->getGraphicsQueue();
+      init_info.Instance = gpu_.getInstance();
+      init_info.PhysicalDevice = gpu_.getPhysicalDevice();
+      init_info.Device = gpu_.getDevice();
+      init_info.Queue = gpu_.getGraphicsQueue();
       init_info.DescriptorPool = imguiPool_;
       init_info.MinImageCount = 3;
       init_info.ImageCount = 3;
@@ -103,13 +89,13 @@ namespace gestalt::application {
 
       ImGui_ImplVulkan_Init(&init_info);
 
-      gpu_->immediateSubmit( // wait until the font texture is uploaded
+      gpu_.immediateSubmit( // wait until the font texture is uploaded
           [&](VkCommandBuffer cmd) {
             ImGui_ImplVulkan_CreateFontsTexture();
           });
     }
 
-    void Gui::cleanup() {
+    Gui::~Gui() {
       // Destroy ImGui context
       ImGui_ImplVulkan_Shutdown();
       ImGui_ImplSDL2_Shutdown();
@@ -117,7 +103,7 @@ namespace gestalt::application {
 
       // Destroy ImGui descriptor pool
       if (imguiPool_ != VK_NULL_HANDLE) {
-        vkDestroyDescriptorPool(gpu_->getDevice(), imguiPool_, nullptr);
+        vkDestroyDescriptorPool(gpu_.getDevice(), imguiPool_, nullptr);
         imguiPool_ = VK_NULL_HANDLE;
       }
     }
@@ -141,7 +127,7 @@ namespace gestalt::application {
       ImGuizmo::BeginFrame();
 
       const Entity camera_entity = actions_.get_active_camera();
-      const auto& cam = repository_->camera_components[camera_entity];
+      const auto& cam = repository_.camera_components[camera_entity];
       auto viewCam = cam.view_matrix;
       auto proj = cam.projection_matrix;
       proj[1][1] *= -1;  // Flip the Y-axis for opengl like system
@@ -165,7 +151,7 @@ namespace gestalt::application {
       ImGuizmo::ViewManipulate(view, camDistance, viewManipulatorPosition, ImVec2(128, 128),
                                0xB4101010);
 
-      const auto transform_component = repository_->transform_components.get(selected_entity_);
+      const auto transform_component = repository_.transform_components.get(selected_entity_);
       if (transform_component.has_value()) {
         auto& transform = transform_component.value().get();
 
@@ -374,7 +360,7 @@ namespace gestalt::application {
 
           ImGui::Separator();
 
-          const auto& root = repository_->scene_graph.get(root_entity).value().get();
+          const auto& root = repository_.scene_graph.get(root_entity).value().get();
 
           static glm::vec3 min_bounds = root.bounds.min;
           static glm::vec3 max_bounds = root.bounds.max;
@@ -456,7 +442,7 @@ namespace gestalt::application {
 
         std::vector<std::pair<Entity, std::reference_wrapper<LightComponent>>> lights;
         std::vector<std::pair<Entity, std::reference_wrapper<LightComponent>>> temp
-            = repository_->light_components.asVector();
+            = repository_.light_components.asVector();
         for (auto& [ent, comp] : temp) {
           if (comp.get().type == LightType::kDirectional && currentOption == 0) {
             lights.push_back({ent, comp});
@@ -472,7 +458,7 @@ namespace gestalt::application {
           ImGui::SliderInt("Select Light", &selectedLightIndex, 0, lights.size() - 1);
 
           auto& [entity, light_component] = lights[selectedLightIndex];
-          const auto transform_component = repository_->transform_components.get(entity).value();
+          const auto transform_component = repository_.transform_components.get(entity).value();
 
           show_light_component(light_component, transform_component.get());
         }
@@ -483,7 +469,7 @@ namespace gestalt::application {
     void Gui::cameras() {
       if (ImGui::Begin("Cameras")) {
         std::vector<std::pair<Entity, std::reference_wrapper<CameraComponent>>> cameras
-            = repository_->camera_components.asVector();
+            = repository_.camera_components.asVector();
 
         static int selectedCameraIndex = 0;
         if (!cameras.empty()) {
@@ -503,9 +489,9 @@ namespace gestalt::application {
       float windowWidth = 300.0f;  // Width of the ImGui window
       uint32_t menuBarHeight = 18;
       float windowHeight
-          = window_->get_height() - menuBarHeight;  // Full height of the application window
+          = window_.get_height() - menuBarHeight;  // Full height of the application window
       ImVec2 windowPos
-          = ImVec2(window_->get_width() - windowWidth, menuBarHeight);  // Position to the right
+          = ImVec2(window_.get_width() - windowWidth, menuBarHeight);  // Position to the right
       ImVec2 windowSize = ImVec2(windowWidth, windowHeight);            // Size of the ImGui window
 
       ImGui::SetNextWindowPos(windowPos);
@@ -682,7 +668,7 @@ namespace gestalt::application {
 
         static bool freeze_frustum_cull = false;
         if( ImGui::Checkbox("Freeze Frustum Culling", &freeze_frustum_cull)) {
-          repository_->per_frame_data_buffers->freezeCullCamera = freeze_frustum_cull;
+          repository_.per_frame_data_buffers->freezeCullCamera = freeze_frustum_cull;
         }
 
         const char* shadow_mode_options[] = {"On", "Off"};
@@ -815,7 +801,10 @@ namespace gestalt::application {
           config.hdr.toneMappingOption = currentOption;
         }
 
-        ImGui::Checkbox("Show Bright Pass", &config.hdr.show_bright_pass);
+        bool showBrightPass = config.hdr.show_bright_pass;
+        if (ImGui::Checkbox("Show Bright Pass", &showBrightPass)) {
+          config.hdr.show_bright_pass = static_cast<int>(showBrightPass);
+        }
         ImGui::SliderFloat("Exposure", &config.hdr.exposure, 0.1f, 2.0f, "%.3f");
         ImGui::SliderFloat("Max White", &config.hdr.maxWhite, 0.1f, 10.f, "%.3f");
         ImGui::SliderFloat("Bloom Strength", &config.hdr.bloomStrength, 0.0f, 1.f, "%.4f",
@@ -834,7 +823,7 @@ namespace gestalt::application {
     }
 
     void Gui::display_scene_hierarchy(const Entity entity) {
-      const auto& node_optional = repository_->scene_graph.get(entity);
+      const auto& node_optional = repository_.scene_graph.get(entity);
       if (node_optional.has_value()) {
         NodeComponent& node = node_optional.value().get();
 
@@ -974,10 +963,10 @@ namespace gestalt::application {
     }
 
     void Gui::show_mesh_component(MeshComponent& mesh_component) {
-      auto& mesh = repository_->meshes.get(mesh_component.mesh);
+      auto& mesh = repository_.meshes.get(mesh_component.mesh);
 
       for (auto& surface : mesh.surfaces) {
-        auto& material = repository_->materials.get(surface.material);
+        auto& material = repository_.materials.get(surface.material);
         if (ImGui::TreeNode(material.name.c_str())) {
           auto& config = material.config;
 
@@ -1232,31 +1221,31 @@ namespace gestalt::application {
 
     void Gui::show_node_component() {
       if (selected_entity_ != invalid_entity) {
-        auto& selected_node = repository_->scene_graph.get(selected_entity_)->get();
+        auto& selected_node = repository_.scene_graph.get(selected_entity_)->get();
         ImGui::Text(selected_node.name.c_str());
 
-        const auto transform_optional = repository_->transform_components.get(selected_entity_);
+        const auto transform_optional = repository_.transform_components.get(selected_entity_);
         if (transform_optional.has_value()) {
           if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
             show_transform_component(selected_node, transform_optional.value().get());
           }
         }
 
-        const auto& mesh_optional = repository_->mesh_components.get(selected_entity_);
+        const auto& mesh_optional = repository_.mesh_components.get(selected_entity_);
         if (mesh_optional.has_value()) {
           if (ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_DefaultOpen)) {
             show_mesh_component(mesh_optional.value().get());
           }
         }
 
-        const auto& light_optional = repository_->light_components.get(selected_entity_);
+        const auto& light_optional = repository_.light_components.get(selected_entity_);
         if (light_optional.has_value() && transform_optional.has_value()) {
           if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen)) {
             show_light_component(light_optional.value().get(), transform_optional.value().get());
           }
         }
 
-        const auto& camera_optional = repository_->camera_components.get(selected_entity_);
+        const auto& camera_optional = repository_.camera_components.get(selected_entity_);
         if (camera_optional.has_value()) {
           if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
             show_camera_component(camera_optional.value().get());

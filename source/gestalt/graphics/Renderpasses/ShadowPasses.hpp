@@ -21,7 +21,7 @@ namespace gestalt::graphics {
                                  const std::shared_ptr<BufferInstance>& task_commands,
                                  const std::shared_ptr<BufferInstance>& draws,
                                  const std::shared_ptr<BufferInstance>& command_count,
-        IGpu* gpu,
+        IGpu& gpu,
                                  std::function<int32()> draw_count_provider)
         : RenderPass("Draw Cull Directional Depth Pass"),
           resources_(std::move(
@@ -35,7 +35,7 @@ namespace gestalt::graphics {
                   .add_binding(1, 7, command_count, ResourceUsage::WRITE,
                                VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
                   .add_push_constant(sizeof(DrawCullDepthConstants), VK_SHADER_STAGE_COMPUTE_BIT))),
-          compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
+          compute_pipeline_(&gpu, get_name(), resources_.get_image_bindings(),
                             resources_.get_buffer_bindings(), resources_.get_image_array_bindings(),
                             resources_.get_push_constant_range(),
                             "draw_cull_depth.comp.spv"),
@@ -81,7 +81,7 @@ namespace gestalt::graphics {
     TaskSubmitDirectionalDepthPass(const std::shared_ptr<BufferInstance>& task_commands,
                                    const std::shared_ptr<BufferInstance>& command_count, 
                                    const std::shared_ptr<BufferInstance>& group_count, 
-        IGpu* gpu)
+        IGpu& gpu)
         : RenderPass("Task Submit Directional Depth Pass"),
           resources_(std::move(
               ResourceComponentBindings()
@@ -92,7 +92,7 @@ namespace gestalt::graphics {
                   .add_binding(0, 8,group_count, ResourceUsage::WRITE, 
                                VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
           )),
-          compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
+          compute_pipeline_(&gpu, get_name(), resources_.get_image_bindings(),
                             resources_.get_buffer_bindings(), resources_.get_image_array_bindings(),
                             resources_.get_push_constant_range(),
                             "task_submit.comp.spv") {}
@@ -138,7 +138,7 @@ namespace gestalt::graphics {
                                 const std::shared_ptr<BufferInstance>& task_commands,
                                 const std::shared_ptr<BufferInstance>& draws,
                                 const std::shared_ptr<BufferInstance>& group_count,
-                                const std::shared_ptr<ImageInstance>& shadow_map, IGpu* gpu)
+                                const std::shared_ptr<ImageInstance>& shadow_map, IGpu& gpu)
         : RenderPass("Meshlet Directional Depth Pass"),
           resources_(std::move(
               ResourceComponentBindings()
@@ -178,7 +178,7 @@ namespace gestalt::graphics {
                   .add_attachment(shadow_map))),
 
           graphics_pipeline_(
-              gpu, get_name(), resources_.get_image_bindings(), resources_.get_buffer_bindings(),
+              &gpu, get_name(), resources_.get_image_bindings(), resources_.get_buffer_bindings(),
               resources_.get_image_array_bindings(),
               resources_.get_push_constant_range(), "geometry_depth.task.spv",
               "geometry_depth.mesh.spv", "geometry_depth.frag.spv",

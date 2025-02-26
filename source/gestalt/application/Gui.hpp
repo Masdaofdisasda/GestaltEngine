@@ -24,9 +24,9 @@ namespace gestalt::application {
     };
 
     class Gui{
-      IGpu* gpu_ = nullptr;
-      Window* window_ = nullptr;
-      Repository* repository_ = nullptr;
+      IGpu& gpu_;
+      Window& window_;
+      Repository& repository_;
       GuiCapabilities actions_;
       VkDescriptorPool imguiPool_;
 
@@ -67,22 +67,15 @@ namespace gestalt::application {
       void show_help();
 
     public:
-      Gui() = default;
-      ~Gui() = default;
+      Gui(IGpu& gpu, Window& window, VkFormat swapchain_format, Repository& repository,
+          GuiCapabilities actions);
+      ~Gui();
 
       Gui(const Gui&) = delete;
       Gui& operator=(const Gui&) = delete;
 
       Gui(Gui&&) = delete;
       Gui& operator=(Gui&&) = delete;
-
-      VkDescriptorSet descriptor_set_;
-
-      void set_debug_texture(VkImageView image_view, VkSampler sampler);
-
-      void init(IGpu* gpu, Window* window, VkFormat swapchain_format, Repository* repository, const GuiCapabilities& actions);
-
-      void cleanup();
 
       void draw(VkCommandBuffer cmd, const VkImageView swapchain_view,
                 const VkExtent2D swapchain_extent);

@@ -38,7 +38,7 @@ namespace gestalt::graphics {
                  const std::shared_ptr<ImageInstance>& scene_lit,
                  const std::shared_ptr<AccelerationStructureInstance>& tlas_instance,
                  const VkSampler post_process_sampler, const VkSampler interpolation_sampler,
-                 const VkSampler cube_map_sampler, IGpu* gpu,
+                 const VkSampler cube_map_sampler, IGpu& gpu,
                  const std::function<RenderConfig::LightingParams()>& push_constant_provider,
                  const std::function<PerFrameData()>& camera_provider,
                  const std::function<uint32()>& dir_light_count_provider,
@@ -91,7 +91,7 @@ namespace gestalt::graphics {
                   .add_binding(3, 8, tlas_instance, ResourceUsage::READ, VK_SHADER_STAGE_COMPUTE_BIT)
                   .add_push_constant(sizeof(RenderConfig::LightingParams),
                                      VK_SHADER_STAGE_COMPUTE_BIT))),
-          compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
+          compute_pipeline_(&gpu, get_name(), resources_.get_image_bindings(),
                             resources_.get_buffer_bindings(), resources_.get_image_array_bindings(),
                             resources_.get_push_constant_range(), "pbr_lighting.comp.spv",
                             resources_.get_tlas_bindings()),

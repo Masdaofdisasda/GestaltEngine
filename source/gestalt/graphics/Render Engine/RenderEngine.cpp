@@ -67,20 +67,19 @@ namespace gestalt::graphics {
     return frames_[frame_->get_current_frame_index()];
   }
 
-  void RenderEngine::init(IGpu* gpu, Window* window, ResourceAllocator* resource_allocator,
-                             Repository* repository, Gui* imgui_gui, FrameProvider* frame) {
-
-    gpu_ = gpu;
-    window_ = window;
-    resource_allocator_ = resource_allocator;
-    repository_ = repository;
-    imgui_ = imgui_gui;
-    frame_ = frame;
+  RenderEngine::RenderEngine(IGpu& gpu, Window& window, ResourceAllocator& resource_allocator,
+                             Repository& repository, Gui* imgui_gui, FrameProvider& frame)
+      : gpu_(gpu),
+        window_(window),
+        resource_allocator_(resource_allocator),
+        repository_(repository),
+        imgui_(imgui_gui),
+        frame_(frame) {
 
     swapchain_ = std::make_unique<VkSwapchain>();
-    swapchain_->init(gpu_, {window_->get_width(), window_->get_height(), 1});
+    swapchain_->init(&gpu_, {window_.get_width(), window_.get_height(), 1});
 
-    frame_graph_ = std::make_unique<FrameGraph>(resource_allocator);
+    frame_graph_ = std::make_unique<FrameGraph>(&resource_allocator);
 
     auto shadow_map = frame_graph_->add_resource(
         ImageTemplate("Shadow Map")
@@ -158,7 +157,7 @@ namespace gestalt::graphics {
                         VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_FALSE, 0.0f, 0.0f,
                         VK_LOD_CLAMP_NONE, 1.0f, VK_FALSE, VK_COMPARE_OP_NEVER,
                         VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK),
-        gpu_->getDevice());
+        gpu_.getDevice());
 
     interpolation_sampler_ = std::make_unique<SamplerInstance>(
         SamplerTemplate("Post Process Sampler", VK_FILTER_LINEAR, VK_FILTER_LINEAR,
@@ -167,7 +166,7 @@ namespace gestalt::graphics {
                         VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_FALSE, 0.0f, 0.0f,
                         VK_LOD_CLAMP_NONE, 1.0f, VK_FALSE, VK_COMPARE_OP_NEVER,
                         VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK),
-        gpu_->getDevice());
+        gpu_.getDevice());
 
             cube_map_sampler_ = std::make_unique<SamplerInstance>(
         SamplerTemplate("Environment Cubemap Sampler", VK_FILTER_LINEAR, VK_FILTER_LINEAR,
@@ -176,36 +175,36 @@ namespace gestalt::graphics {
                         VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_FALSE, 0.0f, 0.0f,
                         VK_LOD_CLAMP_NONE, 1.0f, VK_FALSE, VK_COMPARE_OP_NEVER,
                         VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK),
-        gpu_->getDevice());
+        gpu_.getDevice());
 
     // camera
     auto camera_buffer = frame_graph_->add_resource(
-        repository->per_frame_data_buffers->camera_buffer);
+        repository.per_frame_data_buffers->camera_buffer);
 
     // geometry
     auto index_buffer = frame_graph_->add_resource(
-        repository->mesh_buffers->index_buffer, CreationType::EXTERNAL);
+        repository.mesh_buffers->index_buffer, CreationType::EXTERNAL);
     auto vertex_position_buffer
-        = frame_graph_->add_resource(repository->mesh_buffers->vertex_position_buffer);
+        = frame_graph_->add_resource(repository.mesh_buffers->vertex_position_buffer);
     auto vertex_data_buffer
-        = frame_graph_->add_resource(repository->mesh_buffers->vertex_data_buffer);
+        = frame_graph_->add_resource(repository.mesh_buffers->vertex_data_buffer);
 
     auto meshlet_buffer
-        = frame_graph_->add_resource(repository->mesh_buffers->meshlet_buffer);
+        = frame_graph_->add_resource(repository.mesh_buffers->meshlet_buffer);
     auto meshlet_vertices
-        = frame_graph_->add_resource(repository->mesh_buffers->meshlet_vertices);
+        = frame_graph_->add_resource(repository.mesh_buffers->meshlet_vertices);
     auto meshlet_triangles
-        = frame_graph_->add_resource(repository->mesh_buffers->meshlet_triangles);
+        = frame_graph_->add_resource(repository.mesh_buffers->meshlet_triangles);
     auto meshlet_task_commands_buffer = frame_graph_->add_resource(
-        repository->mesh_buffers->meshlet_task_commands_buffer);
+        repository.mesh_buffers->meshlet_task_commands_buffer);
     auto mesh_draw_buffer
-        = frame_graph_->add_resource(repository->mesh_buffers->mesh_draw_buffer);
+        = frame_graph_->add_resource(repository.mesh_buffers->mesh_draw_buffer);
     auto command_count_buffer
-        = frame_graph_->add_resource(repository->mesh_buffers->command_count_buffer);
+        = frame_graph_->add_resource(repository.mesh_buffers->command_count_buffer);
     auto group_count_buffer
-        = frame_graph_->add_resource(repository->mesh_buffers->group_count_buffer);
+        = frame_graph_->add_resource(repository.mesh_buffers->group_count_buffer);
 
-    const auto tlas_instance = frame_graph_->add_resource(repository->tlas);
+    const auto tlas_instance = frame_graph_->add_resource(repository.tlas);
 
     // Material
       
@@ -228,33 +227,33 @@ namespace gestalt::graphics {
         CreationType::EXTERNAL);
           
     auto material_buffer
-        = frame_graph_->add_resource(repository->material_buffers->material_buffer);
+        = frame_graph_->add_resource(repository.material_buffers->material_buffer);
 
     auto material_textures
         = frame_graph_->add_resource(std::make_shared<ImageArrayInstance>(
                                          "PBR Textures",
                                          [this]() -> std::vector<Material> {
-                                           return repository_->materials.data();
+                                           return repository_.materials.data();
                                          },
                                          getMaxTextures()),
                                      CreationType::EXTERNAL);
 
     // Light
     auto directional_light
-        = frame_graph_->add_resource(repository->light_buffers->dir_light_buffer);
+        = frame_graph_->add_resource(repository.light_buffers->dir_light_buffer);
     auto point_light
-        = frame_graph_->add_resource(repository->light_buffers->point_light_buffer);
-    auto spot_light = frame_graph_->add_resource(repository->light_buffers->spot_light_buffer);
+        = frame_graph_->add_resource(repository.light_buffers->point_light_buffer);
+    auto spot_light = frame_graph_->add_resource(repository.light_buffers->spot_light_buffer);
     auto light_matrices
-        = frame_graph_->add_resource(repository->light_buffers->view_proj_matrices);
+        = frame_graph_->add_resource(repository.light_buffers->view_proj_matrices);
 
     //TODO figure out why this needs to be that way
-    auto luminance_histogram = frame_graph_->add_resource(repository_->mesh_buffers->luminance_histogram_buffer);
+    auto luminance_histogram = frame_graph_->add_resource(repository_.mesh_buffers->luminance_histogram_buffer);
 
     // Shader Passes
     frame_graph_->add_pass<DrawCullDirectionalDepthPass>(
         camera_buffer, meshlet_task_commands_buffer, mesh_draw_buffer, command_count_buffer, gpu_,
-        [&]() { return static_cast<int32>(repository_->mesh_draws_.size()); });
+        [&]() { return static_cast<int32>(repository_.mesh_draws_.size()); });
 
     frame_graph_->add_pass<TaskSubmitDirectionalDepthPass>(
         meshlet_task_commands_buffer, command_count_buffer, group_count_buffer, gpu_);
@@ -267,7 +266,7 @@ namespace gestalt::graphics {
     // mesh shading
     frame_graph_->add_pass<DrawCullPass>(
         camera_buffer, meshlet_task_commands_buffer, mesh_draw_buffer, command_count_buffer, gpu_,
-        [&] { return static_cast<int32>(repository_->mesh_draws_.size()); });
+        [&] { return static_cast<int32>(repository_.mesh_draws_.size()); });
 
     frame_graph_->add_pass<TaskSubmitPass>(meshlet_task_commands_buffer, command_count_buffer,
                                            group_count_buffer, gpu_);
@@ -287,9 +286,9 @@ namespace gestalt::graphics {
     frame_graph_->add_pass<VolumetricLightingInjectionPass>(
         blue_noise, volumetric_noise, froxel_data, post_process_sampler_->get_sampler_handle(),
         [&] { return config_.volumetric_lighting; },
-        [&] { return frame_->get_current_frame_number(); },
+        [&] { return frame_.get_current_frame_number(); },
         [&] {
-          return repository_->per_frame_data_buffers->data.at(frame_->get_current_frame_index());
+          return repository_.per_frame_data_buffers->data.at(frame_.get_current_frame_index());
         },
         gpu_);
 
@@ -297,12 +296,12 @@ namespace gestalt::graphics {
         camera_buffer, light_matrices, directional_light, point_light, spot_light, blue_noise, froxel_data,
         shadow_map, light_scattering, post_process_sampler_->get_sampler_handle(),
         [&] { return config_.volumetric_lighting; },
-        [&] { return frame_->get_current_frame_number(); },
+        [&] { return frame_.get_current_frame_number(); },
         [&] {
-          return repository_->per_frame_data_buffers->data.at(frame_->get_current_frame_index());
+          return repository_.per_frame_data_buffers->data.at(frame_.get_current_frame_index());
         },
-        [&] { return static_cast<uint32>(repository_->point_lights.size()); },
-        [&] { return static_cast<uint32>(repository_->spot_lights.size()); }, gpu_);
+        [&] { return static_cast<uint32>(repository_.point_lights.size()); },
+        [&] { return static_cast<uint32>(repository_.spot_lights.size()); }, gpu_);
 
     frame_graph_->add_pass<VolumetricLightingSpatialFilterPass>(
         light_scattering, light_scattering_filtered, interpolation_sampler_->get_sampler_handle(),
@@ -312,9 +311,9 @@ namespace gestalt::graphics {
         light_scattering_filtered, integrated_light_scattering,
         post_process_sampler_->get_sampler_handle(),
         [&] { return config_.volumetric_lighting; },
-        [&] { return frame_->get_current_frame_number(); },
+        [&] { return frame_.get_current_frame_number(); },
         [&] {
-          return repository_->per_frame_data_buffers->data.at(frame_->get_current_frame_index());
+          return repository_.per_frame_data_buffers->data.at(frame_.get_current_frame_index());
         },
         gpu_);
 
@@ -325,11 +324,11 @@ namespace gestalt::graphics {
         post_process_sampler_->get_sampler_handle(), interpolation_sampler_->get_sampler_handle(),
         cube_map_sampler_->get_sampler_handle(), gpu_, [&] { return config_.lighting; },
         [&] {
-          return repository_->per_frame_data_buffers->data.at(frame_->get_current_frame_index());
+          return repository_.per_frame_data_buffers->data.at(frame_.get_current_frame_index());
         },
-        [&] { return static_cast<uint32>(repository_->directional_lights.size()); },
-        [&] { return static_cast<uint32>(repository_->point_lights.size()); },
-        [&] { return static_cast<uint32>(repository_->spot_lights.size()); }
+        [&] { return static_cast<uint32>(repository_.directional_lights.size()); },
+        [&] { return static_cast<uint32>(repository_.point_lights.size()); },
+        [&] { return static_cast<uint32>(repository_.spot_lights.size()); }
     );
 
     frame_graph_->add_pass<SkyboxPass>(
@@ -352,8 +351,9 @@ namespace gestalt::graphics {
 
     frame_graph_->compile();
 
-    frame_data_.init(gpu_->getDevice(), gpu_->getGraphicsQueueFamily(), *frame_);
+    frame_data_.init(gpu_.getDevice(), gpu_.getGraphicsQueueFamily(), frame_);
   }
+
 
   bool FrameData::acquire_next_image(const VkDevice device, VkSwapchainKHR& swapchain,
                                      uint32& swapchain_image_index) const {
@@ -386,17 +386,17 @@ namespace gestalt::graphics {
 
   void RenderEngine::execute_passes() {
     if (resize_requested_) {
-      swapchain_->resize_swapchain(window_);
+      swapchain_->resize_swapchain(&window_);
       resize_requested_ = false;
     }
 
-    if (frame_data_.acquire_next_image(gpu_->getDevice(), swapchain_->swapchain, swapchain_image_index_)) {
+    if (frame_data_.acquire_next_image(gpu_.getDevice(), swapchain_->swapchain, swapchain_image_index_)) {
       return;
     }
 
     auto cmd = start_draw();
 
-    resource_allocator_->flush();
+    resource_allocator_.flush();
     cmd.global_barrier();
     frame_graph_->execute(cmd);
 
@@ -548,11 +548,11 @@ namespace gestalt::graphics {
       cmd.pipeline_barrier2(dependency_info);
     }
 
-    resize_requested_ = frame_data_.present(cmd, gpu_->getGraphicsQueue(), swapchain_->swapchain, swapchain_image_index_);
+    resize_requested_ = frame_data_.present(cmd, gpu_.getGraphicsQueue(), swapchain_->swapchain, swapchain_image_index_);
   }
 
-  void RenderEngine::cleanup() {
-    frame_data_.cleanup(gpu_->getDevice());
+  RenderEngine::~RenderEngine() {
+    frame_data_.cleanup(gpu_.getDevice());
     swapchain_->destroy_swapchain();
   }
 

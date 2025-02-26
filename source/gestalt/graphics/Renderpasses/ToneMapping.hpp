@@ -17,7 +17,7 @@ namespace gestalt::graphics {
     ToneMapPass(const std::shared_ptr<ImageInstance>& scene_linear,
                 const std::shared_ptr<ImageInstance>& scene_tone_mapped,
                 const std::shared_ptr<ImageInstance>& luminance_average,
-                const VkSampler post_process_sampler, IGpu* gpu,
+                const VkSampler post_process_sampler, IGpu& gpu,
                 const std::function<RenderConfig::HdrParams()>& push_constant_provider
         )
         : RenderPass("Tone Map Pass"),
@@ -31,7 +31,7 @@ namespace gestalt::graphics {
                   .add_binding(0, 3, scene_tone_mapped, nullptr, ResourceUsage::WRITE, 
                                VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT)
                   .add_push_constant(sizeof(RenderConfig::HdrParams), VK_SHADER_STAGE_COMPUTE_BIT))),
-          compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
+          compute_pipeline_(&gpu, get_name(), resources_.get_image_bindings(),
                             resources_.get_buffer_bindings(), resources_.get_image_array_bindings(),
                             resources_.get_push_constant_range(),
                             "tone_mapping.comp.spv", resources_.get_tlas_bindings()), push_constant_provider_(push_constant_provider) {}
@@ -67,7 +67,7 @@ namespace gestalt::graphics {
     LuminanceHistogramPass(
         const std::shared_ptr<ImageInstance>& scene,
         const std::shared_ptr<BufferInstance>& luminance_histogram,
-        const VkSampler post_process_sampler, IGpu* gpu,
+        const VkSampler post_process_sampler, IGpu& gpu,
         const std::function<RenderConfig::LuminanceParams()>& push_constant_provider)
         : RenderPass("Luminance Histogram Pass"),
           resources_(
@@ -80,7 +80,7 @@ namespace gestalt::graphics {
                                          VK_SHADER_STAGE_COMPUTE_BIT)
                             .add_push_constant(sizeof(RenderConfig::LuminanceParams),
                                                VK_SHADER_STAGE_COMPUTE_BIT))),
-          compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
+          compute_pipeline_(&gpu, get_name(), resources_.get_image_bindings(),
                             resources_.get_buffer_bindings(), resources_.get_image_array_bindings(),
                             resources_.get_push_constant_range(), "luminance_histogram.comp.spv",
                             resources_.get_tlas_bindings()),
@@ -120,7 +120,7 @@ namespace gestalt::graphics {
   public:
     LuminanceAveragePass(
         const std::shared_ptr<ImageInstance>& lum_tex,
-        const std::shared_ptr<BufferInstance>& luminance_histogram, IGpu* gpu,
+        const std::shared_ptr<BufferInstance>& luminance_histogram, IGpu& gpu,
         const std::function<RenderConfig::LuminanceParams()>& push_constant_provider)
         : RenderPass("Luminance Average Pass"),
           resources_(std::move(ResourceComponentBindings()
@@ -132,7 +132,7 @@ namespace gestalt::graphics {
                                                 VK_SHADER_STAGE_COMPUTE_BIT)
                                    .add_push_constant(sizeof(RenderConfig::LuminanceParams),
                                                       VK_SHADER_STAGE_COMPUTE_BIT))),
-          compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
+          compute_pipeline_(&gpu, get_name(), resources_.get_image_bindings(),
                             resources_.get_buffer_bindings(), resources_.get_image_array_bindings(),
                             resources_.get_push_constant_range(), "luminance_average.comp.spv"),
           push_constant_provider_(push_constant_provider) {}

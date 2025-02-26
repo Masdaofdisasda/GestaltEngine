@@ -45,12 +45,12 @@ namespace gestalt::graphics {
   };
 
   class RenderEngine {
-    IGpu* gpu_ = nullptr;
-    Window* window_ = nullptr;
-    ResourceAllocator* resource_allocator_ = nullptr;
-      Repository* repository_ = nullptr;
-      Gui* imgui_ = nullptr;
-      FrameProvider* frame_ = nullptr;
+    IGpu& gpu_;
+    Window& window_;
+    ResourceAllocator& resource_allocator_;
+    Repository& repository_;
+    Gui* imgui_ = nullptr;
+    FrameProvider& frame_;
 
       RenderConfig config_{};
 
@@ -73,8 +73,9 @@ namespace gestalt::graphics {
       CommandBuffer start_draw();
 
     public:
-      RenderEngine() = default;
-      ~RenderEngine() = default;
+      RenderEngine(IGpu& gpu, Window& window, ResourceAllocator& resource_allocator,
+                   Repository& repository, Gui* imgui_gui, FrameProvider& frame);
+      ~RenderEngine();
 
       RenderEngine(const RenderEngine&) = delete;
       RenderEngine& operator=(const RenderEngine&) = delete;
@@ -82,12 +83,7 @@ namespace gestalt::graphics {
       RenderEngine(RenderEngine&&) = delete;
       RenderEngine& operator=(RenderEngine&&) = delete;
 
-      void init(IGpu* gpu, Window* window,
-                ResourceAllocator* resource_allocator,
-                   Repository* repository, Gui* imgui_gui, FrameProvider* frame);
       void execute_passes();
-
-      void cleanup();
 
       RenderConfig& get_config() { return config_; }
       VkFormat get_swapchain_format() const { return swapchain_->swapchain_image_format; }

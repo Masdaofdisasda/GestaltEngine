@@ -7,12 +7,12 @@ layout( push_constant ) uniform constants
     float exposure;
 	float maxWhite; 
 	float bloomStrength; 
-	float adaptationSpeed;
+	float padding;
+
 	vec4 lift; 
 	vec4 gamma; 
 	vec4 gain;
-
-	bool showBloom;
+	int showBloom;
     int toneMappingOption;
     float vignette_radius;
     float vignette_softness;
@@ -257,14 +257,13 @@ void main()
     float avgLuminance = imageLoad(texLuminance, ivec2(0, 0)).r;
 
 
-    if (params.showBloom) {
+    if (params.showBloom == 1) {
         sceneColor = bloomColor;
     } else {
-
-    // todo Upsample bloom if necessary
-    vec3 upsampledBloom = bloomColor;
-    upsampledBloom *= params.bloomStrength;
-    sceneColor += upsampledBloom;
+        // todo Upsample bloom if necessary
+        vec3 upsampledBloom = bloomColor;
+        upsampledBloom *= params.bloomStrength;
+        sceneColor += upsampledBloom;
 
 	}
 
