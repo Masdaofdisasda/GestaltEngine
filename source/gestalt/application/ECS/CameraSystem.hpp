@@ -9,26 +9,30 @@ namespace gestalt::foundation {
 
 namespace gestalt::application {
 
-    class CameraSystem final : public BaseSystem {
-      Entity active_camera_{0};  // entity id of the active camera
-      float32 aspect_ratio_{1.f};
+  class CameraSystem final {
+    IGpu& gpu_;
+    IResourceAllocator& resource_allocator_;
+    Repository& repository_;
+    FrameProvider& frame_;
 
-    public:
-      CameraSystem() = default;
-      ~CameraSystem() override = default;
+    Entity active_camera_{0};  // entity id of the active camera
+    float32 aspect_ratio_{1.f};
 
-      CameraSystem(const CameraSystem&) = delete;
-      CameraSystem& operator=(const CameraSystem&) = delete;
+  public:
+    CameraSystem(IGpu& gpu, IResourceAllocator& resource_allocator, Repository& repository,
+                 FrameProvider& frame);
+    ~CameraSystem();
 
-      CameraSystem(CameraSystem&&) = delete;
-      CameraSystem& operator=(CameraSystem&&) = delete;
+    CameraSystem(const CameraSystem&) = delete;
+    CameraSystem& operator=(const CameraSystem&) = delete;
 
-      void set_active_camera(const Entity camera) { active_camera_ = camera; }
-      Entity get_active_camera() const { return active_camera_; }
+    CameraSystem(CameraSystem&&) = delete;
+    CameraSystem& operator=(CameraSystem&&) = delete;
 
-      void prepare() override;
-      void update(float delta_time, const UserInput& movement, float aspect) override;
-      void cleanup() override;
-    };
+    void set_active_camera(const Entity camera) { active_camera_ = camera; }
+    Entity get_active_camera() const { return active_camera_; }
 
-}  // namespace gestalt
+    void update(float delta_time, const UserInput& movement, float aspect);
+  };
+
+}  // namespace gestalt::application

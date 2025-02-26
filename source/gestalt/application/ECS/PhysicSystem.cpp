@@ -12,11 +12,19 @@
 
 
 namespace gestalt::application {
-  void PhysicSystem::prepare() {
+
+  
+  PhysicSystem::PhysicSystem(IGpu& gpu, IResourceAllocator& resource_allocator,
+                             Repository& repository, FrameProvider& frame)
+      : gpu_(gpu),
+        resource_allocator_(resource_allocator),
+        repository_(repository),
+        frame_(frame) 
+  {
     physic_engine_ = std::make_unique<PhysicEngine>();
     physic_engine_->init();
 
-    for (auto& [entity, physics_component] : repository_->physics_components.components()) {
+    for (auto& [entity, physics_component] : repository_.physics_components.components()) {
       if (physics_component.collider_type == CAPSULE) {
         player_ = entity;
       }
@@ -24,9 +32,9 @@ namespace gestalt::application {
   }
 
   void PhysicSystem::move_player(const float delta_time, const UserInput& movement) const {
-    const auto& player_physics = repository_->physics_components[player_];
+    const auto& player_physics = repository_.physics_components[player_];
     if (player_physics.body == nullptr) return;
-    const auto& player_transform = repository_->transform_components[player_];
+    const auto& player_transform = repository_.transform_components[player_];
 
     auto orientation = player_transform.rotation;
     orientation.w *= -1; // Jolt uses a different handedness convention (i guess)
@@ -65,18 +73,18 @@ namespace gestalt::application {
     }
   }
 
-  void PhysicSystem::update(float delta_time, const UserInput& movement, float aspect) {
+  void PhysicSystem::update(float delta_time, const UserInput& movement) const {
 
     move_player(delta_time, movement);
 
     physic_engine_->step_simulation(delta_time);
 
-    for (auto& [entity, physics_component] : repository_->physics_components.components()) {
+    for (auto& [entity, physics_component] : repository_.physics_components.components()) {
 
       if (physics_component.body == nullptr) {
         physics_component.body = physic_engine_->create_body(
-            physics_component, repository_->transform_components[entity].position,
-            repository_->transform_components[entity].rotation);
+            physics_component, repository_.transform_components[entity].position,
+            repository_.transform_components[entity].rotation);
       }
 
       if (physics_component.body_type == DYNAMIC) {
@@ -84,12 +92,10 @@ namespace gestalt::application {
         glm::quat orientation;
         physic_engine_->get_body_transform(physics_component.body, position,
                                            orientation);
-        repository_->transform_components[entity].position = position;
-        repository_->transform_components[entity].rotation = orientation;
+        repository_.transform_components[entity].position = position;
+        repository_.transform_components[entity].rotation = orientation;
       }
     }
   }
-
-  void PhysicSystem::cleanup() {}
 
 }  // namespace gestalt::application

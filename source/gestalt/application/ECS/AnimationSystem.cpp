@@ -3,6 +3,10 @@
 
 namespace gestalt::application {
 
+  AnimationSystem::AnimationSystem(Repository& repository)
+      : repository_(repository)
+  {}
+
   void AnimationSystem::update_translation(const Entity& entity,
                                            AnimationChannel<glm::vec3>& translation_channel, bool loop) const {
     const auto& translation_keyframes = translation_channel.keyframes;
@@ -37,7 +41,7 @@ namespace gestalt::application {
     // Linearly interpolate the translation between the two keyframes
     const glm::vec3 interpolated_translation = mix(start_keyframe.value, end_keyframe.value, t);
 
-    repository_->transform_components[entity].position = interpolated_translation;
+    repository_.transform_components[entity].position = interpolated_translation;
 
     if (loop && current_time > translation_keyframes.back().time) {
       current_time = 0.0f;  // Reset for looping
@@ -79,7 +83,7 @@ namespace gestalt::application {
     // Linearly interpolate the translation between the two keyframes
     const glm::quat interpolated_rotation = glm::mix(start_keyframe.value, end_keyframe.value, t);
 
-    repository_->transform_components[entity].rotation = glm::normalize(interpolated_rotation);
+    repository_.transform_components[entity].rotation = glm::normalize(interpolated_rotation);
 
     if (loop && current_time > rotation_keyframes.back().time) {
       current_time = 0.0f;  // Reset for looping
@@ -87,9 +91,9 @@ namespace gestalt::application {
     rotation_channel.current_time = current_time;
   }
 
-  void AnimationSystem::update(const float delta_time, const UserInput& movement, float aspect) {
+  void AnimationSystem::update(const float delta_time) {
     delta_time_ = delta_time;
-    for (auto [entity, animation_component] : repository_->animation_components.asVector()) {
+    for (auto [entity, animation_component] : repository_.animation_components.asVector()) {
 
       update_translation(entity, animation_component.get().translation_channel, animation_component.get().loop);
       update_rotation(entity, animation_component.get().rotation_channel,

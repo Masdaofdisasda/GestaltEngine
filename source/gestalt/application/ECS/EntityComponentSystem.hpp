@@ -4,10 +4,15 @@
 
 #include "BaseSystem.hpp"
 #include "AnimationSystem.hpp"
+#include "AudioSystem.hpp"
 #include "CameraSystem.hpp"
 #include "ComponentFactory.hpp"
+#include "LightSystem.hpp"
 #include "MaterialSystem.hpp"
+#include "MeshSystem.hpp"
 #include "PhysicSystem.hpp"
+#include "RayTracingSystem.hpp"
+#include "TransformSystem.hpp"
 #include "common.hpp"
 #include "Resource Loading/AssetLoader.hpp"
 
@@ -31,15 +36,15 @@ namespace gestalt::application {
       ComponentFactory component_factory_;
       AssetLoader asset_loader_;
 
-      std::unique_ptr<MaterialSystem> material_system_;
-      std::unique_ptr<BaseSystem> light_system_;
-      std::unique_ptr<CameraSystem> camera_system_;
-      std::unique_ptr<BaseSystem> transform_system_;
-      std::unique_ptr<AnimationSystem> animation_system_;
-      std::unique_ptr<BaseSystem> mesh_system_;
-      std::unique_ptr<PhysicSystem> physics_system_;
-      std::unique_ptr<BaseSystem> audio_system_;
-      std::unique_ptr<BaseSystem> raytracing_system_;
+      MaterialSystem material_system_;
+      CameraSystem camera_system_;
+      LightSystem light_system_;
+      TransformSystem transform_system_;
+      AnimationSystem animation_system_;
+      MeshSystem mesh_system_;
+      AudioSystem audio_system_;
+      PhysicSystem physics_system_;
+      RayTracingSystem raytracing_system_;
 
       Entity root_entity_ = 0;
       std::filesystem::path scene_path_;
@@ -62,7 +67,7 @@ namespace gestalt::application {
       NodeComponent& get_root_node();
       [[nodiscard]] uint32 get_root_entity() const { return root_entity_; }
       void add_to_root(Entity entity, NodeComponent& node);
-      void set_active_camera(Entity camera) const;
+      void set_active_camera(Entity camera);
       [[nodiscard]] Entity get_active_camera() const;
     };
 

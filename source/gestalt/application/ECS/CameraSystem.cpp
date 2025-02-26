@@ -14,22 +14,29 @@
 
 namespace gestalt::application {
 
-    void CameraSystem::prepare() {
-    const auto cameras = repository_->camera_components.asVector();
+  CameraSystem::CameraSystem(IGpu& gpu, IResourceAllocator& resource_allocator,
+                             Repository& repository, FrameProvider& frame)
+      : gpu_(gpu),
+        resource_allocator_(resource_allocator),
+        repository_(repository),
+        frame_(frame)
+  {
+    const auto cameras = repository_.camera_components.asVector();
     if (!cameras.empty()) {
       active_camera_ = cameras.front().first;
     }
 
-    const auto& per_frame_data_buffers = repository_->per_frame_data_buffers;
+    const auto& per_frame_data_buffers = repository_.per_frame_data_buffers;
 
-    per_frame_data_buffers->camera_buffer = resource_allocator_->create_buffer(BufferTemplate(
+    per_frame_data_buffers->camera_buffer = resource_allocator_.create_buffer(BufferTemplate(
         "Camera Uniform Buffer", sizeof(PerFrameData),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
   }
 
-    inline glm::vec4 NormalizePlane(glm::vec4 p) { return p / length(glm::vec3(p)); }
+
+  inline glm::vec4 NormalizePlane(glm::vec4 p) { return p / length(glm::vec3(p)); }
 
   
     glm::mat4 PerspectiveProjection(float fovY, float aspectWbyH, float zNear) {
@@ -41,10 +48,10 @@ namespace gestalt::application {
     void CameraSystem::update(const float delta_time, const UserInput& movement, float aspect) {
       aspect_ratio_ = aspect;
 
-      active_camera_ = repository_->camera_components.asVector().back().first;
+      active_camera_ = repository_.camera_components.asVector().back().first;
 
-      auto& camera_component = repository_->camera_components[active_camera_];
-      auto& transform_component = repository_->transform_components[active_camera_];
+      auto& camera_component = repository_.camera_components[active_camera_];
+      auto& transform_component = repository_.transform_components[active_camera_];
       std::visit(
           [&]<typename CameraDataType>(CameraDataType& camera_data) {
             using T = std::decay_t<CameraDataType>;
@@ -68,9 +75,9 @@ namespace gestalt::application {
           },
           camera_component.camera_data);
 
-      const auto frame = frame_->get_current_frame_index();
+      const auto frame = frame_.get_current_frame_index();
 
-      const auto& buffers = repository_->per_frame_data_buffers;
+      const auto& buffers = repository_.per_frame_data_buffers;
 
       const glm::mat4 view_matrix = std::visit(
           []<typename CameraDataType>(const CameraDataType& camera_data) -> glm::mat4 {
@@ -138,8 +145,8 @@ namespace gestalt::application {
       }
 
       if constexpr (false) {
-        const glm::mat4 view_matrix = repository_->light_view_projections.get(0).view;
-        glm::mat4 projection = repository_->light_view_projections.get(0).proj;
+        const glm::mat4 view_matrix = repository_.light_view_projections.get(0).view;
+        glm::mat4 projection = repository_.light_view_projections.get(0).proj;
 
         glm::mat4 projection_t = transpose(projection);
         camera_component.view_matrix = view_matrix;
@@ -165,18 +172,18 @@ namespace gestalt::application {
         buffers->data[frame].frustum[5] = NormalizePlane(projection_t[3] - projection_t[2]);
       }
       
-    const auto staging = resource_allocator_->create_buffer(std::move(BufferTemplate(
+    const auto staging = resource_allocator_.create_buffer(std::move(BufferTemplate(
           "Camera Staging",
           sizeof(PerFrameData),
           VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
           VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)));
 
       void* mapped_data;
-      VK_CHECK(vmaMapMemory(gpu_->getAllocator(), staging->get_allocation(), &mapped_data));
+      VK_CHECK(vmaMapMemory(gpu_.getAllocator(), staging->get_allocation(), &mapped_data));
       memcpy(mapped_data, &buffers->data[frame], sizeof(PerFrameData));
-      vmaUnmapMemory(gpu_->getAllocator(), staging->get_allocation());
+      vmaUnmapMemory(gpu_.getAllocator(), staging->get_allocation());
 
-    gpu_->immediateSubmit([&](VkCommandBuffer cmd) {
+    gpu_.immediateSubmit([&](VkCommandBuffer cmd) {
         VkBufferCopy copy_region;
         copy_region.size = sizeof(PerFrameData);
         copy_region.srcOffset = 0;
@@ -184,7 +191,7 @@ namespace gestalt::application {
         vkCmdCopyBuffer(cmd, staging->get_buffer_handle(),
                         buffers->camera_buffer->get_buffer_handle(), 1, &copy_region);
       });
-      resource_allocator_->destroy_buffer(staging);
+      resource_allocator_.destroy_buffer(staging);
 
       // TODO
       meshlet_push_constants.pyramidWidth = 0;
@@ -192,11 +199,12 @@ namespace gestalt::application {
       meshlet_push_constants.clusterOcclusionEnabled = 0;
     }
 
-    void CameraSystem::cleanup() {
-      repository_->camera_components.clear();
+  
+  CameraSystem::~CameraSystem() {
+      repository_.camera_components.clear();
 
-      const auto& buffers = repository_->per_frame_data_buffers;
-      resource_allocator_->destroy_buffer(buffers->camera_buffer);
+      const auto& buffers = repository_.per_frame_data_buffers;
+      resource_allocator_.destroy_buffer(buffers->camera_buffer);
 
     }
 

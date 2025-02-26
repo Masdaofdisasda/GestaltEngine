@@ -27,17 +27,25 @@ namespace gestalt::application {
   constexpr size_t kMaxMeshDrawBufferSize = getMaxMeshes() * sizeof(MeshDraw);
   constexpr size_t kMaxDrawCountBufferSize = 4 * sizeof(uint32); // commandCount, x, y, z
 
-  void MeshSystem::prepare() {
+  
+
+  MeshSystem::MeshSystem(IGpu& gpu, IResourceAllocator& resource_allocator, Repository& repository,
+                         FrameProvider& frame)
+      : gpu_(gpu),
+        resource_allocator_(resource_allocator),
+        repository_(repository),
+        frame_(frame) 
+  {
     create_buffers();
   }
 
   void MeshSystem::upload_mesh() {
-    const std::span indices = repository_->indices.data();
-    const std::span vertex_positions = repository_->vertex_positions.data();
-    const std::span vertex_data = repository_->vertex_data.data();
-    const std::span meshlets = repository_->meshlets.data();
-    const std::span meshlet_vertices = repository_->meshlet_vertices.data();
-    const std::span meshlet_triangles = repository_->meshlet_triangles.data();
+    const std::span indices = repository_.indices.data();
+    const std::span vertex_positions = repository_.vertex_positions.data();
+    const std::span vertex_data = repository_.vertex_data.data();
+    const std::span meshlets = repository_.meshlets.data();
+    const std::span meshlet_vertices = repository_.meshlet_vertices.data();
+    const std::span meshlet_triangles = repository_.meshlet_triangles.data();
 
     const size_t vertex_position_buffer_size = vertex_positions.size() * sizeof(GpuVertexPosition);
     const size_t vertex_data_buffer_size = vertex_data.size() * sizeof(GpuVertexData);
@@ -46,7 +54,7 @@ namespace gestalt::application {
     const size_t meshlet_vertices_size = meshlet_vertices.size() * sizeof(uint32);
     const size_t meshlet_triangles_size = meshlet_triangles.size() * sizeof(uint8);
 
-    const auto& mesh_buffers = repository_->mesh_buffers;
+    const auto& mesh_buffers = repository_.mesh_buffers;
 
     if (kMaxVertexPositionBufferSize < vertex_position_buffer_size) {
       fmt::println("vertex_position_buffer size needs to be increased by {}",
@@ -78,7 +86,7 @@ namespace gestalt::application {
                    meshlet_triangles_size - mesh_buffers->meshlet_triangles->get_size());
     }
 
-    const auto staging = resource_allocator_->create_buffer(std::move(
+    const auto staging = resource_allocator_.create_buffer(std::move(
         BufferTemplate("Mesh Staging",
                        vertex_position_buffer_size + vertex_data_buffer_size + index_buffer_size
                            + meshlet_buffer_size + meshlet_vertices_size + meshlet_triangles_size,
@@ -87,7 +95,7 @@ namespace gestalt::application {
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)));
 
     void* data;
-    VK_CHECK(vmaMapMemory(gpu_->getAllocator(), staging->get_allocation(), &data));
+    VK_CHECK(vmaMapMemory(gpu_.getAllocator(), staging->get_allocation(), &data));
 
     // copy vertex buffer
     memcpy(data, vertex_positions.data(), vertex_position_buffer_size);
@@ -106,9 +114,9 @@ namespace gestalt::application {
                + index_buffer_size + meshlet_buffer_size + meshlet_vertices_size,
            meshlet_triangles.data(), meshlet_triangles_size);
 
-    vmaUnmapMemory(gpu_->getAllocator(), staging->get_allocation());
+    vmaUnmapMemory(gpu_.getAllocator(), staging->get_allocation());
 
-    gpu_->immediateSubmit([&](VkCommandBuffer cmd) {
+    gpu_.immediateSubmit([&](VkCommandBuffer cmd) {
       VkBufferCopy copy_regions[6] = {};
 
       copy_regions[0].dstOffset = 0;
@@ -154,21 +162,21 @@ namespace gestalt::application {
                       mesh_buffers->meshlet_triangles->get_buffer_handle(), 1,
                       &copy_regions[5]);
     });
-    resource_allocator_->destroy_buffer(staging);
+    resource_allocator_.destroy_buffer(staging);
   }
 
   void MeshSystem::create_buffers() {
-    const auto& mesh_buffers = repository_->mesh_buffers;
+    const auto& mesh_buffers = repository_.mesh_buffers;
 
     auto vertex_usage_flags = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
                               | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     if (isVulkanRayTracingEnabled()) {
       vertex_usage_flags |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
     }
-    mesh_buffers->vertex_position_buffer = resource_allocator_->create_buffer(
+    mesh_buffers->vertex_position_buffer = resource_allocator_.create_buffer(
         BufferTemplate("Vertex Positions Storage Buffer", kMaxVertexPositionBufferSize, vertex_usage_flags,
                        0, VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
-    mesh_buffers->vertex_data_buffer = resource_allocator_->create_buffer(
+    mesh_buffers->vertex_data_buffer = resource_allocator_.create_buffer(
         BufferTemplate("Vertex Data Storage Buffer", kMaxVertexDataBufferSize,
                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
                            | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
@@ -178,49 +186,49 @@ namespace gestalt::application {
     if (isVulkanRayTracingEnabled()) {
       index_usage_flags |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
     }
-    mesh_buffers->index_buffer = resource_allocator_->create_buffer(
+    mesh_buffers->index_buffer = resource_allocator_.create_buffer(
         BufferTemplate("Index Storage Buffer", kMaxIndexBufferSize, index_usage_flags, 0,
                        VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
 
-    mesh_buffers->meshlet_buffer = resource_allocator_->create_buffer(
+    mesh_buffers->meshlet_buffer = resource_allocator_.create_buffer(
         BufferTemplate("Meshlet Storage Buffer", kMaxMeshletBufferSize,
                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
                        VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
-    mesh_buffers->meshlet_vertices = resource_allocator_->create_buffer(
+    mesh_buffers->meshlet_vertices = resource_allocator_.create_buffer(
         BufferTemplate("Meshlet Vertex Storage Buffer", kMaxMeshletVertexBufferSize,
                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
                        VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
-    mesh_buffers->meshlet_triangles = resource_allocator_->create_buffer(
+    mesh_buffers->meshlet_triangles = resource_allocator_.create_buffer(
         BufferTemplate("Meshlet Triangle Storage Buffer", kMaxMeshletIndexBufferSize,
                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
                        VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
 
-    mesh_buffers->meshlet_task_commands_buffer = resource_allocator_->create_buffer(
+    mesh_buffers->meshlet_task_commands_buffer = resource_allocator_.create_buffer(
         BufferTemplate("Meshlet Task Commands Storage Buffer", kMaxMeshletTaskCommandsBufferSize,
                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, 0,
                        VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
-    mesh_buffers->mesh_draw_buffer = resource_allocator_->create_buffer(BufferTemplate(
+    mesh_buffers->mesh_draw_buffer = resource_allocator_.create_buffer(BufferTemplate(
         "Mesh Draws Storage Buffer", kMaxMeshDrawBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
-    mesh_buffers->command_count_buffer = resource_allocator_->create_buffer(
+    mesh_buffers->command_count_buffer = resource_allocator_.create_buffer(
         BufferTemplate("Draw Command Count Storage Buffer", kMaxDrawCountBufferSize,
                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
                        VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
-    mesh_buffers->group_count_buffer = resource_allocator_->create_buffer(
+    mesh_buffers->group_count_buffer = resource_allocator_.create_buffer(
         BufferTemplate("Group Count Storage Buffer", kMaxDrawCountBufferSize,
                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
                            | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                        0, VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
 
-    mesh_buffers->luminance_histogram_buffer = resource_allocator_->create_buffer(
+    mesh_buffers->luminance_histogram_buffer = resource_allocator_.create_buffer(
         BufferTemplate("Luminance Histogram Buffer", 256 * sizeof(uint32), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                        0, VMA_MEMORY_USAGE_GPU_ONLY, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
   }
 
-  void MeshSystem::update(float delta_time, const UserInput& movement, float aspect) {
-    if (repository_->meshes.size() != meshes_) {
-      meshes_ = repository_->meshes.size();
+  void MeshSystem::update() {
+    if (repository_.meshes.size() != meshes_) {
+      meshes_ = repository_.meshes.size();
 
       /* TODO use this
       update_mesh(get_indices(), .get_vertices());*/
@@ -237,16 +245,16 @@ namespace gestalt::application {
         1.f,
     };
 
-    repository_->mesh_draws_.clear();
+    repository_.mesh_draws_.clear();
     traverse_scene(0, root_transform);
 
-    if (repository_->mesh_draws_.empty()) {
+    if (repository_.mesh_draws_.empty()) {
       return;
     }
 
-    const size_t mesh_draw_buffer_size = repository_->mesh_draws_.size() * sizeof(MeshDraw);
+    const size_t mesh_draw_buffer_size = repository_.mesh_draws_.size() * sizeof(MeshDraw);
 
-    const auto& mesh_buffers = repository_->mesh_buffers;
+    const auto& mesh_buffers = repository_.mesh_buffers;
 
     if (kMaxMeshDrawBufferSize < mesh_draw_buffer_size) {
       fmt::println("mesh_draw_buffer size needs to be increased by {}",
@@ -254,27 +262,27 @@ namespace gestalt::application {
     }
 
     mesh_buffers->mesh_draw_buffer->copy_to_mapped(
-        gpu_->getAllocator(), repository_->mesh_draws_.data(),
+        gpu_.getAllocator(), repository_.mesh_draws_.data(),
                                                    mesh_draw_buffer_size);
 
   }
 
   void MeshSystem::traverse_scene(const Entity entity, const TransformComponent& parent_transform) {
-    const auto& node = repository_->scene_graph.get(entity).value().get();
+    const auto& node = repository_.scene_graph.get(entity).value().get();
     if (!node.visible) {
       return;
     }
 
-    const auto& local_transform = repository_->transform_components.get(entity)->get();
+    const auto& local_transform = repository_.transform_components.get(entity)->get();
 
     TransformComponent world_transform = parent_transform * local_transform;
 
-    const auto& mesh_component = repository_->mesh_components.get(entity);
+    const auto& mesh_component = repository_.mesh_components.get(entity);
     if (mesh_component.has_value()) {
-      const auto& mesh = repository_->meshes.get(mesh_component->get().mesh);
+      const auto& mesh = repository_.meshes.get(mesh_component->get().mesh);
 
       for (const auto surface : mesh.surfaces) {
-        const auto& material = repository_->materials.get(surface.material);
+        const auto& material = repository_.materials.get(surface.material);
 
         MeshDraw draw{
             .position = world_transform.position,
@@ -291,7 +299,7 @@ namespace gestalt::application {
             .materialIndex = static_cast<uint32>(surface.material),
         };
 
-        repository_->mesh_draws_.push_back(draw);
+        repository_.mesh_draws_.push_back(draw);
 
         if (material.config.transparent) {
           // mesh_task_commands_.push_back(task);
@@ -305,22 +313,22 @@ namespace gestalt::application {
     }
   }
 
-  void MeshSystem::cleanup() {
-    const auto& mesh_buffers = repository_->mesh_buffers;
-    resource_allocator_->destroy_buffer(mesh_buffers->vertex_position_buffer);
-    resource_allocator_->destroy_buffer(mesh_buffers->vertex_data_buffer);
-    resource_allocator_->destroy_buffer(mesh_buffers->index_buffer);
-    resource_allocator_->destroy_buffer(mesh_buffers->meshlet_buffer);
-    resource_allocator_->destroy_buffer(mesh_buffers->meshlet_vertices);
-    resource_allocator_->destroy_buffer(mesh_buffers->meshlet_triangles);
+  MeshSystem::~MeshSystem() {
+    const auto& mesh_buffers = repository_.mesh_buffers;
+    resource_allocator_.destroy_buffer(mesh_buffers->vertex_position_buffer);
+    resource_allocator_.destroy_buffer(mesh_buffers->vertex_data_buffer);
+    resource_allocator_.destroy_buffer(mesh_buffers->index_buffer);
+    resource_allocator_.destroy_buffer(mesh_buffers->meshlet_buffer);
+    resource_allocator_.destroy_buffer(mesh_buffers->meshlet_vertices);
+    resource_allocator_.destroy_buffer(mesh_buffers->meshlet_triangles);
 
-      resource_allocator_->destroy_buffer(mesh_buffers->meshlet_task_commands_buffer);
-      resource_allocator_->destroy_buffer(mesh_buffers->mesh_draw_buffer);
-      resource_allocator_->destroy_buffer(mesh_buffers->command_count_buffer);
-      resource_allocator_->destroy_buffer(mesh_buffers->group_count_buffer);
+      resource_allocator_.destroy_buffer(mesh_buffers->meshlet_task_commands_buffer);
+      resource_allocator_.destroy_buffer(mesh_buffers->mesh_draw_buffer);
+      resource_allocator_.destroy_buffer(mesh_buffers->command_count_buffer);
+      resource_allocator_.destroy_buffer(mesh_buffers->group_count_buffer);
 
-    repository_->vertex_data.clear();
-    repository_->vertex_positions.clear();
-    repository_->indices.clear();
+    repository_.vertex_data.clear();
+    repository_.vertex_positions.clear();
+    repository_.indices.clear();
   }
 }  // namespace gestalt::application

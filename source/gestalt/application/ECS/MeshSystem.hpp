@@ -5,7 +5,11 @@
 
 namespace gestalt::application {
 
-    class MeshSystem final : public BaseSystem {
+    class MeshSystem final {
+    IGpu& gpu_;
+    IResourceAllocator& resource_allocator_;
+    Repository& repository_;
+    FrameProvider& frame_;
       size_t meshes_ = 0;
       void traverse_scene(Entity entity, const TransformComponent& parent_transform);
       void upload_mesh();
@@ -13,8 +17,9 @@ namespace gestalt::application {
       void create_buffers();
 
     public:
-      MeshSystem() = default;
-      ~MeshSystem() override = default;
+      MeshSystem(IGpu& gpu, IResourceAllocator& resource_allocator, Repository& repository,
+                 FrameProvider& frame);
+      ~MeshSystem();
 
       MeshSystem(const MeshSystem&) = delete;
       MeshSystem& operator=(const MeshSystem&) = delete;
@@ -22,9 +27,7 @@ namespace gestalt::application {
       MeshSystem(MeshSystem&&) = delete;
       MeshSystem& operator=(MeshSystem&&) = delete;
 
-      void prepare() override;
-      void update(float delta_time, const UserInput& movement, float aspect) override;
-      void cleanup() override;
+      void update();
     };
 
 }  // namespace gestalt

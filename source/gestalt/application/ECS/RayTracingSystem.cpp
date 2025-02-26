@@ -13,8 +13,13 @@
 
 namespace gestalt::application {
 
-  void RayTracingSystem::prepare() {
-  }
+  RayTracingSystem::RayTracingSystem(IGpu& gpu, IResourceAllocator& resource_allocator,
+                                     Repository& repository, FrameProvider& frame)
+      : gpu_(gpu),
+        resource_allocator_(resource_allocator),
+        repository_(repository),
+        frame_(frame)
+  {}
 
   void RayTracingSystem::build_tlas() {
     // TODO: This is a TLAS build, not an update, and probably should be refactored to some other
@@ -31,31 +36,31 @@ namespace gestalt::application {
     std::vector<VkAccelerationStructureInstanceKHR> tlasInstances;
     collect_tlas_instance_data(root_entity, root_transform, tlasInstances);
 
-    if (repository_->tlas != nullptr) {
-      vkDestroyAccelerationStructureKHR(gpu_->getDevice(),
-                                        repository_->tlas->acceleration_structure, nullptr);
+    if (repository_.tlas != nullptr) {
+      vkDestroyAccelerationStructureKHR(gpu_.getDevice(),
+                                        repository_.tlas->acceleration_structure, nullptr);
     }
-    repository_->tlas = std::make_shared<AccelerationStructure>();
+    repository_.tlas = std::make_shared<AccelerationStructure>();
 
     VkDeviceSize instancesSize = tlasInstances.size() * sizeof(VkAccelerationStructureInstanceKHR);
-    const auto tlasInstanceScratchBuffer = resource_allocator_->create_buffer(
+    const auto tlasInstanceScratchBuffer = resource_allocator_.create_buffer(
         BufferTemplate("TLAS Instances Scratch Buffer", instancesSize,
                        VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                        0, VMA_MEMORY_USAGE_CPU_TO_GPU));
 
-    repository_->tlas_instance_buffer = resource_allocator_->create_buffer(
+    repository_.tlas_instance_buffer = resource_allocator_.create_buffer(
         BufferTemplate("TLAS Instance Buffer", instancesSize,
                        VK_BUFFER_USAGE_TRANSFER_DST_BIT
                            | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR
                            | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                        0, VMA_MEMORY_USAGE_GPU_ONLY));
 
-    // vmaCopyMemoryToAllocation(gpu_->getAllocator(), tlasInstances.data(),
+    // vmaCopyMemoryToAllocation(gpu_.getAllocator(), tlasInstances.data(),
     // tlasScratchBuffer->get_allocation(), 0, instancesSize);
     void* tlasInstanceStagingMapped;
     const VmaAllocation allocation = tlasInstanceScratchBuffer->get_allocation();
 
-    VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation, &tlasInstanceStagingMapped));
+    VK_CHECK(vmaMapMemory(gpu_.getAllocator(), allocation, &tlasInstanceStagingMapped));
     std::memcpy(tlasInstanceStagingMapped, tlasInstances.data(),
                 tlasInstances.size() * sizeof(MeshDraw));
 
@@ -64,7 +69,7 @@ namespace gestalt::application {
     };
     geometryInstancesData.arrayOfPointers = VK_FALSE;
     geometryInstancesData.data
-        = VkDeviceOrHostAddressConstKHR(repository_->tlas_instance_buffer->get_address());
+        = VkDeviceOrHostAddressConstKHR(repository_.tlas_instance_buffer->get_address());
 
     VkAccelerationStructureGeometryDataKHR tlasGeometryData = {};
     tlasGeometryData.instances = geometryInstancesData;
@@ -89,10 +94,10 @@ namespace gestalt::application {
     };
     const uint32_t instanceCount = tlasInstances.size();
     vkGetAccelerationStructureBuildSizesKHR(
-        gpu_->getDevice(), VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &tlasBuildGeometryInfo,
+        gpu_.getDevice(), VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &tlasBuildGeometryInfo,
         &instanceCount, &tlasBuildSizesInfo);
 
-    repository_->tlas_storage_buffer = resource_allocator_->create_buffer(
+    repository_.tlas_storage_buffer = resource_allocator_.create_buffer(
         BufferTemplate("TLAS Storage Buffer", tlasBuildSizesInfo.accelerationStructureSize,
                        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR
                            | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -101,22 +106,22 @@ namespace gestalt::application {
     VkAccelerationStructureCreateInfoKHR tlasCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR,
     };
-    tlasCreateInfo.buffer = repository_->tlas_storage_buffer->get_buffer_handle();
+    tlasCreateInfo.buffer = repository_.tlas_storage_buffer->get_buffer_handle();
     tlasCreateInfo.offset = 0;
     tlasCreateInfo.size = tlasBuildSizesInfo.accelerationStructureSize;
     tlasCreateInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
 
-    vkCreateAccelerationStructureKHR(gpu_->getDevice(), &tlasCreateInfo, nullptr,
-                                     &repository_->tlas->acceleration_structure);
-    gpu_->set_debug_name("TLAS", VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR,
-                         reinterpret_cast<uint64_t>(repository_->tlas->acceleration_structure));
+    vkCreateAccelerationStructureKHR(gpu_.getDevice(), &tlasCreateInfo, nullptr,
+                                     &repository_.tlas->acceleration_structure);
+    gpu_.set_debug_name("TLAS", VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR,
+                         reinterpret_cast<uint64_t>(repository_.tlas->acceleration_structure));
 
-    const auto tlasBuildScratchBuffer = resource_allocator_->create_buffer(BufferTemplate(
+    const auto tlasBuildScratchBuffer = resource_allocator_.create_buffer(BufferTemplate(
         "TLAS Scratch Buffer", tlasBuildSizesInfo.buildScratchSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, 0,
         VMA_MEMORY_USAGE_AUTO));
 
-    tlasBuildGeometryInfo.dstAccelerationStructure = repository_->tlas->acceleration_structure;
+    tlasBuildGeometryInfo.dstAccelerationStructure = repository_.tlas->acceleration_structure;
     tlasBuildGeometryInfo.scratchData
         = VkDeviceOrHostAddressKHR(tlasBuildScratchBuffer->get_address());
 
@@ -125,14 +130,14 @@ namespace gestalt::application {
     std::vector<const VkAccelerationStructureBuildRangeInfoKHR*> tlasBuildRanges
         = {&tlasBuildRangeInfo};
 
-    gpu_->immediateSubmit([&](const VkCommandBuffer& commandBuffer) {
+    gpu_.immediateSubmit([&](const VkCommandBuffer& commandBuffer) {
       // Copy instance data from staging to gpu-side buffer
       VkBufferCopy copyRegion = {};
       copyRegion.size = instancesSize;
       copyRegion.srcOffset = 0;
       copyRegion.dstOffset = 0;
       vkCmdCopyBuffer(commandBuffer, tlasInstanceScratchBuffer->get_buffer_handle(),
-                      repository_->tlas_instance_buffer->get_buffer_handle(), 1, &copyRegion);
+                      repository_.tlas_instance_buffer->get_buffer_handle(), 1, &copyRegion);
 
       // Build TLAS
       vkCmdBuildAccelerationStructuresKHR(commandBuffer, tlasBuildRanges.size(),
@@ -143,16 +148,16 @@ namespace gestalt::application {
     const VkAccelerationStructureDeviceAddressInfoKHR tlasAddressInfo = {
       .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR,
       .pNext = nullptr,
-      .accelerationStructure = repository_->tlas->acceleration_structure
+      .accelerationStructure = repository_.tlas->acceleration_structure
   };
-    auto tlasAddress = vkGetAccelerationStructureDeviceAddressKHR(gpu_->getDevice(), &tlasAddressInfo);
-    repository_->tlas->address = tlasAddress;
+    auto tlasAddress = vkGetAccelerationStructureDeviceAddressKHR(gpu_.getDevice(), &tlasAddressInfo);
+    repository_.tlas->address = tlasAddress;
   }
 
   void RayTracingSystem::build_blas() {
-    auto* mesh_buffers = repository_->mesh_buffers.get();
-    auto* ray_tracing_buffers = repository_->ray_tracing_buffer.get();
-    auto& meshes = repository_->meshes.data();
+    auto* mesh_buffers = repository_.mesh_buffers.get();
+    auto* ray_tracing_buffers = repository_.ray_tracing_buffer.get();
+    auto& meshes = repository_.meshes.data();
 
     const size_t blasCount = std::accumulate(
         std::begin(meshes), std::end(meshes), 0,
@@ -248,7 +253,7 @@ namespace gestalt::application {
 
     for (size_t i = 0; i < blasCount; i++) {
       vkGetAccelerationStructureBuildSizesKHR(
-          gpu_->getDevice(), VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
+          gpu_.getDevice(), VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
           &buildGeometryInfos[i], &primitiveCounts[i], &buildSizesInfos[i]);
     }
 
@@ -256,7 +261,7 @@ namespace gestalt::application {
      * Create BLAS Data and Staging Buffers, and calculate per BLAS offsets
      */
 
-    /** gpu_->getAccelerationStructureProperties().minAccelerationStructureScratchOffsetAlignment;
+    /** gpu_.getAccelerationStructureProperties().minAccelerationStructureScratchOffsetAlignment;
      * Minimum alignment on a desktop 3060 was 128, however the validation says that the offset must
      * be a multiple of 256, so we're just gonna use 256 for now.
      */
@@ -271,7 +276,7 @@ namespace gestalt::application {
         });
 
     ray_tracing_buffers->bottom_level_acceleration_structure_buffer
-        = resource_allocator_->create_buffer(
+        = resource_allocator_.create_buffer(
         BufferTemplate("BLAS Buffer", blasDataBufferSize,
                        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR
                            | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -291,7 +296,7 @@ namespace gestalt::application {
       maxAlignedBlasSize = std::max(maxAlignedBlasSize, alignedSize);
     }
 
-    const auto scratchBuffer = resource_allocator_->create_buffer(BufferTemplate(
+    const auto scratchBuffer = resource_allocator_.create_buffer(BufferTemplate(
         "BLAS Scratch Buffer", blasDataBufferSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, 0,
         VMA_MEMORY_USAGE_AUTO));
@@ -310,10 +315,10 @@ namespace gestalt::application {
       };
 
       vkCreateAccelerationStructureKHR(
-          gpu_->getDevice(), &create_info, nullptr,
+          gpu_.getDevice(), &create_info, nullptr,
           &ray_tracing_buffers->bottom_level_acceleration_structures[i]->acceleration_structure);
 
-      gpu_->set_debug_name(
+      gpu_.set_debug_name(
           blasNames[i], VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR,
           reinterpret_cast<uint64_t>(ray_tracing_buffers->bottom_level_acceleration_structures[i]
                                          ->acceleration_structure));
@@ -326,7 +331,7 @@ namespace gestalt::application {
           = ray_tracing_buffers->bottom_level_acceleration_structures[i]->acceleration_structure,
       };
       auto blasAddress
-          = vkGetAccelerationStructureDeviceAddressKHR(gpu_->getDevice(), &blas_address);
+          = vkGetAccelerationStructureDeviceAddressKHR(gpu_.getDevice(), &blas_address);
       ray_tracing_buffers->bottom_level_acceleration_structures[i]->address = blasAddress;
     }
 
@@ -343,7 +348,7 @@ namespace gestalt::application {
           = VkDeviceOrHostAddressKHR(scratchBuffer->get_address() + blasDataBufferOffsets[i]);
     }
 
-    gpu_->immediateSubmit([&](const VkCommandBuffer& commandBuffer) {
+    gpu_.immediateSubmit([&](const VkCommandBuffer& commandBuffer) {
       vkCmdBuildAccelerationStructuresKHR(commandBuffer, buildRangeInfoPtrs.size(),
                                           buildGeometryInfos.data(), buildRangeInfoPtrs.data());
     });
@@ -352,21 +357,21 @@ namespace gestalt::application {
   void RayTracingSystem::collect_tlas_instance_data(
       Entity entity, const TransformComponent& parent_transform,
       std::vector<VkAccelerationStructureInstanceKHR>& data) {
-    const auto& node = repository_->scene_graph.get(entity).value().get();
+    const auto& node = repository_.scene_graph.get(entity).value().get();
     if (!node.visible) {
       return;
     }
 
-    const auto& localTransform = repository_->transform_components.get(entity)->get();
+    const auto& localTransform = repository_.transform_components.get(entity)->get();
     TransformComponent worldTransform = parent_transform * localTransform;
 
-    const auto& meshComponent = repository_->mesh_components.get(entity);
+    const auto& meshComponent = repository_.mesh_components.get(entity);
     if (meshComponent.has_value()) {
-      const auto& mesh = repository_->meshes.get(meshComponent->get().mesh);
+      const auto& mesh = repository_.meshes.get(meshComponent->get().mesh);
       for (const auto surface : mesh.surfaces) {
         if (surface.bottom_level_as != no_component) {
           auto blas_address
-              = repository_->ray_tracing_buffer
+              = repository_.ray_tracing_buffer
                                    ->bottom_level_acceleration_structures[surface.bottom_level_as]->address;
           VkAccelerationStructureInstanceKHR instance = {};
           instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
@@ -394,26 +399,26 @@ namespace gestalt::application {
     }
   }
 
-
-  void RayTracingSystem::update(float delta_time, const UserInput& movement, float aspect) {
+  void RayTracingSystem::update() {
     if (!isVulkanRayTracingEnabled()) {
       return;
     }
 
-    if (repository_->meshes.size() != meshes_) {
+    if (repository_.meshes.size() != meshes_) {
       build_blas();
       build_tlas();
-      meshes_ = repository_->meshes.size();
+      meshes_ = repository_.meshes.size();
     }
   }
 
-  void RayTracingSystem::cleanup() {
+  
+  RayTracingSystem::~RayTracingSystem() {
     if (!isVulkanRayTracingEnabled()) {
       return;
     }
-    resource_allocator_->destroy_buffer(repository_->tlas_instance_buffer);
-    resource_allocator_->destroy_buffer(repository_->tlas_storage_buffer);
-    resource_allocator_->destroy_buffer(
-        repository_->ray_tracing_buffer->bottom_level_acceleration_structure_buffer);
+    resource_allocator_.destroy_buffer(repository_.tlas_instance_buffer);
+    resource_allocator_.destroy_buffer(repository_.tlas_storage_buffer);
+    resource_allocator_.destroy_buffer(
+        repository_.ray_tracing_buffer->bottom_level_acceleration_structure_buffer);
   }
 }  // namespace gestalt::application

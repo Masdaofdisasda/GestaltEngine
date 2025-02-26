@@ -5,8 +5,13 @@
 
 namespace gestalt::application {
 
-    class MaterialSystem final : public BaseSystem {
+    class MaterialSystem final {
       std::array<VkDescriptorImageInfo, getMaxTextures()> image_infos_ = {};
+
+      IGpu& gpu_;
+      IResourceAllocator& resource_allocator_;
+      Repository& repository_;
+      FrameProvider& frame_;
 
       void create_buffers();
       void create_default_material();
@@ -14,8 +19,9 @@ namespace gestalt::application {
       void write_material(PbrMaterial& material, uint32 material_id);
 
     public:
-      MaterialSystem() = default;
-      ~MaterialSystem() override = default;
+      MaterialSystem(IGpu& gpu, IResourceAllocator& resource_allocator, Repository& repository,
+                     FrameProvider& frame);
+      ~MaterialSystem();
 
       MaterialSystem(const MaterialSystem&) = delete;
       MaterialSystem& operator=(const MaterialSystem&) = delete;
@@ -23,9 +29,7 @@ namespace gestalt::application {
       MaterialSystem(MaterialSystem&&) = delete;
       MaterialSystem& operator=(MaterialSystem&&) = delete;
 
-      void prepare() override;
-      void update(float delta_time, const UserInput& movement, float aspect) override;
-      void cleanup() override;
+      void update();
     };
 
 }  // namespace gestalt

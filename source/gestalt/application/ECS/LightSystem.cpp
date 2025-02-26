@@ -12,33 +12,41 @@ namespace gestalt::application {
 
   inline size_t GetMaxViewProjMatrices() { return getMaxPointLights() * 6 + getMaxDirectionalLights(); }
 
-  void LightSystem::prepare() {
+  
+  LightSystem::LightSystem(IGpu& gpu, IResourceAllocator& resource_allocator,
+                           Repository& repository, FrameProvider& frame)
+
+    : gpu_(gpu),
+        resource_allocator_(resource_allocator),
+        repository_(repository),
+        frame_(frame)
+  {
       create_buffers();
   }
 
   void LightSystem::create_buffers() {
-    const auto& light_data = repository_->light_buffers;
+    const auto& light_data = repository_.light_buffers;
 
     light_data->dir_light_buffer
-        = resource_allocator_->create_buffer(std::move(BufferTemplate(
+        = resource_allocator_.create_buffer(std::move(BufferTemplate(
             "Directional Light Storage Buffer", sizeof(GpuDirectionalLight) * getMaxDirectionalLights(),
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)));
     light_data->point_light_buffer
-        = resource_allocator_->create_buffer(std::move(BufferTemplate(
+        = resource_allocator_.create_buffer(std::move(BufferTemplate(
             "Point Light Storage Buffer", sizeof(GpuPointLight) * getMaxPointLights(),
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)));
     light_data->spot_light_buffer
-        = resource_allocator_->create_buffer(std::move(BufferTemplate(
+        = resource_allocator_.create_buffer(std::move(BufferTemplate(
             "Spot Light Storage Buffer", sizeof(GpuSpotLight) * getMaxSpotLights(),
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)));
     light_data->view_proj_matrices
-        = resource_allocator_->create_buffer(std::move(BufferTemplate(
+        = resource_allocator_.create_buffer(std::move(BufferTemplate(
             "View Proj Light Storage Buffer", sizeof(GpuProjViewData) * GetMaxViewProjMatrices(),
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO,
@@ -47,7 +55,7 @@ namespace gestalt::application {
   }
 
   glm::mat4 LightSystem::calculate_directional_light_view_matrix(const glm::vec3 direction) const {
-    auto& [min, max, is_dirty] = repository_->scene_graph.get(root_entity).value().get().bounds;
+    auto& [min, max, is_dirty] = repository_.scene_graph.get(root_entity).value().get().bounds;
 
     const glm::vec3 center = (min + max) * 0.5f;
     glm::vec3 size = max - min;
@@ -105,7 +113,7 @@ namespace gestalt::application {
       const glm::mat4& light_view) const {
     // Retrieve scene min/max
     auto& [scene_min, scene_max, dirty]
-        = repository_->scene_graph.get(root_entity).value().get().bounds;
+        = repository_.scene_graph.get(root_entity).value().get().bounds;
 
     // Step 1: Compute 8 corners of the scene bounding box
     glm::vec3 corners[8] = {scene_min,
@@ -233,40 +241,39 @@ namespace gestalt::application {
     return glm::orthoRH_ZO(left, right, bottom, top, nearZ, farZ);
   }
 
+  void LightSystem::update() {
+    repository_.light_view_projections.clear();
+    repository_.directional_lights.clear();
+    repository_.point_lights.clear();
+    repository_.spot_lights.clear();
 
-  void LightSystem::update(float delta_time, const UserInput& movement, float aspect) {
-    repository_->light_view_projections.clear();
-    repository_->directional_lights.clear();
-    repository_->point_lights.clear();
-    repository_->spot_lights.clear();
-
-    for (auto [entity, Light_component] : repository_->light_components.asVector()) {
+    for (auto [entity, Light_component] : repository_.light_components.asVector()) {
       if (Light_component.get().type == LightType::kDirectional) {
         auto& light = Light_component.get();
-        const auto& rotation = repository_->transform_components[entity].rotation;
+        const auto& rotation = repository_.transform_components[entity].rotation;
         auto& dir_light_data = std::get<DirectionalLightData>(Light_component.get().specific);
         glm::vec3 direction = -normalize(rotation * glm::vec3(0, 0, -1.f));
 
-        dir_light_data.light_view_projection = repository_->light_view_projections.size();
+        dir_light_data.light_view_projection = repository_.light_view_projections.size();
         // TODO fix this
         glm::mat4 inv_cam
-            = repository_->per_frame_data_buffers->data.at(frame_->get_current_frame_index())
+            = repository_.per_frame_data_buffers->data.at(frame_.get_current_frame_index())
                   .inv_viewProj;
         auto view = calculate_directional_light_view_matrix_cam_only(direction, inv_cam);
         auto proj = calculate_directional_light_proj_matrix_camera_only(view, inv_cam, 0.f);
-        repository_->light_view_projections.add({view, proj});
+        repository_.light_view_projections.add({view, proj});
 
         GpuDirectionalLight dir_light = {};
         dir_light.color = light.base.color;
         dir_light.intensity = light.base.intensity;
         dir_light.direction = direction;
         dir_light.viewProj = dir_light_data.light_view_projection;
-        repository_->directional_lights.add(dir_light);
+        repository_.directional_lights.add(dir_light);
 
         light.is_dirty = false;
       } else if (Light_component.get().type == LightType::kPoint) {
         auto& light = Light_component.get();
-        const auto& position = repository_->transform_components[entity].position;
+        const auto& position = repository_.transform_components[entity].position;
         const auto& point_light_data = std::get<PointLightData>(light.specific);
 
         // TODO Calculate the 6 view matrices for the light
@@ -276,13 +283,13 @@ namespace gestalt::application {
         point_light.intensity = light.base.intensity;
         point_light.position = position;
         point_light.range = point_light_data.range;
-        repository_->point_lights.add(point_light);
+        repository_.point_lights.add(point_light);
 
         light.is_dirty = false;
       } else if (Light_component.get().type == LightType::kSpot) {
         auto& light = Light_component.get();
-        const auto& position = repository_->transform_components[entity].position;
-        const auto& rotation = repository_->transform_components[entity].rotation;
+        const auto& position = repository_.transform_components[entity].position;
+        const auto& rotation = repository_.transform_components[entity].rotation;
         const auto& spot_light_data = std::get<SpotLightData>(light.specific);
         GpuSpotLight spot_light = {};
         spot_light.color = light.base.color;
@@ -292,42 +299,41 @@ namespace gestalt::application {
         spot_light.direction = normalize(rotation * glm::vec3(0, 0, -1.f));
         spot_light.inner_cone_angle = spot_light_data.inner_cone_cos;
         spot_light.outer_cone_angle = spot_light_data.outer_cone_cos;
-        repository_->spot_lights.add(spot_light);
+        repository_.spot_lights.add(spot_light);
         light.is_dirty = false;
       }
     }
 
-    auto& light_data = repository_->light_buffers;
+    auto& light_data = repository_.light_buffers;
 
     light_data->dir_light_buffer->copy_to_mapped(
-        gpu_->getAllocator(), repository_->directional_lights.data().data(),
-        sizeof(GpuDirectionalLight) * repository_->directional_lights.size());
+        gpu_.getAllocator(), repository_.directional_lights.data().data(),
+        sizeof(GpuDirectionalLight) * repository_.directional_lights.size());
 
     light_data->point_light_buffer->copy_to_mapped(
-        gpu_->getAllocator(), repository_->point_lights.data().data(),
-        sizeof(GpuPointLight) * repository_->point_lights.size());
+        gpu_.getAllocator(), repository_.point_lights.data().data(),
+        sizeof(GpuPointLight) * repository_.point_lights.size());
 
     light_data->spot_light_buffer->copy_to_mapped(
-        gpu_->getAllocator(), repository_->spot_lights.data().data(),
-        sizeof(GpuSpotLight) * repository_->spot_lights.size());
+        gpu_.getAllocator(), repository_.spot_lights.data().data(),
+        sizeof(GpuSpotLight) * repository_.spot_lights.size());
 
     light_data->view_proj_matrices->copy_to_mapped(
-        gpu_->getAllocator(), repository_->light_view_projections.data().data(),
-        sizeof(GpuProjViewData) * repository_->light_view_projections.size());
+        gpu_.getAllocator(), repository_.light_view_projections.data().data(),
+        sizeof(GpuProjViewData) * repository_.light_view_projections.size());
   }
 
-  void LightSystem::cleanup() {
-    repository_->directional_lights.clear();
-    repository_->point_lights.clear();
-    repository_->spot_lights.clear();
-    repository_->light_view_projections.clear();
+  LightSystem::~LightSystem() {
+    repository_.directional_lights.clear();
+    repository_.point_lights.clear();
+    repository_.spot_lights.clear();
+    repository_.light_view_projections.clear();
 
-    const auto& light_buffers = repository_->light_buffers;
-    resource_allocator_->destroy_buffer(light_buffers->dir_light_buffer);
-    resource_allocator_->destroy_buffer(light_buffers->point_light_buffer);
-    resource_allocator_->destroy_buffer(light_buffers->view_proj_matrices);
-    resource_allocator_->destroy_buffer(light_buffers->spot_light_buffer);
-
+    const auto& light_buffers = repository_.light_buffers;
+    resource_allocator_.destroy_buffer(light_buffers->dir_light_buffer);
+    resource_allocator_.destroy_buffer(light_buffers->point_light_buffer);
+    resource_allocator_.destroy_buffer(light_buffers->view_proj_matrices);
+    resource_allocator_.destroy_buffer(light_buffers->spot_light_buffer);
   }
 
 }  // namespace gestalt::application

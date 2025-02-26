@@ -19,12 +19,17 @@ namespace gestalt::foundation {
 
 namespace gestalt::application {
 
-    class PhysicSystem final : public BaseSystem {
+    class PhysicSystem final {
+    IGpu& gpu_;
+    IResourceAllocator& resource_allocator_;
+    Repository& repository_;
+    FrameProvider& frame_;
       std::unique_ptr<PhysicEngine> physic_engine_;
       Entity player_ = invalid_entity;
     public:
-      PhysicSystem() = default;
-      ~PhysicSystem() override = default;
+      PhysicSystem(IGpu& gpu, IResourceAllocator& resource_allocator, Repository& repository,
+                   FrameProvider& frame);
+      ~PhysicSystem() = default;
 
       PhysicSystem(const PhysicSystem&) = delete;
       PhysicSystem& operator=(const PhysicSystem&) = delete;
@@ -32,10 +37,8 @@ namespace gestalt::application {
       PhysicSystem(PhysicSystem&&) = delete;
       PhysicSystem& operator=(PhysicSystem&&) = delete;
 
-      void prepare() override;
       void move_player(float delta_time, const UserInput& movement) const;
-      void update(float delta_time, const UserInput& movement, float aspect) override;
-      void cleanup() override;
+      void update(float delta_time, const UserInput& movement) const;
     };
 
 }  // namespace gestalt

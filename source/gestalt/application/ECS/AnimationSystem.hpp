@@ -6,7 +6,8 @@
 
 namespace gestalt::application {
 
-    class AnimationSystem final : public BaseSystem {
+    class AnimationSystem final {
+    Repository& repository_;
       float delta_time_ = 0.0f;
       void update_translation(const Entity& entity,
                               AnimationChannel<glm::vec3>& translation_channel, bool loop) const;
@@ -14,8 +15,8 @@ namespace gestalt::application {
                            bool loop) const;
 
     public:
-      AnimationSystem() = default;
-      ~AnimationSystem() override = default;
+    explicit AnimationSystem(Repository& repository);
+      ~AnimationSystem() = default;
 
       AnimationSystem(const AnimationSystem&) = delete;
       AnimationSystem& operator=(const AnimationSystem&) = delete;
@@ -23,7 +24,7 @@ namespace gestalt::application {
       AnimationSystem(AnimationSystem&&) = delete;
       AnimationSystem& operator=(AnimationSystem&&) = delete;
 
-      void update(float delta_time, const UserInput& movement, float aspect) override;
+      void update(float delta_time);
     };
 
 }  // namespace gestalt
