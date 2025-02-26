@@ -8,20 +8,20 @@
 
 namespace gestalt {
 
-  GameEngine::GameEngine() : window_(), gpu_(window_), resource_allocator_(gpu_) {
-
-    scene_manager_->init(&gpu_, &resource_allocator_, repository_.get(),
-                         frame_provider_.get());
-    scene_manager_->update_scene(
-      time_tracking_service_.get_delta_time(), input_system_.get_movement(),
-      static_cast<float>(window_.get_width()) / static_cast<float>(window_.get_height()));
-
+  GameEngine::GameEngine()
+      : gpu_(window_),
+        frame_provider_(&frame_number_),
+        resource_allocator_(gpu_),
+        ecs_(gpu_, resource_allocator_, repository_, frame_provider_) {
+    ecs_.update_scene(
+        time_tracking_service_.get_delta_time(), input_system_.get_movement(),
+        static_cast<float>(window_.get_width()) / static_cast<float>(window_.get_height()));
     render_pipeline_ = std::make_unique<graphics::RenderEngine>();
-    render_pipeline_->init(&gpu_, &window_, &resource_allocator_, repository_.get(),
-                           imgui_.get(), frame_provider_.get());
+    render_pipeline_->init(&gpu_, &window_, &resource_allocator_, &repository_, imgui_.get(),
+                           &frame_provider_);
 
     register_gui_actions();
-    imgui_->init(&gpu_, &window_, render_pipeline_->get_swapchain_format(), repository_.get(),
+    imgui_->init(&gpu_, &window_, render_pipeline_->get_swapchain_format(), &repository_,
                  gui_actions_);
 
     is_initialized_ = true;
@@ -31,16 +31,15 @@ namespace gestalt {
   void GameEngine::register_gui_actions() {
     gui_actions_.exit = [this]() { quit_ = true; };
     gui_actions_.load_gltf
-        = [this](const std::filesystem::path& file_path) { scene_manager_->request_scene(file_path); };
-    gui_actions_.get_component_factory = [this]() -> application::ComponentFactory& {
-      return scene_manager_->get_component_factory();
-    };
+        = [this](const std::filesystem::path& file_path) { ecs_.request_scene(file_path); };
+    gui_actions_.get_component_factory
+        = [this]() -> application::ComponentFactory& { return ecs_.get_component_factory(); };
     gui_actions_.get_render_config
         = [this]() -> graphics::RenderConfig& { return render_pipeline_->get_config(); };
     gui_actions_.set_active_camera
-        = [this](const foundation::Entity camera) { scene_manager_->set_active_camera(camera); };
+        = [this](const foundation::Entity camera) { ecs_.set_active_camera(camera); };
     gui_actions_.get_active_camera
-        = [this]() -> foundation::Entity { return scene_manager_->get_active_camera(); };
+        = [this]() -> foundation::Entity { return ecs_.get_active_camera(); };
   }
 
   void GameEngine::run() {
@@ -85,13 +84,13 @@ namespace gestalt {
       render_pipeline_->get_config().luminance_params.time_coeff
           = time_tracking_service_.get_delta_time();
 
-      scene_manager_->update_scene(
+      ecs_.update_scene(
           time_tracking_service_.get_delta_time(), input_system_.get_movement(),
           static_cast<float>(window_.get_width()) / static_cast<float>(window_.get_height()));
 
       render_pipeline_->execute_passes();
 
-      frame_number++;
+      frame_number_++;
       FrameMark;
     }
   }
@@ -102,7 +101,6 @@ namespace gestalt {
       vkDeviceWaitIdle(gpu_.getDevice());
 
       imgui_->cleanup();
-      scene_manager_->cleanup();
       render_pipeline_->cleanup();
     }
   }

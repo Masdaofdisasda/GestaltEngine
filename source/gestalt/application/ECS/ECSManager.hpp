@@ -25,9 +25,9 @@ namespace gestalt::application {
      * @brief Class responsible for managing scenes, entities, and their components.
      */
     class ECSManager {
-      IGpu* gpu_ = nullptr;
-      IResourceAllocator* resource_allocator_ = nullptr;
-      Repository* repository_ = nullptr;
+      IGpu& gpu_;
+      IResourceAllocator& resource_allocator_;
+      Repository& repository_;
 
       std::unique_ptr<AssetLoader> asset_loader_;
       std::unique_ptr<ComponentFactory> component_factory_;
@@ -46,19 +46,15 @@ namespace gestalt::application {
       std::filesystem::path scene_path_;
 
     public:
-      ECSManager() = default;
-      ~ECSManager() = default;
+      ECSManager(IGpu& gpu, IResourceAllocator& resource_allocator, Repository& repository,
+                 FrameProvider& frame);
+      ~ECSManager();
 
       ECSManager(const ECSManager&) = delete;
       ECSManager& operator=(const ECSManager&) = delete;
 
       ECSManager(ECSManager&&) = delete;
       ECSManager& operator=(ECSManager&&) = delete;
-
-      void init(IGpu* gpu,
-                IResourceAllocator* resource_allocator,
-                Repository* repository, FrameProvider* frame);
-      void cleanup() const;
 
       void update_scene(float delta_time, const UserInput& movement, float aspect);
 

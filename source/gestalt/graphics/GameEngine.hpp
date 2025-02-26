@@ -28,16 +28,16 @@ namespace gestalt {
     bool is_initialized_{false};
     bool quit_{false};
     bool freeze_rendering_{false};
+    uint64 frame_number_{0};
 
     application::Window window_;
     graphics::Gpu gpu_;
+    foundation::Repository repository_;
+    foundation::FrameProvider frame_provider_;
     graphics::ResourceAllocator resource_allocator_;
+    application::ECSManager ecs_;
 
     std::unique_ptr<graphics::RenderEngine> render_pipeline_;
-    std::unique_ptr<application::ECSManager> scene_manager_
-        = std::make_unique<application::ECSManager>();
-    std::unique_ptr<foundation::Repository> repository_
-        = std::make_unique<foundation::Repository>();
 
     application::GuiCapabilities gui_actions_;
     std::unique_ptr<application::Gui> imgui_ = std::make_unique<application::Gui>();
@@ -46,9 +46,5 @@ namespace gestalt {
     // utility services
     application::TimeTrackingService time_tracking_service_;
     application::InputSystem input_system_;
-
-    uint64 frame_number{0};
-    std::unique_ptr<foundation::FrameProvider> frame_provider_
-        = std::make_unique<graphics::FrameProvider>(&frame_number);
   };
 }  // namespace gestalt
