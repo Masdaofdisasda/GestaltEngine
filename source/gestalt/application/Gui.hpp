@@ -3,7 +3,7 @@
 #include <functional>
 
 #include "RenderConfig.hpp"
-#include "ECS/ECSManager.hpp"
+#include "ECS/EntityComponentSystem.hpp"
 #include "Window.hpp"
 #include <SDL_events.h>
 

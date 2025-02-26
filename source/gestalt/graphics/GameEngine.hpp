@@ -5,13 +5,13 @@
 #include "Gui.hpp"
 #include "InputSystem.hpp"
 #include "Render Engine/RenderEngine.hpp"
-#include "ECS/ECSManager.hpp"
+#include "ECS/EntityComponentSystem.hpp"
 #include "FrameProvider.hpp"
 #include "ResourceAllocator.hpp"
 #include "TmeTrackingService.hpp"
 
 namespace gestalt {
-  class GameEngine {
+  class GameEngine final {
   public:
     GameEngine();
     ~GameEngine();
@@ -35,11 +35,10 @@ namespace gestalt {
     foundation::Repository repository_;
     foundation::FrameProvider frame_provider_;
     graphics::ResourceAllocator resource_allocator_;
-    application::ECSManager ecs_;
-    std::unique_ptr<application::Gui> imgui_;
+    application::EntityComponentSystem ecs_;
     graphics::RenderEngine render_engine_;
+    std::unique_ptr<application::Gui> imgui_;
 
-    // utility services
     application::TimeTrackingService time_tracking_service_;
     application::InputSystem input_system_;
   };

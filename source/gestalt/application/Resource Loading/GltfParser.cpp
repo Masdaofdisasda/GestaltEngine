@@ -9,7 +9,7 @@
 #include <ranges>
 
 #include "MeshProcessor.hpp"
-#include "ECS/ECSManager.hpp"
+#include "ECS/EntityComponentSystem.hpp"
 #include "ECS/ComponentFactory.hpp"
 #include "Mesh/MeshSurface.hpp"
 

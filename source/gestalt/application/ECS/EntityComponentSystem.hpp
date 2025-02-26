@@ -24,13 +24,12 @@ namespace gestalt::application {
     /**
      * @brief Class responsible for managing scenes, entities, and their components.
      */
-    class ECSManager {
+    class EntityComponentSystem {
       IGpu& gpu_;
-      IResourceAllocator& resource_allocator_;
       Repository& repository_;
 
-      std::unique_ptr<AssetLoader> asset_loader_;
-      std::unique_ptr<ComponentFactory> component_factory_;
+      ComponentFactory component_factory_;
+      AssetLoader asset_loader_;
 
       std::unique_ptr<MaterialSystem> material_system_;
       std::unique_ptr<BaseSystem> light_system_;
@@ -46,20 +45,20 @@ namespace gestalt::application {
       std::filesystem::path scene_path_;
 
     public:
-      ECSManager(IGpu& gpu, IResourceAllocator& resource_allocator, Repository& repository,
+      EntityComponentSystem(IGpu& gpu, IResourceAllocator& resource_allocator, Repository& repository,
                  FrameProvider& frame);
-      ~ECSManager();
+      ~EntityComponentSystem();
 
-      ECSManager(const ECSManager&) = delete;
-      ECSManager& operator=(const ECSManager&) = delete;
+      EntityComponentSystem(const EntityComponentSystem&) = delete;
+      EntityComponentSystem& operator=(const EntityComponentSystem&) = delete;
 
-      ECSManager(ECSManager&&) = delete;
-      ECSManager& operator=(ECSManager&&) = delete;
+      EntityComponentSystem(EntityComponentSystem&&) = delete;
+      EntityComponentSystem& operator=(EntityComponentSystem&&) = delete;
 
       void update_scene(float delta_time, const UserInput& movement, float aspect);
 
       void request_scene(const std::filesystem::path& file_path);
-      [[nodiscard]] ComponentFactory& get_component_factory() const { return *component_factory_; }
+      [[nodiscard]] ComponentFactory& get_component_factory() { return component_factory_; }
       NodeComponent& get_root_node();
       [[nodiscard]] uint32 get_root_entity() const { return root_entity_; }
       void add_to_root(Entity entity, NodeComponent& node);

@@ -1,5 +1,5 @@
 ﻿
-#include "ECSManager.hpp"
+#include "EntityComponentSystem.hpp"
 
 #include "AnimationSystem.hpp"
 #include "AudioSystem.hpp"
@@ -16,26 +16,12 @@
 
 namespace gestalt::application {
 
-  ECSManager::ECSManager(IGpu& gpu, IResourceAllocator& resource_allocator, Repository& repository,
-                         FrameProvider& frame)
-      : gpu_(gpu), resource_allocator_(resource_allocator), repository_(repository) {
-    asset_loader_ = std::make_unique<AssetLoader>();
-    component_factory_ = std::make_unique<ComponentFactory>();
-
-    component_factory_->init(&repository_);
-    asset_loader_->init(&resource_allocator_, component_factory_.get(), &repository_);
-
-    if (const std::string initial_scene = getInitialScene(); !initial_scene.empty()) {
-      request_scene(std::filesystem::current_path() / "../../assets" / initial_scene);
-    }
-    component_factory_->create_directional_light(glm::vec3(1.f, 0.957f, 0.917f), 683.f,
-                                                 glm::vec3(0.216, -0.941, 0.257));
-    component_factory_->create_point_light(glm::vec3(1.0f), 5.0f, glm ::vec3(0.0, 6.0, 0.0), 100.f);
-
-    auto [main_cam, main_cam_node] = component_factory_->create_entity("Editor Camera");
-    component_factory_->link_entity_to_parent(main_cam, root_entity_);
-    component_factory_->add_free_fly_camera(glm::vec3(7, 1.8, -7), glm::vec3(0, 0, 0),
-                                            glm::vec3(0, 1, 0), main_cam);
+  EntityComponentSystem::EntityComponentSystem(IGpu& gpu, IResourceAllocator& resource_allocator,
+                                               Repository& repository, FrameProvider& frame)
+      : gpu_(gpu),
+        repository_(repository),
+        component_factory_(repository),
+        asset_loader_(resource_allocator, repository, component_factory_) {
 
     material_system_ = std::make_unique<MaterialSystem>();
     material_system_->init(&gpu_, &resource_allocator, &repository_, &frame);
@@ -58,13 +44,25 @@ namespace gestalt::application {
     raytracing_system_ = std::make_unique<RayTracingSystem>();
     raytracing_system_->init(&gpu_, &resource_allocator, &repository_, &frame);
 
+    if (const std::string initial_scene = getInitialScene(); !initial_scene.empty()) {
+      request_scene(std::filesystem::current_path() / "../../assets" / initial_scene);
+    }
+    component_factory_.create_directional_light(glm::vec3(1.f, 0.957f, 0.917f), 683.f,
+                                                 glm::vec3(0.216, -0.941, 0.257));
+    component_factory_.create_point_light(glm::vec3(1.0f), 5.0f, glm ::vec3(0.0, 6.0, 0.0), 100.f);
+
+    auto [main_cam, main_cam_node] = component_factory_.create_entity("Editor Camera");
+    component_factory_.link_entity_to_parent(main_cam, root_entity_);
+    component_factory_.add_free_fly_camera(glm::vec3(7, 1.8, -7), glm::vec3(0, 0, 0),
+                                            glm::vec3(0, 1, 0), main_cam);
+
+
     // TODO: find out how to create initial TLAS and update it instead of this hack
     UserInput movement;
     update_scene(0.f, movement, 0.f);
-
   }
 
-  ECSManager::~ECSManager() {
+  EntityComponentSystem::~EntityComponentSystem() {
     physics_system_->cleanup();
     mesh_system_->cleanup();
     transform_system_->cleanup();
@@ -81,26 +79,26 @@ namespace gestalt::application {
     repository_.scene_graph.clear();
   }
 
-  void ECSManager::set_active_camera(const Entity camera) const {
+  void EntityComponentSystem::set_active_camera(const Entity camera) const {
     camera_system_->set_active_camera(camera);
   }
 
-  Entity ECSManager::get_active_camera() const { return camera_system_->get_active_camera(); }
+  Entity EntityComponentSystem::get_active_camera() const { return camera_system_->get_active_camera(); }
 
-  NodeComponent& ECSManager::get_root_node() {
+  NodeComponent& EntityComponentSystem::get_root_node() {
     return repository_.scene_graph.get(get_root_entity()).value();
   }
 
-  void ECSManager::add_to_root(Entity entity, NodeComponent& node) {
+  void EntityComponentSystem::add_to_root(Entity entity, NodeComponent& node) {
     assert(entity != invalid_entity);
     get_root_node().children.push_back(entity);
     node.parent = get_root_entity();
   }
 
-  void ECSManager::update_scene(const float delta_time, const UserInput& movement,
+  void EntityComponentSystem::update_scene(const float delta_time, const UserInput& movement,
                                 const float aspect) {
     if (!scene_path_.empty()) {
-      asset_loader_->load_scene_from_gltf(scene_path_);
+      asset_loader_.load_scene_from_gltf(scene_path_);
       scene_path_.clear();
     }
 
@@ -117,7 +115,7 @@ namespace gestalt::application {
     scene_path_.clear();
   }
 
-  void ECSManager::request_scene(const std::filesystem::path& file_path) {
+  void EntityComponentSystem::request_scene(const std::filesystem::path& file_path) {
     scene_path_ = file_path;
   }
 

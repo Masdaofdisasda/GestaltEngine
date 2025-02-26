@@ -6,7 +6,7 @@
 
 #include <functional>
 
-#include "ECS/ECSManager.hpp"
+#include "ECS/EntityComponentSystem.hpp"
 #include "Mesh/MeshSurface.hpp"
 
 namespace gestalt::application {

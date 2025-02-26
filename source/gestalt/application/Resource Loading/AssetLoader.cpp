@@ -12,25 +12,24 @@
 #include <ranges>
 
 #include "GltfParser.hpp"
-#include "ECS/ECSManager.hpp"
+#include "ECS/EntityComponentSystem.hpp"
 #include "Animation/InterpolationType.hpp"
 #include "ECS/ComponentFactory.hpp"
 #include "Interface/IResourceAllocator.hpp"
 #include "Mesh/MeshSurface.hpp"
 
 namespace gestalt::application {
-  void AssetLoader::init(IResourceAllocator* resource_allocator,
-                         ComponentFactory* component_factory,
-                         Repository* repository) {
-    resource_allocator_ = resource_allocator;
-    repository_ = repository;
-    component_factory_ = component_factory;
-  }
+  AssetLoader::AssetLoader(IResourceAllocator& resource_allocator,
+                           Repository& repository,
+                           ComponentFactory& component_factory)
+      : resource_allocator_(resource_allocator),
+        repository_(repository),
+        component_factory_(component_factory) {}
 
   void AssetLoader::load_scene_from_gltf(const std::filesystem::path& file_path) {
     fmt::print("Loading GLTF: {}\n", file_path.string());
 
-    const size_t node_offset = repository_->scene_graph.size();
+    const size_t node_offset = repository_.scene_graph.size();
 
     fastgltf::Asset gltf;
     if (auto asset = parse_gltf(file_path)) {
@@ -39,8 +38,8 @@ namespace gestalt::application {
       return;
     }
 
-    size_t image_offset = repository_->textures.size();
-    const size_t material_offset = repository_->materials.size();
+    size_t image_offset = repository_.textures.size();
+    const size_t material_offset = repository_.materials.size();
 
     import_nodes(gltf);
 
@@ -53,23 +52,23 @@ namespace gestalt::application {
     import_animations(gltf, node_offset);
 
     {  // Import physics
-      for (const auto& entity : repository_->scene_graph.components() | std::views::keys) {
-        if (repository_->mesh_components.get(entity).has_value()) {
-          const auto& mesh = repository_->meshes.get(repository_->mesh_components[entity].mesh);
+      for (const auto& entity : repository_.scene_graph.components() | std::views::keys) {
+        if (repository_.mesh_components.get(entity).has_value()) {
+          const auto& mesh = repository_.meshes.get(repository_.mesh_components[entity].mesh);
 
           for (const auto& surface : mesh.surfaces) {
-            auto name = repository_->materials.get(surface.material).name;
+            auto name = repository_.materials.get(surface.material).name;
             if (name == "DY_SP") {
-              component_factory_->create_physics_component(
+              component_factory_.create_physics_component(
                   entity, DYNAMIC, SphereCollider{mesh.local_bounds.radius});
             } else if (name == "DY_BO") {
               const glm::vec3 bounds = mesh.local_aabb.max - mesh.local_aabb.min;
-              component_factory_->create_physics_component(entity, DYNAMIC, BoxCollider{bounds});
+              component_factory_.create_physics_component(entity, DYNAMIC, BoxCollider{bounds});
             } else if (name == "ST_BO") {
               const glm::vec3 bounds = mesh.local_aabb.max - mesh.local_aabb.min;
-              component_factory_->create_physics_component(entity, STATIC, BoxCollider{bounds});
+              component_factory_.create_physics_component(entity, STATIC, BoxCollider{bounds});
             } else if (name == "ST_SP") {
-              component_factory_->create_physics_component(
+              component_factory_.create_physics_component(
                   entity, STATIC, SphereCollider{mesh.local_bounds.radius});
             }
           }
@@ -164,20 +163,20 @@ namespace gestalt::application {
               });
         }
       }
-      component_factory_->create_animation_component(entity, translation_keyframes,
+      component_factory_.create_animation_component(entity, translation_keyframes,
                                                      rotation_keyframes, scale_keyframes);
     }
   }
 
   void AssetLoader::import_nodes(fastgltf::Asset& gltf) const {
-    const size_t mesh_offset = repository_->meshes.size();
-    const size_t node_offset = repository_->scene_graph.size();
+    const size_t mesh_offset = repository_.meshes.size();
+    const size_t node_offset = repository_.scene_graph.size();
 
-    GltfParser::create_nodes(gltf, mesh_offset, component_factory_);
-    GltfParser::build_hierarchy(gltf.nodes, node_offset, repository_);
+    GltfParser::create_nodes(gltf, mesh_offset, &component_factory_);
+    GltfParser::build_hierarchy(gltf.nodes, node_offset, &repository_);
     constexpr Entity root = 0;
-    GltfParser::link_orphans_to_root(root, repository_->scene_graph.get(root).value().get(),
-                                     repository_->scene_graph.components());
+    GltfParser::link_orphans_to_root(root, repository_.scene_graph.get(root).value().get(),
+                                     repository_.scene_graph.components());
   }
 
   std::optional<fastgltf::Asset> AssetLoader::parse_gltf(const std::filesystem::path& file_path) {
@@ -265,7 +264,7 @@ namespace gestalt::application {
         },
         image.data);
 
-    auto image_instance = resource_allocator_->create_image(std::move(image_template));
+    auto image_instance = resource_allocator_.create_image(std::move(image_template));
 
     return image_instance;
   }
@@ -276,22 +275,22 @@ namespace gestalt::application {
       auto img = load_image(gltf, image);
 
       if (img->get_image_handle() != VK_NULL_HANDLE) {
-        size_t image_id = repository_->textures.add(img);
+        size_t image_id = repository_.textures.add(img);
         fmt::print("loaded texture {}, image_id {}\n", image.name, image_id);
       } else {
         fmt::print("gltf failed to load texture {}\n", image.name);
-        repository_->textures.add(repository_->default_material_.error_checkerboard_image_instance);
+        repository_.textures.add(repository_.default_material_.error_checkerboard_image_instance);
       }
     }
   }
 
   size_t AssetLoader::create_material(const PbrMaterial& config, const std::string& name) const {
-    const size_t material_id = repository_->materials.size();
+    const size_t material_id = repository_.materials.size();
     fmt::print("creating material {}, mat_id {}\n", name, material_id);
 
     const std::string key = name.empty() ? "material_" + std::to_string(material_id) : name;
 
-    repository_->materials.add(Material{.name = key, .config = config});
+    repository_.materials.add(Material{.name = key, .config = config});
 
     return material_id;
   }
@@ -302,7 +301,7 @@ namespace gestalt::application {
     const size_t image_index = gltf.textures[texture_index].imageIndex.value();
     const size_t sampler_index = gltf.textures[texture_index].samplerIndex.value();
 
-    return repository_->textures.get(image_index + image_offset);
+    return repository_.textures.get(image_index + image_offset);
   }
 
   void AssetLoader::import_albedo(const fastgltf::Asset& gltf, const size_t& image_offset,
@@ -392,7 +391,7 @@ namespace gestalt::application {
       pbr_config.constants.alpha_cutoff = mat.alphaCutoff;
     }
 
-    auto& default_material = repository_->default_material_;
+    auto& default_material = repository_.default_material_;
 
     pbr_config.textures = {.albedo_image = default_material.color_image_instance,
                            .albedo_sampler = default_material.color_sampler->get_sampler_handle(),
@@ -426,9 +425,9 @@ namespace gestalt::application {
   void AssetLoader::import_meshes(fastgltf::Asset& gltf, const size_t material_offset) const {
     fmt::print("importing meshes\n");
     for (fastgltf::Mesh& mesh : gltf.meshes) {
-      const auto surfaces = GltfParser::extract_mesh(gltf, mesh, material_offset, repository_);
+      const auto surfaces = GltfParser::extract_mesh(gltf, mesh, material_offset, &repository_);
 
-      component_factory_->create_mesh(surfaces, std::string(mesh.name));
+      component_factory_.create_mesh(surfaces, std::string(mesh.name));
     }
   }
 }  // namespace gestalt::application

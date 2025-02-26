@@ -23,9 +23,9 @@ namespace gestalt::foundation {
 namespace gestalt::application {
 
     class AssetLoader {
-      IResourceAllocator* resource_allocator_ = nullptr;
-      Repository* repository_ = nullptr;
-      ComponentFactory* component_factory_ = nullptr;
+      IResourceAllocator& resource_allocator_;
+      Repository& repository_;
+      ComponentFactory& component_factory_;
 
       std::optional<fastgltf::Asset> parse_gltf(const std::filesystem::path& file_path);
       std::shared_ptr<ImageInstance> load_image(fastgltf::Asset& asset,
@@ -57,7 +57,8 @@ namespace gestalt::application {
       void import_meshes(fastgltf::Asset& gltf, size_t material_offset) const;
 
     public:
-      AssetLoader() = default;
+      AssetLoader(IResourceAllocator& resource_allocator, Repository& repository,
+                  ComponentFactory& component_factory);
       ~AssetLoader() = default;
 
       AssetLoader(const AssetLoader&) = delete;
@@ -66,9 +67,6 @@ namespace gestalt::application {
       AssetLoader(AssetLoader&&) = delete;
       AssetLoader& operator=(AssetLoader&&) = delete;
 
-      void init(IResourceAllocator* resource_allocator,
-                ComponentFactory* component_factory,
-                Repository* repository);
       void import_nodes(fastgltf::Asset& gltf) const;
       void load_scene_from_gltf(const std::filesystem::path& file_path);
       void import_animations(const fastgltf::Asset& gltf, const size_t node_offset);
