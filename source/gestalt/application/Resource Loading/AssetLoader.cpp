@@ -92,7 +92,9 @@ namespace gestalt::application {
   }
 
   void AssetLoader::import_animations(const fastgltf::Asset& gltf, const size_t node_offset) {
-    fmt::print("Importing animations\n");
+    if (!gltf.animations.empty()) {
+      fmt::print("Importing animations\n");
+    }
 
     for (const fastgltf::Animation& animation : gltf.animations) {
       fmt::print("Importing animation: {}\n", animation.name);
@@ -123,6 +125,9 @@ namespace gestalt::application {
 
           fastgltf::iterateAccessorWithIndex<glm::vec3>(
               gltf, output_accessor, [&](glm::vec3 translation, size_t index) {
+                if (index >= translation_keyframes.size()) {
+                  return;
+                }
                 translation_keyframes[index].value = translation;
                 translation_keyframes[index].type = interpolation;
               });
@@ -135,10 +140,11 @@ namespace gestalt::application {
 
           fastgltf::iterateAccessorWithIndex<glm::vec4>(
               gltf, output_accessor, [&](glm::vec4 rotation, size_t index) {
-                // NOTE: ordering of quaternion components is different in GLTF
-                // also the coordinate system is different
+                if (index >= rotation_keyframes.size()) {
+                  return;
+                }
                 const auto rotationQuat = glm::quat(rotation.w, rotation.x, rotation.y, rotation.z);
-                rotation_keyframes[index].value = glm::normalize(glm::conjugate(rotationQuat));
+                rotation_keyframes[index].value = glm::normalize(rotationQuat);
                 rotation_keyframes[index].type = interpolation;
               });
         } else if (type == fastgltf::AnimationPath::Scale) {
@@ -150,6 +156,9 @@ namespace gestalt::application {
 
           fastgltf::iterateAccessorWithIndex<glm::vec3>(
               gltf, output_accessor, [&](glm::vec3 scale, size_t index) {
+                if (index >= scale_keyframes.size()) {
+                  return;
+                }
                 scale_keyframes[index].value = scale;
                 scale_keyframes[index].type = interpolation;
               });
@@ -211,6 +220,7 @@ namespace gestalt::application {
       image_name = "Image " + std::to_string(asset.images.size());
     }
     ImageTemplate image_template(image_name);
+    image_template.set_has_mipmap(true);
 
     const std::function<void(fastgltf::sources::URI&)> create_image_from_file
         = [&](fastgltf::sources::URI& file_path) {

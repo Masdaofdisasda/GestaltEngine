@@ -9,5 +9,6 @@ namespace gestalt::foundation {
     uint32 descriptorIndex;
     VkDescriptorAddressInfoEXT addr_info; // only relevant for buffer resources
     VkDescriptorImageInfo image_info; // only relevant for image resources
+    VkDeviceAddress tlas_address; // Top-level Acceleration Structure address
   };
 }  // namespace gestalt

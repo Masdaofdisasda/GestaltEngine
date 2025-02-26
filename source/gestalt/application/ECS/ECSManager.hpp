@@ -39,6 +39,8 @@ namespace gestalt::application {
       std::unique_ptr<AnimationSystem> animation_system_;
       std::unique_ptr<BaseSystem> mesh_system_;
       std::unique_ptr<PhysicSystem> physics_system_;
+      std::unique_ptr<BaseSystem> audio_system_;
+      std::unique_ptr<BaseSystem> raytracing_system_;
 
       Entity root_entity_ = 0;
       std::filesystem::path scene_path_;

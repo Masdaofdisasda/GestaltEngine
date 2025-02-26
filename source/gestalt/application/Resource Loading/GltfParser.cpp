@@ -1,5 +1,6 @@
 ﻿#include "GltfParser.hpp"
 
+#include <algorithm>
 #include <fastgltf/glm_element_traits.hpp>
 
 #include <fmt/core.h>
@@ -11,6 +12,10 @@
 #include "ECS/ECSManager.hpp"
 #include "ECS/ComponentFactory.hpp"
 #include "Mesh/MeshSurface.hpp"
+
+constexpr auto forward_z = glm::vec3(0, 0, -1.f);
+
+static glm::vec3 compute_direction(const glm::quat orientation) { return glm::normalize(orientation * forward_z); }
 
 namespace gestalt::application {
 
@@ -128,20 +133,34 @@ namespace gestalt::application {
         auto light = gltf.lights.at(node.lightIndex.value());
 
         if (light.type == fastgltf::LightType::Directional) {
-          glm::vec3 direction = normalize(glm::vec3(0, 0, -1.f) * orientation);
+          glm::vec3 direction = compute_direction(orientation);
           component_factory->create_directional_light(
               glm::vec3(light.color.at(0), light.color.at(1), light.color.at(2)), light.intensity,
               direction, entity);
 
         } else if (light.type == fastgltf::LightType::Point) {
-          float32 range = light.range.value_or(100.f);
+          float32 range = light.range.value_or(-1.f);  // -1 means infinite range
 
           component_factory->create_point_light(
               glm::vec3(light.color.at(0), light.color.at(1), light.color.at(2)), light.intensity,
               position, range, entity);
 
         } else if (light.type == fastgltf::LightType::Spot) {
-          // TODO not supported yet
+          float32 innerConeRadians = light.innerConeAngle.value_or(0.f);
+          float32 outerConeRadians = light.outerConeAngle.value_or(3.141f / 4.f);
+
+          innerConeRadians = std::max<float32>(innerConeRadians, 0);
+
+          if (outerConeRadians < innerConeRadians ) {
+            fmt::print(
+                "Outer cone angle is less than inner cone angle\n");
+          }
+
+          component_factory->create_spot_light(
+              glm::vec3(light.color.at(0), light.color.at(1), light.color.at(2)), light.intensity,
+              compute_direction(orientation), position, light.range.value_or(-1.f),
+              innerConeRadians, outerConeRadians,
+              entity);
         }
       }
 
@@ -152,9 +171,9 @@ namespace gestalt::application {
           const float32 aspect_ratio = perspective.aspectRatio.value_or(1.f);
           const float32 fov = perspective.yfov; // in radians
           const float32 near = perspective.znear;
-          const float32 far = perspective.zfar.value_or(10000.f);
+          const float32 far = perspective.zfar.value_or(1000.f);
           component_factory->add_animation_camera(
-              position, normalize(conjugate(orientation)), entity,
+              position, orientation, entity,
               PerspectiveProjectionData{fov, aspect_ratio, near, far});
         } else if (std::holds_alternative<fastgltf::Camera::Orthographic>(cam.camera)) {
           const auto& ortho = std::get<fastgltf::Camera::Orthographic>(cam.camera);
@@ -163,7 +182,7 @@ namespace gestalt::application {
           const float32 near = ortho.znear;
           const float32 far = ortho.zfar;
           component_factory->add_animation_camera(
-              position, normalize(conjugate(orientation)), entity,
+              position, orientation, entity,
               OrthographicProjectionData{xmag, ymag, near, far});
         }
       }

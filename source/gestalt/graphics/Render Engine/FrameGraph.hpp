@@ -91,6 +91,9 @@ namespace gestalt::graphics {
                                                  CreationType creation_type
                                                  = CreationType::INTERNAL);
 
+    std::shared_ptr<AccelerationStructureInstance> add_resource(const std::shared_ptr<AccelerationStructure>& accelerationStructure,
+      CreationType creation_type = CreationType::EXTERNAL);
+
 
     template <typename ResourceInstanceType>
     auto add_resource(std::shared_ptr<ResourceInstanceType> resource_instance,

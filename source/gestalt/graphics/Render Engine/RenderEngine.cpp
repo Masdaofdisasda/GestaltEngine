@@ -96,6 +96,7 @@ namespace gestalt::graphics {
         .build());
     auto scene_lit = frame_graph_->add_resource(ImageTemplate("Scene Lit"));
     auto scene_skybox = frame_graph_->add_resource(ImageTemplate("Scene Skybox"));
+    auto scene_composed = frame_graph_->add_resource(ImageTemplate("Scene Composed"));
     auto scene_final = frame_graph_->add_resource(ImageTemplate("Scene Final"));
     scene_final_ = scene_final;
     auto rotation_texture
@@ -145,38 +146,36 @@ namespace gestalt::graphics {
         .set_initial_value({1.f, 0.f, 0.f, 1.f})
         .build());
 
-    post_process_sampler_ = std::make_unique<SamplerInstance>(SamplerTemplate(
-        "Post Process Sampler",
-        /* mag_filter       */ VK_FILTER_LINEAR,
-        /* min_filter       */ VK_FILTER_LINEAR,
-        /* mipmap_mode      */ VK_SAMPLER_MIPMAP_MODE_LINEAR,
-        /* address_mode_u   */ VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        /* address_mode_v   */ VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        /* address_mode_w   */ VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        /* anisotropy_enable*/ VK_FALSE,
-        /* mip_lod_bias     */ 0.0f,
-        /* min_lod          */ 0.0f,
-        /* max_lod          */ VK_LOD_CLAMP_NONE,
-        /* max_anisotropy   */ 1.0f,
-        /* compare_enable   */ VK_FALSE,
-        /* compare_op       */ VK_COMPARE_OP_NEVER,
-        /* border_color     */ VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK), gpu_->getDevice());
+    auto luminance_average = frame_graph_->add_resource(ImageTemplate("Luminance Average Value")
+                                         .set_image_size(1, 1)
+                                         .set_image_type(TextureType::kColor, VK_FORMAT_R16_SFLOAT)
+                                         .build());
+
+    post_process_sampler_ = std::make_unique<SamplerInstance>(
+        SamplerTemplate("Post Process Sampler", VK_FILTER_NEAREST, VK_FILTER_NEAREST,
+                        VK_SAMPLER_MIPMAP_MODE_NEAREST, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_FALSE, 0.0f, 0.0f,
+                        VK_LOD_CLAMP_NONE, 1.0f, VK_FALSE, VK_COMPARE_OP_NEVER,
+                        VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK),
+        gpu_->getDevice());
+
+    interpolation_sampler_ = std::make_unique<SamplerInstance>(
+        SamplerTemplate("Post Process Sampler", VK_FILTER_LINEAR, VK_FILTER_LINEAR,
+                        VK_SAMPLER_MIPMAP_MODE_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_FALSE, 0.0f, 0.0f,
+                        VK_LOD_CLAMP_NONE, 1.0f, VK_FALSE, VK_COMPARE_OP_NEVER,
+                        VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK),
+        gpu_->getDevice());
 
             cube_map_sampler_ = std::make_unique<SamplerInstance>(
-        SamplerTemplate("Environment Cubemap Sampler",
-                        VK_FILTER_LINEAR,                       // mag
-                        VK_FILTER_LINEAR,                       // min
-                        VK_SAMPLER_MIPMAP_MODE_LINEAR,          // mipmap mode
-                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,  // address U
-                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,  // address V
-                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,  // address W
-                        VK_FALSE,                               // anisotropy enable
-                        0.0f,                                   // mipBias
-                        0.0f,                                   // minLod
-                        VK_LOD_CLAMP_NONE,                      // maxLod
-                        1.0f,      // maxAnisotropy (ignored if anisotropyEnable=VK_FALSE)
-                        VK_FALSE,  // compare enable
-                        VK_COMPARE_OP_NEVER, VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK),
+        SamplerTemplate("Environment Cubemap Sampler", VK_FILTER_LINEAR, VK_FILTER_LINEAR,
+                        VK_SAMPLER_MIPMAP_MODE_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_FALSE, 0.0f, 0.0f,
+                        VK_LOD_CLAMP_NONE, 1.0f, VK_FALSE, VK_COMPARE_OP_NEVER,
+                        VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK),
         gpu_->getDevice());
 
     // camera
@@ -206,6 +205,8 @@ namespace gestalt::graphics {
     auto group_count_buffer
         = frame_graph_->add_resource(repository->mesh_buffers->group_count_buffer);
 
+    const auto tlas_instance = frame_graph_->add_resource(repository->tlas);
+
     // Material
       
     auto brdf_lut = frame_graph_->add_resource(
@@ -213,16 +214,17 @@ namespace gestalt::graphics {
         CreationType::EXTERNAL);
     auto texEnvMap = frame_graph_->add_resource(
         ImageTemplate("Environment Map Texture")
-        .set_initial_value(asset("san_giuseppe_bridge_4k_environment.hdr"))
-        .set_image_type(TextureType::kColor, VK_FORMAT_R32G32B32A32_SFLOAT, ImageType::kCubeMap)
-        .build(),
+            .set_initial_value(asset("san_giuseppe_bridge_4k_environment.hdr"))
+            .set_has_mipmap(true)
+            .set_image_type(TextureType::kColor, VK_FORMAT_R32G32B32A32_SFLOAT, ImageType::kCubeMap)
+            .build(),
         CreationType::EXTERNAL);
     auto texIrradianceMap = frame_graph_->add_resource(
         ImageTemplate("Irradiance Map Texture")
-        .set_initial_value(asset("san_giuseppe_bridge_4k_irradiance.hdr"))
-        .set_image_type(TextureType::kColor, VK_FORMAT_R32G32B32A32_SFLOAT,
-                        ImageType::kCubeMap)
-        .build(),
+            .set_initial_value(asset("san_giuseppe_bridge_4k_irradiance.hdr"))
+            .set_has_mipmap(true)
+            .set_image_type(TextureType::kColor, VK_FORMAT_R32G32B32A32_SFLOAT, ImageType::kCubeMap)
+            .build(),
         CreationType::EXTERNAL);
           
     auto material_buffer
@@ -242,13 +244,17 @@ namespace gestalt::graphics {
         = frame_graph_->add_resource(repository->light_buffers->dir_light_buffer);
     auto point_light
         = frame_graph_->add_resource(repository->light_buffers->point_light_buffer);
+    auto spot_light = frame_graph_->add_resource(repository->light_buffers->spot_light_buffer);
     auto light_matrices
         = frame_graph_->add_resource(repository->light_buffers->view_proj_matrices);
+
+    //TODO figure out why this needs to be that way
+    auto luminance_histogram = frame_graph_->add_resource(repository_->mesh_buffers->luminance_histogram_buffer);
 
     // Shader Passes
     frame_graph_->add_pass<DrawCullDirectionalDepthPass>(
         camera_buffer, meshlet_task_commands_buffer, mesh_draw_buffer, command_count_buffer, gpu_,
-        [&]() { return static_cast<int32>(repository_->mesh_draws.size()); });
+        [&]() { return static_cast<int32>(repository_->mesh_draws_.size()); });
 
     frame_graph_->add_pass<TaskSubmitDirectionalDepthPass>(
         meshlet_task_commands_buffer, command_count_buffer, group_count_buffer, gpu_);
@@ -261,7 +267,7 @@ namespace gestalt::graphics {
     // mesh shading
     frame_graph_->add_pass<DrawCullPass>(
         camera_buffer, meshlet_task_commands_buffer, mesh_draw_buffer, command_count_buffer, gpu_,
-        [&] { return static_cast<int32>(repository_->mesh_draws.size()); });
+        [&] { return static_cast<int32>(repository_->mesh_draws_.size()); });
 
     frame_graph_->add_pass<TaskSubmitPass>(meshlet_task_commands_buffer, command_count_buffer,
                                            group_count_buffer, gpu_);
@@ -288,17 +294,18 @@ namespace gestalt::graphics {
         gpu_);
 
     frame_graph_->add_pass<VolumetricLightingScatteringPass>(
-        camera_buffer, light_matrices, directional_light, point_light, blue_noise, froxel_data,
+        camera_buffer, light_matrices, directional_light, point_light, spot_light, blue_noise, froxel_data,
         shadow_map, light_scattering, post_process_sampler_->get_sampler_handle(),
         [&] { return config_.volumetric_lighting; },
         [&] { return frame_->get_current_frame_number(); },
         [&] {
           return repository_->per_frame_data_buffers->data.at(frame_->get_current_frame_index());
         },
-        [&] { return static_cast<uint32>(repository_->point_lights.size()); }, gpu_);
+        [&] { return static_cast<uint32>(repository_->point_lights.size()); },
+        [&] { return static_cast<uint32>(repository_->spot_lights.size()); }, gpu_);
 
     frame_graph_->add_pass<VolumetricLightingSpatialFilterPass>(
-        light_scattering, light_scattering_filtered, post_process_sampler_->get_sampler_handle(),
+        light_scattering, light_scattering_filtered, interpolation_sampler_->get_sampler_handle(),
         [&] { return config_.volumetric_lighting; }, gpu_);
 
     frame_graph_->add_pass<VolumetricLightingIntegrationPass>(
@@ -312,25 +319,36 @@ namespace gestalt::graphics {
         gpu_);
 
     frame_graph_->add_pass<LightingPass>(
-        camera_buffer, texEnvMap, texIrradianceMap, brdf_lut, light_matrices, directional_light, point_light,
+        camera_buffer, texEnvMap, texIrradianceMap, brdf_lut, light_matrices, directional_light, point_light, spot_light,
         g_buffer_1, g_buffer_2, g_buffer_3, g_buffer_depth, shadow_map,
-        integrated_light_scattering, ambient_occlusion_texture, scene_lit,
-        post_process_sampler_->get_sampler_handle(),
+        integrated_light_scattering, ambient_occlusion_texture, scene_lit, tlas_instance,
+        post_process_sampler_->get_sampler_handle(), interpolation_sampler_->get_sampler_handle(),
         cube_map_sampler_->get_sampler_handle(), gpu_, [&] { return config_.lighting; },
         [&] {
           return repository_->per_frame_data_buffers->data.at(frame_->get_current_frame_index());
         },
         [&] { return static_cast<uint32>(repository_->directional_lights.size()); },
-        [&] { return static_cast<uint32>(repository_->point_lights.size()); });
+        [&] { return static_cast<uint32>(repository_->point_lights.size()); },
+        [&] { return static_cast<uint32>(repository_->spot_lights.size()); }
+    );
 
     frame_graph_->add_pass<SkyboxPass>(
         camera_buffer, directional_light, scene_lit, texEnvMap, scene_skybox, g_buffer_depth,
-        post_process_sampler_->get_sampler_handle(),
+        post_process_sampler_->get_sampler_handle(), cube_map_sampler_->get_sampler_handle(),
         gpu_, [&] { return config_.skybox; });
 
-    frame_graph_->add_pass<ToneMapPass>(scene_final, scene_lit, scene_skybox,
-                                        post_process_sampler_->get_sampler_handle(), gpu_,
-                                        [&] { return config_.hdr; });
+    frame_graph_->add_pass<ComposeScenePass>(scene_lit, scene_skybox, scene_composed,
+                                             post_process_sampler_->get_sampler_handle(), gpu_);
+
+     frame_graph_->add_pass<LuminanceHistogramPass>(scene_composed, luminance_histogram,
+                                                    post_process_sampler_->get_sampler_handle(),
+                                                    gpu_, [&] { return config_.luminance_params; });
+     frame_graph_->add_pass<LuminanceAveragePass>(luminance_average, luminance_histogram,
+                                                    gpu_, [&] { return config_.luminance_params; });
+
+     frame_graph_->add_pass<ToneMapPass>(scene_composed, scene_final, luminance_average,
+                                         post_process_sampler_->get_sampler_handle(), gpu_,
+                                         [&] { return config_.hdr; });
 
     frame_graph_->compile();
 
@@ -507,7 +525,6 @@ namespace gestalt::graphics {
       cmd.global_barrier();
     }
 
-    // Render ImGui overlay
     imgui_->draw(cmd.get(), swapchain_image.get_image_view(), swapchain_image.get_extent());
 
     {

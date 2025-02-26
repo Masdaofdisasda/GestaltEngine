@@ -16,6 +16,52 @@
 #include "Mesh/Mesh.hpp"
 #include "Mesh/MeshSurface.hpp"
 
+static glm::quat orientation_from_direction(const glm::vec3& direction, const glm::vec3& base_forward = glm::vec3(0.f,0.f,-1.f)) {
+
+  glm::vec3 dir = glm::normalize(direction);
+  glm::vec3 base = glm::normalize(base_forward);
+
+  // clamp to avoid numerical issues in acos
+  float dotVal = glm::clamp(glm::dot(base, dir), -1.0f, 1.0f);
+  float angle = acosf(dotVal);
+
+  // If base and dir are almost the same, angle ~ 0 => use identity quaternion
+  // If base and dir are nearly opposite, angle ~ pi => cross might be zero if they are collinear
+
+  glm::vec3 axis = glm::cross(base, dir);
+
+  // If cross is close to zero length, pick any orthonormal axis, e.g. (1,0,0)
+  float lengthSq = glm::dot(axis, axis);
+  if (lengthSq < 1e-8f) {
+    // They are parallel or nearly so. Check if they are in the same or opposite direction
+    if (dotVal > 0.0f) {
+      // same direction => no rotation
+      return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    } else {
+      // opposite => rotate 180° about some axis perpendicular to base
+      // e.g. pick an axis perpendicular to base
+      axis = glm::vec3(0.f, 1.f, 0.f);
+      angle = 3.1415926535f;  // pi
+    }
+  } else {
+    // 4) normalize axis
+    axis = glm::normalize(axis);
+  }
+
+  // 5) Build a quaternion from axis-angle
+  // q = cos(a/2) + sin(a/2)*(axis.x, axis.y, axis.z)
+  float halfAngle = 0.5f * angle;
+  float s = sinf(halfAngle);
+
+  glm::quat q;
+  q.w = cosf(halfAngle);
+  q.x = axis.x * s;
+  q.y = axis.y * s;
+  q.z = axis.z * s;
+
+  return glm::normalize(q);
+}
+
 namespace gestalt::application {
 
     Entity ComponentFactory::next_entity() { return next_entity_id_++; }
@@ -117,10 +163,10 @@ namespace gestalt::application {
             = create_entity("directional_light_" + std::to_string(number_of_lights + 1));
         entity = new_entity;
         link_entity_to_parent(entity, root_entity);
+        auto& transform = repository_->transform_components[entity];
+        transform.rotation = orientation_from_direction(direction);
       }
 
-      auto& transform = repository_->transform_components[entity];
-      transform.rotation = glm::quat(lookAt(glm::vec3(0), direction, glm::vec3(0, 1, 0)));
 
       const uint32 matrix_id
           = repository_->light_view_projections.add({glm::mat4(1.0), glm::mat4(1.0)});
@@ -132,21 +178,24 @@ namespace gestalt::application {
     }
 
     Entity ComponentFactory::create_spot_light(
-        const glm::vec3& color, const float intensity, const glm::vec3& direction,
-                                               const glm::vec3& position, const float innerCone,
-                                               const float outerCone, Entity entity) {
+        const glm::vec3& color, const float32 intensity, const glm::vec3& direction,
+                                                const glm::vec3& position, const float32 range,
+                                                const float32 inner_cone_radians,
+                                                const float32 outer_cone_radians, Entity entity) {
       if (entity == invalid_entity) {
         const auto number_of_lights = repository_->light_components.size();
         auto [new_entity, node]
             = create_entity("spot_light_" + std::to_string(number_of_lights + 1));
         entity = new_entity;
-        link_entity_to_parent(entity, root_entity);
+          link_entity_to_parent(entity, root_entity);
+        auto& transform = repository_->transform_components[entity];
+        transform.rotation = orientation_from_direction(direction);
+        transform.position = position;
       }
-      auto& transform = repository_->transform_components[entity];
-      transform.rotation = glm::quat(lookAt(glm::vec3(0), direction, glm::vec3(0, 1, 0)));
-      transform.position = position;
+      const uint32 matrix_id
+          = repository_->light_view_projections.add({glm::mat4(1.0), glm::mat4(1.0)});
 
-      const LightComponent light(color, intensity, innerCone, outerCone);
+      const LightComponent light(color, intensity, range, matrix_id, cos(inner_cone_radians), cos(outer_cone_radians));
 
       repository_->light_components.add(entity, light);
 
@@ -161,11 +210,11 @@ namespace gestalt::application {
         auto [new_entity, node]
             = create_entity("point_light_" + std::to_string(number_of_lights + 1));
         entity = new_entity;
-        link_entity_to_parent(entity, root_entity);
+          link_entity_to_parent(entity, root_entity);
+        auto& transform = repository_->transform_components[entity];
+        transform.position = position;
       }
 
-      auto& transform = repository_->transform_components[entity];
-      transform.position = position;
 
       const uint32 matrix_id
           = repository_->light_view_projections.add({glm::mat4(1.0), glm::mat4(1.0)});

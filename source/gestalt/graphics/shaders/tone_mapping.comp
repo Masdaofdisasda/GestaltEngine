@@ -1,6 +1,6 @@
 #version 450
 
-layout(local_size_x = 8, local_size_y = 8) in;
+layout(local_size_x = 16, local_size_y = 16) in;
 
 layout( push_constant ) uniform constants
 {
@@ -11,14 +11,24 @@ layout( push_constant ) uniform constants
 	vec4 lift; 
 	vec4 gamma; 
 	vec4 gain;
+
 	bool showBloom;
     int toneMappingOption;
+    float vignette_radius;
+    float vignette_softness;
+
+    float iso;
+    float shutter;
+    float aperture;
+    float exposureCompensation;
+
+    float saturation;
+    float contrast;
 } params;
 
-layout(set = 0, binding = 0) uniform sampler2D texScene;
-layout(set = 0, binding = 1) uniform sampler2D texSkybox;
+layout(set = 0, binding = 0, rgba16f) uniform image2D texScene;
 //layout(set = 0, binding = 1) uniform sampler2D texBloom;
-//layout(set = 0, binding = 2) uniform sampler2D texLuminance;
+layout(set = 0, binding = 2, r16f) uniform image2D texLuminance;
 layout(set = 0, binding = 3, rgba16f) writeonly uniform image2D texOut;
 
 float Reinhard_L_scaled(float a, float Lw, float L_avg) {
@@ -114,17 +124,38 @@ vec3 agx_tonemapping(vec3 /*Linear BT.709*/ci) {
     return /*Linear BT.709*/co;
 }
 
-vec3 ApplyLiftGammaGain(vec3 color, vec3 lift, vec3 gamma, vec3 gain) {
-    // Apply lift (shadows)
-    color += lift;
+vec3 ApplyColorGrading(vec3 color, vec3 shadowAdjust, vec3 midtoneAdjust, vec3 highlightAdjust) {
+    // Define tone ranges
+    float shadowMask = smoothstep(0.0, 0.25, max(color.r, max(color.g, color.b))); // Shadows
+    float midtoneMask = smoothstep(0.25, 0.75, max(color.r, max(color.g, color.b))); // Midtones
+    float highlightMask = smoothstep(0.75, 1.0, max(color.r, max(color.g, color.b))); // Highlights
 
-    // Apply gamma (midtones)
-    color = pow(color, 1.0 / gamma);
+    // Normalize masks so they blend smoothly
+    float totalMask = shadowMask + midtoneMask + highlightMask;
+    shadowMask /= totalMask;
+    midtoneMask /= totalMask;
+    highlightMask /= totalMask;
 
-    // Apply gain (highlights)
-    color *= gain;
+    // Apply adjustments to each range
+    vec3 adjustedColor = color;
+    adjustedColor = mix(adjustedColor, adjustedColor + shadowAdjust, shadowMask); // Shadows
+    adjustedColor = mix(adjustedColor, adjustedColor * midtoneAdjust, midtoneMask); // Midtones
+    adjustedColor = mix(adjustedColor, adjustedColor * highlightAdjust, highlightMask); // Highlights
 
-    return color;
+    return adjustedColor;
+}
+
+vec3 AdjustSaturation(vec3 color, float saturation) {
+    // Calculate the grayscale intensity (luma)
+    float luma = dot(color, vec3(0.2126, 0.7152, 0.0722)); // Rec. 709 luminance formula
+
+    // Blend between grayscale and original color based on saturation
+    return mix(vec3(luma), color, saturation);
+}
+
+vec3 AdjustContrast(vec3 color, float contrast) {
+    // Scale color around the midpoint (0.5)
+    return 0.5 + (color - 0.5) * contrast;
 }
 
 vec3 linearToSrgb(vec3 linearColor) {
@@ -192,18 +223,38 @@ vec3 convertYxy2RGB(vec3 Yxy) {
     return convertXYZ2RGB(xyz);
 }
 
+float camera_exposure()
+{
+    // Aperture^2 / shutter => base EV at ISO=100
+    float ev100 = log2( (params.aperture * params.aperture) / params.shutter );
+
+    // Adjust for iso
+    float isoFactor = log2(params.iso / 100.0f);
+    ev100 -= isoFactor;
+
+    // Add user compensation
+    ev100 += params.exposureCompensation;
+
+    // Then convert EV -> linear scale
+    // negative sign depends on your preferred convention
+    float exposure = pow(2.0f, -ev100);
+    return exposure;
+}
+
 void main()
 {	
-	ivec2 texSize = imageSize(texOut);
-	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
-	if (gl_GlobalInvocationID.x >= texSize.x || gl_GlobalInvocationID.y >= texSize.y) {
-		return;
-	}
-    vec2 uv = vec2(pixelCoord) / texSize;
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+
+    ivec2 outSize = imageSize(texOut);
+
+    if (gid.x >= outSize.x || gid.y >= outSize.y) {
+        return;
+    }
+    vec2 uv = vec2(gid) / (outSize-1);
     
-    vec3 sceneColor = texture(texScene, uv).rgb + texture(texSkybox, uv).rgb;
+    vec3 sceneColor = imageLoad(texScene, gid).rgb;
     vec3 bloomColor = vec3(0.0); // texture(texBloom, uv).rgb;
-    float avgLuminance = 0.5; // max(texture(texLuminance, vec2(0.5, 0.5)).r, 0.0000001);
+    float avgLuminance = imageLoad(texLuminance, ivec2(0, 0)).r;
 
 
     if (params.showBloom) {
@@ -217,8 +268,9 @@ void main()
 
 	}
 
-    float keyValue = 0.18; // Middle gray value
-    float exposure = keyValue / avgLuminance * params.exposure;
+    float keyValue = 0.214; // Middle gray value
+    float autoExposure = keyValue / avgLuminance;
+    float exposure = autoExposure * camera_exposure() * params.exposure;
 
     sceneColor *= exposure;
 
@@ -246,10 +298,19 @@ void main()
     }
 
     // Color grading
-    sceneColor = ApplyLiftGammaGain(sceneColor, params.lift.rgb, params.gamma.rgb, params.gain.rgb);
+    sceneColor = ApplyColorGrading(sceneColor, params.lift.rgb, params.gamma.rgb, params.gain.rgb);
+    sceneColor = AdjustSaturation(sceneColor, params.saturation);
+    sceneColor = AdjustContrast(sceneColor, params.contrast);
+    
+    // vignette
+    float radius = params.vignette_radius;
+    float softness = params.vignette_softness;
+    float dist = length(uv - vec2(0.5)) * 2.0;
+    float vignette = smoothstep(radius, radius - softness, dist);
+    sceneColor *= vignette;
 
     vec3 finalColor = linearToSrgb(sceneColor);
 
-	imageStore( texOut, pixelCoord, vec4(finalColor, 1.0) );
+	imageStore( texOut, gid, vec4(finalColor, 1.0) );
 }
 

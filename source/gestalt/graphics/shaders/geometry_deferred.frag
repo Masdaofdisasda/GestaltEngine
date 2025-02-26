@@ -87,8 +87,7 @@ void main() {
 
 	vec4 Kd = materialData[nonuniformEXT(inMaterialIndex)].albedo_factor;
 	if(hasAlbedoTexture) {
-		Kd = texture(nonuniformEXT(textures[albedoIndex]), UV);
-		Kd.a = 1.0;
+		Kd = texture(textures[nonuniformEXT(albedoIndex)], UV);
     }
 	Kd.rgb = sRGBToLinear(Kd.rgb);
 

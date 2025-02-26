@@ -106,13 +106,13 @@ namespace gestalt::graphics {
     StagingBuffer create_staging_buffer(VkDeviceSize size);
 
     void load_cubemap(const HdrImageData& image_data, VkImage image, bool mipmap);
-    void load_image(const ImageData& image_data, VkImage image);
+    void load_image(const ImageData& image_data, VkImage image, bool mipmap);
 
   public:
     explicit TaskQueue(IGpu* gpu);
 
     void add_image(const std::filesystem::path& path, VkImage image, bool is_cubemap = false, bool mipmap = false);
-    void add_image(std::vector<unsigned char>& data, VkImage image, VkExtent3D extent);
+    void add_image(std::vector<unsigned char>& data, VkImage image, VkExtent3D extent, bool mipmap = false);
 
     void enqueue(const std::function<void()>& task) {
       tasks_.push(task);

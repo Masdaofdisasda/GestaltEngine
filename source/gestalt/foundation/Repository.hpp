@@ -8,6 +8,7 @@
 #include "Buffer/MaterialBuffer.hpp"
 #include "Buffer/MeshBuffer.hpp"
 #include "Buffer/PerFrameDataBuffer.hpp"
+#include "Buffer/RayTracingBuffer.hpp"
 #include "Components/AnimationComponent.hpp"
 #include "Components/CameraComponent.hpp"
 #include "Components/Entity.hpp"
@@ -23,6 +24,7 @@
 #include "Resources/GpuDirectionalLight.hpp"
 #include "Resources/GpuPointLight.hpp"
 #include "Resources/GpuProjViewData.hpp"
+#include "Resources/GpuSpotLight.hpp"
 #include "Resources/GpuVertexData.hpp"
 #include "Resources/GpuVertexPosition.hpp"
 
@@ -137,6 +139,11 @@ namespace gestalt::foundation {
     std::unique_ptr<MeshBuffers> mesh_buffers = std::make_unique<MeshBuffers>();
     std::unique_ptr<LightBuffers> light_buffers = std::make_unique<LightBuffers>();
     std::unique_ptr<PerFrameDataBuffers> per_frame_data_buffers = std::make_unique<PerFrameDataBuffers>();
+    std::unique_ptr<RayTracingBuffer> ray_tracing_buffer = std::make_unique<RayTracingBuffer>();
+
+    std::shared_ptr<AccelerationStructure> tlas;
+    std::shared_ptr<BufferInstance>        tlas_instance_buffer;
+    std::shared_ptr<BufferInstance>        tlas_storage_buffer;
 
     GpuDataContainer<GpuVertexPosition> vertex_positions;
     GpuDataContainer<GpuVertexData> vertex_data;
@@ -147,10 +154,13 @@ namespace gestalt::foundation {
     GpuDataContainer<GpuProjViewData> light_view_projections;
     GpuDataContainer<GpuDirectionalLight> directional_lights;
     GpuDataContainer<GpuPointLight> point_lights;
+    GpuDataContainer<GpuSpotLight> spot_lights;
     GpuDataContainer<std::shared_ptr<ImageInstance>> textures;
     GpuDataContainer<Material> materials;
     GpuDataContainer<Mesh> meshes;
     GpuDataContainer<MeshDraw> mesh_draws;
+
+    std::vector<MeshDraw> mesh_draws_; ///actual one, super cursed i know
 
     ComponentContainer<NodeComponent> scene_graph;
     ComponentContainer<MeshComponent> mesh_components;

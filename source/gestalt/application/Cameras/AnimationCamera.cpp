@@ -12,13 +12,6 @@ namespace gestalt::application {
                             AnimationCameraData& data) {
     auto& camera_data = data;
 
-    glm::quat unclamped_rotation = camera_data.orientation;
-    float32 pitch = glm::pitch(unclamped_rotation);
-    float32 yaw = glm::yaw(unclamped_rotation);
-
-    if ((std::abs(yaw) >= 0.0001 || (std::abs(pitch) <= glm::half_pi<float>())))  // clamp y-rotation
-      camera_data.orientation = unclamped_rotation;
-
     camera_data.orientation = normalize(camera_data.orientation);
   }
 

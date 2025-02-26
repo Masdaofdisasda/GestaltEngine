@@ -45,11 +45,11 @@ namespace gestalt::foundation {
 
     // Adjustable Parameters
     float32 mouse_speed = 4.5f;
-    float32 acceleration = .01f;
-    float32 damping = 15.f;
-    float32 max_speed = .05f;
+    float32 acceleration = 35.f;
+    float32 damping = 0.15f;
+    float32 max_speed = 10.f;
     float32 fast_coef = 5.f;
-    float32 slow_coef = .001f;
+    float32 slow_coef = .1f;
 
     // State Variables
     glm::vec3 move_speed = glm::vec3(0.0f);

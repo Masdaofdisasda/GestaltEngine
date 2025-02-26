@@ -28,6 +28,7 @@ target_link_libraries(
           TracyClient
           fmt::fmt
 		  Jolt
+		  soloud
           ${APPLICATION_MODULE}
           ${FOUNDATION_MODULE}
           ${GRAPHICS_MODULE}

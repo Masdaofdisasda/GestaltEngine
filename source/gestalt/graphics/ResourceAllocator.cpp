@@ -54,20 +54,21 @@ namespace gestalt::graphics {
 
         const auto allocated_image
             = allocate_image(path.filename().string(), VK_FORMAT_R32G32B32A32_SFLOAT,
-                             usage_flags, cube_map_face_size,
-                             VK_IMAGE_ASPECT_COLOR_BIT, ImageType::kCubeMap, true);
+                             usage_flags, cube_map_face_size, VK_IMAGE_ASPECT_COLOR_BIT, ImageType::kCubeMap,
+                             image_template.has_mipmap());
 
-        task_queue_.add_image(path, allocated_image.image_handle, true, true);
+        task_queue_.add_image(path, allocated_image.image_handle, true,
+                              image_template.has_mipmap());
         return std::make_unique<ImageInstance>(std::move(image_template), allocated_image, extent);
       }
 
       const ImageInfo image_info(path);
 
       auto allocated_image = allocate_image(
-          image_template.get_name(), image_info.get_format(), usage_flags, image_info.get_extent(),
-          image_template.get_aspect_flags(), image_template.get_image_type());
+          image_template.get_name(), image_info.get_format(), usage_flags, image_info.get_extent(), image_template.get_aspect_flags(),
+                           image_template.get_image_type(), image_template.has_mipmap());
 
-      task_queue_.add_image(path, allocated_image.image_handle);
+      task_queue_.add_image(path, allocated_image.image_handle, false, image_template.has_mipmap());
 
       return std::make_unique<ImageInstance>(std::move(image_template), allocated_image,
                                              image_info.get_extent());
@@ -78,18 +79,19 @@ namespace gestalt::graphics {
       const ImageInfo image_info(data.data(), data.size(), extent);
 
       auto allocated_image = allocate_image(
-          image_template.get_name(), image_info.get_format(), usage_flags, image_info.get_extent(),
-          image_template.get_aspect_flags(), image_template.get_image_type());
+          image_template.get_name(), image_info.get_format(), usage_flags, image_info.get_extent(), image_template.get_aspect_flags(),
+                           image_template.get_image_type(), image_template.has_mipmap());
 
-      task_queue_.add_image(data, allocated_image.image_handle, image_info.get_extent());
+      task_queue_.add_image(data, allocated_image.image_handle, image_info.get_extent(),
+                            image_template.has_mipmap());
 
       return std::make_unique<ImageInstance>(std::move(image_template), allocated_image,
                                              image_info.get_extent());
     }
 
     auto allocated_image = allocate_image(image_template.get_name(), image_template.get_format(),
-                                          usage_flags, extent, image_template.get_aspect_flags(),
-                                          image_template.get_image_type());
+                                          usage_flags, extent, image_template.get_aspect_flags(), image_template.get_image_type(),
+                         image_template.has_mipmap());
 
     return std::make_unique<ImageInstance>(std::move(image_template), allocated_image, extent);
   }
@@ -167,6 +169,9 @@ namespace gestalt::graphics {
         view_info.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
         view_info.subresourceRange.layerCount = 6;
         break;
+    }
+    if (mipmap) {
+      view_info.subresourceRange.levelCount = img_info.mipLevels;
     }
 
     VK_CHECK(vkCreateImageView(gpu_->getDevice(), &view_info, nullptr, &image.image_view));

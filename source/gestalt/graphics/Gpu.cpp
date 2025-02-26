@@ -70,6 +70,18 @@ namespace gestalt::graphics {
            .dynamicRendering = VK_TRUE,
            .maintenance4 = VK_TRUE};
 
+#pragma region "RayTracing features"
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structure_features{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR,
+        .accelerationStructure = true,
+    };
+
+    VkPhysicalDeviceRayQueryFeaturesKHR ray_query_features{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR,
+        .pNext = &acceleration_structure_features,
+        .rayQuery = true,
+    };
+#pragma endregion
 
     VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT,
@@ -78,6 +90,11 @@ namespace gestalt::graphics {
         .multiviewMeshShader = VK_TRUE, // validation bug?
         .primitiveFragmentShadingRateMeshShader = VK_TRUE,
         .meshShaderQueries = VK_FALSE};
+
+    if (isVulkanRayTracingEnabled()) {
+      mesh_shader_features.pNext = &ray_query_features;
+      fmt::println("RayTracing features enabled.");
+    }
 
     VkPhysicalDeviceFragmentShadingRateFeaturesKHR shading_rate_features{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR,
@@ -96,39 +113,65 @@ namespace gestalt::graphics {
           VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME, VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME
     };
 
-    vkb::PhysicalDeviceSelector selector{vkb_inst};
-    auto device_ret = selector.set_minimum_version(1, 3)
-                          .set_required_features(features10)
-                          .set_required_features_11(features11)
-                          .set_required_features_12(features12)
-                          .set_required_features_13(features13)
-                          .add_required_extension_features(descriptorBufferFeatures)
-                          .add_required_extensions(extensions)
-                          .set_surface(surface)
-                          .select();
+    if (isVulkanRayTracingEnabled()) {
+      std::vector const ray_tracing_extensions = {
+          VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+          VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+          VK_KHR_RAY_QUERY_EXTENSION_NAME,
+          VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
+      };
 
-    if (!device_ret.has_value()) {
-      throw std::runtime_error("Could not select a Vulkan device: " + device_ret.error().message());
+      std::ranges::copy(ray_tracing_extensions, std::back_inserter(extensions));
     }
 
-    vkb::PhysicalDevice physicalDevice = device_ret.value();
+    vkb::PhysicalDeviceSelector selector{vkb_inst};
+    selector.set_minimum_version(1, 3)
+        .set_required_features(features10)
+        .set_required_features_11(features11)
+        .set_required_features_12(features12)
+        .set_required_features_13(features13)
+        .add_required_extension_features(descriptorBufferFeatures)
+        .add_required_extensions(extensions)
+        .set_surface(surface);
+
+    auto devices_result = selector.select_devices(vkb::DeviceSelectionMode::only_fully_suitable);
+    if (!devices_result.has_value()) {
+      throw std::runtime_error("Could not select a Vulkan device: "
+                               + devices_result.error().message());
+    }
+    auto& devices = devices_result.value();
+    fmt::println("Number of devices: {}", devices.size());
+    for (size_t idx = 0; auto& device : devices) {
+      fmt::println("Device {}: {}",idx, device.name);
+    }
+
+    if (getPhysicalDeviceIndex() >= devices.size()) {
+      throw std::runtime_error("Requested Device Index is out of range.");
+    }
+
+    vkb::PhysicalDevice physical_device = devices.at(getPhysicalDeviceIndex());
+    fmt::println("Selected device {}: {}", getPhysicalDeviceIndex(), physical_device.name);
 
     // create the final vulkan device
-    vkb::DeviceBuilder deviceBuilder{physicalDevice};
+    vkb::DeviceBuilder device_builder{physical_device};
 
-    auto dev_ret = deviceBuilder.build();
+    auto dev_ret = device_builder.build();
 
     if (!dev_ret.has_value()) {
       throw std::runtime_error("Could not create a Vulkan device: " + dev_ret.error().message());
     }
 
-    vkb::Device vkbDevice = dev_ret.value();
+    const vkb::Device& vkb_device = dev_ret.value();
 
     // Get the VkDevice handle used in the rest of a vulkan application
-    device = vkbDevice.device;
+    device = vkb_device.device;
     volkLoadDevice(device);
-    chosen_gpu = physicalDevice.physical_device;
+    chosen_gpu = physical_device.physical_device;
     vkGetPhysicalDeviceProperties(chosen_gpu, &device_properties);
+
+    if (isVulkanRayTracingEnabled()) {
+      descriptorBufferProperties.pNext = &acceleration_structure_properties;
+    }
 
     device_properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
     device_properties2.pNext = &descriptorBufferProperties;
@@ -136,18 +179,18 @@ namespace gestalt::graphics {
 
     set_debug_name("Main Device", VK_OBJECT_TYPE_DEVICE,
                          reinterpret_cast<uint64_t>(device));
-    set_debug_name(physicalDevice.name, VK_OBJECT_TYPE_PHYSICAL_DEVICE,
+    set_debug_name(physical_device.name, VK_OBJECT_TYPE_PHYSICAL_DEVICE,
                          reinterpret_cast<uint64_t>(chosen_gpu));
 
     // get a Graphics queue
-    auto graphics_queue_ret = vkbDevice.get_queue(vkb::QueueType::graphics);
+    auto graphics_queue_ret = vkb_device.get_queue(vkb::QueueType::graphics);
 
     if (!graphics_queue_ret.has_value()) {
       throw std::runtime_error("Could not get a graphics queue: "
                                + graphics_queue_ret.error().message());
     }
     graphics_queue = graphics_queue_ret.value();
-    graphics_queue_family = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
+    graphics_queue_family = vkb_device.get_queue_index(vkb::QueueType::graphics).value();
 
     set_debug_name("Graphics Queue", VK_OBJECT_TYPE_QUEUE,
                          reinterpret_cast<uint64_t>(graphics_queue));
@@ -239,6 +282,11 @@ namespace gestalt::graphics {
 
   VkPhysicalDeviceDescriptorBufferPropertiesEXT Gpu::getDescriptorBufferProperties() const {
     return descriptorBufferProperties;
+  }
+
+  VkPhysicalDeviceAccelerationStructurePropertiesKHR Gpu::getAccelerationStructureProperties()
+      const {
+    return acceleration_structure_properties;
   }
 
   void Gpu::set_debug_name(const std::string_view name, const VkObjectType type,

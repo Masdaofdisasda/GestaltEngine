@@ -11,16 +11,15 @@ namespace gestalt::foundation {
         : position(starting_pos), orientation(starting_orientation) {}
 
     [[nodiscard]] glm::mat4 get_view_matrix() const {
-      const glm::mat4 translation_matrix = translate(glm::mat4(1.0f), -position);
-      const glm::mat4 rotation_matrix = mat4_cast(orientation);
-
-      return rotation_matrix * translation_matrix;
+      glm::mat4 worldTransform
+          = glm::translate(glm::mat4(1.0f), position) * glm::mat4_cast(orientation);
+      return glm::inverse(worldTransform);
     }
 
     void set_position(const glm::vec3& new_position) { position = new_position; }
     void set_orientation(const glm::quat& new_orientation) { orientation = new_orientation; }
     void set_euler_angles(float pitch, float yaw, float roll) {
-      orientation = glm::quat(glm::vec3(pitch, yaw, roll));
+      orientation = glm::quat(glm::vec3(yaw, pitch, roll));
     }
 
     // Configuration Values

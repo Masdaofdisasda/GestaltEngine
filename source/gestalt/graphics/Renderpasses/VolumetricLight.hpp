@@ -81,6 +81,7 @@
     }
 
     void execute(const CommandBuffer cmd) override {
+
       compute_pipeline_.bind(cmd);
 
       const auto params = push_constant_provider_();
@@ -130,6 +131,8 @@
       float32 phase_anisotropy{0.2f};
       uint32 phase_type{0};
       uint32 num_point_lights;
+
+      uint32 num_spot_lights;
     };
     ResourceComponent resources_;
     ComputePipeline compute_pipeline_;
@@ -137,6 +140,7 @@
     std::function<uint32()> frame_provider_;
     std::function<PerFrameData()> camera_provider_;
     std::function<uint32()> point_light_count_provider_;
+    std::function<uint32()> spot_light_count_provider_;
 
   public:
     VolumetricLightingScatteringPass(
@@ -144,6 +148,7 @@
         const std::shared_ptr<BufferInstance>& light_matrices,
         const std::shared_ptr<BufferInstance>& directional_lights,
         const std::shared_ptr<BufferInstance>& points_lights,
+        const std::shared_ptr<BufferInstance>& spot_lights,
         const std::shared_ptr<ImageInstance>& blue_noise,
         const std::shared_ptr<ImageInstance>& froxel_data,
         const std::shared_ptr<ImageInstance>& shadow_map,
@@ -152,7 +157,8 @@
         const std::function<RenderConfig::VolumetricLightingParams()>& push_constant_provider,
         const std::function<uint32()>& frame_provider,
         const std::function<PerFrameData()>& camera_provider,
-        const std::function<uint32()>& point_light_count_provider, IGpu* gpu)
+        const std::function<uint32()>& point_light_count_provider,
+        const std::function<uint32()>& spot_light_count_provider, IGpu* gpu)
         : RenderPass("Volumetric Lighting Scattering Pass"),
           resources_(std::move(
               ResourceComponentBindings()
@@ -177,6 +183,8 @@
                                VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
                   .add_binding(2, 2, points_lights, ResourceUsage::READ,
                                VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+                  .add_binding(2, 3, spot_lights, ResourceUsage::READ,
+                               VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
                   .add_push_constant(sizeof(VolumetricLightingScatteringPassConstants),
                                      VK_SHADER_STAGE_COMPUTE_BIT))),
           compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
@@ -186,7 +194,7 @@
           push_constant_provider_(push_constant_provider),
           frame_provider_(frame_provider),
           camera_provider_(camera_provider),
-          point_light_count_provider_(point_light_count_provider) {}
+          point_light_count_provider_(point_light_count_provider), spot_light_count_provider_(spot_light_count_provider) {}
 
     std::vector<ResourceBinding<ResourceInstance>> get_resources(
         const ResourceUsage usage) override {
@@ -214,6 +222,7 @@
       push_constants.noise_scale = params.noise_scale;
       push_constants.noise_type = params.noise_type;
       push_constants.num_point_lights = point_light_count_provider_();
+      push_constants.num_spot_lights = spot_light_count_provider_();
 
       cmd.push_constants(compute_pipeline_.get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
                          sizeof(VolumetricLightingScatteringPassConstants), &push_constants);
@@ -355,6 +364,7 @@
     std::function<RenderConfig::VolumetricLightingParams()> push_constant_provider_;
     std::function<uint32()> frame_provider_;
     std::function<PerFrameData()> camera_provider_;
+    bool executed_ = false;
 
   public:
     VolumetricLightingNoisePass(const std::shared_ptr<ImageInstance>& volumetric_noise_texture,
@@ -378,9 +388,13 @@
     }
 
     void execute(const CommandBuffer cmd) override {
+      if (executed_) {
+        return;
+      }
       compute_pipeline_.bind(cmd);
       const auto [width, height, _] = resources_.get_image_binding(0, 0).resource->get_extent();
       cmd.dispatch(static_cast<uint32>(ceil(width / 8)), static_cast<uint32>(ceil(height / 8)), 64);
+      executed_ = true;
     }
   };
 }
