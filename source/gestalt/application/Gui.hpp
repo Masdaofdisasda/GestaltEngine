@@ -44,6 +44,7 @@ namespace gestalt::application {
       bool show_guizmo_ = true;
       bool show_lights_ = false;
       bool show_cameras_ = false;
+      bool show_help_ = false;
 
       void menu_bar();
       void lights();
@@ -63,6 +64,7 @@ namespace gestalt::application {
       void tone_map_settings();
       void guizmo();
       void check_file_dialog();
+      void show_help();
 
     public:
       VkDescriptorSet descriptor_set_;

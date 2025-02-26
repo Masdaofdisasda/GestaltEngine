@@ -2,71 +2,65 @@
 #include "ECSManager.hpp"
 
 #include "AnimationSystem.hpp"
+#include "AudioSystem.hpp"
 #include "CameraSystem.hpp"
 #include "LightSystem.hpp"
 #include "MaterialSystem.hpp"
 #include "MeshSystem.hpp"
 #include "PhysicSystem.hpp"
+#include "RayTracingSystem.hpp"
 #include "TransformSystem.hpp"
 #include "Interface/IResourceAllocator.hpp"
 #include "Resource Loading/AssetLoader.hpp"
 
 namespace gestalt::application {
 
-    void ECSManager::init(IGpu* gpu, IResourceAllocator* resource_allocator,  Repository* repository,
-                           FrameProvider* frame) {
+    void ECSManager::init(IGpu* gpu, IResourceAllocator* resource_allocator, Repository* repository,
+                        FrameProvider* frame) {
     gpu_ = gpu;
     resource_allocator_ = resource_allocator;
     repository_ = repository;
 
-      asset_loader_ = std::make_unique<AssetLoader>();
+    asset_loader_ = std::make_unique<AssetLoader>();
     component_factory_ = std::make_unique<ComponentFactory>();
 
-
     component_factory_->init(repository_);
-    asset_loader_->init(resource_allocator_, component_factory_.get(),
-                        repository_);
+    asset_loader_->init(resource_allocator_, component_factory_.get(), repository_);
 
-    component_factory_->create_directional_light(
-        glm::vec3(1.f, 0.957f, 0.917f), 100000.f, glm::vec3(-0.216, 0.941, -0.257));
-    component_factory_->create_point_light(glm::vec3(1.0f), 5.0f, glm ::vec3(0.0, 6.0, 0.0), 100.f);
+    if (const std::string initial_scene = getInitialScene(); !initial_scene.empty()) {
+      request_scene(std::filesystem::current_path() / "../../assets" / initial_scene);
+    }
+    component_factory_->create_directional_light(glm::vec3(1.f, 0.957f, 0.917f), 683.f,
+                                                   glm::vec3(0.216, -0.941, 0.257));
+      component_factory_->create_point_light(glm::vec3(1.0f), 5.0f, glm ::vec3(0.0, 6.0, 0.0),
+                                             100.f);
 
     auto [main_cam, main_cam_node] = component_factory_->create_entity("Editor Camera");
     component_factory_->link_entity_to_parent(main_cam, root_entity_);
     component_factory_->add_free_fly_camera(glm::vec3(7, 1.8, -7), glm::vec3(0, 0, 0),
                                             glm::vec3(0, 1, 0), main_cam);
 
-
-    auto [player, player_node] = component_factory_->create_entity("Player");
-    component_factory_->link_entity_to_parent(player, root_entity_);
-    component_factory_->add_first_person_camera(glm::vec3(7, 1.8, -7), player);
-    repository_->transform_components[player].position = glm::vec3(0, 20.f, 0);
-    component_factory_->create_physics_component(player, DYNAMIC, CapsuleCollider{.9f, 1.8f});
-
-      auto [floor, floor_node] = component_factory_->create_entity("Floor");
-      component_factory_->link_entity_to_parent(floor, root_entity_);
-      component_factory_->create_physics_component(floor, STATIC,
-                                                   BoxCollider{glm::vec3(1000.f, 0.1f, 1000.f)});
-
     material_system_ = std::make_unique<MaterialSystem>();
-    material_system_->init(gpu_, resource_allocator, repository_,frame);
+    material_system_->init(gpu_, resource_allocator, repository_, frame);
     camera_system_ = std::make_unique<CameraSystem>();
-    camera_system_->init(gpu_, resource_allocator, repository_,
-                         frame);
+    camera_system_->init(gpu_, resource_allocator, repository_, frame);
     light_system_ = std::make_unique<LightSystem>();
-    light_system_->init(gpu_,  resource_allocator, repository_,
-                        frame);
+    light_system_->init(gpu_, resource_allocator, repository_, frame);
     transform_system_ = std::make_unique<TransformSystem>();
-    transform_system_->init(gpu_,  resource_allocator, repository_,
-                            frame);
+    transform_system_->init(gpu_, resource_allocator, repository_, frame);
     animation_system_ = std::make_unique<AnimationSystem>();
-    animation_system_->init(gpu_, resource_allocator, repository_,
-                            frame);
+    animation_system_->init(gpu_, resource_allocator, repository_, frame);
     mesh_system_ = std::make_unique<MeshSystem>();
+    mesh_system_->init(gpu_, resource_allocator, repository_, frame);
+
+    audio_system_ = std::make_unique<AudioSystem>();
+    audio_system_->init(gpu_, resource_allocator, repository_, frame);
     mesh_system_->init(gpu_,  resource_allocator, repository_,
                        frame);
     physics_system_ = std::make_unique<PhysicSystem>();
     physics_system_->init(gpu_, resource_allocator, repository_, frame);
+    raytracing_system_ = std::make_unique<RayTracingSystem>();
+    raytracing_system_->init(gpu_, resource_allocator, repository_, frame);
   }
 
   void ECSManager::set_active_camera(const Entity camera) const {
@@ -83,6 +77,7 @@ namespace gestalt::application {
       camera_system_->cleanup();
       light_system_->cleanup();
       material_system_->cleanup();
+      audio_system_->cleanup();
 
       repository_->transform_components.clear();
       repository_->camera_components.clear();
@@ -107,13 +102,17 @@ namespace gestalt::application {
         scene_path_.clear();
       }
 
-      physics_system_->update(delta_time, movement, aspect);
+      //physics_system_->update(delta_time, movement, aspect);
       material_system_->update(delta_time, movement, aspect);
       camera_system_->update(delta_time, movement, aspect);
       light_system_->update(delta_time, movement, aspect);
       transform_system_->update(delta_time, movement, aspect);
       mesh_system_->update(delta_time, movement, aspect);
       animation_system_->update(delta_time, movement, aspect);
+      audio_system_->update(delta_time, movement, aspect);
+      raytracing_system_->update(delta_time, movement, aspect);
+
+      scene_path_.clear();
     }
 
     void ECSManager::request_scene(const std::filesystem::path& file_path) {

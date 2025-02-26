@@ -16,6 +16,7 @@ namespace gestalt::graphics {
     std::vector<ResourceBinding<ImageArrayInstance>> image_array_bindings;
     std::vector<ResourceBinding<ImageInstance>> image_bindings;
     std::vector<ResourceBinding<BufferInstance>> buffer_bindings;
+    std::vector<ResourceBinding<AccelerationStructureInstance>> tlas_bindings;
 
     PushDescriptor push_descriptor;
 
@@ -96,6 +97,18 @@ namespace gestalt::graphics {
       return *this;
     }
 
+    ResourceComponentBindings& add_binding(uint32 set_index, uint32 binding_index,
+                                           const std::shared_ptr<AccelerationStructureInstance>& tlas,
+                                           ResourceUsage usage, VkShaderStageFlags shader_stages) {
+      if (!tlas) {
+        throw std::invalid_argument("AccelerationStructure cannot be null");
+      }
+
+      tlas_bindings.push_back(
+          {tlas, {set_index, binding_index, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, shader_stages, 1}, usage});
+      return *this;
+    }
+
     // Add push constants
     ResourceComponentBindings& add_push_constant(uint32_t size, VkShaderStageFlags stage_flags) {
       push_descriptor = PushDescriptor(size, stage_flags);
@@ -113,6 +126,7 @@ namespace gestalt::graphics {
       std::vector<ResourceBinding<ResourceInstance>> result;
       append_bindings(result, data_.image_bindings, usage);
       append_bindings(result, data_.buffer_bindings, usage);
+      append_bindings(result, data_.tlas_bindings, usage);
       return result;
     }
 
@@ -136,6 +150,16 @@ namespace gestalt::graphics {
       throw std::runtime_error("Resource binding not found");
     }
 
+    [[nodiscard]] ResourceBinding<AccelerationStructureInstance> get_tlas_binding(
+    const uint32 set_index, const uint32 binding_index) const {
+      for (const auto& resource : data_.tlas_bindings) {
+        if (resource.info.set_index == set_index && resource.info.binding_index == binding_index) {
+          return resource;
+        }
+      }
+      throw std::runtime_error("Resource binding not found");
+    }
+
     // Get image or buffer bindings as spans
     [[nodiscard]] std::span<const ResourceBinding<ImageInstance>> get_image_bindings() const {
       return data_.image_bindings;
@@ -143,6 +167,10 @@ namespace gestalt::graphics {
 
     [[nodiscard]] std::span<const ResourceBinding<BufferInstance>> get_buffer_bindings() const {
       return data_.buffer_bindings;
+    }
+
+    [[nodiscard]] std::span<const ResourceBinding<AccelerationStructureInstance>> get_tlas_bindings() const {
+      return data_.tlas_bindings;
     }
 
     [[nodiscard]] std::span<const ResourceBinding<ImageArrayInstance>>

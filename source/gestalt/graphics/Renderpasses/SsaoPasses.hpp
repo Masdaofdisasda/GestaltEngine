@@ -62,7 +62,9 @@ namespace gestalt::graphics {
       cmd.push_constants(compute_pipeline_.get_pipeline_layout(), VK_SHADER_STAGE_COMPUTE_BIT, 0,
                          sizeof(RenderConfig::SsaoParams), &push_constants);
       const auto [width, height, _] = resources_.get_image_binding(1, 3).resource->get_extent();
-      cmd.dispatch(static_cast<uint32>(ceil(width / 8)), static_cast<uint32>(ceil(height / 8)), 1);
+      const uint32 groupX = (width + 16 - 1) / 16;
+      const uint32 groupY = (height + 16 - 1) / 16;
+      cmd.dispatch(groupX, groupY, 1);
     }
   };
 

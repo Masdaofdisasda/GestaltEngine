@@ -21,11 +21,14 @@ namespace gestalt::foundation {
 
       nlohmann::json config_json = {
                                     {"applicationName", config_.applicationName},
+                                    {"initialScene", config_.initialScene},
                                     {"windowedWidth", config_.windowedWidth},
                                     {"windowedHeight", config_.windowedHeight},
                                     {"useFullscreen", config_.useFullscreen},
                                     {"useVsync", config_.useVsync},
-                                    {"useValidationLayers", config_.useValidationLayers}};
+                                    {"enableVulkanRayTracing", config_.enableVulkanRayTracing},
+                                    {"useValidationLayers", config_.useValidationLayers},
+                                    {"physicalDeviceIndex", config_.physicalDeviceIndex}};
 
       std::ofstream out_config_file(filename);
       if (out_config_file) {
@@ -54,13 +57,18 @@ namespace gestalt::foundation {
 
     try {
       config_.applicationName = config_json.value("applicationName", config_.applicationName);
+      config_.initialScene = config_json.value("initialScene", config_.initialScene);
       config_.windowedWidth = config_json.value("windowedWidth", config_.windowedWidth);
       config_.windowedHeight = config_json.value("windowedHeight", config_.windowedHeight);
 
       config_.useFullscreen = config_json.value("useFullscreen", config_.useFullscreen);
       config_.useVsync = config_json.value("useVsync", config_.useVsync);
+      config_.enableVulkanRayTracing
+          = config_json.value("enableVulkanRayTracing", config_.enableVulkanRayTracing);
       config_.useValidationLayers
           = config_json.value("useValidationLayers", config_.useValidationLayers);
+      config_.physicalDeviceIndex
+          = config_json.value("physicalDeviceIndex", config_.physicalDeviceIndex);
 
     } catch (const nlohmann::json::type_error& e) {
       fmt::println("JSON type error in configuration file: {}", e.what());

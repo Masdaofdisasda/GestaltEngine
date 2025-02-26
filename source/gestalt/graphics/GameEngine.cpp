@@ -27,7 +27,6 @@ namespace gestalt {
 
     foundation::EngineConfiguration::get_instance().load_from_file();
     auto config = foundation::EngineConfiguration::get_instance().get_config();
-    //config.useValidationLayers = true;
     foundation::EngineConfiguration::get_instance().set_config(config);
 
     window_->init();
@@ -38,6 +37,9 @@ namespace gestalt {
         = std::make_unique<graphics::ResourceAllocator>(gpu_.get());
 
     scene_manager_->init(gpu_.get(), resource_allocator_.get(), repository_.get(), frame_provider_.get());
+    scene_manager_->update_scene(
+      time_tracking_service_.get_delta_time(), input_system_.get_movement(),
+      static_cast<float>(window_->extent.width) / static_cast<float>(window_->extent.height));
 
     render_pipeline_ = std::make_unique<graphics::RenderEngine>();
     render_pipeline_->init(gpu_.get(), window_.get(), resource_allocator_.get(), repository_.get(),
@@ -103,7 +105,8 @@ namespace gestalt {
 
       imgui_->new_frame();
 
-      render_pipeline_->get_config().light_adaptation.delta_time
+      time_tracking_service_.update_timer();
+      render_pipeline_->get_config().luminance_params.time_coeff
           = time_tracking_service_.get_delta_time();
 
       scene_manager_->update_scene(

@@ -31,6 +31,7 @@ include(source/external/tracy.cmake)
 include(source/external/vulkan.cmake)
 include(source/external/vkb.cmake)
 include(source/external/sdl2.cmake)
+include(source/external/so-loud.cmake)
 include(source/external/imgui.cmake)
 include(source/external/jolt.cmake)
 

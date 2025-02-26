@@ -18,11 +18,13 @@ namespace gestalt::foundation {
     [[nodiscard]] virtual VkPhysicalDevice getPhysicalDevice() const = 0;
     [[nodiscard]] virtual VkPhysicalDeviceProperties getPhysicalDeviceProperties() const = 0;
     [[nodiscard]] virtual VkPhysicalDeviceProperties2 getPhysicalDeviceProperties2() const = 0;
-    [[nodiscard]] virtual VkPhysicalDeviceDescriptorBufferPropertiesEXT getDescriptorBufferProperties()
-        const = 0;
-    virtual void set_debug_name(std::string_view name, VkObjectType type,
-                                           uint64 handle) const
+    [[nodiscard]] virtual VkPhysicalDeviceDescriptorBufferPropertiesEXT
+    getDescriptorBufferProperties() const
         = 0;
+    [[nodiscard]] virtual VkPhysicalDeviceAccelerationStructurePropertiesKHR
+    getAccelerationStructureProperties() const
+        = 0;
+    virtual void set_debug_name(std::string_view name, VkObjectType type, uint64 handle) const = 0;
 
     virtual void immediateSubmit(std::function<void(VkCommandBuffer cmd)> function) const = 0;
   };

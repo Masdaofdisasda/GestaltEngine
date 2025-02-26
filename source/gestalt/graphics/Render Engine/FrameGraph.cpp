@@ -88,7 +88,7 @@ namespace gestalt::graphics {
   }
 
   std::shared_ptr<BufferInstance> FrameGraph::add_resource(BufferTemplate&& buffer_template,
-                                               CreationType creation_type) {
+                                                           CreationType creation_type) {
     auto resource = resource_registry_.add_template(std::move(buffer_template));
     const uint64 handle = resource->handle();
     if (handle == -1) {
@@ -103,6 +103,24 @@ namespace gestalt::graphics {
 
     return std::static_pointer_cast<BufferInstance>(inserted.first->second->resource);
   }
+  std::shared_ptr<AccelerationStructureInstance> FrameGraph::add_resource(
+    const std::shared_ptr<AccelerationStructure>& accelerationStructure, CreationType creation_type) {
+    const auto asInstance = std::make_shared<AccelerationStructureInstance>(accelerationStructure);
+    auto resource = resource_registry_.add_resource(asInstance);
+
+    const uint64 handle = resource->handle();
+    if (handle == -1) {
+      throw std::runtime_error("Invalid resource handle!");
+    }
+
+    auto inserted = edges_.emplace(
+        handle, std::make_shared<FrameGraphEdge>(std::move(resource), creation_type));
+    if (!inserted.second) {
+      throw std::runtime_error("Failed to insert edge into edges map!");
+    }
+
+    return std::static_pointer_cast<AccelerationStructureInstance>(inserted.first->second->resource);
+  }
 
   void FrameGraph::add_render_pass(std::shared_ptr<RenderPass>&& pass) {
     nodes_.push_back(std::make_shared<FrameGraphNode>(std::move(pass)));
@@ -110,8 +128,8 @@ namespace gestalt::graphics {
 
   void FrameGraph::compile() {
     for (auto& node : nodes_) {
-      for (const auto& [read_resource, info, _] : node->render_pass->get_resources(ResourceUsage::READ)) {
-        auto& edge = edges_.at(read_resource->handle());
+      for (const auto& resource : node->render_pass->get_resources(ResourceUsage::READ)) {
+        auto& edge = edges_.at(resource.resource->handle());
         edge->nodes_to.push_back(node);
         node->edges_in.push_back(edge);
       }
@@ -123,7 +141,7 @@ namespace gestalt::graphics {
     }
 
     // for debugging:
-    //print_graph();
+    // print_graph();
 
     topological_sort();
 
@@ -163,7 +181,7 @@ namespace gestalt::graphics {
 
     for (const auto& node : sorted_nodes_) {
       const auto name = std::string(node->render_pass->get_name());
-      //fmt::println("executing: {}", name);
+      // fmt::println("executing: {}", name);
       synchronization_manager_.synchronize_resources(node, cmd);
 
       VkDebugUtilsLabelEXT label_info = {

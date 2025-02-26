@@ -1,0 +1,76 @@
+#version 450
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// based on https://bruop.github.io/exposure/
+
+const float EPSILON      = 0.005;
+const uint  HISTOGRAM_SIZE = 256;
+
+layout( push_constant ) uniform constants
+{	
+    float min_log_lum;
+    float max_log_lum;
+    float log_lum_range;
+    float inv_log_lum_range;
+
+    float time_coeff;
+    float num_pixels;
+    float width;
+    float height;
+} params;
+
+layout(set = 0, binding = 0) buffer HistogramBuffer
+{
+    uint histogram[];
+};
+
+layout(set = 0, binding = 1) uniform sampler2D texColor;
+
+// Each thread group uses a shared array for intermediate accumulation
+shared uint histogramShared[HISTOGRAM_SIZE];
+
+const vec3 RGB_TO_LUM = vec3(0.2125, 0.7154, 0.0721);
+
+// Convert an HDR color to a bin index using log2-based scaling
+uint colorToBin(vec3 hdrColor, float minLogLum, float invLogLumRange)
+{
+    float lum = dot(hdrColor, RGB_TO_LUM);
+
+    // If nearly black, bin 0
+    if (lum < EPSILON)
+    {
+        return 24u;
+    }
+
+    // log2(lum), then map to [0..1]
+    float logLum = clamp((log2(lum) - minLogLum) * invLogLumRange, 0.0, 1.0);
+    // Map [0..1] to [1..255], leaving bin 0 for near-black
+    return uint(logLum * 254.0 + 1.0);
+}
+
+void main()
+{
+    // Clear local histogram
+    uint localIdx = gl_LocalInvocationIndex;
+    histogramShared[localIdx] = 0u;
+    barrier(); // Wait for all threads to clear
+
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 dims = ivec2(params.width,params.height);
+
+    if (gid.x < dims.x && gid.y < dims.y) {
+        vec3 rgb      = texture(texColor, vec2(gid) / vec2(dims)).rgb;
+
+        // Compute bin
+        uint binIndex = colorToBin(rgb, params.min_log_lum, params.inv_log_lum_range);
+        
+        // Accumulate in local shared memory
+        atomicAdd(histogramShared[binIndex], 1u);
+    }
+
+    barrier(); // Wait for all threads to clear
+
+    // Now each group collectively writes out to the global histogram
+    // We use an atomicAdd on the global array, to avoid collisions with other groups
+    atomicAdd(histogram[localIdx], histogramShared[localIdx]);
+}

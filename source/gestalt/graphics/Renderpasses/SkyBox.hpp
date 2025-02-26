@@ -22,6 +22,7 @@ namespace gestalt::graphics {
                const std::shared_ptr<ImageInstance>& scene_skybox,
                 const std::shared_ptr<ImageInstance>& g_buffer_depth, 
         const VkSampler post_process_sampler,
+        const VkSampler cube_map_sampler,
         IGpu* gpu, const std::function<RenderConfig::SkyboxParams()>& push_constant_provider
     )
         : RenderPass("Skybox Pass"),
@@ -35,7 +36,7 @@ namespace gestalt::graphics {
                                VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
                   .add_binding(2, 0, scene_lit, post_process_sampler, ResourceUsage::READ,
                                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
-                  .add_binding(2, 1, texEnvMap, post_process_sampler, ResourceUsage::READ,
+                  .add_binding(2, 1, texEnvMap, cube_map_sampler, ResourceUsage::READ,
                                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
                   .add_push_constant(sizeof(RenderConfig::SkyboxParams),
                                      VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -78,6 +79,52 @@ namespace gestalt::graphics {
 
       cmd.draw(36, 1, 0, 0);
       cmd.end_rendering();
+    }
+  };
+
+  
+  class ComposeScenePass final : public RenderPass {
+    ResourceComponent resources_;
+    ComputePipeline compute_pipeline_;
+
+  public:
+    ComposeScenePass(
+        const std::shared_ptr<ImageInstance>& scene_lit,
+        const std::shared_ptr<ImageInstance>& scene_skybox,
+                     const std::shared_ptr<ImageInstance>& scene_composed,
+                     const VkSampler post_process_sampler,
+        IGpu* gpu)
+        : RenderPass("Compose Scene Pass"),
+          resources_(std::move(ResourceComponentBindings()
+                            .add_binding(0, 0, scene_lit, nullptr, ResourceUsage::READ,
+                               VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+                                                VK_SHADER_STAGE_COMPUTE_BIT)
+                            .add_binding(0, 1, scene_skybox, nullptr, ResourceUsage::READ,
+                               VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+                                                VK_SHADER_STAGE_COMPUTE_BIT)
+                            .add_binding(0, 2, scene_composed, nullptr, ResourceUsage::WRITE,
+                                                VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+                                                VK_SHADER_STAGE_COMPUTE_BIT))),
+          compute_pipeline_(gpu, get_name(), resources_.get_image_bindings(),
+                            resources_.get_buffer_bindings(), resources_.get_image_array_bindings(),
+                            resources_.get_push_constant_range(), "compose_image.comp.spv") {}
+
+    std::vector<ResourceBinding<ResourceInstance>> get_resources(
+        const ResourceUsage usage) override {
+      return resources_.get_resources(usage);
+    }
+
+    std::map<uint32, std::shared_ptr<DescriptorBufferInstance>> get_descriptor_buffers() override {
+      return compute_pipeline_.get_descriptor_buffers();
+    }
+
+    void execute(CommandBuffer cmd) override {
+      compute_pipeline_.bind(cmd);
+
+      const auto [width, height, _] = resources_.get_image_binding(0, 2).resource->get_extent();
+      const uint32 groupX = (width + 16 - 1) / 16;
+      const uint32 groupY = (height + 16 - 1) / 16;
+      cmd.dispatch(groupX, groupY, 1);
     }
   };
 }

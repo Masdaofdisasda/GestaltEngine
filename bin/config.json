@@ -1,7 +1,10 @@
 {
     "applicationName": "Gestalt Engine",
+    "enableVulkanRayTracing": true,
+    "initialScene": "sponza_pestana.glb",
+    "physicalDeviceIndex": 0,
     "useFullscreen": false,
-    "useValidationLayers": false,
+    "useValidationLayers": true,
     "useVsync": false,
     "windowedHeight": 900,
     "windowedWidth": 1300

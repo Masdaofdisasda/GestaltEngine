@@ -119,25 +119,27 @@ namespace gestalt::application {
         .set_initial_value(checkerboard.data(), checkerboard.size()).build());
     repository_->textures.add(default_mat.error_checkerboard_image_instance);
 
+    auto max_sampler_anisotropy = gpu_->getPhysicalDeviceProperties().limits.maxSamplerAnisotropy;
+
     default_mat.color_sampler = std::make_unique<SamplerInstance>(
         SamplerTemplate("Albedo Sampler", VK_FILTER_LINEAR, VK_FILTER_LINEAR,
                         VK_SAMPLER_MIPMAP_MODE_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT,
                         VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_TRUE,
-                        0.0f, 0.0f, VK_LOD_CLAMP_NONE, 16.0f, VK_FALSE, VK_COMPARE_OP_NEVER,
+                        0.f, 0.0f, VK_LOD_CLAMP_NONE, max_sampler_anisotropy, VK_FALSE, VK_COMPARE_OP_NEVER,
                         VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK),
         gpu_->getDevice());       
     default_mat.metallic_roughness_sampler = std::make_unique<SamplerInstance>(
         SamplerTemplate("Metal Rough Sampler", VK_FILTER_LINEAR, VK_FILTER_LINEAR,
                         VK_SAMPLER_MIPMAP_MODE_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT,
-                        VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_FALSE,
-                        0.0f, 0.0f, VK_LOD_CLAMP_NONE, 1.0f, VK_FALSE, VK_COMPARE_OP_NEVER,
+                        VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_TRUE,
+                        0.0f, 0.0f, VK_LOD_CLAMP_NONE, max_sampler_anisotropy, VK_FALSE, VK_COMPARE_OP_NEVER,
                         VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK),
         gpu_->getDevice());
     default_mat.normal_sampler = std::make_unique<SamplerInstance>(
         SamplerTemplate("NormalMapSampler", VK_FILTER_LINEAR, VK_FILTER_LINEAR,
                         VK_SAMPLER_MIPMAP_MODE_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT,
-                        VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_FALSE,
-                        0.0f, 0.0f, VK_LOD_CLAMP_NONE, 1.0f, VK_FALSE, VK_COMPARE_OP_NEVER,
+                        VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_TRUE,
+                        0.0f, 0.0f, VK_LOD_CLAMP_NONE, max_sampler_anisotropy, VK_FALSE, VK_COMPARE_OP_NEVER,
                         VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK),
         gpu_->getDevice());
     default_mat.emissive_sampler = std::make_unique<SamplerInstance>(

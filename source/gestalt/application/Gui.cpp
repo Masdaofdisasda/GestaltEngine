@@ -10,6 +10,7 @@
 #include <ImGuizmo.h>
 #include <ImGuiFileDialog.h>
 
+#include <algorithm>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/random.hpp>
@@ -234,6 +235,30 @@ namespace gestalt::application {
       }
     }
 
+    void Gui::show_help() {
+      ImGui::Begin("Help - Controls", &show_help_, ImGuiWindowFlags_AlwaysAutoResize);
+
+      ImGui::Text("Overall Control Scheme");
+      ImGui::Separator();
+
+      ImGui::Text("Global Controls:");
+      ImGui::BulletText("F1 - Lock mouse to window");
+      ImGui::BulletText("F2 - Unlock mouse");
+      ImGui::BulletText("F3 - Toggle Free Camera/Animation Camera");
+
+      ImGui::Spacing();
+
+      ImGui::Text("Free Camera Controls:");
+      ImGui::BulletText("W/A/S/D - Move Camera");
+      ImGui::BulletText("LSHIFT - Move Down");
+      ImGui::BulletText("SPACE - Move Up");
+      ImGui::BulletText("LCTRL - Increase Speed");
+      ImGui::BulletText("LALT - Decrease Speed");
+      ImGui::BulletText("Right Mouse Button + Drag - Rotate View");
+
+      ImGui::End();
+    }
+
     void Gui::menu_bar() {
       if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
@@ -310,6 +335,13 @@ namespace gestalt::application {
             ImGui::EndMenu();
           }
 
+          ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Help")) {
+          if (ImGui::MenuItem("Show Controls")) {
+            show_help_ = true;  // Open the Help window
+          }
           ImGui::EndMenu();
         }
 
@@ -529,30 +561,55 @@ namespace gestalt::application {
         tone_map_settings();
       }
 
+      if (show_help_) {
+        show_help();
+      }
+
       check_file_dialog();
 
       ImGui::Render();
     }
 
     void Gui::light_adaptation_settings() {
-      if (ImGui::Begin("Light Adaptation")) {
+      if (ImGui::Begin("Exposure & Light Adaptation")) {
         RenderConfig& config = actions_.get_render_config();
+        auto& lum_params = config.luminance_params;
+        auto& cam_params = config.hdr;
 
-        // Use ImGuiSliderFlags_Logarithmic to create a logarithmic slider.
-        // The slider's value directly represents the actual value being modified.
-        ImGui::SliderFloat("Light Adaption Speed",
-                           &config.light_adaptation.adaptation_speed_dark2light, 0.0001f, 100.0f,
-                           "Light: %.4f", ImGuiSliderFlags_Logarithmic);
+        ImGui::Text("Histogram-based Luminance");
+        if (ImGui::SliderFloat("min_log_lum", &lum_params.min_log_lum, -20.0f, 20.0f, "%.2f")) {
+          lum_params.log_lum_range = lum_params.max_log_lum - lum_params.min_log_lum;
+          lum_params.inv_log_lum_range = 1.0f / lum_params.log_lum_range;
+          lum_params.min_log_lum = std::min(lum_params.min_log_lum, lum_params.max_log_lum);
+          if (lum_params.min_log_lum == 0.f) {
+            lum_params.min_log_lum = -0.01f;
+          }
+        }
+        if (ImGui::SliderFloat("max_log_lum", &lum_params.max_log_lum, -20.0f, 20.0f, "%.2f")) {
+          lum_params.log_lum_range = lum_params.max_log_lum - lum_params.min_log_lum;
+          lum_params.inv_log_lum_range = 1.0f / lum_params.log_lum_range;
+          lum_params.max_log_lum = std::max(lum_params.max_log_lum, lum_params.min_log_lum);
+          if (lum_params.max_log_lum == 0.f) {
+            lum_params.max_log_lum = 0.01f;
+          }
+        }
+        // Show derived logLumRange, read-only
+        ImGui::Text("log_lum_range: %.2f", lum_params.log_lum_range);
+        ImGui::Text("inv_log_lum_range: %.3f", lum_params.inv_log_lum_range);
 
-        ImGui::SliderFloat("Dark Adaption Speed",
-                           &config.light_adaptation.adaptation_speed_light2dark, 0.0001f, 100.0f,
-                           "Dark: %.4f", ImGuiSliderFlags_Logarithmic);
+        // time_coeff to control adaptation speed
+        ImGui::SliderFloat("time_coeff", &lum_params.time_coeff, 0.01f, 1.0f, "%.2f");
+        ImGui::Separator();
 
-        ImGui::SliderFloat("Min Luminance", &config.light_adaptation.min_luminance, 0.0001f, 1.0f,
-                           "Min: %.4f", ImGuiSliderFlags_Logarithmic);
+        // "Camera-like" controls
+        ImGui::Text("Camera-based Exposure");
+        ImGui::SliderFloat("ISO", &cam_params.iso, 25.0f, 6400.0f, "%.0f");
+        ImGui::SliderFloat("Shutter (s)", &cam_params.shutter, 1.0f / 4000.0f, 1.0f / 1.0f, "%.4f",
+                           ImGuiSliderFlags_Logarithmic);
+        ImGui::SliderFloat("Aperture (f-stop)", &cam_params.aperture, 1.0f, 22.0f, "%.1f");
+        ImGui::SliderFloat("EV Compensation", &cam_params.exposureCompensation, -4.0f, 4.0f,
+                           "%.2f");
 
-        ImGui::SliderFloat("Max Luminance", &config.light_adaptation.max_luminance, 1.0f, 100000.0f,
-                           "Max: %.4f", ImGuiSliderFlags_Logarithmic);
       }
       ImGui::End();
     }
@@ -670,11 +727,12 @@ namespace gestalt::application {
                              "%.2f");
 
           // Density Modifier (controls overall fog density, typical range [0.0001, 5.0])
-          ImGui::SliderFloat("Density Modifier", &params.density_modifier, 0.0001f, 5.0f, "%.4f",
+          ImGui::SliderFloat("Density Modifier", &params.density_modifier, 0.0001f, 100.0f, "%.4f",
                              ImGuiSliderFlags_Logarithmic);
 
           // Noise Scale (scales noise for fog, typical range [0.1, 10.0])
-          ImGui::SliderFloat("Noise Scale", &params.noise_scale, 0.1f, 10.0f, "%.2f");
+          ImGui::SliderFloat("Noise Scale", &params.noise_scale, 0.0001f, 10.0f, "%.4f",
+                             ImGuiSliderFlags_Logarithmic);
 
           ImGui::Combo("Noise Type", (int*)&params.noise_type,
                        "Blue Noise\0Interleaved Noise\0");
@@ -686,10 +744,10 @@ namespace gestalt::application {
 
           // Volumetric Noise Speed Multiplier (range [0.0, 10.0] for noise animation speed)
           ImGui::SliderFloat("Noise Speed Multiplier", &params.volumetric_noise_speed_multiplier,
-                             0.0f, 10.0f, "%.2f");
+                             0.0001f, 10.0f, "%.4f", ImGuiSliderFlags_Logarithmic);
 
           // Height Fog Density (controls fog density along the Y-axis, range [0.0, 1.0])
-          ImGui::SliderFloat("Height Fog Density", &params.height_fog_density, 0.0001f, 5.0f, "%.4f",
+          ImGui::SliderFloat("Height Fog Density", &params.height_fog_density, 0.0001f, 100.0f, "%.4f",
                              ImGuiSliderFlags_Logarithmic);
 
           // Height Fog Falloff (range [0.1, 10.0] for how quickly fog density falls off with
@@ -698,19 +756,20 @@ namespace gestalt::application {
                              ImGuiSliderFlags_Logarithmic);
 
           // Box Position (world-space position of the fog box, wide range)
-          ImGui::SliderFloat3("Box Position", &params.box_position.x, -100.0f, 100.0f, "%.2f");
+          ImGui::SliderFloat3("Box Position", &params.box_position.x, -2000.0f, 2000.0f, "%.2f");
 
           // Box Fog Density (density of the fog within the box, range [0.0, 1.0])
-          ImGui::SliderFloat("Box Fog Density", &params.box_fog_density, 0.0001f, 5.0f, "%.4f",
+          ImGui::SliderFloat("Box Fog Density", &params.box_fog_density, 0.0001f, 100.0f, "%.4f",
                              ImGuiSliderFlags_Logarithmic);
 
           // Box Size (size of the fog box in world-space units, typical range [1.0, 100.0])
-          ImGui::SliderFloat3("Box Size", &params.box_size.x, 1.0f, 100.0f, "%.2f");
+          ImGui::SliderFloat3("Box Size", &params.box_size.x, 1.0f, 1000.0f, "%.2f");
 
            ImGui::SliderInt("Enable Spatial Filtering", &params.enable_spatial_filter, 0, 1);
 
           // Scattering Factor (how much light scatters in the fog, range [0.0, 1.0])
-          ImGui::SliderFloat("Scattering Factor", &params.scattering_factor, 0.0f, 1.0f, "%.2f");
+           ImGui::SliderFloat("Scattering Factor", &params.scattering_factor, 0.0001f, 1.0f, "%.4f",
+                              ImGuiSliderFlags_Logarithmic);
 
            if (params.phase_type == 3) {
             // Droplet Size (controls the size of the droplets, range [5.0, 50.0])
@@ -761,9 +820,16 @@ namespace gestalt::application {
         ImGui::SliderFloat("Max White", &config.hdr.maxWhite, 0.1f, 10.f, "%.3f");
         ImGui::SliderFloat("Bloom Strength", &config.hdr.bloomStrength, 0.0f, 1.f, "%.4f",
                            ImGuiSliderFlags_Logarithmic);
+
+        ImGui::SliderFloat("Vignette Radius", &config.hdr.vignette_radius, 0.0f, 2.0f, "%.3f");
+        ImGui::SliderFloat("Vignette Softness", &config.hdr.vignette_softness, 0.0f, 1.0f, "%.3f");
+
         ImGui::ColorPicker4("Lift", &config.hdr.lift[0], ImGuiColorEditFlags_Float);
         ImGui::ColorPicker4("Gamma", &config.hdr.gamma[0], ImGuiColorEditFlags_Float);
         ImGui::ColorPicker4("Gain", &config.hdr.gain[0], ImGuiColorEditFlags_Float);
+
+        ImGui::SliderFloat("Saturation", &config.hdr.saturation, 0.0f, 2.0f, "%.3f");
+        ImGui::SliderFloat("Contrast", &config.hdr.contrast, 0.0f, 2.0f, "%.3f");
       }
     }
 
@@ -1032,6 +1098,39 @@ namespace gestalt::application {
                              ImGuiSliderFlags_Logarithmic)) {
         light.is_dirty = true;
       }
+
+      if (light.type == LightType::kSpot) {
+        if (auto* spot_light_data = std::get_if<SpotLightData>(&light.specific)) {
+          if (ImGui::SliderFloat("Radius", &spot_light_data->range, 0.0f, 100.0f, "%.3f",
+                                 ImGuiSliderFlags_Logarithmic)) {
+            light.is_dirty = true;
+          }
+          float innerDeg = glm::degrees(acosf(spot_light_data->inner_cone_cos));
+          float outerDeg = glm::degrees(acosf(spot_light_data->outer_cone_cos));
+
+          // Draw sliders in degrees
+          ImGui::Text("Spotlight Angles (deg)");
+          if (ImGui::SliderFloat("Inner Angle", &innerDeg, 0.0f, 90, "%.1f")) {
+            light.is_dirty = true;
+          }
+          if (ImGui::SliderFloat("Outer Angle", &outerDeg, 0.0f, 90, "%.1f")) {
+            light.is_dirty = true;
+          }
+
+          // Enforce that the outer angle is >= inner angle
+          if (outerDeg < innerDeg) {
+            outerDeg = innerDeg;
+            light.is_dirty = true;
+          }
+
+          // Convert angles (in degrees) -> cosines (in radians)
+          float innerRadians = glm::radians(innerDeg);
+          float outerRadians = glm::radians(outerDeg);
+          spot_light_data->inner_cone_cos = cosf(innerRadians);
+          spot_light_data->outer_cone_cos = cosf(outerRadians);
+        }
+      }
+
       if (light.type == LightType::kPoint) {
         if (auto* point_light_data = std::get_if<PointLightData>(&light.specific)) {
           if (ImGui::SliderFloat("Radius", &point_light_data->range, 0.0f, 100.0f, "%.3f",
@@ -1099,8 +1198,8 @@ namespace gestalt::application {
             if constexpr (std::is_same_v<T, FreeFlyCameraData>) {
               ImGui::Text("FreeFly Camera:");
               ImGui::SliderFloat("Mouse Speed", &cam.mouse_speed, 0.1f, 10.0f, "%.2f");
-              ImGui::SliderFloat("Acceleration", &cam.acceleration, 0.01f, 1.0f, "%.2f");
-              ImGui::SliderFloat("Damping", &cam.damping, 0.1f, 100.0f, "%.2f");
+              ImGui::SliderFloat("Acceleration", &cam.acceleration, 0.1f, 100.0f, "%.2f");
+              ImGui::SliderFloat("Damping", &cam.damping, 0.1f, 1, "%.2f");
               ImGui::SliderFloat("Max Speed", &cam.max_speed, 0.01f, 10.0f, "%.2f");
               ImGui::SliderFloat("Fast Coefficient", &cam.fast_coef, 0.1f, 10.0f, "%.2f");
               ImGui::SliderFloat("Slow Coefficient", &cam.slow_coef, 0.0001f, 1.0f, "%.4f");

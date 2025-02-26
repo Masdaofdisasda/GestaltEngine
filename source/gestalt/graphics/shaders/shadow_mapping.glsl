@@ -39,15 +39,18 @@ float PCF_Poisson(int kernelSize, vec2 shadowCoord, float depth, sampler2D shado
     return shadow / float(kernelSize);
 }
 
-float shadowFactor(vec4 shadowCoord, sampler2D shadowMap, float depthBias)
+float shadowFactor(vec3 shadowCoords, sampler2D shadowMap, float depthBias)
 {
-	vec3 shadowCoords = shadowCoord.xyz / shadowCoord.w;
-
-	float shadowSample = PCF_Poisson( 13, shadowCoords.xy, shadowCoords.z - depthBias, shadowMap);
+	float shadowSample = PCF_Poisson( 7, shadowCoords.xy, shadowCoords.z - depthBias, shadowMap);
 
 	return mix(0.00001, 1.0, shadowSample);
 }
 
-float calculateDynamicBias(vec3 normal, vec3 lightDir) {
-    return max(0.01 * (1.0 - dot(normal, -lightDir)), 0.005);  
+float calculateDynamicBias(vec3 normal, vec3 lightDir, float depth) {
+    float angleFactor = max(0.1, 1.0 - dot(normal, -lightDir));
+    float angleBias = angleFactor * 0.0001;
+
+    float depthBias =  depth * 0.00001;
+
+    return max(angleBias + depthBias, 0.00005);
 }

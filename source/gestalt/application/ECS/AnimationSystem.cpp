@@ -7,7 +7,7 @@ namespace gestalt::application {
                                            AnimationChannel<glm::vec3>& translation_channel, bool loop) const {
     const auto& translation_keyframes = translation_channel.keyframes;
     float current_time = translation_channel.current_time;
-    current_time += delta_time_ * 0.01f;
+    current_time += delta_time_;
 
     if (translation_keyframes.size() < 2) {
       return;  // Not enough keyframes to interpolate
@@ -49,7 +49,7 @@ namespace gestalt::application {
                                            AnimationChannel<glm::quat>& rotation_channel, bool loop) const {
     const auto& rotation_keyframes = rotation_channel.keyframes;
     float current_time = rotation_channel.current_time;
-    current_time += delta_time_ * 0.01f;
+    current_time += delta_time_;
 
     if (rotation_keyframes.size() < 2) {
       return;  // Not enough keyframes to interpolate

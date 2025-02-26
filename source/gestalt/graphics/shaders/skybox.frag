@@ -70,7 +70,7 @@ float miePhase(float cosTheta, float g) {
 
 const float EARTH_RADIUS = 6360e3;     // Earth's radius in meters
 const float ATMOSPHERE_RADIUS = 6460e3; // Atmosphere's top radius in meters
-const float Hr = 8e3;                 // Rayleigh scale height (meters)
+const float Hr = 3e3;                 // Rayleigh scale height (meters)
 const float Hm = 1.2e3;               // Mie scale height (meters)
 
 // Density function
@@ -103,17 +103,14 @@ void main() {
 
     if (params.showEnviromentMap == 0) {
 
-        // Sunlight intensity and direction
         vec3 lightDir = normalize(dirLight[0].direction);
-        vec3 sunIntensity = dirLight[0].color * dirLight[0].intensity;
+        vec3 sunIntensity = dirLight[0].color * dirLight[0].intensity * 100000.0;
 
-        // Compute scattering
         vec3 scattering = computeScattering(dir, lightDir, params.betaR, params.betaM, sunIntensity);
 
         // Absorption
         scattering -= params.betaA * 0.002;
 
-        // Output the final sky color
         FragColor = vec4(scattering, 1.0);
 
     } else {
@@ -121,7 +118,6 @@ void main() {
         // Sample the environment texture using the normalized direction
         vec4 envColor = texture(texEnvMap, dir);
 
-        // Output the sampled color directly for debugging
         FragColor = envColor;
     }
 }

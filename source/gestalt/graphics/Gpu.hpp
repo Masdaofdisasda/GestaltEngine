@@ -28,6 +28,8 @@ namespace gestalt::graphics {
           .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
       VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptorBufferProperties{
           .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_PROPERTIES_EXT};
+      VkPhysicalDeviceAccelerationStructurePropertiesKHR acceleration_structure_properties{
+          .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR};
 
       VkFence immediate_submit_fence_ = VK_NULL_HANDLE;
       VkCommandPool immediate_submit_command_pool_ = VK_NULL_HANDLE;
@@ -52,6 +54,9 @@ namespace gestalt::graphics {
       [[nodiscard]] VkPhysicalDeviceProperties2 getPhysicalDeviceProperties2() const override;
       [[nodiscard]] VkPhysicalDeviceDescriptorBufferPropertiesEXT getDescriptorBufferProperties()
           const override;
+
+      [[nodiscard]] VkPhysicalDeviceAccelerationStructurePropertiesKHR
+      getAccelerationStructureProperties() const override;
       void set_debug_name(std::string_view name, VkObjectType type,
                                              uint64 handle) const override;
       void immediateSubmit(std::function<void(VkCommandBuffer cmd)> function) const override;

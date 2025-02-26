@@ -23,5 +23,6 @@ namespace gestalt::foundation {
 
       size_t material = default_material;
       size_t mesh_draw = no_component;
+      size_t bottom_level_as = no_component;
     };
 }  // namespace gestalt

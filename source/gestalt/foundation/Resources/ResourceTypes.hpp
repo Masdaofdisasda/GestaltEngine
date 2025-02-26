@@ -4,10 +4,12 @@
 #include <variant>
 #include <filesystem>
 
-#include "common.hpp"
-#include "VulkanTypes.hpp"
-#include "VulkanCheck.hpp"
 #include <Resources/TextureType.hpp>
+#include "VulkanCheck.hpp"
+#include "VulkanTypes.hpp"
+#include "common.hpp"
+
+#include "AccelerationStructure.hpp"
 #include "Interface/IGpu.hpp"
 
 #include "Descriptor/DescriptorBinding.hpp"
@@ -74,6 +76,7 @@ namespace gestalt::foundation {
         = VkClearValue({.color = {0.f, 0.f, 0.f, 1.f}});
     std::variant<RelativeImageSize, AbsoluteImageSize> image_size = RelativeImageSize(1.f);
     VkFormat format = VK_FORMAT_R16G16B16A16_SFLOAT;
+    bool has_mipmap_ = false;
 
   public:
     explicit ImageTemplate(std::string name)
@@ -143,6 +146,11 @@ namespace gestalt::foundation {
       return *this;
     }
 
+    ImageTemplate& set_has_mipmap(const bool has_mipmap) {
+      has_mipmap_ = has_mipmap;
+      return *this;
+    }
+
     ImageTemplate build() { return std::move(*this); }
 
     [[nodiscard]] ImageType get_image_type() const { return image_type; }
@@ -156,6 +164,7 @@ namespace gestalt::foundation {
     [[nodiscard]] std::variant<RelativeImageSize, AbsoluteImageSize> get_image_size() const {
       return image_size;
     }
+    [[nodiscard]] bool has_mipmap() const { return has_mipmap_; }
 
   };
 
@@ -199,7 +208,6 @@ namespace gestalt::foundation {
       return buffer_create_flags_;
     }
   };
-
 
   class SamplerTemplate final : public ResourceTemplate {
 
@@ -250,19 +258,16 @@ namespace gestalt::foundation {
     ~SamplerTemplate() override = default;
   };
 
-
-    class BufferInstance;
-    class ImageInstance;
+  class BufferInstance;
+  class ImageInstance;
   class ImageArrayInstance;
+  class AccelerationStructureInstance;
 
   struct ResourceVisitor {
-    virtual void visit(BufferInstance& buffer, ResourceUsage usage, VkShaderStageFlags shader_stage)
-        = 0;
-    virtual void visit(ImageInstance& image, ResourceUsage usage, VkShaderStageFlags shader_stage)
-        = 0;
-    virtual void visit(ImageArrayInstance& images, ResourceUsage usage,
-                       VkShaderStageFlags shader_stage)
-    = 0;
+    virtual void visit(BufferInstance& buffer, ResourceUsage usage, VkShaderStageFlags shader_stage) = 0;
+    virtual void visit(ImageInstance& image, ResourceUsage usage, VkShaderStageFlags shader_stage) = 0;
+    virtual void visit(ImageArrayInstance& images, ResourceUsage usage, VkShaderStageFlags shader_stage) = 0;
+    virtual void visit(AccelerationStructureInstance& images, ResourceUsage usage, VkShaderStageFlags shader_stage) = 0;
     virtual ~ResourceVisitor() = default;
   };
 
@@ -288,6 +293,27 @@ namespace gestalt::foundation {
     VkImage image_handle = VK_NULL_HANDLE;
     VkImageView image_view = VK_NULL_HANDLE;
     VmaAllocation allocation = VK_NULL_HANDLE;
+  };
+
+  class AccelerationStructureInstance final : public ResourceInstance {
+  public:
+    explicit AccelerationStructureInstance(const std::shared_ptr<AccelerationStructure>& accelerationStructure)
+    : ResourceInstance("TLAS")
+    , mAccelerationStructure(accelerationStructure) {
+    }
+
+    void accept(ResourceVisitor& visitor, ResourceUsage usage, VkShaderStageFlags shader_stage) override {
+      visitor.visit(*this, usage, shader_stage);
+    }
+
+    const VkAccelerationStructureKHR& getHandle() const { return mAccelerationStructure->acceleration_structure; }
+
+    const VkDeviceAddress& getAddress() const { return mAccelerationStructure->address; }
+
+    ~AccelerationStructureInstance() override = default;
+
+  private:
+    std::shared_ptr<AccelerationStructure> mAccelerationStructure;
   };
 
   class ImageInstance final : public ResourceInstance {
@@ -423,10 +449,17 @@ namespace gestalt::foundation {
 
     [[nodiscard]] VkPipelineStageFlags2 get_current_stage() const { return current_stage_; }
     void set_current_stage(const VkPipelineStageFlags2 stage) { current_stage_ = stage; }
+
+    void copy_to_mapped(const VmaAllocator allocator, void const* data, const size_t size ) const {
+      void* mapped_data;
+      VK_CHECK(vmaMapMemory(allocator, get_allocation(), &mapped_data));
+      memcpy(mapped_data, data, size);
+      vmaUnmapMemory(allocator, get_allocation());
+    }
   };
 
   
-class SamplerInstance final : public ResourceInstance {
+  class SamplerInstance final : public ResourceInstance {
     SamplerTemplate sampler_template_;
     VkSampler sampler_ = VK_NULL_HANDLE;
     VkDevice device_ = VK_NULL_HANDLE;
@@ -499,6 +532,8 @@ class SamplerInstance final : public ResourceInstance {
           return properties.storageImageDescriptorSize;
         case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
           return properties.inputAttachmentDescriptorSize;
+        case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:
+          return properties.accelerationStructureDescriptorSize;
         default:
           throw std::runtime_error("Descriptor type not implemented");
       }
@@ -566,32 +601,33 @@ class SamplerInstance final : public ResourceInstance {
       VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation_,
                             reinterpret_cast<void**>(&descriptor_buf_ptr)));
 
-      for (const auto& [type, descriptorSize, binding, descriptorIndex, addr_info, image_info] :
-           update_infos_) {
+      for (const auto& update : update_infos_) {
         VkDescriptorGetInfoEXT descriptor_info = {
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT,
-            .type = type,
+            .type = update.type,
         };
 
-        if (type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) {
-          descriptor_info.data.pUniformBuffer = &addr_info;
-        } else if (type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
-          descriptor_info.data.pStorageBuffer = &addr_info;
-        } else if (type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
-          descriptor_info.data.pCombinedImageSampler = &image_info;
-        } else if (type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) {
-          descriptor_info.data.pStorageImage = &image_info;
+        if (update.type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) {
+          descriptor_info.data.pUniformBuffer = &update.addr_info;
+        } else if (update.type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
+          descriptor_info.data.pStorageBuffer = &update.addr_info;
+        } else if (update.type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
+          descriptor_info.data.pCombinedImageSampler = &update.image_info;
+        } else if (update.type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) {
+          descriptor_info.data.pStorageImage = &update.image_info;
+        } else if (update.type == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR) {
+          descriptor_info.data.accelerationStructure = update.tlas_address;
         } else {
           throw std::runtime_error("Unsupported descriptor type");
         }
 
-        auto binding_it = bindings_.find(binding);
+        auto binding_it = bindings_.find(update.binding);
         if (binding_it == bindings_.end()) {
           throw std::runtime_error("Invalid binding index.");
         }
 
-        const VkDeviceSize offset = descriptorIndex * descriptorSize + binding_it->second.offset;
-        vkGetDescriptorEXT(gpu_->getDevice(), &descriptor_info, descriptorSize,
+        const VkDeviceSize offset = update.descriptorIndex * update.descriptorSize + binding_it->second.offset;
+        vkGetDescriptorEXT(gpu_->getDevice(), &descriptor_info, update.descriptorSize,
                            descriptor_buf_ptr + offset);
       }
 
@@ -620,6 +656,7 @@ class SamplerInstance final : public ResourceInstance {
                                           const uint32 descriptor_index = 0) {
       return write_image_array(binding, type, {image_info}, descriptor_index);
     }
+
     DescriptorBufferInstance& write_buffer(const uint32 binding, const VkDescriptorType type,
                                            const VkDeviceAddress resource_address,
                                            const size_t buffer_size,
@@ -649,6 +686,29 @@ class SamplerInstance final : public ResourceInstance {
 
       return *this;
     }
+
+    DescriptorBufferInstance& write_acceleration_structure(const uint32_t binding, const VkDeviceAddress address, const uint32_t index = 0) {
+      const auto binding_it = bindings_.find(binding);
+      if (binding_it == bindings_.end()) {
+        throw std::runtime_error("Invalid binding index.");
+      }
+
+      DescriptorBinding& descriptor_binding = binding_it->second;
+
+      DescriptorUpdate update_info = {
+        .type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
+        .descriptorSize = map_descriptor_size(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR),
+        .binding = binding,
+        .descriptorIndex = index,
+        .tlas_address = address,
+    };
+
+      update_infos_.emplace_back(update_info);
+      descriptor_binding.descriptor_size = map_descriptor_size(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR);
+
+      return *this;
+    }
+
     DescriptorBufferInstance& write_image_array(
         const uint32 binding, const VkDescriptorType type,
         const std::vector<VkDescriptorImageInfo>& image_infos, const uint32 first_descriptor = 0) {

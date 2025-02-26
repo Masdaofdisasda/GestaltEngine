@@ -34,6 +34,7 @@ namespace gestalt::graphics {
       void visit(ImageArrayInstance& images, ResourceUsage usage,
                  VkShaderStageFlags shader_stage) override;
 
+      void visit(AccelerationStructureInstance& images, ResourceUsage usage, VkShaderStageFlags shader_stage) override {}
 
       void apply() const;
     };

@@ -310,12 +310,10 @@ vec3 getDirectionalLighIntensity(vec3 lightColor, float lightIntensity)
     return lightIntensity * lightColor;
 }
 
-vec3 getSpotLighIntensity(vec3 lightColor, float lightIntensity, vec3 pointToLight)
+vec3 getSpotLighIntensity(vec3 lightColor, float lightIntensity, vec3 direction, vec3 pointToLight, float range, float outerConeCos, float innerConeCos)
 {
-    float range = 5.0;
     float rangeAttenuation = getRangeAttenuation(range, length(pointToLight));
-    float spotAttenuation = 1.0;
-    //spotAttenuation = getSpotAttenuation(pointToLight, light.direction, light.outerConeCos, light.innerConeCos);
+    float spotAttenuation  = getSpotAttenuation(pointToLight, direction, outerConeCos, innerConeCos);
 
-    return rangeAttenuation * lightIntensity * lightColor;
+    return rangeAttenuation * spotAttenuation * lightIntensity * lightColor;
 }

@@ -1,0 +1,89 @@
+#version 450
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+// based on https://bruop.github.io/exposure/
+const uint  HISTOGRAM_SIZE = 256;
+
+layout( push_constant ) uniform constants
+{	
+    float min_log_lum;
+    float max_log_lum;
+    float log_lum_range;
+    float inv_log_lum_range;
+
+    float time_coeff;
+    float num_pixels;
+    float width;
+    float height;
+} params;
+
+layout(std430, set = 0, binding = 0) buffer HistogramBuffer
+{
+    uint histogram[];
+};
+layout(set = 0, binding = 1, r16f) uniform image2D adapted_lum; // store adapted lum
+
+shared uint histogramShared[HISTOGRAM_SIZE];
+
+void main()
+{
+    uint localIndex     = gl_LocalInvocationIndex;
+
+    // Each thread reads bin count from global buffer
+    uint countForThisBin = histogram[localIndex];
+
+    histogramShared[localIndex] = localIndex * countForThisBin;
+
+    // Reset histogram so next frame starts fresh
+    histogram[localIndex] = 0;
+
+    barrier();
+
+    // Parallel reduction to sum up weighted bin counts
+    for (uint offset = 128u; offset > 0u; offset >>= 1)
+    {
+        if (localIndex < offset)
+        {
+            histogramShared[localIndex] += histogramShared[localIndex + offset];
+        }
+        barrier();
+    }
+
+    // Single thread does final calculations
+    if (localIndex == 0)
+    {
+        uint weightedSum = histogramShared[0];
+
+        // We approximate an average bin index (excluding black pixels).
+        // Example approach:
+        float validPixels = max(params.num_pixels, 1.0); 
+        float avgBin      = float(weightedSum) / validPixels;
+
+        // Weighted sum yields [1..255], so map that back to log-lum:
+        // The bin 0 for black pixels doesn't contribute to average here
+        // The range is 1..255 => shift by -1 then /254
+        float ratio        = (avgBin - 1.0) / 254.0; // in [0..1]
+        ratio             = clamp(ratio, 0.0, 1.0);
+        float logLum       = ratio * params.log_lum_range + params.min_log_lum;
+
+        // Convert from log2(lum) back to actual luminance
+        float weightedAvgLum = exp2(logLum);
+
+        float lumLastFrame = imageLoad(adapted_lum, ivec2(0,0)).x;
+
+        float dt = params.time_coeff;
+        float tauUp   = 0.1f; // second for brightening
+        float tauDown = 0.1f; // seconds for darkening
+
+        float targetLum = weightedAvgLum;
+        float oldLum    = lumLastFrame;
+
+        float tau = (targetLum > oldLum) ? tauUp : tauDown;
+        float factor = 1.0f - exp(-dt / tau);
+        
+        float adaptedLum = max(oldLum + factor * (targetLum - oldLum), 0.000001);
+        //float adaptedLum   = mix(lumLastFrame, weightedAvgLum, params.time_coeff);
+
+        imageStore(adapted_lum, ivec2(0,0), vec4(adaptedLum, 0.0, 0.0, 0.0));
+    }
+}

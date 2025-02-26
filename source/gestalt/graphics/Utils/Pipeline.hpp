@@ -176,7 +176,8 @@ namespace gestalt::graphics {
     void create_descriptor_layout(
         std::span<const ResourceBinding<ImageInstance>> image_bindings,
         std::span<const ResourceBinding<BufferInstance>> buffer_bindings,
-        std::span<const ResourceBinding<ImageArrayInstance>> image_array_bindings
+        std::span<const ResourceBinding<ImageArrayInstance>> image_array_bindings,
+        std::span<const ResourceBinding<AccelerationStructureInstance>> tlas_bindings = {}
         ) {
       using BindingMap = std::map<uint32, VkDescriptorSetLayoutBinding>;
       std::map<uint32, BindingMap> descriptor_sets;
@@ -199,6 +200,7 @@ namespace gestalt::graphics {
       process_bindings(image_bindings);
       process_bindings(buffer_bindings);
       process_bindings(image_array_bindings);
+      process_bindings(tlas_bindings);
 
       // Create the descriptor layouts
       create_descriptor_layout(std::move(descriptor_sets));
@@ -210,6 +212,8 @@ namespace gestalt::graphics {
           buffer_bindings_by_set;
       std::unordered_map<uint32_t, std::vector<ResourceBinding<ImageArrayInstance>>>
           image_array_bindings_by_set;
+      std::unordered_map<uint32_t, std::vector<ResourceBinding<AccelerationStructureInstance>>>
+          tlas_bindings_by_set;
 
       for (const auto& binding : image_bindings) {
         image_bindings_by_set[binding.info.set_index].push_back(binding);
@@ -221,6 +225,10 @@ namespace gestalt::graphics {
 
       for (const auto& binding : image_array_bindings) {
         image_array_bindings_by_set[binding.info.set_index].push_back(binding);
+      }
+
+      for (const auto& binding : tlas_bindings) {
+        tlas_bindings_by_set[binding.info.set_index].push_back(binding);
       }
 
       // Iterate over each set index to create descriptor buffers and write descriptors
@@ -293,6 +301,14 @@ namespace gestalt::graphics {
           }
         }
 
+        // Process tlas bindings for this set index
+        if (auto it = tlas_bindings_by_set.find(set_index); it != tlas_bindings_by_set.end()) {
+          for (const auto& binding : it->second) {
+            const auto& info = binding.info;
+            descriptor_buffer->write_acceleration_structure(info.binding_index, binding.resource->getAddress());
+          }
+        }
+
         descriptor_buffer->update();
 
         descriptor_buffers_.emplace(set_index, std::move(descriptor_buffer));
@@ -354,7 +370,6 @@ namespace gestalt::graphics {
             .update();
         }
 
-
         std::vector<VkDescriptorBufferBindingInfoEXT> buffer_bindings;
         buffer_bindings.reserve(descriptor_buffers_.size());
         for (const auto& descriptor_buffer : descriptor_buffers_ | std::views::values) {
@@ -362,6 +377,7 @@ namespace gestalt::graphics {
                                      .address = descriptor_buffer->get_address(),
                                      .usage = descriptor_buffer->get_usage()});
         }
+
         // TODO bind them once at the start of the frame
         cmd.bind_descriptor_buffers_ext(buffer_bindings.size(), buffer_bindings.data());
 
@@ -778,10 +794,10 @@ namespace gestalt::graphics {
                     const std::span<const ResourceBinding<BufferInstance>> buffer_bindings,
                     const std::span<const ResourceBinding<ImageArrayInstance>> image_array_bindings,
                     const VkPushConstantRange push_constant_range,
-                    const std::string&& compute_source)
+                    const std::string&& compute_source,
+                    const std::span<const ResourceBinding<AccelerationStructureInstance>> tlas_bindings = {})
       : pipeline_tool_(gpu, pipeline_name) {
-      pipeline_tool_.
-          create_descriptor_layout(image_bindings, buffer_bindings, image_array_bindings);
+      pipeline_tool_.create_descriptor_layout(image_bindings, buffer_bindings, image_array_bindings, tlas_bindings);
       pipeline_tool_.add_shader(std::move(compute_source), VK_SHADER_STAGE_COMPUTE_BIT);
       pipeline_tool_.create_pipeline_layout(push_constant_range);
       pipeline_tool_.create_compute_pipeline();

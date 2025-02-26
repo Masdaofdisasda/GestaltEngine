@@ -28,10 +28,11 @@ namespace gestalt::foundation {
           base{color, intensity},
           specific(PointLightData{range, first_light_view_projection}) {}
 
-    LightComponent(glm::vec3 color, float32 intensity, float32 inner_cone, float32 outer_cone)
+    LightComponent(glm::vec3 color, float32 intensity, float32 range,
+                   uint32 light_view_projection, float32 inner_cone_cos, float32 outer_cone_cos)
         : type(LightType::kSpot),
           base{color, intensity},
-          specific(SpotLightData{inner_cone, outer_cone}) {}
+          specific(SpotLightData{range, light_view_projection, inner_cone_cos, outer_cone_cos}) {}
   };
 
 }  // namespace gestalt::foundation

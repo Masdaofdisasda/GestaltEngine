@@ -19,15 +19,17 @@ namespace gestalt::foundation {
 
   constexpr uint32 kDefaultMaxDirectionalLights = 2;  // needed for 64 bit alignment
   constexpr uint32 kDefaultMaxPointLights = 256;
-  constexpr uint32 kDefaultMaxSpotLights = 0;  // are not implemented yet
+  constexpr uint32 kDefaultMaxSpotLights = 256;
 
   // Run time configuration
   constexpr std::string_view kDefaultApplicationName = "Gestalt Engine";
+  constexpr std::string_view kDefaultScene = "";
   constexpr uint32 kDefaultResolutionWidth = 1300;
   constexpr uint32 kDefaultResolutionHeight = 900;
   constexpr bool kUseFullscreen = false;
   constexpr bool kUseVsync = false;
   constexpr bool kUseValidationLayers = false;
+  constexpr bool kDefaultEnableVulkanRayTracing = true;
 
   struct Config {
     // compile time configuration
@@ -38,11 +40,14 @@ namespace gestalt::foundation {
 
     // run time configuration
     std::string applicationName = std::string(kDefaultApplicationName);
+    std::string initialScene = std::string(kDefaultScene);
     uint32 windowedWidth = kDefaultResolutionWidth;
     uint32 windowedHeight = kDefaultResolutionHeight;
     bool useFullscreen = kUseFullscreen;
     bool useValidationLayers = kUseValidationLayers;
     bool useVsync = kUseVsync;
+    bool enableVulkanRayTracing = kDefaultEnableVulkanRayTracing;
+    uint32 physicalDeviceIndex = 0;
   };
 
   class EngineConfiguration {
@@ -106,6 +111,10 @@ namespace gestalt::foundation {
     return EngineConfiguration::get_instance().get_config().applicationName;
   }
 
+  inline std::string& getInitialScene() {
+    return EngineConfiguration::get_instance().get_config().initialScene;
+  }
+
   inline bool useValidationLayers() {
     return EngineConfiguration::get_instance().get_config().useValidationLayers;
   }
@@ -115,5 +124,10 @@ namespace gestalt::foundation {
   inline bool useFullscreen() {
     return EngineConfiguration::get_instance().get_config().useFullscreen;
   }
-
+  inline bool isVulkanRayTracingEnabled() {
+    return EngineConfiguration::get_instance().get_config().enableVulkanRayTracing;
+  }
+  inline uint32 getPhysicalDeviceIndex() {
+    return EngineConfiguration::get_instance().get_config().physicalDeviceIndex;
+  }
 }  // namespace gestalt::foundation

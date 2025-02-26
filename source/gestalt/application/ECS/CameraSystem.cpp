@@ -15,17 +15,18 @@
 namespace gestalt::application {
 
     void CameraSystem::prepare() {
+    const auto cameras = repository_->camera_components.asVector();
+    if (!cameras.empty()) {
+      active_camera_ = cameras.front().first;
+    }
 
     const auto& per_frame_data_buffers = repository_->per_frame_data_buffers;
 
-    per_frame_data_buffers->camera_buffer
-        = resource_allocator_->create_buffer(BufferTemplate(
+    per_frame_data_buffers->camera_buffer = resource_allocator_->create_buffer(BufferTemplate(
         "Camera Uniform Buffer", sizeof(PerFrameData),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
-            VMA_MEMORY_USAGE_AUTO,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-            ));
+        VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, VMA_MEMORY_USAGE_AUTO,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
   }
 
     inline glm::vec4 NormalizePlane(glm::vec4 p) { return p / length(glm::vec3(p)); }
@@ -39,6 +40,8 @@ namespace gestalt::application {
 
     void CameraSystem::update(const float delta_time, const UserInput& movement, float aspect) {
       aspect_ratio_ = aspect;
+
+      active_camera_ = repository_->camera_components.asVector().back().first;
 
       auto& camera_component = repository_->camera_components[active_camera_];
       auto& transform_component = repository_->transform_components[active_camera_];

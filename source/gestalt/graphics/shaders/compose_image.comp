@@ -1,0 +1,23 @@
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(set = 0, binding = 0, rgba16f) uniform image2D imageA;
+layout(set = 0, binding = 1, rgba16f) uniform image2D imageB;
+layout(set = 0, binding = 2, rgba16f) writeonly uniform image2D texOut;
+
+void main()
+{	
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+
+    ivec2 outSize = imageSize(texOut);
+
+    if (gid.x >= outSize.x || gid.y >= outSize.y) {
+        return;
+    }
+    
+    vec3 composed = imageLoad(imageA, gid).rgb + imageLoad(imageB, gid).rgb;
+
+	imageStore( texOut, gid, vec4(composed, 1.0) );
+}
+

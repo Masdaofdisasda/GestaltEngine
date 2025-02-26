@@ -38,6 +38,7 @@ target_include_directories(
          "${meshoptimizer_SOURCE_DIR}/src"
          "${Stb_SOURCE_DIR}"
          "${SDL2_INCLUDE_DIR}"
+         "${SoLoud_SOURCE_DIR}/include"
          "${imgui_SOURCE_DIR}"
          "${imgui_SOURCE_DIR}/backends"
          "${ImGuiFileDialog_SOURCE_DIR}"

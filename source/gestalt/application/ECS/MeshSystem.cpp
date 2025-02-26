@@ -1,5 +1,7 @@
 ﻿#include "MeshSystem.hpp"
 
+#include <numeric>
+#include <ranges>
 #include <span>
 
 #include "VulkanCheck.hpp"
@@ -158,10 +160,13 @@ namespace gestalt::application {
   void MeshSystem::create_buffers() {
     const auto& mesh_buffers = repository_->mesh_buffers;
 
+    auto vertex_usage_flags = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
+                              | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    if (isVulkanRayTracingEnabled()) {
+      vertex_usage_flags |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
+    }
     mesh_buffers->vertex_position_buffer = resource_allocator_->create_buffer(
-        BufferTemplate("Vertex Positions Storage Buffer", kMaxVertexPositionBufferSize,
-                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
-                           | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        BufferTemplate("Vertex Positions Storage Buffer", kMaxVertexPositionBufferSize, vertex_usage_flags,
                        0, VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
     mesh_buffers->vertex_data_buffer = resource_allocator_->create_buffer(
         BufferTemplate("Vertex Data Storage Buffer", kMaxVertexDataBufferSize,
@@ -169,9 +174,12 @@ namespace gestalt::application {
                            | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                        0, VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
 
+    auto index_usage_flags = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    if (isVulkanRayTracingEnabled()) {
+      index_usage_flags |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
+    }
     mesh_buffers->index_buffer = resource_allocator_->create_buffer(
-        BufferTemplate("Index Storage Buffer", kMaxIndexBufferSize,
-                       VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
+        BufferTemplate("Index Storage Buffer", kMaxIndexBufferSize, index_usage_flags, 0,
                        VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
 
     mesh_buffers->meshlet_buffer = resource_allocator_->create_buffer(
@@ -204,6 +212,10 @@ namespace gestalt::application {
                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
                            | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                        0, VMA_MEMORY_USAGE_AUTO, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
+
+    mesh_buffers->luminance_histogram_buffer = resource_allocator_->create_buffer(
+        BufferTemplate("Luminance Histogram Buffer", 256 * sizeof(uint32), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                       0, VMA_MEMORY_USAGE_GPU_ONLY, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
   }
 
   void MeshSystem::update(float delta_time, const UserInput& movement, float aspect) {
@@ -225,28 +237,25 @@ namespace gestalt::application {
         1.f,
     };
 
+    repository_->mesh_draws_.clear();
     traverse_scene(0, root_transform);
 
-    auto mesh_draws = repository_->mesh_draws;
-    if (mesh_draws.size() == 0) {
+    if (repository_->mesh_draws_.empty()) {
       return;
     }
 
-    const size_t mesh_draw_buffer_size = mesh_draws.size() * sizeof(MeshDraw);
+    const size_t mesh_draw_buffer_size = repository_->mesh_draws_.size() * sizeof(MeshDraw);
 
     const auto& mesh_buffers = repository_->mesh_buffers;
-    const auto frame = frame_->get_current_frame_index();
 
     if (kMaxMeshDrawBufferSize < mesh_draw_buffer_size) {
       fmt::println("mesh_draw_buffer size needs to be increased by {}",
                    mesh_draw_buffer_size - mesh_buffers->mesh_draw_buffer->get_size());
     }
-    void* mapped_data;
-    const VmaAllocation allocation = mesh_buffers->mesh_draw_buffer->get_allocation();
-    VK_CHECK(vmaMapMemory(gpu_->getAllocator(), allocation, &mapped_data));
-    const auto mesh_draw_data = static_cast<MeshDraw*>(mapped_data);
-    std::memcpy(mesh_draw_data, mesh_draws.data().data(), mesh_draws.size() * sizeof(MeshDraw));
-    vmaUnmapMemory(gpu_->getAllocator(), mesh_buffers->mesh_draw_buffer->get_allocation());
+
+    mesh_buffers->mesh_draw_buffer->copy_to_mapped(
+        gpu_->getAllocator(), repository_->mesh_draws_.data(),
+                                                   mesh_draw_buffer_size);
 
   }
 
@@ -282,7 +291,7 @@ namespace gestalt::application {
             .materialIndex = static_cast<uint32>(surface.material),
         };
 
-        repository_->mesh_draws.get(surface.mesh_draw) = draw;
+        repository_->mesh_draws_.push_back(draw);
 
         if (material.config.transparent) {
           // mesh_task_commands_.push_back(task);

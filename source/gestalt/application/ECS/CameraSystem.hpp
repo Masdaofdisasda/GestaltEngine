@@ -10,7 +10,7 @@ namespace gestalt::foundation {
 namespace gestalt::application {
 
     class CameraSystem final : public BaseSystem, public NonCopyable<CameraSystem> {
-      Entity active_camera_{3};  // entity id of the active camera
+      Entity active_camera_{0};  // entity id of the active camera
       float32 aspect_ratio_{1.f};
 
     public:

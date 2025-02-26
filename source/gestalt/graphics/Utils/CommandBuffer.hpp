@@ -89,6 +89,12 @@ namespace gestalt::graphics {
       vkCmdSetScissor(cmd, first_scissor, scissor_count, scissors);
     }
 
+    void set_depth_bias(const float32 depth_bias_constant_factor, const float32 depth_bias_clamp,
+                        const float32 depth_bias_slope_factor) const {
+      vkCmdSetDepthBias(cmd,  depth_bias_constant_factor,  depth_bias_clamp,
+                         depth_bias_slope_factor);
+    }
+
     void push_constants(const VkPipelineLayout layout, const VkShaderStageFlags stage_flags,
                         const uint32 offset, const uint32 size, const void* data) const {
       vkCmdPushConstants(cmd, layout, stage_flags, offset, size, data);

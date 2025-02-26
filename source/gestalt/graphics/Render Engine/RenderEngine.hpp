@@ -60,6 +60,7 @@ namespace gestalt::graphics {
       std::shared_ptr<ImageInstance> scene_final_;
 
     std::unique_ptr<SamplerInstance> post_process_sampler_;
+    std::unique_ptr<SamplerInstance> interpolation_sampler_;
       std::unique_ptr<SamplerInstance> cube_map_sampler_;
 
 

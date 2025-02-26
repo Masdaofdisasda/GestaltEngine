@@ -54,9 +54,10 @@ namespace gestalt::application {
       Entity create_directional_light(const glm::vec3& color, float intensity,
                                       const glm::vec3& direction,
                                       const Entity entity = invalid_entity);
-      Entity create_spot_light(const glm::vec3& color, float intensity,
-                               const glm::vec3& direction, const glm::vec3& position, float innerCone, float outerCone,
-                               const Entity entity = invalid_entity);
+      Entity create_spot_light(const glm::vec3& color, float32 intensity,
+                               const glm::vec3& direction, const glm::vec3& position, float32 range,
+                               float32 inner_cone_radians, float32 outer_cone_radians,
+                               Entity entity = invalid_entity);
       Entity create_point_light(const glm::vec3& color, float intensity, const glm::vec3& position,
                                 float32 range, const Entity entity = invalid_entity);
       Entity add_free_fly_camera(const glm::vec3& position, const glm::vec3& direction,
