@@ -4,10 +4,10 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <algorithm>
 
 #include "common.hpp"
 #include "Resources/ResourceTypes.hpp"
-#include <algorithm>
 
 #include "ResourceRegistry.hpp"
 #include "Renderpasses/RenderPass.hpp"

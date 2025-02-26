@@ -13,8 +13,15 @@
 namespace gestalt {
   class GameEngine {
   public:
-    void init();
-    void cleanup() const;
+    GameEngine();
+    ~GameEngine();
+
+    GameEngine(const GameEngine&) = delete;
+    GameEngine& operator=(const GameEngine&) = delete;
+
+    GameEngine(GameEngine&&) = delete;
+    GameEngine& operator=(GameEngine&&) = delete;
+
     void run();
 
   private:

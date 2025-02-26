@@ -78,7 +78,7 @@ namespace gestalt::graphics {
     frame_ = frame;
 
     swapchain_ = std::make_unique<VkSwapchain>();
-    swapchain_->init(gpu_, {window_->extent.width, window_->extent.height, 1});
+    swapchain_->init(gpu_, {window_->get_width(), window_->get_height(), 1});
 
     frame_graph_ = std::make_unique<FrameGraph>(resource_allocator);
 

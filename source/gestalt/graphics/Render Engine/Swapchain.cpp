@@ -65,7 +65,7 @@ namespace gestalt::graphics {
 
     window->update_window_size();
 
-    create_swapchain(window->extent.width, window->extent.height);
+    create_swapchain(window->get_width(), window->get_height());
   }
 
   void VkSwapchain::destroy_swapchain() const {

@@ -1,16 +1,5 @@
 ﻿#include "GameEngine.hpp"
 
-#if 0
-#define VMA_DEBUG_INITIALIZE_ALLOCATIONS 1
-#define VMA_DEBUG_LOG_FORMAT(format, ...) do { \
-    printf((format), __VA_ARGS__); \
-    printf("\n"); \
-} while(false)
-#endif
-#define VMA_IMPLEMENTATION
-#define VMA_VULKAN_VERSION 1003000
-#include <vk_mem_alloc.h>
-
 #include <tracy/Tracy.hpp>
 
 #include <chrono>
@@ -19,11 +8,7 @@
 
 namespace gestalt {
 
-  GameEngine* engine = nullptr;
-
-  void GameEngine::init() {
-    assert(engine == nullptr);
-    engine = this;
+  GameEngine::GameEngine() {
 
     foundation::EngineConfiguration::get_instance().load_from_file();
     auto config = foundation::EngineConfiguration::get_instance().get_config();
@@ -39,7 +24,7 @@ namespace gestalt {
     scene_manager_->init(gpu_.get(), resource_allocator_.get(), repository_.get(), frame_provider_.get());
     scene_manager_->update_scene(
       time_tracking_service_.get_delta_time(), input_system_.get_movement(),
-      static_cast<float>(window_->extent.width) / static_cast<float>(window_->extent.height));
+      static_cast<float>(window_->get_width()) / static_cast<float>(window_->get_height()));
 
     render_pipeline_ = std::make_unique<graphics::RenderEngine>();
     render_pipeline_->init(gpu_.get(), window_.get(), resource_allocator_.get(), repository_.get(),
@@ -83,7 +68,7 @@ namespace gestalt {
           if (e.key.keysym.scancode == SDL_SCANCODE_F1) window_->capture_mouse();
           if (e.key.keysym.scancode == SDL_SCANCODE_F2) window_->release_mouse();
         }
-        input_system_.handle_event(e, window_->extent.width, window_->extent.height);
+        input_system_.handle_event(e, window_->get_width(), window_->get_height());
 
         if (e.type == SDL_WINDOWEVENT) {
           if (e.window.event == SDL_WINDOWEVENT_MINIMIZED) {
@@ -111,7 +96,7 @@ namespace gestalt {
 
       scene_manager_->update_scene(
           time_tracking_service_.get_delta_time(), input_system_.get_movement(),
-          static_cast<float>(window_->extent.width) / static_cast<float>(window_->extent.height));
+          static_cast<float>(window_->get_width()) / static_cast<float>(window_->get_height()));
 
       render_pipeline_->execute_passes();
 
@@ -120,7 +105,7 @@ namespace gestalt {
     }
   }
 
-  void GameEngine::cleanup() const {
+  GameEngine::~GameEngine() {
     fmt::print("Engine shutting down\n");
     if (is_initialized_) {
       vkDeviceWaitIdle(gpu_->getDevice());

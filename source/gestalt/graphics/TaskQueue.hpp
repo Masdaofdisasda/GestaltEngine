@@ -3,9 +3,9 @@
 #include <filesystem>
 #include <queue>
 
+#include "Interface/IGpu.hpp"
 #include "common.hpp"
 #include "VulkanTypes.hpp"
-#include "Interface/IGpu.hpp"
 
 namespace gestalt::graphics {
 

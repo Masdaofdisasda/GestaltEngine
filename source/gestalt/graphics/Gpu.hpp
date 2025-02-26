@@ -4,8 +4,6 @@
 #include "Interface/IGpu.hpp"
 #include "Window.hpp"
 
-#include <vk_mem_alloc.h>
-
 #include <functional>
 
 #include "common.hpp"

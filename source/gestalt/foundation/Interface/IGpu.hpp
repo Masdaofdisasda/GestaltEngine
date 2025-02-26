@@ -2,6 +2,7 @@
 
 #include <functional>
 #include "common.hpp"
+#include "VulkanTypes.hpp"
 
 namespace gestalt::foundation {
 

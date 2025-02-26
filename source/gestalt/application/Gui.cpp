@@ -73,7 +73,7 @@ namespace gestalt::application {
       ImGui::CreateContext();
 
       // this initializes imgui for SDL
-      ImGui_ImplSDL2_InitForVulkan(window_->handle);
+      ImGui_ImplSDL2_InitForVulkan(window_->get_handle());
 
       ImGui_ImplVulkan_LoadFunctions(
           [](const char* function_name, void* user_data) -> PFN_vkVoidFunction {
@@ -503,9 +503,9 @@ namespace gestalt::application {
       float windowWidth = 300.0f;  // Width of the ImGui window
       uint32_t menuBarHeight = 18;
       float windowHeight
-          = window_->extent.height - menuBarHeight;  // Full height of the application window
+          = window_->get_height() - menuBarHeight;  // Full height of the application window
       ImVec2 windowPos
-          = ImVec2(window_->extent.width - windowWidth, menuBarHeight);  // Position to the right
+          = ImVec2(window_->get_width() - windowWidth, menuBarHeight);  // Position to the right
       ImVec2 windowSize = ImVec2(windowWidth, windowHeight);            // Size of the ImGui window
 
       ImGui::SetNextWindowPos(windowPos);
