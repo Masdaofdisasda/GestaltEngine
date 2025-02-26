@@ -8,15 +8,13 @@
 
 namespace gestalt {
 
-  GameEngine::GameEngine() {
+  GameEngine::GameEngine(): window_() {
 
     foundation::EngineConfiguration::get_instance().load_from_file();
     auto config = foundation::EngineConfiguration::get_instance().get_config();
     foundation::EngineConfiguration::get_instance().set_config(config);
 
-    window_->init();
-
-    gpu_->init(window_.get());
+    gpu_->init(&window_);
 
     resource_allocator_
         = std::make_unique<graphics::ResourceAllocator>(gpu_.get());
@@ -24,14 +22,15 @@ namespace gestalt {
     scene_manager_->init(gpu_.get(), resource_allocator_.get(), repository_.get(), frame_provider_.get());
     scene_manager_->update_scene(
       time_tracking_service_.get_delta_time(), input_system_.get_movement(),
-      static_cast<float>(window_->get_width()) / static_cast<float>(window_->get_height()));
+      static_cast<float>(window_.get_width()) / static_cast<float>(window_.get_height()));
 
     render_pipeline_ = std::make_unique<graphics::RenderEngine>();
-    render_pipeline_->init(gpu_.get(), window_.get(), resource_allocator_.get(), repository_.get(),
+    render_pipeline_->init(gpu_.get(), &window_, resource_allocator_.get(), repository_.get(),
                            imgui_.get(), frame_provider_.get());
 
     register_gui_actions();
-    imgui_->init(gpu_.get(), window_.get(), render_pipeline_->get_swapchain_format(), repository_.get(),  gui_actions_);
+    imgui_->init(gpu_.get(), &window_, render_pipeline_->get_swapchain_format(), repository_.get(),
+                 gui_actions_);
 
     is_initialized_ = true;
     fmt::print("Engine initialized\n");
@@ -65,10 +64,10 @@ namespace gestalt {
         if (e.type == SDL_QUIT) quit_ = true;
 
         if (e.type == SDL_KEYDOWN) {
-          if (e.key.keysym.scancode == SDL_SCANCODE_F1) window_->capture_mouse();
-          if (e.key.keysym.scancode == SDL_SCANCODE_F2) window_->release_mouse();
+          if (e.key.keysym.scancode == SDL_SCANCODE_F1) window_.capture_mouse();
+          if (e.key.keysym.scancode == SDL_SCANCODE_F2) window_.release_mouse();
         }
-        input_system_.handle_event(e, window_->get_width(), window_->get_height());
+        input_system_.handle_event(e, window_.get_width(), window_.get_height());
 
         if (e.type == SDL_WINDOWEVENT) {
           if (e.window.event == SDL_WINDOWEVENT_MINIMIZED) {
@@ -96,7 +95,7 @@ namespace gestalt {
 
       scene_manager_->update_scene(
           time_tracking_service_.get_delta_time(), input_system_.get_movement(),
-          static_cast<float>(window_->get_width()) / static_cast<float>(window_->get_height()));
+          static_cast<float>(window_.get_width()) / static_cast<float>(window_.get_height()));
 
       render_pipeline_->execute_passes();
 
@@ -114,7 +113,6 @@ namespace gestalt {
       scene_manager_->cleanup();
       render_pipeline_->cleanup();
       gpu_->cleanup();
-      window_->cleanup();
     }
   }
 }  // namespace gestalt

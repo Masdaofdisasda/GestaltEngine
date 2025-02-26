@@ -29,7 +29,7 @@ namespace gestalt {
     bool quit_{false};
     bool freeze_rendering_{false};
 
-    std::unique_ptr<application::Window> window_ = std::make_unique<application::Window>();
+    application::Window window_;
     std::unique_ptr<graphics::Gpu> gpu_ = std::make_unique<graphics::Gpu>();
 
     std::unique_ptr<graphics::RenderEngine> render_pipeline_;

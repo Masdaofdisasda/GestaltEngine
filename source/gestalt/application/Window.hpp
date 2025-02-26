@@ -9,11 +9,11 @@ typedef struct VkSurfaceKHR_T* VkSurfaceKHR;
 namespace gestalt::application {
 
     class Window {
-      SDL_Window* handle;
-      uint32 width, height;
+      SDL_Window* handle_;
+      uint32 width_, height_;
     public:
-      Window() = default;
-      ~Window() = default;
+      Window();
+      ~Window();
 
       Window(const Window&) = delete;
       Window& operator=(const Window&) = delete;
@@ -21,7 +21,6 @@ namespace gestalt::application {
       Window(Window&&) = delete;
       Window& operator=(Window&&) = delete;
 
-      void init();
       void create_surface(VkInstance instance, VkSurfaceKHR* surface) const;
       void update_window_size();
       void capture_mouse() const;
@@ -29,6 +28,5 @@ namespace gestalt::application {
       [[nodiscard]] uint32 get_width() const;
       [[nodiscard]] uint32 get_height() const;
       [[nodiscard]] SDL_Window* get_handle() const;
-      void cleanup() const;
     };
 }  // namespace gestalt
