@@ -15,27 +15,19 @@ namespace gestalt {
         ecs_(gpu_, resource_allocator_, repository_, frame_provider_),
         render_engine_(gpu_, window_, resource_allocator_, repository_, imgui_.get(), frame_provider_)
   {
-
-    register_gui_actions();
     imgui_ = std::make_unique<application::Gui>(
-        gpu_, window_, render_engine_.get_swapchain_format(), repository_, gui_actions_);
+        gpu_, window_, render_engine_.get_swapchain_format(), repository_,
+        application::GuiCapabilities{
+            [&] { quit_ = true; },
+            [&](const std::filesystem::path& file_path) { ecs_.request_scene(file_path); },
+            [&]() -> application::ComponentFactory& { return ecs_.get_component_factory(); },
+            [&]() -> graphics::RenderConfig& { return render_engine_.get_config(); },
+            [&](foundation::Entity camera) { ecs_.set_active_camera(camera); },
+            [&]() -> foundation::Entity { return ecs_.get_active_camera(); }}
+        );
 
     is_initialized_ = true;
     fmt::print("Engine initialized\n");
-  }
-
-  void GameEngine::register_gui_actions() {
-    gui_actions_.exit = [this]() { quit_ = true; };
-    gui_actions_.load_gltf
-        = [this](const std::filesystem::path& file_path) { ecs_.request_scene(file_path); };
-    gui_actions_.get_component_factory
-        = [this]() -> application::ComponentFactory& { return ecs_.get_component_factory(); };
-    gui_actions_.get_render_config
-        = [this]() -> graphics::RenderConfig& { return render_engine_.get_config(); };
-    gui_actions_.set_active_camera
-        = [this](const foundation::Entity camera) { ecs_.set_active_camera(camera); };
-    gui_actions_.get_active_camera
-        = [this]() -> foundation::Entity { return ecs_.get_active_camera(); };
   }
 
   void GameEngine::run() {

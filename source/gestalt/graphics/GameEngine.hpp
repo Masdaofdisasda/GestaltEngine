@@ -39,9 +39,6 @@ namespace gestalt {
     std::unique_ptr<application::Gui> imgui_;
     graphics::RenderEngine render_engine_;
 
-    application::GuiCapabilities gui_actions_;
-    void register_gui_actions();
-
     // utility services
     application::TimeTrackingService time_tracking_service_;
     application::InputSystem input_system_;
