@@ -35,11 +35,7 @@ namespace gestalt::graphics {
       VkCommandBuffer immediate_submit_command_buffer_ = VK_NULL_HANDLE;
 
     public:
-
-      void init(Window* window);
-      void cleanup() const;
-
-      Gpu() = default;
+      explicit Gpu(Window& window);
       ~Gpu() override;
 
       Gpu(const Gpu&) = delete;

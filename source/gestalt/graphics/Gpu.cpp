@@ -9,7 +9,8 @@
 
 namespace gestalt::graphics {
 
-  void Gpu::init(Window* window) {
+  
+  Gpu::Gpu(Window& window) {
     volkInitialize();
 
     // create the vulkan instance
@@ -37,7 +38,7 @@ namespace gestalt::graphics {
     debug_messenger = vkb_inst.debug_messenger;
 
     // create the device
-    window->create_surface(instance, &surface);
+    window.create_surface(instance, &surface);
 
     VkPhysicalDeviceFeatures features10
         = {.fillModeNonSolid = VK_TRUE, .samplerAnisotropy = VK_TRUE,.shaderInt16 = VK_TRUE};
@@ -246,17 +247,16 @@ namespace gestalt::graphics {
     VK_CHECK(vkWaitForFences(getDevice(), 1, &immediate_submit_fence_, VK_TRUE, UINT64_MAX));
   }
 
-  void Gpu::cleanup() const {
+
+  Gpu::~Gpu() {
     vmaDestroyAllocator(allocator);
     vkDestroyCommandPool(device, immediate_submit_command_pool_, nullptr);
-    vkDestroyFence( device, immediate_submit_fence_, nullptr);
+    vkDestroyFence(device, immediate_submit_fence_, nullptr);
     vkDestroyDevice(device, nullptr);
     vkDestroySurfaceKHR(instance, surface, nullptr);
     vkb::destroy_debug_utils_messenger(instance, debug_messenger);
     vkDestroyInstance(instance, nullptr);
   }
-
-  Gpu::~Gpu() = default;
 
   VkInstance Gpu::getInstance() const { return instance; }
 

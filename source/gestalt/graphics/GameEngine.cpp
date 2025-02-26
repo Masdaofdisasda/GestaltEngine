@@ -8,28 +8,27 @@
 
 namespace gestalt {
 
-  GameEngine::GameEngine(): window_() {
+  GameEngine::GameEngine() : window_(), gpu_(window_) {
 
     foundation::EngineConfiguration::get_instance().load_from_file();
     auto config = foundation::EngineConfiguration::get_instance().get_config();
     foundation::EngineConfiguration::get_instance().set_config(config);
 
-    gpu_->init(&window_);
-
     resource_allocator_
-        = std::make_unique<graphics::ResourceAllocator>(gpu_.get());
+        = std::make_unique<graphics::ResourceAllocator>(&gpu_);
 
-    scene_manager_->init(gpu_.get(), resource_allocator_.get(), repository_.get(), frame_provider_.get());
+    scene_manager_->init(&gpu_, resource_allocator_.get(), repository_.get(),
+                         frame_provider_.get());
     scene_manager_->update_scene(
       time_tracking_service_.get_delta_time(), input_system_.get_movement(),
       static_cast<float>(window_.get_width()) / static_cast<float>(window_.get_height()));
 
     render_pipeline_ = std::make_unique<graphics::RenderEngine>();
-    render_pipeline_->init(gpu_.get(), &window_, resource_allocator_.get(), repository_.get(),
+    render_pipeline_->init(&gpu_, &window_, resource_allocator_.get(), repository_.get(),
                            imgui_.get(), frame_provider_.get());
 
     register_gui_actions();
-    imgui_->init(gpu_.get(), &window_, render_pipeline_->get_swapchain_format(), repository_.get(),
+    imgui_->init(&gpu_, &window_, render_pipeline_->get_swapchain_format(), repository_.get(),
                  gui_actions_);
 
     is_initialized_ = true;
@@ -107,12 +106,11 @@ namespace gestalt {
   GameEngine::~GameEngine() {
     fmt::print("Engine shutting down\n");
     if (is_initialized_) {
-      vkDeviceWaitIdle(gpu_->getDevice());
+      vkDeviceWaitIdle(gpu_.getDevice());
 
       imgui_->cleanup();
       scene_manager_->cleanup();
       render_pipeline_->cleanup();
-      gpu_->cleanup();
     }
   }
 }  // namespace gestalt

@@ -30,7 +30,7 @@ namespace gestalt {
     bool freeze_rendering_{false};
 
     application::Window window_;
-    std::unique_ptr<graphics::Gpu> gpu_ = std::make_unique<graphics::Gpu>();
+    graphics::Gpu gpu_;
 
     std::unique_ptr<graphics::RenderEngine> render_pipeline_;
     std::unique_ptr<application::ECSManager> scene_manager_
