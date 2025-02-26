@@ -69,7 +69,7 @@ namespace gestalt::foundation {
 
       struct LuminanceParams {
         float min_log_lum{-10.f};        // minimum log2 luminance
-        float max_log_lum{-2.f};                          // maximum log2 luminance
+        float max_log_lum{10.f};                          // maximum log2 luminance
         float log_lum_range{max_log_lum - min_log_lum};  // log2 luminance range
         float inv_log_lum_range{1.0f / log_lum_range};    // 1 / log2 luminance range
 

@@ -1,10 +1,17 @@
 ﻿#pragma once
 #include <memory>
-#include "common.hpp"
 
 namespace gestalt::foundation {
 
-  struct MaterialBuffers final : NonCopyable<MaterialBuffers> {
+  struct MaterialBuffers final {
+    MaterialBuffers() = default;
+    ~MaterialBuffers() = default;
+
+    MaterialBuffers(const MaterialBuffers&) = delete;
+    MaterialBuffers& operator=(const MaterialBuffers&) = delete;
+
+    MaterialBuffers(MaterialBuffers&&) = delete;
+    MaterialBuffers& operator=(MaterialBuffers&&) = delete;
 
     std::shared_ptr<BufferInstance> material_buffer;
   };

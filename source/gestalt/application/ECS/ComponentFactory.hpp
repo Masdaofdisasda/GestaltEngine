@@ -21,7 +21,7 @@ namespace gestalt::application {
 
     constexpr float32 kDefaultFov = 1.22173f;  // 70 degrees
 
-    class ComponentFactory : public NonCopyable<ComponentFactory> {
+    class ComponentFactory {
       Repository* repository_ = nullptr;
 
       Entity next_entity_id_{0};
@@ -32,6 +32,15 @@ namespace gestalt::application {
                                       const float& scale = 1.f) const;
 
     public:
+      ComponentFactory() = default;
+      ~ComponentFactory() = default;
+
+      ComponentFactory(const ComponentFactory&) = delete;
+      ComponentFactory& operator=(const ComponentFactory&) = delete;
+
+      ComponentFactory(ComponentFactory&&) = delete;
+      ComponentFactory& operator=(ComponentFactory&&) = delete;
+
       void init(Repository* repository);
 
       std::pair<Entity, std::reference_wrapper<NodeComponent>> create_entity(

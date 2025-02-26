@@ -43,10 +43,42 @@ namespace gestalt::graphics {
     }
   };
 
-    class VkSwapchain : public NonCopyable<VkSwapchain> {
+    class VkSwapchain {
     IGpu* gpu_ = nullptr;
 
     public:
+    VkSwapchain() = default;
+      ~VkSwapchain() = default;
+
+    VkSwapchain(const VkSwapchain&) = delete;
+      VkSwapchain& operator=(const VkSwapchain&) = delete;
+
+    VkSwapchain(VkSwapchain&& other) noexcept
+          : gpu_(other.gpu_),
+            swapchain(other.swapchain),
+            swapchain_image_format(other.swapchain_image_format),
+            swapchain_extent(other.swapchain_extent),
+            draw_extent(other.draw_extent),
+            swapchain_images(std::move(other.swapchain_images)) {
+        other.gpu_ = nullptr;
+        other.swapchain = VK_NULL_HANDLE;
+      }
+
+      VkSwapchain& operator=(VkSwapchain&& other) noexcept {
+        if (this != &other) {
+          gpu_ = other.gpu_;
+          swapchain = other.swapchain;
+          swapchain_image_format = other.swapchain_image_format;
+          swapchain_extent = other.swapchain_extent;
+          draw_extent = other.draw_extent;
+          swapchain_images = std::move(other.swapchain_images);
+
+          other.gpu_ = nullptr;
+          other.swapchain = VK_NULL_HANDLE;
+        }
+        return *this;
+      }
+
       VkSwapchainKHR swapchain;
       VkFormat swapchain_image_format;
       VkExtent2D swapchain_extent;

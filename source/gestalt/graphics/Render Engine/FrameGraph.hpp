@@ -59,7 +59,7 @@ namespace gestalt::graphics {
   };
 
 
-  class FrameGraph : public NonCopyable<FrameGraph> {
+  class FrameGraph final {
     std::vector<std::shared_ptr<FrameGraphNode>> nodes_;
     std::unordered_map<uint64, std::shared_ptr<FrameGraphEdge>> edges_;
 
@@ -78,6 +78,13 @@ namespace gestalt::graphics {
 
   public:
     explicit FrameGraph(ResourceAllocator* resource_allocator);
+
+    ~FrameGraph() = default;
+
+    FrameGraph(const FrameGraph&) = delete;
+    FrameGraph& operator=(const FrameGraph&) = delete;
+
+    FrameGraph(FrameGraph&&) = delete;
 
     template <typename PassType, typename... Args> void add_pass(Args&&... args) {
       add_render_pass(std::make_shared<PassType>(std::forward<Args>(args)...));

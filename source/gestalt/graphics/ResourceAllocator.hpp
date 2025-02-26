@@ -11,7 +11,7 @@
 
 namespace gestalt::graphics {
 
-  class ResourceAllocator final : public IResourceAllocator, NonCopyable<ResourceAllocator> {
+  class ResourceAllocator final : public IResourceAllocator {
 
       IGpu* gpu_ = nullptr;
     TaskQueue task_queue_;
@@ -25,6 +25,13 @@ namespace gestalt::graphics {
         VmaAllocationCreateFlags allocation_flags, VmaMemoryUsage memory_usage) const;
 
     public:
+
+      ResourceAllocator(const ResourceAllocator&) = delete;
+      ResourceAllocator& operator=(const ResourceAllocator&) = delete;
+
+      ResourceAllocator(ResourceAllocator&&) = delete;
+      ResourceAllocator& operator=(ResourceAllocator&&) = delete;
+
       explicit ResourceAllocator(IGpu* gpu) : gpu_(gpu), task_queue_(gpu) {}
 
       std::shared_ptr<ImageInstance> create_image(ImageTemplate&& image_template) override;

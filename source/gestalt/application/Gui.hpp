@@ -23,7 +23,7 @@ namespace gestalt::application {
       std::function<Entity()> get_active_camera;
     };
 
-    class Gui: public NonCopyable<Gui> {
+    class Gui{
       IGpu* gpu_ = nullptr;
       Window* window_ = nullptr;
       Repository* repository_ = nullptr;
@@ -67,6 +67,15 @@ namespace gestalt::application {
       void show_help();
 
     public:
+      Gui() = default;
+      ~Gui() = default;
+
+      Gui(const Gui&) = delete;
+      Gui& operator=(const Gui&) = delete;
+
+      Gui(Gui&&) = delete;
+      Gui& operator=(Gui&&) = delete;
+
       VkDescriptorSet descriptor_set_;
 
       void set_debug_texture(VkImageView image_view, VkSampler sampler);

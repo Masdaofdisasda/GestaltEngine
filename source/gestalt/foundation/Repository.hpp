@@ -111,9 +111,17 @@ namespace gestalt::foundation {
     std::vector<DataType> data_;
   };
 
-  class Repository : public NonCopyable<Repository> {
+  class Repository final {
 
   public:
+    Repository() = default;
+    ~Repository() = default;
+
+    Repository(const Repository&) = delete;
+    Repository& operator=(const Repository&) = delete;
+
+    Repository(Repository&&) = delete;
+    Repository& operator=(Repository&&) = delete;
 
     struct default_material {
       std::shared_ptr<ImageInstance> color_image_instance;

@@ -5,7 +5,7 @@
 
 namespace gestalt::application {
 
-    class LightSystem final : public BaseSystem, public NonCopyable<LightSystem> {
+    class LightSystem final : public BaseSystem {
 
       void create_buffers();
 
@@ -22,6 +22,15 @@ namespace gestalt::application {
         float ndc_min_z, float shadowMapResolution, float zMult);
 
     public:
+      LightSystem() = default;
+      ~LightSystem() override = default;
+
+      LightSystem(const LightSystem&) = delete;
+      LightSystem& operator=(const LightSystem&) = delete;
+
+      LightSystem(LightSystem&&) = delete;
+      LightSystem& operator=(LightSystem&&) = delete;
+
       void prepare() override;
       void update(float delta_time, const UserInput& movement, float aspect) override;
       void cleanup() override;

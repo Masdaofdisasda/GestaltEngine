@@ -44,7 +44,7 @@ namespace gestalt::graphics {
     FrameProvider* frame_ = nullptr;
   };
 
-  class RenderEngine : public NonCopyable<RenderEngine> {
+  class RenderEngine {
     IGpu* gpu_ = nullptr;
     Window* window_ = nullptr;
     ResourceAllocator* resource_allocator_ = nullptr;
@@ -73,6 +73,15 @@ namespace gestalt::graphics {
       CommandBuffer start_draw();
 
     public:
+      RenderEngine() = default;
+      ~RenderEngine() = default;
+
+      RenderEngine(const RenderEngine&) = delete;
+      RenderEngine& operator=(const RenderEngine&) = delete;
+
+      RenderEngine(RenderEngine&&) = delete;
+      RenderEngine& operator=(RenderEngine&&) = delete;
+
       void init(IGpu* gpu, Window* window,
                 ResourceAllocator* resource_allocator,
                    Repository* repository, Gui* imgui_gui, FrameProvider* frame);

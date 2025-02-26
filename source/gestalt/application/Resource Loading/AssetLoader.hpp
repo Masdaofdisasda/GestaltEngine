@@ -22,7 +22,7 @@ namespace gestalt::foundation {
 
 namespace gestalt::application {
 
-    class AssetLoader : public NonCopyable<AssetLoader> {
+    class AssetLoader {
       IResourceAllocator* resource_allocator_ = nullptr;
       Repository* repository_ = nullptr;
       ComponentFactory* component_factory_ = nullptr;
@@ -57,6 +57,15 @@ namespace gestalt::application {
       void import_meshes(fastgltf::Asset& gltf, size_t material_offset) const;
 
     public:
+      AssetLoader() = default;
+      ~AssetLoader() = default;
+
+      AssetLoader(const AssetLoader&) = delete;
+      AssetLoader& operator=(const AssetLoader&) = delete;
+
+      AssetLoader(AssetLoader&&) = delete;
+      AssetLoader& operator=(AssetLoader&&) = delete;
+
       void init(IResourceAllocator* resource_allocator,
                 ComponentFactory* component_factory,
                 Repository* repository);

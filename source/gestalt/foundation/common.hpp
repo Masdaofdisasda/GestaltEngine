@@ -18,18 +18,6 @@ using float64 = double;
 constexpr float32 kPi = 3.14159265358979323846f;
 constexpr float64 kPiDouble = 3.14159265358979323846;
 
-template <typename T> class NonCopyable {
-protected:
-  NonCopyable() = default;
-  ~NonCopyable() = default;
-
-  NonCopyable(const NonCopyable&) = delete;
-  NonCopyable& operator=(const NonCopyable&) = delete;
-
-  NonCopyable(NonCopyable&&) = delete;
-  NonCopyable& operator=(NonCopyable&&) = delete;
-};
-
 template <typename T> class Moveable {
 protected:
   Moveable() = default;

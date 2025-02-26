@@ -1,18 +1,19 @@
 #pragma once
 
 #include "VulkanTypes.hpp"
+#include "Interface/IGpu.hpp"
 #include "Window.hpp"
 
 #include <vk_mem_alloc.h>
 
 #include <functional>
 
-#include "Interface/IGpu.hpp"
+#include "common.hpp"
 
 
 namespace gestalt::graphics {
 
-    class Gpu final : public IGpu, public NonCopyable<Gpu> {
+    class Gpu final : public IGpu{
 
       VkInstance instance;
       VkDevice device;
@@ -42,6 +43,13 @@ namespace gestalt::graphics {
 
       Gpu() = default;
       ~Gpu() override;
+
+      Gpu(const Gpu&) = delete;
+      Gpu& operator=(const Gpu&) = delete;
+
+      Gpu(Gpu&&) = delete;
+      Gpu& operator=(Gpu&&) = delete;
+
       [[nodiscard]] VkInstance getInstance() const override;
       [[nodiscard]] VkDevice getDevice() const override;
       [[nodiscard]] VmaAllocator getAllocator() const override;

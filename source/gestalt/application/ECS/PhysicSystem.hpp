@@ -19,10 +19,19 @@ namespace gestalt::foundation {
 
 namespace gestalt::application {
 
-    class PhysicSystem final : public BaseSystem, public NonCopyable<PhysicSystem> {
+    class PhysicSystem final : public BaseSystem {
       std::unique_ptr<PhysicEngine> physic_engine_;
       Entity player_ = invalid_entity;
     public:
+      PhysicSystem() = default;
+      ~PhysicSystem() override = default;
+
+      PhysicSystem(const PhysicSystem&) = delete;
+      PhysicSystem& operator=(const PhysicSystem&) = delete;
+
+      PhysicSystem(PhysicSystem&&) = delete;
+      PhysicSystem& operator=(PhysicSystem&&) = delete;
+
       void prepare() override;
       void move_player(float delta_time, const UserInput& movement) const;
       void update(float delta_time, const UserInput& movement, float aspect) override;

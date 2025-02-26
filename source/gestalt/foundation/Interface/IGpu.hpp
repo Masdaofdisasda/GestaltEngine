@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <functional>
+#include "common.hpp"
 
 namespace gestalt::foundation {
 
