@@ -31,6 +31,7 @@ namespace gestalt {
 
     application::Window window_;
     graphics::Gpu gpu_;
+    graphics::ResourceAllocator resource_allocator_;
 
     std::unique_ptr<graphics::RenderEngine> render_pipeline_;
     std::unique_ptr<application::ECSManager> scene_manager_
@@ -45,7 +46,6 @@ namespace gestalt {
     // utility services
     application::TimeTrackingService time_tracking_service_;
     application::InputSystem input_system_;
-    std::unique_ptr<graphics::ResourceAllocator> resource_allocator_;
 
     uint64 frame_number{0};
     std::unique_ptr<foundation::FrameProvider> frame_provider_

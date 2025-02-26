@@ -91,7 +91,7 @@ namespace gestalt::graphics {
   };
 
   class TaskQueue {
-    IGpu* gpu_ = nullptr;
+    IGpu& gpu_;
     VkCommandBuffer cmd;
     VkCommandPool command_pool_ = {};
     VkFence flushFence = {};
@@ -109,7 +109,7 @@ namespace gestalt::graphics {
     void load_image(const ImageData& image_data, VkImage image, bool mipmap);
 
   public:
-    explicit TaskQueue(IGpu* gpu);
+    explicit TaskQueue(IGpu& gpu);
 
     void add_image(const std::filesystem::path& path, VkImage image, bool is_cubemap = false, bool mipmap = false);
     void add_image(std::vector<unsigned char>& data, VkImage image, VkExtent3D extent, bool mipmap = false);

@@ -117,7 +117,7 @@ namespace gestalt::graphics {
     VmaAllocationCreateInfo alloc_info = {};
     alloc_info.usage = VMA_MEMORY_USAGE_CPU_ONLY;
 
-    if (vmaCreateBuffer(gpu_->getAllocator(), &buffer_info, &alloc_info, &staging_buffer.buffer,
+    if (vmaCreateBuffer(gpu_.getAllocator(), &buffer_info, &alloc_info, &staging_buffer.buffer,
                         &staging_buffer.allocation, nullptr)
         != VK_SUCCESS) {
       throw std::runtime_error("Failed to create staging buffer for image upload.");
@@ -265,9 +265,9 @@ namespace gestalt::graphics {
 
     // Copy pixel data to the staging buffer
     void* data;
-    vmaMapMemory(gpu_->getAllocator(), allocation, &data);
+    vmaMapMemory(gpu_.getAllocator(), allocation, &data);
     memcpy(data, cube.data_.data(), totalCubemapSizeBytes);
-    vmaUnmapMemory(gpu_->getAllocator(), allocation);
+    vmaUnmapMemory(gpu_.getAllocator(), allocation);
 
     // Step 3: Create and transition the Vulkan image
     VkImageSubresourceRange subresource_range;
@@ -334,9 +334,9 @@ namespace gestalt::graphics {
 
       // Copy pixel data to the staging buffer
       void* data;
-      vmaMapMemory(gpu_->getAllocator(), allocation, &data);
+      vmaMapMemory(gpu_.getAllocator(), allocation, &data);
       memcpy(data, image_data.get_data(), image_size);
-      vmaUnmapMemory(gpu_->getAllocator(), allocation);
+      vmaUnmapMemory(gpu_.getAllocator(), allocation);
 
       // Step 3: Create and transition the Vulkan image
       VkImageSubresourceRange subresource_range;
@@ -391,13 +391,13 @@ namespace gestalt::graphics {
       }
   }
 
-  TaskQueue::TaskQueue(IGpu* gpu): gpu_(gpu) {
+  TaskQueue::TaskQueue(IGpu& gpu): gpu_(gpu) {
     VkCommandPoolCreateInfo pool_info = {};
     pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    pool_info.queueFamilyIndex = gpu_->getGraphicsQueueFamily();
+    pool_info.queueFamilyIndex = gpu_.getGraphicsQueueFamily();
 
-    VK_CHECK(vkCreateCommandPool(gpu_->getDevice(), &pool_info, nullptr, &command_pool_));
+    VK_CHECK(vkCreateCommandPool(gpu_.getDevice(), &pool_info, nullptr, &command_pool_));
 
     VkCommandBufferAllocateInfo alloc_info = {};
     alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -405,11 +405,11 @@ namespace gestalt::graphics {
     alloc_info.commandPool = command_pool_;
     alloc_info.commandBufferCount = 1;
 
-    VK_CHECK(vkAllocateCommandBuffers(gpu_->getDevice(), &alloc_info, &cmd));
+    VK_CHECK(vkAllocateCommandBuffers(gpu_.getDevice(), &alloc_info, &cmd));
 
     VkFenceCreateInfo fenceInfo = {};
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    VK_CHECK(vkCreateFence(gpu_->getDevice(), &fenceInfo, nullptr, &flushFence));
+    VK_CHECK(vkCreateFence(gpu_.getDevice(), &fenceInfo, nullptr, &flushFence));
   }
 
   void TaskQueue::add_image(const std::filesystem::path& path, VkImage image, bool is_cubemap, bool mipmap) {
@@ -463,13 +463,13 @@ namespace gestalt::graphics {
     submitInfo2.commandBufferInfoCount = 1;
     submitInfo2.pCommandBufferInfos = &commandBufferSubmitInfo;
 
-    VK_CHECK(vkQueueSubmit2(gpu_->getGraphicsQueue(), 1, &submitInfo2, flushFence));
-    VK_CHECK(vkWaitForFences(gpu_->getDevice(), 1, &flushFence, VK_TRUE, UINT64_MAX));
-    VK_CHECK(vkResetFences(gpu_->getDevice(), 1, &flushFence));
+    VK_CHECK(vkQueueSubmit2(gpu_.getGraphicsQueue(), 1, &submitInfo2, flushFence));
+    VK_CHECK(vkWaitForFences(gpu_.getDevice(), 1, &flushFence, VK_TRUE, UINT64_MAX));
+    VK_CHECK(vkResetFences(gpu_.getDevice(), 1, &flushFence));
     VK_CHECK(vkResetCommandBuffer(cmd, 0));
 
     for (const auto& [buffer, allocation] : staging_buffers_) {
-      vmaDestroyBuffer(gpu_->getAllocator(), buffer, allocation);
+      vmaDestroyBuffer(gpu_.getAllocator(), buffer, allocation);
     }
     staging_buffers_.clear();
 

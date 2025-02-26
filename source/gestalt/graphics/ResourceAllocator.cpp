@@ -146,11 +146,11 @@ namespace gestalt::graphics {
 
     // 4) Create the VkImage + VMA allocation
     AllocatedImage image;
-    VK_CHECK(vmaCreateImage(gpu_->getAllocator(), &img_info, &allocation_info, &image.image_handle,
+    VK_CHECK(vmaCreateImage(gpu_.getAllocator(), &img_info, &allocation_info, &image.image_handle,
                             &image.allocation, nullptr));
 
     // 5) Give the image a debug name
-    gpu_->set_debug_name(name, VK_OBJECT_TYPE_IMAGE,
+    gpu_.set_debug_name(name, VK_OBJECT_TYPE_IMAGE,
                          reinterpret_cast<uint64_t>(image.image_handle));
 
     // 6) Create the corresponding image view
@@ -174,9 +174,9 @@ namespace gestalt::graphics {
       view_info.subresourceRange.levelCount = img_info.mipLevels;
     }
 
-    VK_CHECK(vkCreateImageView(gpu_->getDevice(), &view_info, nullptr, &image.image_view));
+    VK_CHECK(vkCreateImageView(gpu_.getDevice(), &view_info, nullptr, &image.image_view));
 
-    gpu_->set_debug_name(std::string(name + " View"), VK_OBJECT_TYPE_IMAGE_VIEW,
+    gpu_.set_debug_name(std::string(name + " View"), VK_OBJECT_TYPE_IMAGE_VIEW,
                          reinterpret_cast<uint64_t>(image.image_view));
 
     return image;
@@ -207,9 +207,9 @@ namespace gestalt::graphics {
     };
 
     AllocatedBuffer buffer;
-    VK_CHECK(vmaCreateBuffer(gpu_->getAllocator(), &buffer_info, &allocation_info,
+    VK_CHECK(vmaCreateBuffer(gpu_.getAllocator(), &buffer_info, &allocation_info,
                              &buffer.buffer_handle, &buffer.allocation, &buffer.info));
-    gpu_->set_debug_name(name, VK_OBJECT_TYPE_BUFFER,
+    gpu_.set_debug_name(name, VK_OBJECT_TYPE_BUFFER,
                          reinterpret_cast<uint64_t>(buffer.buffer_handle));
 
     // Get the device address for the buffer
@@ -217,7 +217,7 @@ namespace gestalt::graphics {
         .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
         .buffer = buffer.buffer_handle,
     };
-    buffer.address = vkGetBufferDeviceAddress(gpu_->getDevice(), &device_address_info);
+    buffer.address = vkGetBufferDeviceAddress(gpu_.getDevice(), &device_address_info);
 
     return buffer;
   }
@@ -233,7 +233,7 @@ namespace gestalt::graphics {
   }
 
   void ResourceAllocator::destroy_buffer(const std::shared_ptr<BufferInstance>& buffer) const {
-    vmaDestroyBuffer(gpu_->getAllocator(), buffer->get_buffer_handle(), buffer->get_allocation());
+    vmaDestroyBuffer(gpu_.getAllocator(), buffer->get_buffer_handle(), buffer->get_allocation());
   }
 
 }  // namespace gestalt

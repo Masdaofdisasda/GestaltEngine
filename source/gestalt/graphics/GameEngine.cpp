@@ -8,23 +8,16 @@
 
 namespace gestalt {
 
-  GameEngine::GameEngine() : window_(), gpu_(window_) {
+  GameEngine::GameEngine() : window_(), gpu_(window_), resource_allocator_(gpu_) {
 
-    foundation::EngineConfiguration::get_instance().load_from_file();
-    auto config = foundation::EngineConfiguration::get_instance().get_config();
-    foundation::EngineConfiguration::get_instance().set_config(config);
-
-    resource_allocator_
-        = std::make_unique<graphics::ResourceAllocator>(&gpu_);
-
-    scene_manager_->init(&gpu_, resource_allocator_.get(), repository_.get(),
+    scene_manager_->init(&gpu_, &resource_allocator_, repository_.get(),
                          frame_provider_.get());
     scene_manager_->update_scene(
       time_tracking_service_.get_delta_time(), input_system_.get_movement(),
       static_cast<float>(window_.get_width()) / static_cast<float>(window_.get_height()));
 
     render_pipeline_ = std::make_unique<graphics::RenderEngine>();
-    render_pipeline_->init(&gpu_, &window_, resource_allocator_.get(), repository_.get(),
+    render_pipeline_->init(&gpu_, &window_, &resource_allocator_, repository_.get(),
                            imgui_.get(), frame_provider_.get());
 
     register_gui_actions();
