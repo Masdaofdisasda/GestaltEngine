@@ -17,13 +17,13 @@ namespace gestalt::application {
       return;
     }
 
-    auto& node = repository_.scene_graph.get(entity).value().get();
-    if (node.bounds.is_dirty) {
+    const auto node = repository_.scene_graph.find_mutable(entity);
+    if (node->bounds.is_dirty) {
       return;
     }
 
-    node.bounds.is_dirty = true;
-    mark_parent_bounds_dirty(node.parent);
+    node->bounds.is_dirty = true;
+    mark_parent_bounds_dirty(node->parent);
   }
 
   void TransformSystem::mark_children_bounds_dirty(Entity entity) {
@@ -31,52 +31,51 @@ namespace gestalt::application {
       return;
     }
 
-    const auto& node = repository_.scene_graph.get(entity).value().get();
-    if (node.bounds.is_dirty) {
+    const auto node = repository_.scene_graph.find_mutable(entity);
+    if (node->bounds.is_dirty) {
       return;
     }
 
-    node.bounds.is_dirty = true;
-    for (const auto& child : node.children) {
+    node->bounds.is_dirty = true;
+    for (const auto& child : node->children) {
       mark_children_bounds_dirty(child);
     }
   }
 
   void TransformSystem::mark_bounds_as_dirty(Entity entity) {
-    const auto& node = repository_.scene_graph.get(entity).value().get();
-    node.bounds.is_dirty = true;
-    for (const auto& child : node.children) {
+    const auto node = repository_.scene_graph.find_mutable(entity);
+    node->bounds.is_dirty = true;
+    for (const auto& child : node->children) {
       mark_children_bounds_dirty(child);
     }
-    mark_parent_bounds_dirty(node.parent);
+    mark_parent_bounds_dirty(node->parent);
   }
 
   void TransformSystem::update_aabb(const Entity entity,
                                     const TransformComponent& parent_transform) {
-    auto& node = repository_.scene_graph.get(entity).value().get();
-    if (!node.bounds.is_dirty) {
+    auto node = repository_.scene_graph.find_mutable(entity);
+    if (!node->bounds.is_dirty) {
       return;
     }
-    auto& local_transform = repository_.transform_components.get(entity).value().get();
-    if (node.parent != invalid_entity) {
-      const auto& parent_transform_component
-          = repository_.transform_components.get(node.parent).value().get();
-      local_transform.parent_position = parent_transform_component.position;
-      local_transform.parent_rotation = parent_transform_component.rotation;
-      local_transform.parent_scale = parent_transform_component.scale;
+    auto local_transform = repository_.transform_components.find_mutable(entity);
+    if (node->parent != invalid_entity) {
+      const auto& parent_transform_component = repository_.transform_components.find(node->parent);
+      local_transform->parent_position = parent_transform_component->position;
+      local_transform->parent_rotation = parent_transform_component->rotation;
+      local_transform->parent_scale = parent_transform_component->scale;
     } else {
-      local_transform.parent_position = local_transform.position;
-      local_transform.parent_rotation = local_transform.rotation;
-      local_transform.parent_scale = local_transform.scale;
+      local_transform->parent_position = local_transform->position;
+      local_transform->parent_rotation = local_transform->rotation;
+      local_transform->parent_scale = local_transform->scale;
     }
 
-    const auto& mesh_optional = repository_.mesh_components.get(entity);
+    const auto& mesh_component = repository_.mesh_components.find(entity);
 
     AABB aabb;
     auto& [min, max, is_dirty] = aabb;
 
-    if (mesh_optional.has_value()) {
-      const auto& mesh = repository_.meshes.get(mesh_optional->get().mesh);
+    if (mesh_component != nullptr) {
+      const auto& mesh = repository_.meshes.get(mesh_component->mesh);
       AABB local_aabb;
       local_aabb.min = mesh.local_bounds.center - glm::vec3(mesh.local_bounds.radius);
       local_aabb.max = mesh.local_bounds.center + glm::vec3(mesh.local_bounds.radius);
@@ -89,10 +88,10 @@ namespace gestalt::application {
       max = glm::vec3(0.0001f);
     }
 
-    const TransformComponent model_transform = parent_transform * local_transform;
-    for (const auto& child : node.children) {
+    const TransformComponent model_transform = parent_transform * *local_transform;
+    for (const auto& child : node->children) {
       update_aabb(child, model_transform);
-      const auto& child_aabb = repository_.scene_graph.get(child).value().get().bounds;
+      const auto& child_aabb = repository_.scene_graph.find(child)->bounds;
       min.x = std::min(min.x, child_aabb.min.x);
       min.y = std::min(min.y, child_aabb.min.y);
       min.z = std::min(min.z, child_aabb.min.z);
@@ -124,14 +123,14 @@ namespace gestalt::application {
     max = transformedAABB.max;
 
 
-    node.bounds = aabb;
-    node.bounds.is_dirty = false;
+    node->bounds = aabb;
+    node->bounds.is_dirty = false;
   }
 
   void TransformSystem::update() {
     bool is_dirty = false;
 
-    for (auto& [entity, transform] : repository_.transform_components.components()) {
+    for (auto& [entity, transform] : repository_.transform_components.snapshot()) {
       if (transform.is_dirty) {
         is_dirty = true;
         mark_bounds_as_dirty(entity);

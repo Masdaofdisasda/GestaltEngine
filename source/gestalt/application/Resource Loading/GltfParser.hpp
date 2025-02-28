@@ -3,6 +3,8 @@
 #include <filesystem>
 #include <unordered_map>
 
+#include "AssetLoader.hpp"
+#include "Repository.hpp"
 #include "Vertex.hpp"
 #include "common.hpp"
 #include "ECS/ComponentFactory.hpp"
@@ -44,8 +46,9 @@ namespace gestalt::application {
     static void build_hierarchy(std::vector<fastgltf::Node> nodes, const size_t& node_offset,
                                 Repository* repository);
 
-    static void link_orphans_to_root(const Entity root, NodeComponent& root_node,
-                                     std::unordered_map<Entity, NodeComponent>& nodes);
+    static void link_orphans_to_root(Entity root, NodeComponent* root_node,
+                                     const std::vector<std::pair<Entity, NodeComponent>>& nodes,
+                                     Repository* repository);
   };
 
 }  // namespace gestalt::application

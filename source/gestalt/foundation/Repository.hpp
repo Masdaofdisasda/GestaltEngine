@@ -30,52 +30,34 @@
 
 namespace gestalt::foundation {
 
-  template <typename ComponentType> class ComponentContainer {
+  template <typename ComponentType> class ComponentStorage {
   public:
-    size_t size() const { return components_.size(); }
-
-    std::optional<std::reference_wrapper<ComponentType>> get(const Entity& ent) {
+    [[nodiscard]] const ComponentType* find(Entity ent) const {
       auto it = components_.find(ent);
-      if (it != components_.end()) {
-        return std::ref(it->second);
-      }
-      return std::nullopt;
+      return (it != components_.end()) ? &it->second : nullptr;
     }
 
-    // NOTE: this does not check if the entity exists
-    ComponentType& operator[](const Entity& ent) {
+    [[nodiscard]] ComponentType* find_mutable(Entity ent) {
       auto it = components_.find(ent);
-      if (it != components_.end()) {
-        return it->second;
-      }
-      throw std::runtime_error("Component not found");
+      return (it != components_.end()) ? &it->second : nullptr;
     }
 
-    // NOTE: this does not check if the entity exists
-    const ComponentType& operator[](const Entity& ent) const {
-      auto it = components_.find(ent);
-      if (it != components_.end()) {
-        return it->second;
-      }
+    void upsert(Entity ent, const ComponentType& component) {
+      components_.insert_or_assign(ent, component);
     }
 
-    std::unordered_map<Entity, ComponentType>& components() { return components_; }
+    void remove(Entity ent) { components_.erase(ent); }
 
-    std::vector<std::pair<Entity, std::reference_wrapper<ComponentType>>> asVector() {
-      std::vector<std::pair<Entity, std::reference_wrapper<ComponentType>>> result;
+    [[nodiscard]] std::vector<std::pair<Entity, ComponentType>> snapshot() const {
+      std::vector<std::pair<Entity, ComponentType>> result;
+      result.reserve(components_.size());
       for (auto& [ent, comp] : components_) {
-        result.emplace_back(ent, std::ref(comp));
+        result.emplace_back(ent, comp);  // copy
       }
       return result;
     }
 
-    void add(const Entity& ent, const ComponentType& component) {
-      components_.insert({ent, component});
-    }
-
-    void remove(const Entity& ent) { components_.erase(ent); }
-
-    void clear() { components_.clear(); }
+    [[nodiscard]] size_t size() const { return components_.size(); }
 
   private:
     std::unordered_map<Entity, ComponentType> components_;
@@ -170,12 +152,12 @@ namespace gestalt::foundation {
 
     std::vector<MeshDraw> mesh_draws_; ///actual one, super cursed i know
 
-    ComponentContainer<NodeComponent> scene_graph;
-    ComponentContainer<MeshComponent> mesh_components;
-    ComponentContainer<CameraComponent> camera_components;
-    ComponentContainer<LightComponent> light_components;
-    ComponentContainer<AnimationComponent> animation_components;
-    ComponentContainer<TransformComponent> transform_components;
-    ComponentContainer<PhysicsComponent> physics_components;
+    ComponentStorage<NodeComponent> scene_graph;
+    ComponentStorage<MeshComponent> mesh_components;
+    ComponentStorage<CameraComponent> camera_components;
+    ComponentStorage<LightComponent> light_components;
+    ComponentStorage<AnimationComponent> animation_components;
+    ComponentStorage<TransformComponent> transform_components;
+    ComponentStorage<PhysicsComponent> physics_components;
   };
 }  // namespace gestalt::foundation

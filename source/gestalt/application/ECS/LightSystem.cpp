@@ -54,26 +54,6 @@ namespace gestalt::application {
 
   }
 
-  glm::mat4 LightSystem::calculate_directional_light_view_matrix(const glm::vec3 direction) const {
-    auto& [min, max, is_dirty] = repository_.scene_graph.get(root_entity).value().get().bounds;
-
-    const glm::vec3 center = (min + max) * 0.5f;
-    glm::vec3 size = max - min;
-    size = glm::max(size, glm::vec3(1.f));
-    const float radius = length(size) * 0.5f;
-
-    const glm::vec3 lightDirection = glm::normalize(-direction);
-    const glm::vec3 lightPosition
-        = center - lightDirection * radius;       // Position the light behind the scene
-
-    glm::vec3 up = glm::vec3(0.f, 1.f, 0.f);
-    if (dot(up, direction) < 0.0001f) {
-      up = glm::vec3(0.f, 0.f, 1.f);
-    }
-
-    return glm::lookAt(lightPosition, center, up);
-  }
-
   glm::mat4 LightSystem::calculate_directional_light_view_matrix_cam_only(const glm::vec3 direction, glm::mat4 cam_inv) const {
     glm::vec4 ndc_corners[8] = {
         {-1.0f, -1.0f, 0.0f, 1.0f},  // Near bottom-left
@@ -107,41 +87,6 @@ namespace gestalt::application {
     }
 
     return glm::lookAt(lightPosition, frustum_center, up);
-  }
-
-  glm::mat4 LightSystem::calculate_directional_light_proj_matrix_scene_only(
-      const glm::mat4& light_view) const {
-    // Retrieve scene min/max
-    auto& [scene_min, scene_max, dirty]
-        = repository_.scene_graph.get(root_entity).value().get().bounds;
-
-    // Step 1: Compute 8 corners of the scene bounding box
-    glm::vec3 corners[8] = {scene_min,
-                            {scene_max.x, scene_min.y, scene_min.z},
-                            {scene_min.x, scene_max.y, scene_min.z},
-                            {scene_max.x, scene_max.y, scene_min.z},
-                            {scene_min.x, scene_min.y, scene_max.z},
-                            {scene_max.x, scene_min.y, scene_max.z},
-                            {scene_min.x, scene_max.y, scene_max.z},
-                            scene_max};
-
-    // Step 2: Transform corners into light space
-    glm::mat4 light_view_inv = glm::inverse(light_view);
-    glm::vec3 light_space_min = glm::vec3(std::numeric_limits<float>::max());
-    glm::vec3 light_space_max = glm::vec3(std::numeric_limits<float>::lowest());
-
-    for (const auto& c : corners) {
-      glm::vec4 light_pos = light_view_inv * glm::vec4(c, 1.0f);
-      glm::vec3 lpos3 = glm::vec3(light_pos);
-
-      light_space_min = glm::min(light_space_min, lpos3);
-      light_space_max = glm::max(light_space_max, lpos3);
-    }
-
-    // Step 3: Construct orthographic projection
-    // Note: using orthoRH_ZO or orthoLH_ZO depends on your convention
-    return glm::orthoRH_ZO(light_space_min.x, light_space_max.x, light_space_min.y,
-                           light_space_max.y, light_space_min.z, light_space_max.z);
   }
 
   glm::mat4 LightSystem::calculate_directional_light_proj_matrix_camera_only(
@@ -247,12 +192,11 @@ namespace gestalt::application {
     repository_.point_lights.clear();
     repository_.spot_lights.clear();
 
-    for (auto [entity, Light_component] : repository_.light_components.asVector()) {
-      if (Light_component.get().type == LightType::kDirectional) {
-        auto& light = Light_component.get();
-        const auto& rotation = repository_.transform_components[entity].rotation;
-        auto& dir_light_data = std::get<DirectionalLightData>(Light_component.get().specific);
-        glm::vec3 direction = -normalize(rotation * glm::vec3(0, 0, -1.f));
+    for (auto [entity, Light_component] : repository_.light_components.snapshot()) {
+      if (Light_component.type == LightType::kDirectional) {
+        const auto& rotation = repository_.transform_components.find(entity)->rotation;
+        auto& dir_light_data = std::get<DirectionalLightData>(Light_component.specific);
+        glm::vec3 direction = -glm::normalize(rotation * glm::vec3(0, 0, -1.f));
 
         dir_light_data.light_view_projection = repository_.light_view_projections.size();
         // TODO fix this
@@ -264,43 +208,41 @@ namespace gestalt::application {
         repository_.light_view_projections.add({view, proj});
 
         GpuDirectionalLight dir_light = {};
-        dir_light.color = light.base.color;
-        dir_light.intensity = light.base.intensity;
+        dir_light.color = Light_component.base.color;
+        dir_light.intensity = Light_component.base.intensity;
         dir_light.direction = direction;
         dir_light.viewProj = dir_light_data.light_view_projection;
         repository_.directional_lights.add(dir_light);
 
-        light.is_dirty = false;
-      } else if (Light_component.get().type == LightType::kPoint) {
-        auto& light = Light_component.get();
-        const auto& position = repository_.transform_components[entity].position;
-        const auto& point_light_data = std::get<PointLightData>(light.specific);
+        Light_component.is_dirty = false;
+      } else if (Light_component.type == LightType::kPoint) {
+        const auto& position = repository_.transform_components.find(entity)->position;
+        const auto& point_light_data = std::get<PointLightData>(Light_component.specific);
 
         // TODO Calculate the 6 view matrices for the light
 
         GpuPointLight point_light = {};
-        point_light.color = light.base.color;
-        point_light.intensity = light.base.intensity;
+        point_light.color = Light_component.base.color;
+        point_light.intensity = Light_component.base.intensity;
         point_light.position = position;
         point_light.range = point_light_data.range;
         repository_.point_lights.add(point_light);
 
-        light.is_dirty = false;
-      } else if (Light_component.get().type == LightType::kSpot) {
-        auto& light = Light_component.get();
-        const auto& position = repository_.transform_components[entity].position;
-        const auto& rotation = repository_.transform_components[entity].rotation;
-        const auto& spot_light_data = std::get<SpotLightData>(light.specific);
+        Light_component.is_dirty = false;
+      } else if (Light_component.type == LightType::kSpot) {
+        const auto& position = repository_.transform_components.find(entity)->position;
+        const auto& rotation = repository_.transform_components.find(entity)->rotation;
+        const auto& spot_light_data = std::get<SpotLightData>(Light_component.specific);
         GpuSpotLight spot_light = {};
-        spot_light.color = light.base.color;
-        spot_light.intensity = light.base.intensity;
+        spot_light.color = Light_component.base.color;
+        spot_light.intensity = Light_component.base.intensity;
         spot_light.position = position;
         spot_light.range = spot_light_data.range;
-        spot_light.direction = normalize(rotation * glm::vec3(0, 0, -1.f));
+        spot_light.direction = glm::normalize(rotation * glm::vec3(0, 0, -1.f));
         spot_light.inner_cone_angle = spot_light_data.inner_cone_cos;
         spot_light.outer_cone_angle = spot_light_data.outer_cone_cos;
         repository_.spot_lights.add(spot_light);
-        light.is_dirty = false;
+        Light_component.is_dirty = false;
       }
     }
 

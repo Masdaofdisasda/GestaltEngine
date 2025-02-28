@@ -66,14 +66,15 @@ namespace gestalt::application {
 
   ComponentFactory::ComponentFactory(Repository& repository) : repository_(repository) {
     auto [entity, root_node] = create_entity();
-    root_node.get().name = "root";
+    root_node->name = "root";
   }
 
     Entity ComponentFactory::next_entity() { return next_entity_id_++; }
 
-    std::pair<Entity, std::reference_wrapper<NodeComponent>> ComponentFactory::create_entity(
-        std::string node_name, const glm::vec3& position, const glm::quat& rotation,
-        const float& scale) {
+    std::pair<Entity, NodeComponent*> ComponentFactory::create_entity(std::string node_name,
+                                                                      const glm::vec3& position,
+                                                                      const glm::quat& rotation,
+                                                                      const float& scale) {
       const Entity new_entity = next_entity();
 
       if (node_name.empty()) {
@@ -84,25 +85,25 @@ namespace gestalt::application {
       };
 
       create_transform_component(new_entity, position, rotation, scale);
-      repository_.scene_graph.add(new_entity, node);
+      repository_.scene_graph.upsert(new_entity, node);
 
       fmt::print("created entity {}\n", new_entity);
 
-      return std::make_pair(new_entity, std::ref(repository_.scene_graph.get(new_entity)->get()));
+      return std::make_pair(new_entity, repository_.scene_graph.find_mutable(new_entity));
     }
 
     void ComponentFactory::create_transform_component(const Entity entity,
                                                                const glm::vec3& position,
                                                                const glm::quat& rotation,
                                                                const float& scale) const {
-      repository_.transform_components.add(entity, TransformComponent{true, position, rotation, scale});
+      repository_.transform_components.upsert(entity, TransformComponent{true, position, rotation, scale});
     }
 
     void ComponentFactory::add_mesh_component(const Entity entity,
                                               const size_t mesh_index) {
       assert(entity != invalid_entity);
 
-      repository_.mesh_components.add(entity, MeshComponent{{true}, mesh_index});
+      repository_.mesh_components.upsert(entity, MeshComponent{{true}, mesh_index});
     }
 
   void ComponentFactory::create_mesh(std::vector<MeshSurface> surfaces, const std::string& name) const {
@@ -137,24 +138,24 @@ namespace gestalt::application {
 
   void ComponentFactory::create_physics_component(const Entity entity, const BodyType body_type,
                                                   const BoxCollider& collider) const {
-      repository_.physics_components.add(entity, PhysicsComponent(body_type, collider));
+      repository_.physics_components.upsert(entity, PhysicsComponent(body_type, collider));
     }
 
   void ComponentFactory::create_physics_component(const Entity entity, const BodyType body_type,
                                                   const SphereCollider& collider) const {
-      repository_.physics_components.add(entity, PhysicsComponent(body_type, collider));
+      repository_.physics_components.upsert(entity, PhysicsComponent(body_type, collider));
     }
 
   void ComponentFactory::create_physics_component(const Entity entity, const BodyType body_type,
                                                   const CapsuleCollider& collider) const {
-      repository_.physics_components.add(entity, PhysicsComponent(body_type, collider));
+      repository_.physics_components.upsert(entity, PhysicsComponent(body_type, collider));
     }
 
   void ComponentFactory::create_animation_component(
         const Entity entity, const std::vector<Keyframe<glm::vec3>>& translation_keyframes,
         const std::vector<Keyframe<glm::quat>>& rotation_keyframes,
         const std::vector<Keyframe<glm::vec3>>& scale_keyframes) const {
-    repository_.animation_components.add(
+    repository_.animation_components.upsert(
         entity, AnimationComponent(translation_keyframes, rotation_keyframes, scale_keyframes));
     }
 
@@ -168,8 +169,8 @@ namespace gestalt::application {
             = create_entity("directional_light_" + std::to_string(number_of_lights + 1));
         entity = new_entity;
         link_entity_to_parent(entity, root_entity);
-        auto& transform = repository_.transform_components[entity];
-        transform.rotation = orientation_from_direction(direction);
+        auto transform = repository_.transform_components.find_mutable(entity);
+        transform->rotation = orientation_from_direction(direction);
       }
 
 
@@ -177,7 +178,7 @@ namespace gestalt::application {
           = repository_.light_view_projections.add({glm::mat4(1.0), glm::mat4(1.0)});
       const LightComponent light(color, intensity, matrix_id);
 
-      repository_.light_components.add(entity, light);
+      repository_.light_components.upsert(entity, light);
 
       return entity;
     }
@@ -193,16 +194,16 @@ namespace gestalt::application {
             = create_entity("spot_light_" + std::to_string(number_of_lights + 1));
         entity = new_entity;
           link_entity_to_parent(entity, root_entity);
-        auto& transform = repository_.transform_components[entity];
-        transform.rotation = orientation_from_direction(direction);
-        transform.position = position;
+        auto transform = repository_.transform_components.find_mutable(entity);
+        transform->rotation = orientation_from_direction(direction);
+        transform->position = position;
       }
       const uint32 matrix_id
           = repository_.light_view_projections.add({glm::mat4(1.0), glm::mat4(1.0)});
 
       const LightComponent light(color, intensity, range, matrix_id, cos(inner_cone_radians), cos(outer_cone_radians));
 
-      repository_.light_components.add(entity, light);
+      repository_.light_components.upsert(entity, light);
 
       return entity;
     }
@@ -216,8 +217,8 @@ namespace gestalt::application {
             = create_entity("point_light_" + std::to_string(number_of_lights + 1));
         entity = new_entity;
           link_entity_to_parent(entity, root_entity);
-        auto& transform = repository_.transform_components[entity];
-        transform.position = position;
+        auto transform = repository_.transform_components.find_mutable(entity);
+        transform->position = position;
       }
 
 
@@ -228,7 +229,7 @@ namespace gestalt::application {
       }
       const LightComponent light(color, intensity, range, matrix_id);
 
-      repository_.light_components.add(entity, light);
+      repository_.light_components.upsert(entity, light);
       return entity;
     }
 
@@ -239,7 +240,7 @@ namespace gestalt::application {
       const auto free_fly_component
           = CameraComponent(projection_data,
           FreeFlyCameraData(position, direction, up));
-      repository_.camera_components.add(entity, free_fly_component);
+      repository_.camera_components.upsert(entity, free_fly_component);
 
       return entity;
   }
@@ -248,7 +249,7 @@ namespace gestalt::application {
                                                 const ProjectionData projection_data) const {
     const auto animation_component
         = CameraComponent(projection_data, AnimationCameraData(position, orientation));
-    repository_.camera_components.add(entity, animation_component);
+    repository_.camera_components.upsert(entity, animation_component);
 
     return entity;
   }
@@ -257,7 +258,7 @@ namespace gestalt::application {
                                             const ProjectionData projection_data) const {
     const auto orbit_component = CameraComponent(projection_data,
           OrbitCameraData(target));
-      repository_.camera_components.add(entity, orbit_component);
+      repository_.camera_components.upsert(entity, orbit_component);
 
       return entity;
     }
@@ -267,7 +268,7 @@ namespace gestalt::application {
       const auto first_person_component = CameraComponent(
           projection_data,
           FirstPersonCameraData(position, glm::vec3(0.f,1.f, 0.f)));
-      repository_.camera_components.add(entity, first_person_component);
+      repository_.camera_components.upsert(entity, first_person_component);
 
       return entity;
     }
@@ -277,12 +278,12 @@ namespace gestalt::application {
         return;
       }
 
-      const auto& parent_node = repository_.scene_graph.get(parent);
-      const auto& child_node = repository_.scene_graph.get(child);
+      const auto parent_node = repository_.scene_graph.find_mutable(parent);
+      const auto child_node = repository_.scene_graph.find_mutable(child);
 
-      if (parent_node.has_value() && child_node.has_value()) {
-        parent_node->get().children.push_back(child);
-        child_node->get().parent = parent;
+      if (parent_node != nullptr && child_node != nullptr) {
+        parent_node->children.push_back(child);
+        child_node->parent = parent;
       }
     }
 

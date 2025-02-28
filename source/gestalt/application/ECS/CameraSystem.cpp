@@ -21,7 +21,7 @@ namespace gestalt::application {
         repository_(repository),
         frame_(frame)
   {
-    const auto cameras = repository_.camera_components.asVector();
+    const auto cameras = repository_.camera_components.snapshot();
     if (!cameras.empty()) {
       active_camera_ = cameras.front().first;
     }
@@ -48,32 +48,32 @@ namespace gestalt::application {
     void CameraSystem::update(const float delta_time, const UserInput& movement, float aspect) {
       aspect_ratio_ = aspect;
 
-      active_camera_ = repository_.camera_components.asVector().back().first;
+      active_camera_ = repository_.camera_components.snapshot().back().first;
 
-      auto& camera_component = repository_.camera_components[active_camera_];
-      auto& transform_component = repository_.transform_components[active_camera_];
+      auto camera_component = repository_.camera_components.find_mutable(active_camera_);
+      auto transform_component = repository_.transform_components.find_mutable(active_camera_);;
       std::visit(
           [&]<typename CameraDataType>(CameraDataType& camera_data) {
             using T = std::decay_t<CameraDataType>;
             if constexpr (std::is_same_v<T, FreeFlyCameraData>) {
               FreeFlyCamera::update(delta_time, movement, camera_data);
-              transform_component.rotation = camera_data.orientation;
-              transform_component.position = camera_data.position;
+              transform_component->rotation = camera_data.orientation;
+              transform_component->position = camera_data.position;
             } else if constexpr (std::is_same_v<T, OrbitCameraData>) {
               OrbitCamera::update(delta_time, movement, camera_data);
-              transform_component.rotation = camera_data.orientation;
-              transform_component.position = camera_data.position;
+              transform_component->rotation = camera_data.orientation;
+              transform_component->position = camera_data.position;
             } else if constexpr (std::is_same_v<T, FirstPersonCameraData>) {
-              camera_data.set_position(transform_component.position);
+              camera_data.set_position(transform_component->position);
               FirstPersonCamera::update(delta_time, movement, camera_data);
-              transform_component.rotation = camera_data.orientation;
+              transform_component->rotation = camera_data.orientation;
             } else if constexpr (std::is_same_v<T, AnimationCameraData>) {
-              camera_data.position = transform_component.position;
-              camera_data.orientation = transform_component.rotation;
+              camera_data.position = transform_component->position;
+              camera_data.orientation = transform_component->rotation;
               AnimationCamera::update(delta_time, movement, camera_data);
             }
           },
-          camera_component.camera_data);
+          camera_component->camera_data);
 
       const auto frame = frame_.get_current_frame_index();
 
@@ -94,7 +94,7 @@ namespace gestalt::application {
               return glm::mat4(1.0f);  // Default return value if no match
             }
           },
-          camera_component.camera_data);
+          camera_component->camera_data);
 
       float32 near = 0.1f;
       float32 far = 1000.f;
@@ -116,12 +116,12 @@ namespace gestalt::application {
               return glm::mat4(1.0f);
             }
           },
-          camera_component.projection_data);
+          camera_component->projection_data);
       projection[1][1] *= -1;
 
       glm::mat4 projection_t = transpose(projection);
-      camera_component.view_matrix = view_matrix;
-      camera_component.projection_matrix = projection;
+      camera_component->view_matrix = view_matrix;
+      camera_component->projection_matrix = projection;
       buffers->data[frame].view = view_matrix;
       buffers->data[frame].proj = projection;
       buffers->data[frame].inv_view = inverse(view_matrix);
@@ -149,8 +149,8 @@ namespace gestalt::application {
         glm::mat4 projection = repository_.light_view_projections.get(0).proj;
 
         glm::mat4 projection_t = transpose(projection);
-        camera_component.view_matrix = view_matrix;
-        camera_component.projection_matrix = projection;
+        camera_component->view_matrix = view_matrix;
+        camera_component->projection_matrix = projection;
         buffers->data[frame].view = view_matrix;
         buffers->data[frame].proj = projection;
         buffers->data[frame].inv_view = inverse(view_matrix);
@@ -201,8 +201,6 @@ namespace gestalt::application {
 
   
   CameraSystem::~CameraSystem() {
-      repository_.camera_components.clear();
-
       const auto& buffers = repository_.per_frame_data_buffers;
       resource_allocator_.destroy_buffer(buffers->camera_buffer);
 

@@ -357,17 +357,17 @@ namespace gestalt::application {
   void RayTracingSystem::collect_tlas_instance_data(
       Entity entity, const TransformComponent& parent_transform,
       std::vector<VkAccelerationStructureInstanceKHR>& data) {
-    const auto& node = repository_.scene_graph.get(entity).value().get();
-    if (!node.visible) {
+    const auto node = repository_.scene_graph.find(entity);
+    if (!node->visible) {
       return;
     }
 
-    const auto& localTransform = repository_.transform_components.get(entity)->get();
-    TransformComponent worldTransform = parent_transform * localTransform;
+    const auto localTransform = repository_.transform_components.find(entity);
+    TransformComponent worldTransform = parent_transform * *localTransform;
 
-    const auto& meshComponent = repository_.mesh_components.get(entity);
-    if (meshComponent.has_value()) {
-      const auto& mesh = repository_.meshes.get(meshComponent->get().mesh);
+    const auto meshComponent = repository_.mesh_components.find(entity);
+    if (meshComponent != nullptr) {
+      const auto& mesh = repository_.meshes.get(meshComponent->mesh);
       for (const auto surface : mesh.surfaces) {
         if (surface.bottom_level_as != no_component) {
           auto blas_address
@@ -394,7 +394,7 @@ namespace gestalt::application {
       }
     }
 
-    for (const auto& childEntity : node.children) {
+    for (const auto& childEntity : node->children) {
       collect_tlas_instance_data(childEntity, worldTransform, data);
     }
   }

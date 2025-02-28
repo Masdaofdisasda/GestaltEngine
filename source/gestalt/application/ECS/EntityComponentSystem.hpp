@@ -64,7 +64,6 @@ namespace gestalt::application {
 
       void request_scene(const std::filesystem::path& file_path);
       [[nodiscard]] ComponentFactory& get_component_factory() { return component_factory_; }
-      NodeComponent& get_root_node();
       [[nodiscard]] uint32 get_root_entity() const { return root_entity_; }
       void add_to_root(Entity entity, NodeComponent& node);
       void set_active_camera(Entity camera);

@@ -25,13 +25,12 @@ namespace gestalt::application {
         material_system_(gpu_, resource_allocator, repository_, frame),
         camera_system_(gpu_, resource_allocator, repository_, frame),
         light_system_(gpu_, resource_allocator, repository_, frame),
-        transform_system_( repository_),
+        transform_system_(repository_),
         animation_system_(repository_),
         mesh_system_(gpu_, resource_allocator, repository_, frame),
         audio_system_(gpu_, resource_allocator, repository_, frame),
         physics_system_(gpu_, resource_allocator, repository_, frame),
         raytracing_system_(gpu_, resource_allocator, repository_, frame) {
-
     if (const std::string initial_scene = getInitialScene(); !initial_scene.empty()) {
       request_scene(std::filesystem::current_path() / "../../assets" / initial_scene);
     }
@@ -50,11 +49,6 @@ namespace gestalt::application {
   }
 
   EntityComponentSystem::~EntityComponentSystem() {
-    repository_.transform_components.clear();
-    repository_.camera_components.clear();
-    repository_.light_components.clear();
-    repository_.mesh_components.clear();
-    repository_.scene_graph.clear();
   }
 
   void EntityComponentSystem::set_active_camera(const Entity camera) {
@@ -65,13 +59,9 @@ namespace gestalt::application {
     return camera_system_.get_active_camera();
   }
 
-  NodeComponent& EntityComponentSystem::get_root_node() {
-    return repository_.scene_graph.get(get_root_entity()).value();
-  }
-
   void EntityComponentSystem::add_to_root(Entity entity, NodeComponent& node) {
     assert(entity != invalid_entity);
-    get_root_node().children.push_back(entity);
+    repository_.scene_graph.find_mutable(get_root_entity())->children.push_back(entity);
     node.parent = get_root_entity();
   }
 

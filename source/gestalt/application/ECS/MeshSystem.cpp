@@ -268,18 +268,18 @@ namespace gestalt::application {
   }
 
   void MeshSystem::traverse_scene(const Entity entity, const TransformComponent& parent_transform) {
-    const auto& node = repository_.scene_graph.get(entity).value().get();
-    if (!node.visible) {
+    const auto& node = repository_.scene_graph.find(entity);
+    if (!node->visible) {
       return;
     }
 
-    const auto& local_transform = repository_.transform_components.get(entity)->get();
+    const auto local_transform = repository_.transform_components.find(entity);
 
-    TransformComponent world_transform = parent_transform * local_transform;
+    TransformComponent world_transform = parent_transform * *local_transform;
 
-    const auto& mesh_component = repository_.mesh_components.get(entity);
-    if (mesh_component.has_value()) {
-      const auto& mesh = repository_.meshes.get(mesh_component->get().mesh);
+    const auto mesh_component = repository_.mesh_components.find(entity);
+    if (mesh_component) {
+      const auto& mesh = repository_.meshes.get(mesh_component->mesh);
 
       for (const auto surface : mesh.surfaces) {
         const auto& material = repository_.materials.get(surface.material);
@@ -308,7 +308,7 @@ namespace gestalt::application {
       }
     }
 
-    for (const auto& childEntity : node.children) {
+    for (const auto& childEntity : node->children) {
       traverse_scene(childEntity, world_transform);
     }
   }

@@ -127,9 +127,9 @@ namespace gestalt::application {
       ImGuizmo::BeginFrame();
 
       const Entity camera_entity = actions_.get_active_camera();
-      const auto& cam = repository_.camera_components[camera_entity];
-      auto viewCam = cam.view_matrix;
-      auto proj = cam.projection_matrix;
+      const auto cam = repository_.camera_components.find(camera_entity);
+      auto viewCam = cam->view_matrix;
+      auto proj = cam->projection_matrix;
       proj[1][1] *= -1;  // Flip the Y-axis for opengl like system
 
       // Convert glm matrices to arrays for ImGuizmo
@@ -151,23 +151,23 @@ namespace gestalt::application {
       ImGuizmo::ViewManipulate(view, camDistance, viewManipulatorPosition, ImVec2(128, 128),
                                0xB4101010);
 
-      const auto transform_component = repository_.transform_components.get(selected_entity_);
-      if (transform_component.has_value()) {
-        auto& transform = transform_component.value().get();
+      const auto transform_component = repository_.transform_components.find_mutable(selected_entity_);
+      if (transform_component != nullptr) {
+        auto& transform = transform_component;
 
-        glm::mat4 localTransform = glm::translate(glm::mat4(1.0f), transform.position)
-                                   * toMat4(transform.rotation)
-                                   * glm::scale(glm::mat4(1.0f), glm::vec3(transform.scale));
+        glm::mat4 localTransform = glm::translate(glm::mat4(1.0f), transform->position)
+                                   * glm::toMat4(transform->rotation)
+                                   * glm::scale(glm::mat4(1.0f), glm::vec3(transform->scale));
         glm::mat4 parentWorldTransform
-            = glm::translate(glm::mat4(1.0f), transform.parent_position)
-              * toMat4(transform.parent_rotation)
-              * glm::scale(glm::mat4(1.0f), glm::vec3(transform.parent_scale));
+            = glm::translate(glm::mat4(1.0f), transform->parent_position)
+              * glm::toMat4(transform->parent_rotation)
+              * glm::scale(glm::mat4(1.0f), glm::vec3(transform->parent_scale));
         glm::mat4 inverseParentWorldTransform = glm::inverse(parentWorldTransform);
         glm::mat4 worldTransform = parentWorldTransform * localTransform;
 
         glm::vec3 t = glm::vec3(worldTransform[3]);
-        glm::quat r = transform.rotation;
-        glm::vec3 s = glm::vec3(transform.scale);
+        glm::quat r = transform->rotation;
+        glm::vec3 s = glm::vec3(transform->scale);
 
         float* translation = &t.x;
         float* rotation = &r.x;
@@ -179,11 +179,11 @@ namespace gestalt::application {
           if (Manipulate(view, projection, ImGuizmo::TRANSLATE, ImGuizmo::LOCAL, model)) {
             ImGuizmo::DecomposeMatrixToComponents(model, translation, rotation, scale);
 
-            transform.position
+            transform->position
                 = glm::vec3(inverseParentWorldTransform
                             * glm::vec4(translation[0], translation[1], translation[2], 1.0f));
 
-            transform.is_dirty = true;
+            transform->is_dirty = true;
           }
         } else if (guizmo_operation_ == 1) {
           if (Manipulate(view, projection, ImGuizmo::TRANSLATE, ImGuizmo::LOCAL, model)) {
@@ -191,14 +191,14 @@ namespace gestalt::application {
 
             // TODO transform.rotation = glm::quat(rotation[3], rotation[0], rotation[1],
             // rotation[2]);
-            transform.is_dirty = true;
+            transform->is_dirty = true;
           }
         } else {
           if (Manipulate(view, projection, ImGuizmo::SCALE, ImGuizmo::LOCAL, model)) {
             ImGuizmo::DecomposeMatrixToComponents(model, translation, rotation, scale);
 
-            transform.scale = std::max({scale[0], scale[1], scale[2]});
-            transform.is_dirty = true;
+            transform->scale = std::max({scale[0], scale[1], scale[2]});
+            transform->is_dirty = true;
           }
         }
       }
@@ -360,10 +360,10 @@ namespace gestalt::application {
 
           ImGui::Separator();
 
-          const auto& root = repository_.scene_graph.get(root_entity).value().get();
+          const auto& root = repository_.scene_graph.find(root_entity);
 
-          static glm::vec3 min_bounds = root.bounds.min;
-          static glm::vec3 max_bounds = root.bounds.max;
+          static glm::vec3 min_bounds = root->bounds.min;
+          static glm::vec3 max_bounds = root->bounds.max;
           static glm::vec2 intensity_range = glm::vec2(1.f);
           static float radius = 5.0f;
           static int32 light_count = 10;
@@ -441,14 +441,14 @@ namespace gestalt::application {
         // std::vector<std::pair<entity, light_component&>> lights;
 
         std::vector<std::pair<Entity, std::reference_wrapper<LightComponent>>> lights;
-        std::vector<std::pair<Entity, std::reference_wrapper<LightComponent>>> temp
-            = repository_.light_components.asVector();
+        auto temp
+            = repository_.light_components.snapshot();
         for (auto& [ent, comp] : temp) {
-          if (comp.get().type == LightType::kDirectional && currentOption == 0) {
+          if (comp.type == LightType::kDirectional && currentOption == 0) {
             lights.push_back({ent, comp});
-          } else if (comp.get().type == LightType::kPoint && currentOption == 1) {
+          } else if (comp.type == LightType::kPoint && currentOption == 1) {
             lights.push_back({ent, comp});
-          } else if (comp.get().type == LightType::kSpot && currentOption == 2) {
+          } else if (comp.type == LightType::kSpot && currentOption == 2) {
             lights.push_back({ent, comp});
           }
         }
@@ -458,9 +458,9 @@ namespace gestalt::application {
           ImGui::SliderInt("Select Light", &selectedLightIndex, 0, lights.size() - 1);
 
           auto& [entity, light_component] = lights[selectedLightIndex];
-          const auto transform_component = repository_.transform_components.get(entity).value();
+          const auto transform_component = repository_.transform_components.find_mutable(entity);
 
-          show_light_component(light_component, transform_component.get());
+          show_light_component(&light_component.get(), transform_component);
         }
       }
       ImGui::End();
@@ -468,8 +468,8 @@ namespace gestalt::application {
 
     void Gui::cameras() {
       if (ImGui::Begin("Cameras")) {
-        std::vector<std::pair<Entity, std::reference_wrapper<CameraComponent>>> cameras
-            = repository_.camera_components.asVector();
+        auto cameras
+            = repository_.camera_components.snapshot();
 
         static int selectedCameraIndex = 0;
         if (!cameras.empty()) {
@@ -477,7 +477,7 @@ namespace gestalt::application {
 
           auto& [entity, camera_component] = cameras[selectedCameraIndex];
 
-          show_camera_component(camera_component);
+          show_camera_component(&camera_component);
           ImGui::Separator();
           if(ImGui::Button("Set as Active Camera")) { actions_.set_active_camera(entity); }
         }
@@ -823,14 +823,13 @@ namespace gestalt::application {
     }
 
     void Gui::display_scene_hierarchy(const Entity entity) {
-      const auto& node_optional = repository_.scene_graph.get(entity);
-      if (node_optional.has_value()) {
-        NodeComponent& node = node_optional.value().get();
+      const auto& node = repository_.scene_graph.find_mutable(entity);
+      if (node != nullptr) {
 
         ImGuiTreeNodeFlags node_flags = ImGuiTreeNodeFlags_OpenOnArrow;
 
         // If the node has no children, make it a leaf node
-        if (node.children.empty()) {
+        if (node->children.empty()) {
           node_flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
         }
 
@@ -844,7 +843,7 @@ namespace gestalt::application {
         // Start a horizontal group to align the tree node and the checkbox
         ImGui::BeginGroup();
 
-        bool node_open = ImGui::TreeNodeEx(node.name.c_str(), node_flags);
+        bool node_open = ImGui::TreeNodeEx(node->name.c_str(), node_flags);
 
         // If the tree node is open, we need a way to click the node itself, not just the arrow
         if (ImGui::IsItemClicked()) {
@@ -859,7 +858,7 @@ namespace gestalt::application {
 
         // Move cursor and render checkbox
         ImGui::SameLine(offset);
-        ImGui::Checkbox("##visible", &node.visible);  // ## to hide label but keep unique ID
+        ImGui::Checkbox("##visible", &node->visible);  // ## to hide label but keep unique ID
 
         ImGui::EndGroup();
 
@@ -872,8 +871,8 @@ namespace gestalt::application {
         }
 
         // Recursively display children if the node is open
-        if (node_open && !node.children.empty()) {
-          for (const auto child_entity : node.children) {
+        if (node_open && !node->children.empty()) {
+          for (const auto child_entity : node->children) {
             display_scene_hierarchy(child_entity);
           }
           ImGui::TreePop();
@@ -881,89 +880,89 @@ namespace gestalt::application {
       }
     }
 
-    void Gui::show_transform_component(NodeComponent& node, TransformComponent& transform) {
+    void Gui::show_transform_component(NodeComponent* node, TransformComponent* transform) {
       ImGui::Text("Local Transform:");
 
       // Local position control
-      if (ImGui::DragFloat3("Local Position", &transform.position.x, 0.1f)) {
-        transform.is_dirty = true;
+      if (ImGui::DragFloat3("Local Position", &transform->position.x, 0.1f)) {
+        transform->is_dirty = true;
       }
 
       // Local rotation controls
-      glm::vec3 euler = degrees(eulerAngles(transform.rotation));
+      glm::vec3 euler = degrees(eulerAngles(transform->rotation));
       if (ImGui::DragFloat("Local X Rotation", &euler.x, 1.0f)) {
-        transform.rotation = glm::quat(radians(euler));
-        transform.is_dirty = true;
+        transform->rotation = glm::quat(radians(euler));
+        transform->is_dirty = true;
       }
       if (ImGui::DragFloat("Local Y Rotation", &euler.y, 1.0f)) {
-        transform.rotation = glm::quat(radians(euler));
-        transform.is_dirty = true;
+        transform->rotation = glm::quat(radians(euler));
+        transform->is_dirty = true;
       }
       if (ImGui::DragFloat("Local Z Rotation", &euler.z, 1.0f)) {
-        transform.rotation = glm::quat(radians(euler));
-        transform.is_dirty = true;
+        transform->rotation = glm::quat(radians(euler));
+        transform->is_dirty = true;
       }
 
       // Local scale control
-      float local_scale = transform.scale;
+      float local_scale = transform->scale;
       if (ImGui::DragFloat("Local Scale", &local_scale, 0.005f)) {
-        transform.scale = local_scale;
-        transform.is_dirty = true;
+        transform->scale = local_scale;
+        transform->is_dirty = true;
       }
 
       ImGui::Separator();
       ImGui::Text("World Transform:");
 
-      glm::mat4 localTransform = translate(glm::mat4(1.0f), transform.position)
-                                 * toMat4(transform.rotation)
-                                 * scale(glm::mat4(1.0f), glm::vec3(transform.scale));
+      glm::mat4 localTransform = translate(glm::mat4(1.0f), transform->position)
+                                 * toMat4(transform->rotation)
+                                 * scale(glm::mat4(1.0f), glm::vec3(transform->scale));
       glm::mat4 parentWorldTransform
-          = translate(glm::mat4(1.0f), transform.parent_position)
-            * toMat4(transform.parent_rotation)
-            * scale(glm::mat4(1.0f), glm::vec3(transform.parent_scale));
+          = translate(glm::mat4(1.0f), transform->parent_position)
+            * toMat4(transform->parent_rotation)
+            * scale(glm::mat4(1.0f), glm::vec3(transform->parent_scale));
       glm::mat4 inverseParentWorldTransform = inverse(parentWorldTransform);
       glm::mat4 worldTransform = parentWorldTransform * localTransform;
 
       // World position control (taking parent transform into account)
       glm::vec3 world_position = glm::vec3(worldTransform[3]);
       if (ImGui::DragFloat3("World Position", &world_position.x, 0.1f)) {
-        transform.position
+        transform->position
             = glm::vec3(inverseParentWorldTransform * glm::vec4(world_position, 1.0f));
-        transform.is_dirty = true;
+        transform->is_dirty = true;
       }
 
       // World rotation controls (taking parent transform into account)
       glm::vec3 world_euler = degrees(eulerAngles(quat_cast(worldTransform)));
       if (ImGui::DragFloat("World X Rotation", &world_euler.x, 1.0f)) {
-        transform.rotation = normalize(
+        transform->rotation = normalize(
             quat_cast(inverseParentWorldTransform * toMat4(glm::quat(radians(world_euler)))));
 
-        transform.is_dirty = true;
+        transform->is_dirty = true;
       }
       if (ImGui::DragFloat("World Y Rotation", &world_euler.y, 1.0f)) {
-        transform.rotation = normalize(
+        transform->rotation = normalize(
             quat_cast(inverseParentWorldTransform * toMat4(glm::quat(radians(world_euler)))));
-        transform.is_dirty = true;
+        transform->is_dirty = true;
       }
       if (ImGui::DragFloat("World Z Rotation", &world_euler.z, 1.0f)) {
-        transform.rotation = normalize(
+        transform->rotation = normalize(
             quat_cast(inverseParentWorldTransform * toMat4(glm::quat(radians(world_euler)))));
-        transform.is_dirty = true;
+        transform->is_dirty = true;
       }
 
       // World scale control (taking parent transform into account)
       float world_scale = length(glm::vec3(worldTransform[0]));
       if (ImGui::DragFloat("World Scale", &world_scale, 0.005f)) {
-        transform.scale = world_scale / transform.parent_scale;
-        transform.is_dirty = true;
+        transform->scale = world_scale / transform->parent_scale;
+        transform->is_dirty = true;
       }
 
-      ImGui::DragFloat3("AABB max", &node.bounds.max.x);
-      ImGui::DragFloat3("AABB min", &node.bounds.min.x);
+      ImGui::DragFloat3("AABB max", &node->bounds.max.x);
+      ImGui::DragFloat3("AABB min", &node->bounds.min.x);
     }
 
-    void Gui::show_mesh_component(MeshComponent& mesh_component) {
-      auto& mesh = repository_.meshes.get(mesh_component.mesh);
+    void Gui::show_mesh_component(const MeshComponent* mesh_component) {
+      auto& mesh = repository_.meshes.get(mesh_component->mesh);
 
       for (auto& surface : mesh.surfaces) {
         auto& material = repository_.materials.get(surface.material);
@@ -1079,20 +1078,20 @@ namespace gestalt::application {
       }
     }
 
-    void Gui::show_light_component(LightComponent& light, TransformComponent& transform) {
-      if (ImGui::ColorPicker3("Color", &light.base.color.x, ImGuiColorEditFlags_Float)) {
-        light.is_dirty = true;
+    void Gui::show_light_component(LightComponent* light, TransformComponent* transform) {
+      if (ImGui::ColorPicker3("Color", &light->base.color.x, ImGuiColorEditFlags_Float)) {
+        light->is_dirty = true;
       }
-      if (ImGui::SliderFloat("Intensity", &light.base.intensity, 0.0f, 150000.0f, "%.3f",
+      if (ImGui::SliderFloat("Intensity", &light->base.intensity, 0.0f, 150000.0f, "%.3f",
                              ImGuiSliderFlags_Logarithmic)) {
-        light.is_dirty = true;
+        light->is_dirty = true;
       }
 
-      if (light.type == LightType::kSpot) {
-        if (auto* spot_light_data = std::get_if<SpotLightData>(&light.specific)) {
+      if (light->type == LightType::kSpot) {
+        if (auto* spot_light_data = std::get_if<SpotLightData>(&light->specific)) {
           if (ImGui::SliderFloat("Radius", &spot_light_data->range, 0.0f, 100.0f, "%.3f",
                                  ImGuiSliderFlags_Logarithmic)) {
-            light.is_dirty = true;
+            light->is_dirty = true;
           }
           float innerDeg = glm::degrees(acosf(spot_light_data->inner_cone_cos));
           float outerDeg = glm::degrees(acosf(spot_light_data->outer_cone_cos));
@@ -1100,16 +1099,16 @@ namespace gestalt::application {
           // Draw sliders in degrees
           ImGui::Text("Spotlight Angles (deg)");
           if (ImGui::SliderFloat("Inner Angle", &innerDeg, 0.0f, 90, "%.1f")) {
-            light.is_dirty = true;
+            light->is_dirty = true;
           }
           if (ImGui::SliderFloat("Outer Angle", &outerDeg, 0.0f, 90, "%.1f")) {
-            light.is_dirty = true;
+            light->is_dirty = true;
           }
 
           // Enforce that the outer angle is >= inner angle
           if (outerDeg < innerDeg) {
             outerDeg = innerDeg;
-            light.is_dirty = true;
+            light->is_dirty = true;
           }
 
           // Convert angles (in degrees) -> cosines (in radians)
@@ -1120,39 +1119,39 @@ namespace gestalt::application {
         }
       }
 
-      if (light.type == LightType::kPoint) {
-        if (auto* point_light_data = std::get_if<PointLightData>(&light.specific)) {
+      if (light->type == LightType::kPoint) {
+        if (auto* point_light_data = std::get_if<PointLightData>(&light->specific)) {
           if (ImGui::SliderFloat("Radius", &point_light_data->range, 0.0f, 100.0f, "%.3f",
                                  ImGuiSliderFlags_Logarithmic)) {
-            light.is_dirty = true;
+            light->is_dirty = true;
           }
         }
 
-        if (ImGui::DragFloat3("Position", &transform.position.x, 0.1f)) {
-          light.is_dirty = true;
+        if (ImGui::DragFloat3("Position", &transform->position.x, 0.1f)) {
+          light->is_dirty = true;
         }
       }
-      if (light.type == LightType::kDirectional) {
+      if (light->type == LightType::kDirectional) {
         glm::vec3 euler_angles
-            = degrees(eulerAngles(transform.rotation));  // Convert quaternion to Euler angles
+            = degrees(eulerAngles(transform->rotation));  // Convert quaternion to Euler angles
 
         float azimuth = euler_angles.y;     // Azimuth angle (yaw)
         float elevation = -euler_angles.x;  // Elevation angle (pitch)
 
         if (ImGui::SliderFloat("Azimuth", &azimuth, -89.f, 89.0f)) {
-          light.is_dirty = true;
+          light->is_dirty = true;
         }
 
         if (ImGui::SliderFloat("Elevation", &elevation, 1.f, 179.f)) {
-          light.is_dirty = true;
+          light->is_dirty = true;
         }
 
         // Update rotation quaternion based on user input
-        transform.rotation = glm::quat(glm::radians(glm::vec3(-elevation, azimuth, 0.0f)));
+        transform->rotation = glm::quat(glm::radians(glm::vec3(-elevation, azimuth, 0.0f)));
       }
     }
 
-    void Gui::show_camera_component(CameraComponent& camera) {
+    void Gui::show_camera_component(CameraComponent* camera) {
       std::visit(
           [&](auto&& projection) {
             using T = std::decay_t<decltype(projection)>;
@@ -1178,7 +1177,7 @@ namespace gestalt::application {
                                  ImGuiSliderFlags_Logarithmic);
             }
           },
-          camera.projection_data);
+          camera->projection_data);
       ImGui::Separator();
       std::visit(
           [&](auto&& cam) {
@@ -1216,39 +1215,39 @@ namespace gestalt::application {
                           cam.orientation.y, cam.orientation.z, cam.orientation.w);
             }
           },
-          camera.camera_data);
+          camera->camera_data);
     }
 
     void Gui::show_node_component() {
       if (selected_entity_ != invalid_entity) {
-        auto& selected_node = repository_.scene_graph.get(selected_entity_)->get();
-        ImGui::Text(selected_node.name.c_str());
+        auto selected_node = repository_.scene_graph.find_mutable(selected_entity_);
+        ImGui::Text(selected_node->name.c_str());
 
-        const auto transform_optional = repository_.transform_components.get(selected_entity_);
-        if (transform_optional.has_value()) {
+        const auto transform = repository_.transform_components.find_mutable(selected_entity_);
+        if (transform != nullptr) {
           if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
-            show_transform_component(selected_node, transform_optional.value().get());
+            show_transform_component(selected_node, transform);
           }
         }
 
-        const auto& mesh_optional = repository_.mesh_components.get(selected_entity_);
-        if (mesh_optional.has_value()) {
+        const auto mesh = repository_.mesh_components.find(selected_entity_);
+        if (mesh != nullptr) {
           if (ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_DefaultOpen)) {
-            show_mesh_component(mesh_optional.value().get());
+            show_mesh_component(mesh);
           }
         }
 
-        const auto& light_optional = repository_.light_components.get(selected_entity_);
-        if (light_optional.has_value() && transform_optional.has_value()) {
+        const auto light = repository_.light_components.find_mutable(selected_entity_);
+        if (light != nullptr && transform != nullptr) {
           if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen)) {
-            show_light_component(light_optional.value().get(), transform_optional.value().get());
+            show_light_component(light, transform);
           }
         }
 
-        const auto& camera_optional = repository_.camera_components.get(selected_entity_);
-        if (camera_optional.has_value()) {
+        const auto camera = repository_.camera_components.find_mutable(selected_entity_);
+        if (camera != nullptr) {
           if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
-            show_camera_component(camera_optional.value().get());
+            show_camera_component(camera);
           }
         }
       }

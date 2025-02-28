@@ -52,9 +52,9 @@ namespace gestalt::application {
     import_animations(gltf, node_offset);
 
     {  // Import physics
-      for (const auto& entity : repository_.scene_graph.components() | std::views::keys) {
-        if (repository_.mesh_components.get(entity).has_value()) {
-          const auto& mesh = repository_.meshes.get(repository_.mesh_components[entity].mesh);
+      for (const auto& [entity, _] : repository_.scene_graph.snapshot()) {
+        if (repository_.mesh_components.find(entity) != nullptr) {
+          const auto& mesh = repository_.meshes.get(repository_.mesh_components.find(entity)->mesh);
 
           for (const auto& surface : mesh.surfaces) {
             auto name = repository_.materials.get(surface.material).name;
@@ -175,8 +175,8 @@ namespace gestalt::application {
     GltfParser::create_nodes(gltf, mesh_offset, &component_factory_);
     GltfParser::build_hierarchy(gltf.nodes, node_offset, &repository_);
     constexpr Entity root = 0;
-    GltfParser::link_orphans_to_root(root, repository_.scene_graph.get(root).value().get(),
-                                     repository_.scene_graph.components());
+    GltfParser::link_orphans_to_root(root, repository_.scene_graph.find_mutable(root),
+                                     repository_.scene_graph.snapshot(), &repository_);
   }
 
   std::optional<fastgltf::Asset> AssetLoader::parse_gltf(const std::filesystem::path& file_path) {

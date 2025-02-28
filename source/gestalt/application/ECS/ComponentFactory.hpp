@@ -41,7 +41,7 @@ namespace gestalt::application {
       ComponentFactory(ComponentFactory&&) = delete;
       ComponentFactory& operator=(ComponentFactory&&) = delete;
 
-      std::pair<Entity, std::reference_wrapper<NodeComponent>> create_entity(
+      std::pair<Entity, NodeComponent*> create_entity(
           std::string node_name = "", const glm::vec3& position = glm::vec3(0.f),
           const glm::quat& rotation = glm::quat(1.f, 0.f, 0.f, 0.f), const float& scale = 1.f);
       void add_mesh_component(Entity entity, size_t mesh_index);

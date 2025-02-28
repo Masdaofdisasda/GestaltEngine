@@ -198,27 +198,27 @@ namespace gestalt::application {
     for (int i = 0; i < nodes.size(); i++) {
       fastgltf::Node& node = nodes[i];
       Entity parent_entity = node_offset + i;
-      auto& scene_object = repository->scene_graph.get(parent_entity).value().get();
+      auto scene_object = repository->scene_graph.find_mutable(parent_entity);
 
       for (auto& c : node.children) {
         Entity child_entity = node_offset + c;
-        auto& child = repository->scene_graph.get(child_entity).value().get();
-        scene_object.children.push_back(child_entity);
-        child.parent = parent_entity;
+        auto child = repository->scene_graph.find_mutable(child_entity);
+        scene_object->children.push_back(child_entity);
+        child->parent = parent_entity;
       }
     }
   }
 
-  void GltfParser::link_orphans_to_root(const Entity root, NodeComponent& root_node,
-      std::unordered_map<Entity, NodeComponent>& nodes) {
+  void GltfParser::link_orphans_to_root(Entity root, NodeComponent* root_node,
+                                        const std::vector<std::pair<Entity, NodeComponent>>& nodes, Repository* repository) {
     for (auto& [entity, node] : nodes) {
       if (entity == root) {
         continue;
       }
 
       if (node.parent == invalid_entity) {
-        root_node.children.push_back(entity);
-        node.parent = root;
+        root_node->children.push_back(entity);
+        repository->scene_graph.find_mutable(entity)->parent = root;
       }
     }
   }
