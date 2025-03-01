@@ -16,6 +16,9 @@
 #include <glm/gtc/random.hpp>
 
 #include "vk_initializers.hpp"
+#include "Components/DirectionalLightComponent.hpp"
+#include "Components/SpotLightComponent.hpp"
+#include "Components/PointLightComponent.hpp"
 #include "ECS/ComponentFactory.hpp"
 #include "Events/EventBus.hpp"
 #include "Events/Events.hpp"
@@ -439,37 +442,43 @@ namespace gestalt::application {
 
     void Gui::lights() {
       if (ImGui::Begin("Lights")) {
-        const char* lightOptions[] = {"Directional Light", "Point Light", "Spot Light"};
-        static int currentOption = 0;  // default to directional light
-        ImGui::Combo("Select Type", &currentOption, lightOptions, IM_ARRAYSIZE(lightOptions));
-
-        // std::vector<std::pair<entity, light_component&>> lights;
-
-        std::vector<std::pair<Entity, std::reference_wrapper<LightComponent>>> lights;
-        auto temp
-            = repository_.light_components.snapshot();
-        for (auto& [ent, comp] : temp) {
-          if (comp.is_type(LightType::kDirectional) && currentOption == 0) {
-            lights.push_back({ent, comp});
-          } else if (comp.is_type(LightType::kPoint) && currentOption == 1) {
-            lights.push_back({ent, comp});
-          } else if (comp.is_type(LightType::kSpot) && currentOption == 2) {
-            lights.push_back({ent, comp});
+        if (ImGui::CollapsingHeader("Directional Lights", ImGuiTreeNodeFlags_DefaultOpen)) {
+          auto lights = repository_.directional_light_components.snapshot();
+          int selectedLightIndex = 0;  // Default to the first light
+          if (!lights.empty()) {
+            ImGui::SliderInt("Select Light", &selectedLightIndex, 0, lights.size() - 1);
+            auto& [entity, light_component] = lights[selectedLightIndex];
+            selected_entity_ = entity;
+            const auto transform_component = repository_.transform_components.find(entity);
+            show_directional_light_component(&light_component, transform_component);
           }
         }
 
-        int selectedLightIndex = 0;  // Default to the first light
-        if (!lights.empty()) {
-          ImGui::SliderInt("Select Light", &selectedLightIndex, 0, lights.size() - 1);
-
-          auto& [entity, light_component] = lights[selectedLightIndex];
-          selected_entity_ = entity;
-          const auto transform_component = repository_.transform_components.find(entity);
-
-          show_light_component(&light_component.get(), transform_component);
+        if (ImGui::CollapsingHeader("Point Lights", ImGuiTreeNodeFlags_DefaultOpen)) {
+          auto lights = repository_.point_light_components.snapshot();
+          int selectedLightIndex = 0;  // Default to the first light
+          if (!lights.empty()) {
+            ImGui::SliderInt("Select Light", &selectedLightIndex, 0, lights.size() - 1);
+            auto& [entity, light_component] = lights[selectedLightIndex];
+            selected_entity_ = entity;
+            const auto transform_component = repository_.transform_components.find(entity);
+            show_point_light_component(&light_component, transform_component);
+          }
         }
+
+        if (ImGui::CollapsingHeader("Spot Lights", ImGuiTreeNodeFlags_DefaultOpen)) {
+          auto lights = repository_.spot_light_components.snapshot();
+          int selectedLightIndex = 0;  // Default to the first light
+          if (!lights.empty()) {
+            ImGui::SliderInt("Select Light", &selectedLightIndex, 0, lights.size() - 1);
+            auto& [entity, light_component] = lights[selectedLightIndex];
+            selected_entity_ = entity;
+            const auto transform_component = repository_.transform_components.find(entity);
+            show_spotlight_component(&light_component, transform_component);
+          }
+        }
+        ImGui::End();
       }
-      ImGui::End();
     }
 
     void Gui::cameras() {
@@ -1085,10 +1094,44 @@ namespace gestalt::application {
       }
     }
 
-    void Gui::show_light_component(const LightComponent* light, const TransformComponent* transform) {
+    void Gui::show_directional_light_component(const DirectionalLightComponent* light,
+                                               const TransformComponent* transform) {
       auto color = light->color();
       if (ImGui::ColorPicker3("Color", &color.x, ImGuiColorEditFlags_Float)) {
-        event_bus_.emit<UpdateLightEvent>(UpdateLightEvent{selected_entity_, color, light->intensity()});
+        event_bus_.emit<UpdateLightEvent>(
+            UpdateLightEvent{selected_entity_, color, light->intensity()});
+      }
+      auto intensity = light->intensity();
+      if (ImGui::SliderFloat("Intensity", &intensity, 0.0f, 150000.0f, "%.3f",
+                             ImGuiSliderFlags_Logarithmic)) {
+        event_bus_.emit<UpdateLightEvent>(
+            UpdateLightEvent{selected_entity_, light->color(), intensity});
+      }
+      glm::vec3 euler_angles
+          = degrees(eulerAngles(transform->rotation()));  // Convert quaternion to Euler angles
+
+      float azimuth = euler_angles.y;     // Azimuth angle (yaw)
+      float elevation = -euler_angles.x;  // Elevation angle (pitch)
+
+      if (ImGui::SliderFloat("Azimuth", &azimuth, -89.f, 89.0f)) {
+        light->is_dirty = true;
+      }
+
+      if (ImGui::SliderFloat("Elevation", &elevation, 1.f, 179.f)) {
+        light->is_dirty = true;
+      }
+
+      // Update rotation quaternion based on user input
+      auto new_rot = glm::quat(glm::radians(glm::vec3(-elevation, azimuth, 0.0f)));
+      event_bus_.emit<RotateEntityEvent>({selected_entity_, new_rot});
+    }
+
+    void Gui::show_point_light_component(const PointLightComponent* light,
+                                         const TransformComponent* transform) {
+      auto color = light->color();
+      if (ImGui::ColorPicker3("Color", &color.x, ImGuiColorEditFlags_Float)) {
+        event_bus_.emit<UpdateLightEvent>(
+            UpdateLightEvent{selected_entity_, color, light->intensity()});
       }
       auto intensity = light->intensity();
       if (ImGui::SliderFloat("Intensity", &intensity, 0.0f, 150000.0f, "%.3f",
@@ -1097,72 +1140,61 @@ namespace gestalt::application {
             UpdateLightEvent{selected_entity_, light->color(), intensity});
       }
 
-      if (light->is_type(LightType::kSpot)) {
-        auto specific = light->specific();
-        if (auto* spot_light_data = std::get_if<SpotLightData>(&specific)) {
-          if (ImGui::SliderFloat("Radius", &spot_light_data->range, 0.0f, 100.0f, "%.3f",
-                                 ImGuiSliderFlags_Logarithmic)) {
-            light->is_dirty = true;
-          }
-          float innerDeg = glm::degrees(acosf(spot_light_data->inner_cone_cos));
-          float outerDeg = glm::degrees(acosf(spot_light_data->outer_cone_cos));
-
-          // Draw sliders in degrees
-          ImGui::Text("Spotlight Angles (deg)");
-          if (ImGui::SliderFloat("Inner Angle", &innerDeg, 0.0f, 90, "%.1f")) {
-            light->is_dirty = true;
-          }
-          if (ImGui::SliderFloat("Outer Angle", &outerDeg, 0.0f, 90, "%.1f")) {
-            light->is_dirty = true;
-          }
-
-          // Enforce that the outer angle is >= inner angle
-          if (outerDeg < innerDeg) {
-            outerDeg = innerDeg;
-            light->is_dirty = true;
-          }
-
-          // Convert angles (in degrees) -> cosines (in radians)
-          float innerRadians = glm::radians(innerDeg);
-          float outerRadians = glm::radians(outerDeg);
-          spot_light_data->inner_cone_cos = cosf(innerRadians);
-          spot_light_data->outer_cone_cos = cosf(outerRadians);
-        }
+      auto range = light->range();
+      if (ImGui::SliderFloat("Radius", &range, 0.0f, 100.0f, "%.3f",
+                             ImGuiSliderFlags_Logarithmic)) {
+        event_bus_.emit<UpdatePointLightEvent>(UpdatePointLightEvent{selected_entity_, range});
       }
 
-      if (light->is_type(LightType::kPoint)) {
-        auto specific = light->specific();
-        if (auto* point_light_data = std::get_if<PointLightData>(&specific)) {
-          if (ImGui::SliderFloat("Radius", &point_light_data->range, 0.0f, 100.0f, "%.3f",
-                                 ImGuiSliderFlags_Logarithmic)) {
-            light->is_dirty = true;
-          }
-        }
-
-        auto position = transform->position();
-        if (ImGui::DragFloat3("Position", &position.x, 0.1f)) {
-          event_bus_.emit<TranslateEntityEvent>({selected_entity_, position});
-        }
+      auto position = transform->position();
+      if (ImGui::DragFloat3("Position", &position.x, 0.1f)) {
+        event_bus_.emit<TranslateEntityEvent>({selected_entity_, position});
       }
-      if (light->is_type(LightType::kDirectional)) {
-        glm::vec3 euler_angles
-            = degrees(eulerAngles(transform->rotation()));  // Convert quaternion to Euler angles
+    }
 
-        float azimuth = euler_angles.y;     // Azimuth angle (yaw)
-        float elevation = -euler_angles.x;  // Elevation angle (pitch)
-
-        if (ImGui::SliderFloat("Azimuth", &azimuth, -89.f, 89.0f)) {
-          light->is_dirty = true;
-        }
-
-        if (ImGui::SliderFloat("Elevation", &elevation, 1.f, 179.f)) {
-          light->is_dirty = true;
-        }
-
-        // Update rotation quaternion based on user input
-        auto new_rot = glm::quat(glm::radians(glm::vec3(-elevation, azimuth, 0.0f)));
-        event_bus_.emit<RotateEntityEvent>({selected_entity_, new_rot});
+    void Gui::show_spotlight_component(const SpotLightComponent* light,
+                                       const TransformComponent* transform) {
+      auto color = light->color();
+      if (ImGui::ColorPicker3("Color", &color.x, ImGuiColorEditFlags_Float)) {
+        event_bus_.emit<UpdateLightEvent>(
+            UpdateLightEvent{selected_entity_, color, light->intensity()});
       }
+      auto intensity = light->intensity();
+      if (ImGui::SliderFloat("Intensity", &intensity, 0.0f, 150000.0f, "%.3f",
+                             ImGuiSliderFlags_Logarithmic)) {
+        event_bus_.emit<UpdateLightEvent>(
+            UpdateLightEvent{selected_entity_, light->color(), intensity});
+      }
+
+      auto range = light->range();
+      if (ImGui::SliderFloat("Radius", &range, 0.0f, 100.0f, "%.3f",
+                             ImGuiSliderFlags_Logarithmic)) {
+        event_bus_.emit<UpdateSpotLightEvent>(UpdateSpotLightEvent{
+            selected_entity_, range, light->inner_cone_cos(), light->outer_cone_cos()});
+      }
+      float innerDeg = glm::degrees(acosf(light->inner_cone_cos()));
+      float outerDeg = glm::degrees(acosf(light->outer_cone_cos()));
+
+      // Draw sliders in degrees
+      ImGui::Text("Spotlight Angles (deg)");
+      if (ImGui::SliderFloat("Inner Angle", &innerDeg, 0.0f, 90, "%.1f")) {
+        light->is_dirty = true;
+      }
+      if (ImGui::SliderFloat("Outer Angle", &outerDeg, 0.0f, 90, "%.1f")) {
+        light->is_dirty = true;
+      }
+
+      // Enforce that the outer angle is >= inner angle
+      if (outerDeg < innerDeg) {
+        outerDeg = innerDeg;
+        light->is_dirty = true;
+      }
+
+      // Convert angles (in degrees) -> cosines (in radians)
+      float innerRadians = glm::radians(innerDeg);
+      float outerRadians = glm::radians(outerDeg);
+      event_bus_.emit<UpdateSpotLightEvent>(
+          UpdateSpotLightEvent{selected_entity_, range, cosf(innerRadians), cosf(outerRadians)});
     }
 
     void Gui::show_camera_component(CameraComponent* camera) {
@@ -1251,10 +1283,24 @@ namespace gestalt::application {
           }
         }
 
-        const auto light = repository_.light_components.find(selected_entity_);
-        if (light != nullptr && transform != nullptr) {
-          if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen)) {
-            show_light_component(light, transform);
+        if (const auto dir_light = repository_.directional_light_components.find(selected_entity_);
+            dir_light != nullptr && transform != nullptr) {
+          if (ImGui::CollapsingHeader("Directional Light", ImGuiTreeNodeFlags_DefaultOpen)) {
+            show_directional_light_component(dir_light, transform);
+          }
+        }
+
+        if (const auto point_light = repository_.point_light_components.find(selected_entity_);
+            point_light != nullptr && transform != nullptr) {
+          if (ImGui::CollapsingHeader("Point Light", ImGuiTreeNodeFlags_DefaultOpen)) {
+            show_point_light_component(point_light, transform);
+          }
+        }
+
+        if (const auto spot_light = repository_.spot_light_components.find(selected_entity_);
+            spot_light != nullptr && transform != nullptr) {
+          if (ImGui::CollapsingHeader("Spot Light", ImGuiTreeNodeFlags_DefaultOpen)) {
+            show_spotlight_component(spot_light, transform);
           }
         }
 

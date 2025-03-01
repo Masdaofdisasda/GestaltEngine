@@ -8,10 +8,12 @@
 #include "Camera/AnimationCameraData.hpp"
 #include "Components/AnimationComponent.hpp"
 #include "Components/CameraComponent.hpp"
-#include "Components/LightComponent.hpp"
+#include "Components/DirectionalLightComponent.hpp"
 #include "Components/MeshComponent.hpp"
 #include "Components/NodeComponent.hpp"
 #include "Components/PhysicsComponent.hpp"
+#include "Components/PointLightComponent.hpp"
+#include "Components/SpotLightComponent.hpp"
 #include "Components/TransformComponent.hpp"
 #include "Events/EventBus.hpp"
 #include "Events/Events.hpp"
@@ -169,7 +171,7 @@ namespace gestalt::application {
                                                                const glm::vec3& direction,
                                                       Entity entity) {
       if (entity == invalid_entity) {
-        const auto number_of_lights = repository_.light_components.size();
+        const auto number_of_lights = repository_.directional_light_components.size();
         auto [new_entity, node]
             = create_entity("directional_light_" + std::to_string(number_of_lights + 1));
         entity = new_entity;
@@ -183,9 +185,9 @@ namespace gestalt::application {
 
       const uint32 matrix_id
           = repository_.light_view_projections.add({glm::mat4(1.0), glm::mat4(1.0)});
-      const LightComponent light(color, intensity, matrix_id);
+      const DirectionalLightComponent light(color, intensity, matrix_id);
 
-      repository_.light_components.upsert(entity, light);
+      repository_.directional_light_components.upsert(entity, light);
 
       return entity;
     }
@@ -196,7 +198,7 @@ namespace gestalt::application {
                                                 const float32 inner_cone_radians,
                                                 const float32 outer_cone_radians, Entity entity) {
       if (entity == invalid_entity) {
-        const auto number_of_lights = repository_.light_components.size();
+        const auto number_of_lights = repository_.spot_light_components.size();
         auto [new_entity, node]
             = create_entity("spot_light_" + std::to_string(number_of_lights + 1));
         entity = new_entity;
@@ -207,9 +209,9 @@ namespace gestalt::application {
       const uint32 matrix_id
           = repository_.light_view_projections.add({glm::mat4(1.0), glm::mat4(1.0)});
 
-      const LightComponent light(color, intensity, range, matrix_id, cos(inner_cone_radians), cos(outer_cone_radians));
+      const SpotLightComponent light(color, intensity, range, matrix_id, cos(inner_cone_radians), cos(outer_cone_radians));
 
-      repository_.light_components.upsert(entity, light);
+      repository_.spot_light_components.upsert(entity, light);
 
       return entity;
     }
@@ -218,7 +220,7 @@ namespace gestalt::application {
                                                          const float32 intensity,
                                                          const glm::vec3& position, const float32 range, Entity entity) {
       if (entity == invalid_entity) {
-        const auto number_of_lights = repository_.light_components.size();
+        const auto number_of_lights = repository_.point_light_components.size();
         auto [new_entity, node]
             = create_entity("point_light_" + std::to_string(number_of_lights + 1));
         entity = new_entity;
@@ -235,9 +237,9 @@ namespace gestalt::application {
       for (int i = 0; i < 5; i++) {
         repository_.light_view_projections.add({glm::mat4(1.0), glm::mat4(1.0)});
       }
-      const LightComponent light(color, intensity, range, matrix_id);
+      const PointLightComponent light(color, intensity, range, matrix_id);
 
-      repository_.light_components.upsert(entity, light);
+      repository_.point_light_components.upsert(entity, light);
       return entity;
     }
 

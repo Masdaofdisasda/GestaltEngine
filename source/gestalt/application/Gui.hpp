@@ -57,7 +57,12 @@ namespace gestalt::application {
       void display_scene_hierarchy(Entity entity);
       void show_transform_component(const NodeComponent* node, const TransformComponent* transform);
       void show_mesh_component(const MeshComponent* mesh_component);
-      void show_light_component(const LightComponent* light, const TransformComponent* transform);
+      void show_directional_light_component(const DirectionalLightComponent* light,
+                                            const TransformComponent* transform);
+      void show_point_light_component(const PointLightComponent* light,
+                                      const TransformComponent* transform);
+      void show_spotlight_component(const SpotLightComponent* light,
+                                    const TransformComponent* transform);
       void show_camera_component(CameraComponent* camera);
       void show_node_component();
       void show_scene_hierarchy_window();

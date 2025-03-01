@@ -41,6 +41,22 @@ namespace gestalt::application {
     float32 intensity;
   };
 
+  struct UpdatePointLightEvent {
+    UpdatePointLightEvent(Entity entity, float32 range)
+        : entity(entity), range(range) {}
+    Entity entity;
+    float32 range;
+  };
+
+  struct UpdateSpotLightEvent {
+    UpdateSpotLightEvent(Entity entity, float32 range, float32 inner_cos, float32 outer_cos)
+        : entity(entity),range(range), inner_cos(inner_cos), outer_cos(outer_cos) {}
+    Entity entity;
+    float32 range;
+    float32 inner_cos;
+    float32 outer_cos;
+  };
+
   struct UpdateCameraProjectionEvent {
     UpdateCameraProjectionEvent(Entity entity, PerspectiveProjectionData perspective_projection)
         : entity(entity), perspective_projection(perspective_projection) {}

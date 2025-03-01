@@ -3,6 +3,9 @@
 #include "FrameProvider.hpp"
 
 #include "Camera/AnimationCameraData.hpp"
+#include "Components/DirectionalLightComponent.hpp"
+#include "Components/PointLightComponent.hpp"
+#include "Components/SpotLightComponent.hpp"
 #include "Events/EventBus.hpp"
 #include "Events/Events.hpp"
 #include "Interface/IGpu.hpp"
@@ -24,14 +27,42 @@ namespace gestalt::application {
         event_bus_(event_bus),
         frame_(frame) {
     event_bus_.subscribe<UpdateLightEvent>([this](const UpdateLightEvent& event) {
-      auto light = repository_.light_components.find_mutable(event.entity);
-      if (light == nullptr) {
-        fmt::println("Light entity {} was not found", event.entity);
+      auto dir_light = repository_.directional_light_components.find_mutable(event.entity);
+      if (dir_light != nullptr) {
+        dir_light->set_color(event.color);
+        dir_light->set_intensity(event.intensity);
+        dir_light->is_dirty = true;
         return;
       }
-      light->set_color(event.color);
-      light->set_intensity(event.intensity);
-      light->is_dirty = true;
+      auto point_light = repository_.point_light_components.find_mutable(event.entity);
+      if (point_light != nullptr) {
+        point_light->set_color(event.color);
+        point_light->set_intensity(event.intensity);
+        point_light->is_dirty = true;
+        return;
+      }
+      auto spot_light = repository_.spot_light_components.find_mutable(event.entity);
+      if (spot_light != nullptr) {
+        spot_light->set_color(event.color);
+        spot_light->set_intensity(event.intensity);
+        spot_light->is_dirty = true;
+      }
+    });
+    event_bus_.subscribe<UpdatePointLightEvent>([this](const UpdatePointLightEvent& event) {
+      auto point_light = repository_.point_light_components.find_mutable(event.entity);
+      if (point_light != nullptr) {
+        point_light->set_range(event.range);
+        point_light->is_dirty = true;
+      }
+    });
+    event_bus_.subscribe<UpdateSpotLightEvent>([this](const UpdateSpotLightEvent& event) {
+      auto spot_light = repository_.spot_light_components.find_mutable(event.entity);
+      if (spot_light != nullptr) {
+        spot_light->set_range(event.range);
+        spot_light->set_inner_cone_cos(event.inner_cos);
+        spot_light->set_outer_cone_cos(event.outer_cos);
+        spot_light->is_dirty = true;
+      }
     });
     create_buffers();
   }
@@ -204,13 +235,11 @@ namespace gestalt::application {
     repository_.point_lights.clear();
     repository_.spot_lights.clear();
 
-    for (auto [entity, Light_component] : repository_.light_components.snapshot()) {
-      if (Light_component.is_type(LightType::kDirectional)) {
+    for (auto [entity, light_component] : repository_.directional_light_components.snapshot()) {
         const auto& rotation = repository_.transform_components.find(entity)->rotation();
-        auto dir_light_data = std::get<DirectionalLightData>(Light_component.specific());
         glm::vec3 direction = -glm::normalize(rotation * glm::vec3(0, 0, -1.f));
 
-        dir_light_data.light_view_projection = repository_.light_view_projections.size();
+        light_component.set_light_view_projection(repository_.light_view_projections.size());
         // TODO fix this
         glm::mat4 inv_cam
             = repository_.per_frame_data_buffers->data.at(frame_.get_current_frame_index())
@@ -220,42 +249,42 @@ namespace gestalt::application {
         repository_.light_view_projections.add({view, proj});
 
         GpuDirectionalLight dir_light = {};
-        dir_light.color = Light_component.color();
-        dir_light.intensity = Light_component.intensity();
+        dir_light.color = light_component.color();
+        dir_light.intensity = light_component.intensity();
         dir_light.direction = direction;
-        dir_light.viewProj = dir_light_data.light_view_projection;
+        dir_light.viewProj = light_component.light_view_projection();
         repository_.directional_lights.add(dir_light);
 
-        Light_component.is_dirty = false;
-      } else if (Light_component.is_type(LightType::kPoint)) {
+        light_component.is_dirty = false;
+    }
+    for (auto [entity, light_component] : repository_.point_light_components.snapshot()) {
         const auto& position = repository_.transform_components.find(entity)->position();
-        const auto point_light_data = std::get<PointLightData>(Light_component.specific());
 
         // TODO Calculate the 6 view matrices for the light
 
         GpuPointLight point_light = {};
-        point_light.color = Light_component.color();
-        point_light.intensity = Light_component.intensity();
+        point_light.color = light_component.color();
+        point_light.intensity = light_component.intensity();
         point_light.position = position;
-        point_light.range = point_light_data.range;
+        point_light.range = light_component.range();
         repository_.point_lights.add(point_light);
 
-        Light_component.is_dirty = false;
-      } else if (Light_component.is_type(LightType::kSpot)) {
+        light_component.is_dirty = false;
+    }
+    for (auto [entity, light_component] : repository_.spot_light_components.snapshot()) {
         const auto& position = repository_.transform_components.find(entity)->position();
         const auto& rotation = repository_.transform_components.find(entity)->rotation();
-        const auto spot_light_data = std::get<SpotLightData>(Light_component.specific());
+
         GpuSpotLight spot_light = {};
-        spot_light.color = Light_component.color();
-        spot_light.intensity = Light_component.intensity();
+        spot_light.color = light_component.color();
+        spot_light.intensity = light_component.intensity();
         spot_light.position = position;
-        spot_light.range = spot_light_data.range;
+        spot_light.range = light_component.range();
         spot_light.direction = glm::normalize(rotation * glm::vec3(0, 0, -1.f));
-        spot_light.inner_cone_angle = spot_light_data.inner_cone_cos;
-        spot_light.outer_cone_angle = spot_light_data.outer_cone_cos;
+        spot_light.inner_cone_angle = light_component.inner_cone_cos();
+        spot_light.outer_cone_angle = light_component.outer_cone_cos();
         repository_.spot_lights.add(spot_light);
-        Light_component.is_dirty = false;
-      }
+        light_component.is_dirty = false;
     }
 
     auto& light_data = repository_.light_buffers;

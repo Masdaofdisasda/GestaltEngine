@@ -11,12 +11,14 @@
 #include "Buffer/RayTracingBuffer.hpp"
 #include "Components/AnimationComponent.hpp"
 #include "Components/CameraComponent.hpp"
+#include "Components/DirectionalLightComponent.hpp"
 #include "Components/Entity.hpp"
-#include "Components/LightComponent.hpp"
 #include "Components/MeshComponent.hpp"
 #include "Components/NodeComponent.hpp"
 #include "Components/TransformComponent.hpp"
 #include "Components/PhysicsComponent.hpp"
+#include "Components/PointLightComponent.hpp"
+#include "Components/SpotLightComponent.hpp"
 #include "Material/Material.hpp"
 #include "Mesh/Mesh.hpp"
 #include "Mesh/MeshDraw.hpp"
@@ -155,7 +157,9 @@ namespace gestalt::foundation {
     ComponentStorage<NodeComponent> scene_graph;
     ComponentStorage<MeshComponent> mesh_components;
     ComponentStorage<CameraComponent> camera_components;
-    ComponentStorage<LightComponent> light_components;
+    ComponentStorage<DirectionalLightComponent> directional_light_components;
+    ComponentStorage<PointLightComponent> point_light_components;
+    ComponentStorage<SpotLightComponent> spot_light_components;
     ComponentStorage<AnimationComponent> animation_components;
     ComponentStorage<TransformComponent> transform_components;
     ComponentStorage<PhysicsComponent> physics_components;
