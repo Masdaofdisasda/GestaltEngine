@@ -34,6 +34,7 @@ namespace gestalt::foundation {
 
       ProjectionData projection_data;
       CameraData camera_data;
+
     };
 
 }  // namespace gestalt

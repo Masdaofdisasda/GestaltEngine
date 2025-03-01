@@ -26,7 +26,7 @@ namespace gestalt::application {
         asset_loader_(resource_allocator, repository, component_factory_),
         material_system_(gpu_, resource_allocator, repository_, frame),
         camera_system_(gpu_, resource_allocator, repository_, frame, event_bus_),
-        light_system_(gpu_, resource_allocator, repository_, frame),
+        light_system_(gpu_, resource_allocator, repository_, event_bus_, frame),
         transform_system_(repository_, event_bus_),
         animation_system_(repository_, event_bus_),
         mesh_system_(gpu_, resource_allocator, repository_, frame),
@@ -50,8 +50,7 @@ namespace gestalt::application {
     update_scene(0.f, movement, 0.f);
   }
 
-  EntityComponentSystem::~EntityComponentSystem() {
-  }
+  EntityComponentSystem::~EntityComponentSystem() = default;
 
   void EntityComponentSystem::set_active_camera(const Entity camera) {
     camera_system_.set_active_camera(camera);

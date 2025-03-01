@@ -27,6 +27,18 @@ namespace gestalt::application {
         frame_(frame),
         event_bus_(event_bus)
   {
+    event_bus_.subscribe<UpdateCameraProjectionEvent>([this](const UpdateCameraProjectionEvent& event) {
+      auto camera = repository_.camera_components.find_mutable(event.entity);
+      std::visit(
+          [&](auto&& projection) {
+            using T = std::decay_t<decltype(projection)>;
+            if constexpr (std::is_same_v<T, PerspectiveProjectionData>) {
+                projection = event.perspective_projection;
+            }
+          },
+          camera->projection_data);
+    });
+
     const auto cameras = repository_.camera_components.snapshot();
     if (!cameras.empty()) {
       active_camera_ = cameras.front().first;

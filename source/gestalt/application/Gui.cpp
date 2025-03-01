@@ -449,11 +449,11 @@ namespace gestalt::application {
         auto temp
             = repository_.light_components.snapshot();
         for (auto& [ent, comp] : temp) {
-          if (comp.type == LightType::kDirectional && currentOption == 0) {
+          if (comp.is_type(LightType::kDirectional) && currentOption == 0) {
             lights.push_back({ent, comp});
-          } else if (comp.type == LightType::kPoint && currentOption == 1) {
+          } else if (comp.is_type(LightType::kPoint) && currentOption == 1) {
             lights.push_back({ent, comp});
-          } else if (comp.type == LightType::kSpot && currentOption == 2) {
+          } else if (comp.is_type(LightType::kSpot) && currentOption == 2) {
             lights.push_back({ent, comp});
           }
         }
@@ -463,6 +463,7 @@ namespace gestalt::application {
           ImGui::SliderInt("Select Light", &selectedLightIndex, 0, lights.size() - 1);
 
           auto& [entity, light_component] = lights[selectedLightIndex];
+          selected_entity_ = entity;
           const auto transform_component = repository_.transform_components.find(entity);
 
           show_light_component(&light_component.get(), transform_component);
@@ -885,7 +886,7 @@ namespace gestalt::application {
       }
     }
 
-    void Gui::show_transform_component(NodeComponent* node, const TransformComponent* transform) {
+    void Gui::show_transform_component(const NodeComponent* node, const TransformComponent* transform) {
       ImGui::Text("Local Transform:");
 
       // Local position control
@@ -960,9 +961,11 @@ namespace gestalt::application {
         auto new_scale = world_scale / transform->parent_scale;
         event_bus_.emit<ScaleEntityEvent>(ScaleEntityEvent{selected_entity_, new_scale});
       }
+      ImGui::Text("AABB max: (%.3f, %.3f, %.3f)", node->bounds.max.x, node->bounds.max.y,
+                  node->bounds.max.z);
+      ImGui::Text("AABB min: (%.3f, %.3f, %.3f)", node->bounds.min.x, node->bounds.min.y,
+                  node->bounds.min.z);
 
-      ImGui::DragFloat3("AABB max", &node->bounds.max.x);
-      ImGui::DragFloat3("AABB min", &node->bounds.min.x);
     }
 
     void Gui::show_mesh_component(const MeshComponent* mesh_component) {
@@ -1082,17 +1085,21 @@ namespace gestalt::application {
       }
     }
 
-    void Gui::show_light_component(LightComponent* light, const TransformComponent* transform) {
-      if (ImGui::ColorPicker3("Color", &light->base.color.x, ImGuiColorEditFlags_Float)) {
-        light->is_dirty = true;
+    void Gui::show_light_component(const LightComponent* light, const TransformComponent* transform) {
+      auto color = light->color();
+      if (ImGui::ColorPicker3("Color", &color.x, ImGuiColorEditFlags_Float)) {
+        event_bus_.emit<UpdateLightEvent>(UpdateLightEvent{selected_entity_, color, light->intensity()});
       }
-      if (ImGui::SliderFloat("Intensity", &light->base.intensity, 0.0f, 150000.0f, "%.3f",
+      auto intensity = light->intensity();
+      if (ImGui::SliderFloat("Intensity", &intensity, 0.0f, 150000.0f, "%.3f",
                              ImGuiSliderFlags_Logarithmic)) {
-        light->is_dirty = true;
+        event_bus_.emit<UpdateLightEvent>(
+            UpdateLightEvent{selected_entity_, light->color(), intensity});
       }
 
-      if (light->type == LightType::kSpot) {
-        if (auto* spot_light_data = std::get_if<SpotLightData>(&light->specific)) {
+      if (light->is_type(LightType::kSpot)) {
+        auto specific = light->specific();
+        if (auto* spot_light_data = std::get_if<SpotLightData>(&specific)) {
           if (ImGui::SliderFloat("Radius", &spot_light_data->range, 0.0f, 100.0f, "%.3f",
                                  ImGuiSliderFlags_Logarithmic)) {
             light->is_dirty = true;
@@ -1123,8 +1130,9 @@ namespace gestalt::application {
         }
       }
 
-      if (light->type == LightType::kPoint) {
-        if (auto* point_light_data = std::get_if<PointLightData>(&light->specific)) {
+      if (light->is_type(LightType::kPoint)) {
+        auto specific = light->specific();
+        if (auto* point_light_data = std::get_if<PointLightData>(&specific)) {
           if (ImGui::SliderFloat("Radius", &point_light_data->range, 0.0f, 100.0f, "%.3f",
                                  ImGuiSliderFlags_Logarithmic)) {
             light->is_dirty = true;
@@ -1136,7 +1144,7 @@ namespace gestalt::application {
           event_bus_.emit<TranslateEntityEvent>({selected_entity_, position});
         }
       }
-      if (light->type == LightType::kDirectional) {
+      if (light->is_type(LightType::kDirectional)) {
         glm::vec3 euler_angles
             = degrees(eulerAngles(transform->rotation()));  // Convert quaternion to Euler angles
 
@@ -1226,7 +1234,7 @@ namespace gestalt::application {
 
     void Gui::show_node_component() {
       if (selected_entity_ != invalid_entity) {
-        auto selected_node = repository_.scene_graph.find_mutable(selected_entity_);
+        auto selected_node = repository_.scene_graph.find(selected_entity_);
         ImGui::Text(selected_node->name.c_str());
 
         const auto transform = repository_.transform_components.find(selected_entity_);
@@ -1243,7 +1251,7 @@ namespace gestalt::application {
           }
         }
 
-        const auto light = repository_.light_components.find_mutable(selected_entity_);
+        const auto light = repository_.light_components.find(selected_entity_);
         if (light != nullptr && transform != nullptr) {
           if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen)) {
             show_light_component(light, transform);

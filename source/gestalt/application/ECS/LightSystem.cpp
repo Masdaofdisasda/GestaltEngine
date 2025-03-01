@@ -3,6 +3,8 @@
 #include "FrameProvider.hpp"
 
 #include "Camera/AnimationCameraData.hpp"
+#include "Events/EventBus.hpp"
+#include "Events/Events.hpp"
 #include "Interface/IGpu.hpp"
 #include "Interface/IResourceAllocator.hpp"
 #include "Resources/GpuProjViewData.hpp"
@@ -14,14 +16,24 @@ namespace gestalt::application {
 
   
   LightSystem::LightSystem(IGpu& gpu, IResourceAllocator& resource_allocator,
-                           Repository& repository, FrameProvider& frame)
+                           Repository& repository, EventBus& event_bus, FrameProvider& frame)
 
-    : gpu_(gpu),
+      : gpu_(gpu),
         resource_allocator_(resource_allocator),
         repository_(repository),
-        frame_(frame)
-  {
-      create_buffers();
+        event_bus_(event_bus),
+        frame_(frame) {
+    event_bus_.subscribe<UpdateLightEvent>([this](const UpdateLightEvent& event) {
+      auto light = repository_.light_components.find_mutable(event.entity);
+      if (light == nullptr) {
+        fmt::println("Light entity {} was not found", event.entity);
+        return;
+      }
+      light->set_color(event.color);
+      light->set_intensity(event.intensity);
+      light->is_dirty = true;
+    });
+    create_buffers();
   }
 
   void LightSystem::create_buffers() {
@@ -193,9 +205,9 @@ namespace gestalt::application {
     repository_.spot_lights.clear();
 
     for (auto [entity, Light_component] : repository_.light_components.snapshot()) {
-      if (Light_component.type == LightType::kDirectional) {
+      if (Light_component.is_type(LightType::kDirectional)) {
         const auto& rotation = repository_.transform_components.find(entity)->rotation();
-        auto& dir_light_data = std::get<DirectionalLightData>(Light_component.specific);
+        auto dir_light_data = std::get<DirectionalLightData>(Light_component.specific());
         glm::vec3 direction = -glm::normalize(rotation * glm::vec3(0, 0, -1.f));
 
         dir_light_data.light_view_projection = repository_.light_view_projections.size();
@@ -208,34 +220,34 @@ namespace gestalt::application {
         repository_.light_view_projections.add({view, proj});
 
         GpuDirectionalLight dir_light = {};
-        dir_light.color = Light_component.base.color;
-        dir_light.intensity = Light_component.base.intensity;
+        dir_light.color = Light_component.color();
+        dir_light.intensity = Light_component.intensity();
         dir_light.direction = direction;
         dir_light.viewProj = dir_light_data.light_view_projection;
         repository_.directional_lights.add(dir_light);
 
         Light_component.is_dirty = false;
-      } else if (Light_component.type == LightType::kPoint) {
+      } else if (Light_component.is_type(LightType::kPoint)) {
         const auto& position = repository_.transform_components.find(entity)->position();
-        const auto& point_light_data = std::get<PointLightData>(Light_component.specific);
+        const auto point_light_data = std::get<PointLightData>(Light_component.specific());
 
         // TODO Calculate the 6 view matrices for the light
 
         GpuPointLight point_light = {};
-        point_light.color = Light_component.base.color;
-        point_light.intensity = Light_component.base.intensity;
+        point_light.color = Light_component.color();
+        point_light.intensity = Light_component.intensity();
         point_light.position = position;
         point_light.range = point_light_data.range;
         repository_.point_lights.add(point_light);
 
         Light_component.is_dirty = false;
-      } else if (Light_component.type == LightType::kSpot) {
+      } else if (Light_component.is_type(LightType::kSpot)) {
         const auto& position = repository_.transform_components.find(entity)->position();
         const auto& rotation = repository_.transform_components.find(entity)->rotation();
-        const auto& spot_light_data = std::get<SpotLightData>(Light_component.specific);
+        const auto spot_light_data = std::get<SpotLightData>(Light_component.specific());
         GpuSpotLight spot_light = {};
-        spot_light.color = Light_component.base.color;
-        spot_light.intensity = Light_component.base.intensity;
+        spot_light.color = Light_component.color();
+        spot_light.intensity = Light_component.intensity();
         spot_light.position = position;
         spot_light.range = spot_light_data.range;
         spot_light.direction = glm::normalize(rotation * glm::vec3(0, 0, -1.f));
