@@ -9,17 +9,20 @@
 #include "PhysicUtil.hpp"
 #include "UserInput.hpp"
 #include "Components/PhysicsComponent.hpp"
+#include "Events/EventBus.hpp"
+#include "Events/Events.hpp"
 
 
 namespace gestalt::application {
 
   
   PhysicSystem::PhysicSystem(IGpu& gpu, IResourceAllocator& resource_allocator,
-                             Repository& repository, FrameProvider& frame)
+                             Repository& repository, FrameProvider& frame, EventBus& event_bus)
       : gpu_(gpu),
         resource_allocator_(resource_allocator),
         repository_(repository),
-        frame_(frame) 
+        frame_(frame),
+  event_bus_(event_bus)
   {
     physic_engine_ = std::make_unique<PhysicEngine>();
     physic_engine_->init();
@@ -36,7 +39,7 @@ namespace gestalt::application {
     if (player_physics->body == nullptr) return;
     const auto player_transform = repository_.transform_components.find(player_);
 
-    auto orientation = player_transform->rotation;
+    auto orientation = player_transform->rotation();
     orientation.w *= -1; // Jolt uses a different handedness convention (i guess)
     glm::vec3 forward = orientation * glm::vec3(0, 0, -1);
     glm::vec3 right = orientation * glm::vec3(1, 0, 0);
@@ -82,9 +85,9 @@ namespace gestalt::application {
     for (auto& [entity, physics_component] : repository_.physics_components.snapshot()) {
 
       if (physics_component.body == nullptr) {
+        auto transform = repository_.transform_components.find(entity);
         physics_component.body = physic_engine_->create_body(
-            physics_component, repository_.transform_components.find(entity)->position,
-            repository_.transform_components.find(entity)->rotation);
+            physics_component, transform->position(), transform->rotation());
       }
 
       if (physics_component.body_type == DYNAMIC) {
@@ -92,8 +95,8 @@ namespace gestalt::application {
         glm::quat orientation;
         physic_engine_->get_body_transform(physics_component.body, position,
                                            orientation);
-        repository_.transform_components.find_mutable(entity)->position = position;
-        repository_.transform_components.find_mutable(entity)->rotation = orientation;
+        event_bus_.emit<TranslateEntityEvent>({entity, position});
+        event_bus_.emit<RotateEntityEvent>({entity, orientation});
       }
     }
   }

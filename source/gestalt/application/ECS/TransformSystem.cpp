@@ -1,15 +1,40 @@
 ﻿#include "TransformSystem.hpp"
 
+#include "Repository.hpp"
+#include "Events/EventBus.hpp"
+#include "Events/Events.hpp"
+
 namespace gestalt::application {
 
-  TransformSystem::TransformSystem(
-                                   Repository& repository)
-      : repository_(repository)
-  {}
+  TransformSystem::TransformSystem(Repository& repository, EventBus& event_bus)
+      : repository_(repository) {
+    event_bus.subscribe<MoveEntityEvent>([this](const MoveEntityEvent& event) {
+      auto transform = repository_.transform_components.find_mutable(event.entity);
+      transform->set_position(event.new_position);
+      transform->set_rotation(event.new_rotation);
+      transform->set_scale(event.new_scale);
+      transform->is_dirty = true;
+    });
+    event_bus.subscribe<TranslateEntityEvent>([this](const TranslateEntityEvent& event) {
+      auto transform = repository_.transform_components.find_mutable(event.entity);
+      transform->set_position(event.new_position);
+      transform->is_dirty = true;
+    });
+    event_bus.subscribe<RotateEntityEvent>([this](const RotateEntityEvent& event) {
+      auto transform = repository_.transform_components.find_mutable(event.entity);
+      transform->set_rotation(event.new_rotation);
+      transform->is_dirty = true;
+    });
+    event_bus.subscribe<ScaleEntityEvent>([this](const ScaleEntityEvent& event) {
+      auto transform = repository_.transform_components.find_mutable(event.entity);
+      transform->set_scale(event.new_scale);
+      transform->is_dirty = true;
+    });
+  }
 
   glm::mat4 TransformSystem::get_model_matrix(const TransformComponent& transform) {
-    return translate(glm::mat4(1.0f), transform.position) * mat4_cast(transform.rotation)
-           * scale(glm::mat4(1.0f), glm::vec3(transform.scale));
+    return translate(glm::mat4(1.0f), transform.position()) * mat4_cast(transform.rotation())
+           * scale(glm::mat4(1.0f), glm::vec3(transform.scale()));
   }
 
   void TransformSystem::mark_parent_bounds_dirty(Entity entity) {
@@ -60,13 +85,13 @@ namespace gestalt::application {
     auto local_transform = repository_.transform_components.find_mutable(entity);
     if (node->parent != invalid_entity) {
       const auto& parent_transform_component = repository_.transform_components.find(node->parent);
-      local_transform->parent_position = parent_transform_component->position;
-      local_transform->parent_rotation = parent_transform_component->rotation;
-      local_transform->parent_scale = parent_transform_component->scale;
+      local_transform->parent_position = parent_transform_component->position();
+      local_transform->parent_rotation = parent_transform_component->rotation();
+      local_transform->parent_scale = parent_transform_component->scale().x;
     } else {
-      local_transform->parent_position = local_transform->position;
-      local_transform->parent_rotation = local_transform->rotation;
-      local_transform->parent_scale = local_transform->scale;
+      local_transform->parent_position = local_transform->position();
+      local_transform->parent_rotation = local_transform->rotation();
+      local_transform->parent_scale = local_transform->scale().x;
     }
 
     const auto& mesh_component = repository_.mesh_components.find(entity);
@@ -102,9 +127,9 @@ namespace gestalt::application {
     }
 
     // Decompose model_matrix into translation (T) and 3x3 rotation matrix (M)
-    glm::vec3 T = model_transform.position;             // Translation vector
-    glm::vec3 S = glm::vec3(model_transform.scale);                // Scale vector
-    glm::mat3 M = glm::mat3(model_transform.rotation);  // Rotation matrix
+    glm::vec3 T = model_transform.position();             // Translation vector
+    glm::vec3 S = glm::vec3(model_transform.scale());                // Scale vector
+    glm::mat3 M = glm::mat3(model_transform.rotation());  // Rotation matrix
     M = transpose(M);  // Otherwise the AABB will be rotated in the wrong direction
 
     AABB transformedAABB = {T, T};  // Start with a zero-volume AABB at T
@@ -139,11 +164,7 @@ namespace gestalt::application {
     }
 
     if (is_dirty) {
-      constexpr auto root_transform = TransformComponent{
-          false, glm::vec3(0), glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
-          1.f,   glm::vec3(0), glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
-          1.f,
-      };
+      const auto root_transform = TransformComponent();
 
       update_aabb(root_entity, root_transform);
     }

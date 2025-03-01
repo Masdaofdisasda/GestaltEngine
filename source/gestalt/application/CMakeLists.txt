@@ -14,7 +14,7 @@ function(add_sources_from_folder folder_name)
 endfunction()
 
 # NOTE: source code will be added from these folders:
-set(FOLDERS "Cameras" "ECS" "Resource Loading")
+set(FOLDERS "Cameras" "ECS" "Resource Loading" "Events")
 
 foreach(folder ${FOLDERS})
     add_sources_from_folder(${folder})

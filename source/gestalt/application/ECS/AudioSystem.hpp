@@ -1,23 +1,26 @@
 ﻿#pragma once
 
-#include "BaseSystem.hpp"
 #include <memory>
+
+#include "common.hpp"
+
+namespace gestalt::foundation {
+  struct FrameProvider;
+  class Repository;
+  class IResourceAllocator;
+  class IGpu;
+}
 
 namespace gestalt::application {
 
     struct AudioEngine;
 
     class AudioSystem final {
-      IGpu& gpu_;
-      IResourceAllocator& resource_allocator_;
-      Repository& repository_;
-      FrameProvider& frame_;
     std::unique_ptr<AudioEngine> audio_engine_; 
     uint32 current_frame_ = 0;
 
   public:
-    AudioSystem(IGpu& gpu, IResourceAllocator& resource_allocator, Repository& repository,
-                FrameProvider& frame);
+    AudioSystem();
     ~AudioSystem();
 
     AudioSystem(const AudioSystem&) = delete;

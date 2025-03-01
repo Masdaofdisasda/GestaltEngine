@@ -194,7 +194,7 @@ namespace gestalt::application {
 
     for (auto [entity, Light_component] : repository_.light_components.snapshot()) {
       if (Light_component.type == LightType::kDirectional) {
-        const auto& rotation = repository_.transform_components.find(entity)->rotation;
+        const auto& rotation = repository_.transform_components.find(entity)->rotation();
         auto& dir_light_data = std::get<DirectionalLightData>(Light_component.specific);
         glm::vec3 direction = -glm::normalize(rotation * glm::vec3(0, 0, -1.f));
 
@@ -216,7 +216,7 @@ namespace gestalt::application {
 
         Light_component.is_dirty = false;
       } else if (Light_component.type == LightType::kPoint) {
-        const auto& position = repository_.transform_components.find(entity)->position;
+        const auto& position = repository_.transform_components.find(entity)->position();
         const auto& point_light_data = std::get<PointLightData>(Light_component.specific);
 
         // TODO Calculate the 6 view matrices for the light
@@ -230,8 +230,8 @@ namespace gestalt::application {
 
         Light_component.is_dirty = false;
       } else if (Light_component.type == LightType::kSpot) {
-        const auto& position = repository_.transform_components.find(entity)->position;
-        const auto& rotation = repository_.transform_components.find(entity)->rotation;
+        const auto& position = repository_.transform_components.find(entity)->position();
+        const auto& rotation = repository_.transform_components.find(entity)->rotation();
         const auto& spot_light_data = std::get<SpotLightData>(Light_component.specific);
         GpuSpotLight spot_light = {};
         spot_light.color = Light_component.base.color;

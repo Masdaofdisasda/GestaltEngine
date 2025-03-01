@@ -1,12 +1,18 @@
 ﻿#pragma once
+#include <Components/Entity.hpp>
 
-#include "Repository.hpp"
-#include "BaseSystem.hpp"
+#include "glm/fwd.hpp"
+
+namespace gestalt::foundation {
+  struct TransformComponent;
+  class Repository;
+}
 
 namespace gestalt::application {
+  class EventBus;
 
-    class TransformSystem final {
-    Repository& repository_;
+  class TransformSystem final {
+      Repository& repository_;
 
       void mark_children_bounds_dirty(Entity entity);
       void mark_bounds_as_dirty(Entity entity);
@@ -14,7 +20,7 @@ namespace gestalt::application {
       void mark_parent_bounds_dirty(Entity entity);
 
     public:
-    explicit TransformSystem(Repository& repository);
+    explicit TransformSystem(Repository& repository, EventBus& event_bus);
       ~TransformSystem() = default;
 
       TransformSystem(const TransformSystem&) = delete;

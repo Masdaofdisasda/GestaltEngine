@@ -11,6 +11,10 @@
 
 #include "Components/PhysicsComponent.hpp"
 
+namespace gestalt::application {
+  class EventBus;
+}
+
 namespace gestalt::foundation {
   struct MeshSurface;
   struct NodeComponent;
@@ -23,6 +27,7 @@ namespace gestalt::application {
 
     class ComponentFactory {
       Repository& repository_;
+      EventBus& event_bus_;
 
       Entity next_entity_id_{0};
 
@@ -32,7 +37,7 @@ namespace gestalt::application {
                                       const float& scale = 1.f) const;
 
     public:
-      explicit ComponentFactory(Repository& repository);
+      explicit ComponentFactory(Repository& repository, EventBus& event_bus);
       ~ComponentFactory() = default;
 
       ComponentFactory(const ComponentFactory&) = delete;

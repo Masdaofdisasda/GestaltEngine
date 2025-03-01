@@ -1,9 +1,15 @@
 ﻿#pragma once
+#include "Components/Entity.hpp"
 
-#include "Repository.hpp"
-#include "BaseSystem.hpp"
+namespace gestalt::application {
+  class EventBus;
+}
 
 namespace gestalt::foundation {
+  class Repository;
+  class IGpu;
+  struct FrameProvider;
+  class IResourceAllocator;
   struct UserInput;
 }
 
@@ -14,13 +20,14 @@ namespace gestalt::application {
     IResourceAllocator& resource_allocator_;
     Repository& repository_;
     FrameProvider& frame_;
+    EventBus& event_bus_;
 
     Entity active_camera_{0};  // entity id of the active camera
     float32 aspect_ratio_{1.f};
 
   public:
     CameraSystem(IGpu& gpu, IResourceAllocator& resource_allocator, Repository& repository,
-                 FrameProvider& frame);
+                 FrameProvider& frame, EventBus& event_bus);
     ~CameraSystem();
 
     CameraSystem(const CameraSystem&) = delete;

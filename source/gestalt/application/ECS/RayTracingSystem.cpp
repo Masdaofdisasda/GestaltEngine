@@ -27,11 +27,7 @@ namespace gestalt::application {
     /**
      * TLAS "Update"
      */
-    constexpr auto root_transform = TransformComponent{
-        false, glm::vec3(0), glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
-        1.f,   glm::vec3(0), glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
-        1.f,
-    };
+    const auto root_transform = TransformComponent();
 
     std::vector<VkAccelerationStructureInstanceKHR> tlasInstances;
     collect_tlas_instance_data(root_entity, root_transform, tlasInstances);
@@ -379,9 +375,9 @@ namespace gestalt::application {
           instance.instanceShaderBindingTableRecordOffset = 0;
           instance.accelerationStructureReference = blas_address;
 
-          glm::mat4 T = glm::translate(glm::mat4(1.0f), worldTransform.position);
-          glm::mat4 R = glm::mat4_cast(worldTransform.rotation);
-          glm::mat4 S = glm::scale(glm::mat4(1.0f), glm::vec3(worldTransform.scale));
+          glm::mat4 T = glm::translate(glm::mat4(1.0f), worldTransform.position());
+          glm::mat4 R = glm::mat4_cast(worldTransform.rotation());
+          glm::mat4 S = glm::scale(glm::mat4(1.0f), worldTransform.scale());
           glm::mat4 m = T * R * S;
 
           instance.transform = {

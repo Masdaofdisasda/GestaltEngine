@@ -9,6 +9,7 @@
 #include "FrameProvider.hpp"
 #include "ResourceAllocator.hpp"
 #include "TmeTrackingService.hpp"
+#include "Events/EventBus.hpp"
 
 namespace gestalt {
   class GameEngine final {
@@ -30,6 +31,7 @@ namespace gestalt {
     bool freeze_rendering_{false};
     uint64 frame_number_{0};
 
+    application::EventBus event_bus_;
     application::Window window_;
     graphics::Gpu gpu_;
     foundation::Repository repository_;

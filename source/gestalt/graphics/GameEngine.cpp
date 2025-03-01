@@ -12,11 +12,11 @@ namespace gestalt {
       : gpu_(window_),
         frame_provider_(&frame_number_),
         resource_allocator_(gpu_),
-        ecs_(gpu_, resource_allocator_, repository_, frame_provider_),
+        ecs_(gpu_, resource_allocator_, repository_, event_bus_, frame_provider_),
         render_engine_(gpu_, window_, resource_allocator_, repository_, imgui_.get(), frame_provider_)
   {
     imgui_ = std::make_unique<application::Gui>(
-        gpu_, window_, render_engine_.get_swapchain_format(), repository_,
+        gpu_, window_, render_engine_.get_swapchain_format(), repository_, event_bus_,
         application::GuiCapabilities{
             [&] { quit_ = true; },
             [&](const std::filesystem::path& file_path) { ecs_.request_scene(file_path); },

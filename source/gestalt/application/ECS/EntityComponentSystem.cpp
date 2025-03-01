@@ -11,25 +11,27 @@
 #include "RayTracingSystem.hpp"
 #include "TransformSystem.hpp"
 #include "UserInput.hpp"
-#include "Interface/IResourceAllocator.hpp"
+#include "Events/EventBus.hpp"
 #include "Resource Loading/AssetLoader.hpp"
 
 namespace gestalt::application {
 
   EntityComponentSystem::EntityComponentSystem(IGpu& gpu, IResourceAllocator& resource_allocator,
-                                               Repository& repository, FrameProvider& frame)
+                                               Repository& repository,
+                                               EventBus& event_bus, FrameProvider& frame)
       : gpu_(gpu),
         repository_(repository),
-        component_factory_(repository),
+        event_bus_(event_bus),
+        component_factory_(repository, event_bus_),
         asset_loader_(resource_allocator, repository, component_factory_),
         material_system_(gpu_, resource_allocator, repository_, frame),
-        camera_system_(gpu_, resource_allocator, repository_, frame),
+        camera_system_(gpu_, resource_allocator, repository_, frame, event_bus_),
         light_system_(gpu_, resource_allocator, repository_, frame),
-        transform_system_(repository_),
-        animation_system_(repository_),
+        transform_system_(repository_, event_bus_),
+        animation_system_(repository_, event_bus_),
         mesh_system_(gpu_, resource_allocator, repository_, frame),
-        audio_system_(gpu_, resource_allocator, repository_, frame),
-        physics_system_(gpu_, resource_allocator, repository_, frame),
+        audio_system_(),
+        physics_system_(gpu_, resource_allocator, repository_, frame, event_bus_),
         raytracing_system_(gpu_, resource_allocator, repository_, frame) {
     if (const std::string initial_scene = getInitialScene(); !initial_scene.empty()) {
       request_scene(std::filesystem::current_path() / "../../assets" / initial_scene);
@@ -60,7 +62,9 @@ namespace gestalt::application {
   }
 
   void EntityComponentSystem::add_to_root(Entity entity, NodeComponent& node) {
-    assert(entity != invalid_entity);
+    if (entity != invalid_entity) {
+      throw std::runtime_error("Entity has invalid id");
+    }
     repository_.scene_graph.find_mutable(get_root_entity())->children.push_back(entity);
     node.parent = get_root_entity();
   }
@@ -80,6 +84,8 @@ namespace gestalt::application {
     animation_system_.update(delta_time);
     audio_system_.update();
     raytracing_system_.update();
+
+    event_bus_.poll();
 
     scene_path_.clear();
   }

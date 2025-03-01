@@ -4,6 +4,8 @@
 #include "VulkanCheck.hpp"
 
 #include "FrameProvider.hpp"
+#include "PerFrameData.hpp"
+#include "Repository.hpp"
 #include "VulkanTypes.hpp"
 #include "Cameras/AnimationCamera.hpp"
 #include "Cameras/FirstPersonCamera.hpp"
@@ -11,15 +13,19 @@
 #include "Cameras/OrbitCamera.hpp"
 #include "Interface/IGpu.hpp"
 #include "Interface/IResourceAllocator.hpp"
+#include <Events/Events.hpp>
+
+#include "Events/EventBus.hpp"
 
 namespace gestalt::application {
 
   CameraSystem::CameraSystem(IGpu& gpu, IResourceAllocator& resource_allocator,
-                             Repository& repository, FrameProvider& frame)
+                             Repository& repository, FrameProvider& frame, EventBus& event_bus)
       : gpu_(gpu),
         resource_allocator_(resource_allocator),
         repository_(repository),
-        frame_(frame)
+        frame_(frame),
+        event_bus_(event_bus)
   {
     const auto cameras = repository_.camera_components.snapshot();
     if (!cameras.empty()) {
@@ -51,25 +57,27 @@ namespace gestalt::application {
       active_camera_ = repository_.camera_components.snapshot().back().first;
 
       auto camera_component = repository_.camera_components.find_mutable(active_camera_);
-      auto transform_component = repository_.transform_components.find_mutable(active_camera_);;
+      auto transform_component = repository_.transform_components.find(active_camera_);
       std::visit(
           [&]<typename CameraDataType>(CameraDataType& camera_data) {
             using T = std::decay_t<CameraDataType>;
             if constexpr (std::is_same_v<T, FreeFlyCameraData>) {
               FreeFlyCamera::update(delta_time, movement, camera_data);
-              transform_component->rotation = camera_data.orientation;
-              transform_component->position = camera_data.position;
+              event_bus_.emit<MoveEntityEvent>(
+                  MoveEntityEvent{active_camera_,camera_data.position,camera_data.orientation,transform_component->scale_uniform()
+              });
             } else if constexpr (std::is_same_v<T, OrbitCameraData>) {
               OrbitCamera::update(delta_time, movement, camera_data);
-              transform_component->rotation = camera_data.orientation;
-              transform_component->position = camera_data.position;
+              event_bus_.emit<MoveEntityEvent>(
+                  MoveEntityEvent{ active_camera_, camera_data.position,camera_data.orientation,transform_component->scale_uniform()});
             } else if constexpr (std::is_same_v<T, FirstPersonCameraData>) {
-              camera_data.set_position(transform_component->position);
+              camera_data.set_position(transform_component->position());
               FirstPersonCamera::update(delta_time, movement, camera_data);
-              transform_component->rotation = camera_data.orientation;
+              event_bus_.emit<MoveEntityEvent>(
+                  MoveEntityEvent{ active_camera_, camera_data.position,camera_data.orientation,transform_component->scale_uniform()});
             } else if constexpr (std::is_same_v<T, AnimationCameraData>) {
-              camera_data.position = transform_component->position;
-              camera_data.orientation = transform_component->rotation;
+              camera_data.position = transform_component->position();
+              camera_data.orientation = transform_component->rotation();
               AnimationCamera::update(delta_time, movement, camera_data);
             }
           },

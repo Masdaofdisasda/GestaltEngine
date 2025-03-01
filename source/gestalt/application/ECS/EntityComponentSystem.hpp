@@ -2,7 +2,6 @@
 
 #include <filesystem>
 
-#include "BaseSystem.hpp"
 #include "AnimationSystem.hpp"
 #include "AudioSystem.hpp"
 #include "CameraSystem.hpp"
@@ -32,6 +31,7 @@ namespace gestalt::application {
     class EntityComponentSystem {
       IGpu& gpu_;
       Repository& repository_;
+      EventBus& event_bus_;
 
       ComponentFactory component_factory_;
       AssetLoader asset_loader_;
@@ -50,7 +50,8 @@ namespace gestalt::application {
       std::filesystem::path scene_path_;
 
     public:
-      EntityComponentSystem(IGpu& gpu, IResourceAllocator& resource_allocator, Repository& repository,
+      EntityComponentSystem(IGpu& gpu, IResourceAllocator& resource_allocator,
+                            Repository& repository, EventBus& event_bus,
                  FrameProvider& frame);
       ~EntityComponentSystem();
 

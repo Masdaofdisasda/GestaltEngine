@@ -1,7 +1,11 @@
 ﻿#pragma once
 
 #include "Repository.hpp"
-#include "BaseSystem.hpp"
+
+namespace gestalt::foundation {
+  struct FrameProvider;
+  class IResourceAllocator;
+}
 
 namespace gestalt::application {
 

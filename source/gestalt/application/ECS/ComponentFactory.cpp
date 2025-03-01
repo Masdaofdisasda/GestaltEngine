@@ -13,6 +13,8 @@
 #include "Components/NodeComponent.hpp"
 #include "Components/PhysicsComponent.hpp"
 #include "Components/TransformComponent.hpp"
+#include "Events/EventBus.hpp"
+#include "Events/Events.hpp"
 #include "Mesh/Mesh.hpp"
 #include "Mesh/MeshSurface.hpp"
 
@@ -64,7 +66,8 @@ static glm::quat orientation_from_direction(const glm::vec3& direction, const gl
 
 namespace gestalt::application {
 
-  ComponentFactory::ComponentFactory(Repository& repository) : repository_(repository) {
+  ComponentFactory::ComponentFactory(Repository& repository, EventBus& event_bus)
+      : repository_(repository), event_bus_(event_bus) {
     auto [entity, root_node] = create_entity();
     root_node->name = "root";
   }
@@ -96,7 +99,9 @@ namespace gestalt::application {
                                                                const glm::vec3& position,
                                                                const glm::quat& rotation,
                                                                const float& scale) const {
-      repository_.transform_components.upsert(entity, TransformComponent{true, position, rotation, scale});
+      const auto transform = TransformComponent(position, rotation, scale);
+      transform.is_dirty = true;
+      repository_.transform_components.upsert(entity, transform);
     }
 
     void ComponentFactory::add_mesh_component(const Entity entity,
@@ -169,8 +174,10 @@ namespace gestalt::application {
             = create_entity("directional_light_" + std::to_string(number_of_lights + 1));
         entity = new_entity;
         link_entity_to_parent(entity, root_entity);
-        auto transform = repository_.transform_components.find_mutable(entity);
-        transform->rotation = orientation_from_direction(direction);
+        auto transform = repository_.transform_components.find(entity);
+        event_bus_.emit<MoveEntityEvent>(
+            MoveEntityEvent{entity, transform->position(), orientation_from_direction(direction),transform->scale_uniform()
+        });
       }
 
 
@@ -194,9 +201,8 @@ namespace gestalt::application {
             = create_entity("spot_light_" + std::to_string(number_of_lights + 1));
         entity = new_entity;
           link_entity_to_parent(entity, root_entity);
-        auto transform = repository_.transform_components.find_mutable(entity);
-        transform->rotation = orientation_from_direction(direction);
-        transform->position = position;
+        event_bus_.emit<MoveEntityEvent>(
+            MoveEntityEvent{entity, position,orientation_from_direction(direction),1.f});
       }
       const uint32 matrix_id
           = repository_.light_view_projections.add({glm::mat4(1.0), glm::mat4(1.0)});
@@ -217,8 +223,10 @@ namespace gestalt::application {
             = create_entity("point_light_" + std::to_string(number_of_lights + 1));
         entity = new_entity;
           link_entity_to_parent(entity, root_entity);
-        auto transform = repository_.transform_components.find_mutable(entity);
-        transform->position = position;
+        auto transform = repository_.transform_components.find(entity);
+          event_bus_.emit<MoveEntityEvent>(
+              MoveEntityEvent{entity,position,transform->rotation(), transform->scale_uniform()
+        });
       }
 
 

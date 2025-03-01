@@ -235,15 +235,7 @@ namespace gestalt::application {
       upload_mesh();
     }
 
-    constexpr auto root_transform = TransformComponent{
-        false,
-        glm::vec3(0),
-        glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
-        1.f,
-        glm::vec3(0),
-        glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
-        1.f,
-    };
+    const auto root_transform = TransformComponent();
 
     repository_.mesh_draws_.clear();
     traverse_scene(0, root_transform);
@@ -285,9 +277,9 @@ namespace gestalt::application {
         const auto& material = repository_.materials.get(surface.material);
 
         MeshDraw draw{
-            .position = world_transform.position,
-            .scale = world_transform.scale,
-            .orientation = world_transform.rotation,
+            .position = world_transform.position(),
+            .scale = world_transform.scale().x,
+            .orientation = world_transform.rotation(),
             .center = glm::vec3(surface.local_bounds.center),
             .radius = surface.local_bounds.radius,
             .meshlet_offset = surface.meshlet_offset,

@@ -17,6 +17,8 @@
 
 #include "vk_initializers.hpp"
 #include "ECS/ComponentFactory.hpp"
+#include "Events/EventBus.hpp"
+#include "Events/Events.hpp"
 #include "Interface/IGpu.hpp"
 #include "Mesh/MeshSurface.hpp"
 
@@ -25,8 +27,9 @@ namespace gestalt::application {
   constexpr int kMaxPoolElements = 128;
 
     Gui::Gui(IGpu& gpu, Window& window, VkFormat swapchain_format, Repository& repository,
+           EventBus& event_bus,
              GuiCapabilities actions)
-        : gpu_(gpu), window_(window), repository_(repository), actions_(actions)
+        : gpu_(gpu), window_(window), repository_(repository), event_bus_(event_bus), actions_(actions)
       {
 
       // 1: create descriptor pool for IMGUI
@@ -151,13 +154,13 @@ namespace gestalt::application {
       ImGuizmo::ViewManipulate(view, camDistance, viewManipulatorPosition, ImVec2(128, 128),
                                0xB4101010);
 
-      const auto transform_component = repository_.transform_components.find_mutable(selected_entity_);
+      const auto transform_component = repository_.transform_components.find(selected_entity_);
       if (transform_component != nullptr) {
         auto& transform = transform_component;
 
-        glm::mat4 localTransform = glm::translate(glm::mat4(1.0f), transform->position)
-                                   * glm::toMat4(transform->rotation)
-                                   * glm::scale(glm::mat4(1.0f), glm::vec3(transform->scale));
+        glm::mat4 localTransform = glm::translate(glm::mat4(1.0f), transform->position())
+                                   * glm::toMat4(transform->rotation())
+                                   * glm::scale(glm::mat4(1.0f), transform->scale());
         glm::mat4 parentWorldTransform
             = glm::translate(glm::mat4(1.0f), transform->parent_position)
               * glm::toMat4(transform->parent_rotation)
@@ -166,8 +169,8 @@ namespace gestalt::application {
         glm::mat4 worldTransform = parentWorldTransform * localTransform;
 
         glm::vec3 t = glm::vec3(worldTransform[3]);
-        glm::quat r = transform->rotation;
-        glm::vec3 s = glm::vec3(transform->scale);
+        glm::quat r = transform->rotation();
+        glm::vec3 s = transform->scale();
 
         float* translation = &t.x;
         float* rotation = &r.x;
@@ -179,9 +182,11 @@ namespace gestalt::application {
           if (Manipulate(view, projection, ImGuizmo::TRANSLATE, ImGuizmo::LOCAL, model)) {
             ImGuizmo::DecomposeMatrixToComponents(model, translation, rotation, scale);
 
-            transform->position
+            const auto new_pos
                 = glm::vec3(inverseParentWorldTransform
                             * glm::vec4(translation[0], translation[1], translation[2], 1.0f));
+            event_bus_.emit<TranslateEntityEvent>(
+                TranslateEntityEvent{selected_entity_, new_pos});
 
             transform->is_dirty = true;
           }
@@ -197,7 +202,7 @@ namespace gestalt::application {
           if (Manipulate(view, projection, ImGuizmo::SCALE, ImGuizmo::LOCAL, model)) {
             ImGuizmo::DecomposeMatrixToComponents(model, translation, rotation, scale);
 
-            transform->scale = std::max({scale[0], scale[1], scale[2]});
+            //transform->scale = std::max({scale[0], scale[1], scale[2]});
             transform->is_dirty = true;
           }
         }
@@ -458,7 +463,7 @@ namespace gestalt::application {
           ImGui::SliderInt("Select Light", &selectedLightIndex, 0, lights.size() - 1);
 
           auto& [entity, light_component] = lights[selectedLightIndex];
-          const auto transform_component = repository_.transform_components.find_mutable(entity);
+          const auto transform_component = repository_.transform_components.find(entity);
 
           show_light_component(&light_component.get(), transform_component);
         }
@@ -880,42 +885,42 @@ namespace gestalt::application {
       }
     }
 
-    void Gui::show_transform_component(NodeComponent* node, TransformComponent* transform) {
+    void Gui::show_transform_component(NodeComponent* node, const TransformComponent* transform) {
       ImGui::Text("Local Transform:");
 
       // Local position control
-      if (ImGui::DragFloat3("Local Position", &transform->position.x, 0.1f)) {
-        transform->is_dirty = true;
+      auto position = transform->position();
+      if (ImGui::DragFloat3("Local Position", &position.x, 0.1f)) {
+        event_bus_.emit<TranslateEntityEvent>(TranslateEntityEvent{selected_entity_, position});
       }
 
       // Local rotation controls
-      glm::vec3 euler = degrees(eulerAngles(transform->rotation));
+      glm::vec3 euler = glm::degrees(eulerAngles(transform->rotation()));
       if (ImGui::DragFloat("Local X Rotation", &euler.x, 1.0f)) {
-        transform->rotation = glm::quat(radians(euler));
-        transform->is_dirty = true;
+        event_bus_.emit<RotateEntityEvent>(
+            RotateEntityEvent{selected_entity_, glm::quat(radians(euler))});
       }
       if (ImGui::DragFloat("Local Y Rotation", &euler.y, 1.0f)) {
-        transform->rotation = glm::quat(radians(euler));
-        transform->is_dirty = true;
+        event_bus_.emit<RotateEntityEvent>(
+            RotateEntityEvent{selected_entity_, glm::quat(radians(euler))});
       }
       if (ImGui::DragFloat("Local Z Rotation", &euler.z, 1.0f)) {
-        transform->rotation = glm::quat(radians(euler));
-        transform->is_dirty = true;
+        event_bus_.emit<RotateEntityEvent>(
+            RotateEntityEvent{selected_entity_, glm::quat(radians(euler))});
       }
 
       // Local scale control
-      float local_scale = transform->scale;
+      float local_scale = transform->scale_uniform();
       if (ImGui::DragFloat("Local Scale", &local_scale, 0.005f)) {
-        transform->scale = local_scale;
-        transform->is_dirty = true;
+        event_bus_.emit<ScaleEntityEvent>(ScaleEntityEvent{selected_entity_, local_scale});
       }
 
       ImGui::Separator();
       ImGui::Text("World Transform:");
 
-      glm::mat4 localTransform = translate(glm::mat4(1.0f), transform->position)
-                                 * toMat4(transform->rotation)
-                                 * scale(glm::mat4(1.0f), glm::vec3(transform->scale));
+      glm::mat4 localTransform = translate(glm::mat4(1.0f), transform->position())
+                                 * toMat4(transform->rotation())
+                                 * scale(glm::mat4(1.0f), transform->scale());
       glm::mat4 parentWorldTransform
           = translate(glm::mat4(1.0f), transform->parent_position)
             * toMat4(transform->parent_rotation)
@@ -926,35 +931,34 @@ namespace gestalt::application {
       // World position control (taking parent transform into account)
       glm::vec3 world_position = glm::vec3(worldTransform[3]);
       if (ImGui::DragFloat3("World Position", &world_position.x, 0.1f)) {
-        transform->position
+        auto new_pos
             = glm::vec3(inverseParentWorldTransform * glm::vec4(world_position, 1.0f));
-        transform->is_dirty = true;
+        event_bus_.emit<TranslateEntityEvent>(TranslateEntityEvent{selected_entity_, new_pos});
       }
 
       // World rotation controls (taking parent transform into account)
       glm::vec3 world_euler = degrees(eulerAngles(quat_cast(worldTransform)));
       if (ImGui::DragFloat("World X Rotation", &world_euler.x, 1.0f)) {
-        transform->rotation = normalize(
+        auto new_rot = normalize(
             quat_cast(inverseParentWorldTransform * toMat4(glm::quat(radians(world_euler)))));
-
-        transform->is_dirty = true;
+        event_bus_.emit<RotateEntityEvent>(RotateEntityEvent{selected_entity_, new_rot});
       }
       if (ImGui::DragFloat("World Y Rotation", &world_euler.y, 1.0f)) {
-        transform->rotation = normalize(
+        auto new_rot = normalize(
             quat_cast(inverseParentWorldTransform * toMat4(glm::quat(radians(world_euler)))));
-        transform->is_dirty = true;
+        event_bus_.emit<RotateEntityEvent>(RotateEntityEvent{selected_entity_, new_rot});
       }
       if (ImGui::DragFloat("World Z Rotation", &world_euler.z, 1.0f)) {
-        transform->rotation = normalize(
+        auto new_rot = normalize(
             quat_cast(inverseParentWorldTransform * toMat4(glm::quat(radians(world_euler)))));
-        transform->is_dirty = true;
+        event_bus_.emit<RotateEntityEvent>(RotateEntityEvent{selected_entity_, new_rot});
       }
 
       // World scale control (taking parent transform into account)
       float world_scale = length(glm::vec3(worldTransform[0]));
       if (ImGui::DragFloat("World Scale", &world_scale, 0.005f)) {
-        transform->scale = world_scale / transform->parent_scale;
-        transform->is_dirty = true;
+        auto new_scale = world_scale / transform->parent_scale;
+        event_bus_.emit<ScaleEntityEvent>(ScaleEntityEvent{selected_entity_, new_scale});
       }
 
       ImGui::DragFloat3("AABB max", &node->bounds.max.x);
@@ -1078,7 +1082,7 @@ namespace gestalt::application {
       }
     }
 
-    void Gui::show_light_component(LightComponent* light, TransformComponent* transform) {
+    void Gui::show_light_component(LightComponent* light, const TransformComponent* transform) {
       if (ImGui::ColorPicker3("Color", &light->base.color.x, ImGuiColorEditFlags_Float)) {
         light->is_dirty = true;
       }
@@ -1127,13 +1131,14 @@ namespace gestalt::application {
           }
         }
 
-        if (ImGui::DragFloat3("Position", &transform->position.x, 0.1f)) {
-          light->is_dirty = true;
+        auto position = transform->position();
+        if (ImGui::DragFloat3("Position", &position.x, 0.1f)) {
+          event_bus_.emit<TranslateEntityEvent>({selected_entity_, position});
         }
       }
       if (light->type == LightType::kDirectional) {
         glm::vec3 euler_angles
-            = degrees(eulerAngles(transform->rotation));  // Convert quaternion to Euler angles
+            = degrees(eulerAngles(transform->rotation()));  // Convert quaternion to Euler angles
 
         float azimuth = euler_angles.y;     // Azimuth angle (yaw)
         float elevation = -euler_angles.x;  // Elevation angle (pitch)
@@ -1147,7 +1152,8 @@ namespace gestalt::application {
         }
 
         // Update rotation quaternion based on user input
-        transform->rotation = glm::quat(glm::radians(glm::vec3(-elevation, azimuth, 0.0f)));
+        auto new_rot = glm::quat(glm::radians(glm::vec3(-elevation, azimuth, 0.0f)));
+        event_bus_.emit<RotateEntityEvent>({selected_entity_, new_rot});
       }
     }
 
@@ -1223,7 +1229,7 @@ namespace gestalt::application {
         auto selected_node = repository_.scene_graph.find_mutable(selected_entity_);
         ImGui::Text(selected_node->name.c_str());
 
-        const auto transform = repository_.transform_components.find_mutable(selected_entity_);
+        const auto transform = repository_.transform_components.find(selected_entity_);
         if (transform != nullptr) {
           if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
             show_transform_component(selected_node, transform);

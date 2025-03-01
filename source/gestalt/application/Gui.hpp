@@ -12,7 +12,10 @@ namespace gestalt::application {
       none,
       add_directional_light,
       add_point_light,
-    };
+  };
+
+  class EventBus;
+
 
     struct GuiCapabilities {
       std::function<void()> exit;
@@ -27,6 +30,7 @@ namespace gestalt::application {
       IGpu& gpu_;
       Window& window_;
       Repository& repository_;
+      EventBus& event_bus_;
       GuiCapabilities actions_;
       VkDescriptorPool imguiPool_;
 
@@ -51,9 +55,9 @@ namespace gestalt::application {
       void cameras();
       void scene_graph();
       void display_scene_hierarchy(Entity entity);
-      void show_transform_component(NodeComponent* node, TransformComponent* transform);
+      void show_transform_component(NodeComponent* node, const TransformComponent* transform);
       void show_mesh_component(const MeshComponent* mesh_component);
-      void show_light_component(LightComponent* light, TransformComponent* transform);
+      void show_light_component(LightComponent* light, const TransformComponent* transform);
       void show_camera_component(CameraComponent* camera);
       void show_node_component();
       void show_scene_hierarchy_window();
@@ -68,7 +72,7 @@ namespace gestalt::application {
 
     public:
       Gui(IGpu& gpu, Window& window, VkFormat swapchain_format, Repository& repository,
-          GuiCapabilities actions);
+          EventBus& event_bus, GuiCapabilities actions);
       ~Gui();
 
       Gui(const Gui&) = delete;
