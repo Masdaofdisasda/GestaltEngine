@@ -24,6 +24,7 @@
 #include "Events/Events.hpp"
 #include "Interface/IGpu.hpp"
 #include "Mesh/MeshSurface.hpp"
+#include <glm/gtx/quaternion.hpp>
 
 namespace gestalt::application {
 
@@ -133,9 +134,29 @@ namespace gestalt::application {
       ImGuizmo::BeginFrame();
 
       const Entity camera_entity = actions_.get_active_camera();
-      const auto cam = repository_.camera_components.find(camera_entity);
-      auto viewCam = cam->view_matrix;
-      auto proj = cam->projection_matrix;
+      glm::mat4 viewCam{1.f};
+      glm::mat4 proj{1.f};
+      if (const auto cam = repository_.animation_camera_components.find(camera_entity); cam != nullptr) {
+        viewCam = cam->view_matrix();
+      } else if (const auto cam = repository_.free_fly_camera_components.find(camera_entity);
+                 cam != nullptr) {
+        viewCam = cam->view_matrix();
+      } else if (const auto cam = repository_.first_person_camera_components.find(camera_entity);
+                 cam != nullptr) {
+        viewCam = cam->view_matrix();
+      } else if (const auto cam = repository_.orbit_camera_components.find(camera_entity);
+                 cam != nullptr) {
+        viewCam = cam->view_matrix();
+      }
+      if (const auto cam = repository_.perspective_projection_components.find(camera_entity);
+          cam != nullptr) {
+        proj = cam->projection_matrix();
+      } else if (const auto cam
+                 = repository_.orthographic_projection_components.find(camera_entity);
+                 cam != nullptr) {
+        proj = cam->projection_matrix();
+      }
+
       proj[1][1] *= -1;  // Flip the Y-axis for opengl like system
 
       // Convert glm matrices to arrays for ImGuizmo
@@ -483,19 +504,75 @@ namespace gestalt::application {
 
     void Gui::cameras() {
       if (ImGui::Begin("Cameras")) {
-        auto cameras
-            = repository_.camera_components.snapshot();
 
-        static int selectedCameraIndex = 0;
-        if (!cameras.empty()) {
-          ImGui::SliderInt("Select Camera", &selectedCameraIndex, 0, cameras.size() - 1);
+        if (ImGui::CollapsingHeader("Animation Cameras", ImGuiTreeNodeFlags_DefaultOpen)) {
+          auto cameras = repository_.animation_camera_components.snapshot();
 
-          auto& [entity, camera_component] = cameras[selectedCameraIndex];
+          static int selectedCameraIndex = 0;
+          if (!cameras.empty()) {
+            ImGui::SliderInt("Select Camera", &selectedCameraIndex, 0, cameras.size() - 1);
 
-          show_camera_component(&camera_component);
-          ImGui::Separator();
-          if(ImGui::Button("Set as Active Camera")) { actions_.set_active_camera(entity); }
+            auto& [entity, camera_component] = cameras[selectedCameraIndex];
+
+            show_camera_component(&camera_component);
+            ImGui::Separator();
+            if (ImGui::Button("Set as Active Camera")) {
+              actions_.set_active_camera(entity);
+            }
+          }
         }
+
+        if (ImGui::CollapsingHeader("First Person Cameras", ImGuiTreeNodeFlags_DefaultOpen)) {
+          auto cameras = repository_.first_person_camera_components.snapshot();
+
+          static int selectedCameraIndex = 0;
+          if (!cameras.empty()) {
+            ImGui::SliderInt("Select Camera", &selectedCameraIndex, 0, cameras.size() - 1);
+
+            auto& [entity, camera_component] = cameras[selectedCameraIndex];
+
+            show_camera_component(&camera_component);
+            ImGui::Separator();
+            if (ImGui::Button("Set as Active Camera")) {
+              actions_.set_active_camera(entity);
+            }
+          }
+        }
+
+        if (ImGui::CollapsingHeader("Free Fly Cameras", ImGuiTreeNodeFlags_DefaultOpen)) {
+          auto cameras = repository_.free_fly_camera_components.snapshot();
+
+          static int selectedCameraIndex = 0;
+          if (!cameras.empty()) {
+            ImGui::SliderInt("Select Camera", &selectedCameraIndex, 0, cameras.size() - 1);
+
+            auto& [entity, camera_component] = cameras[selectedCameraIndex];
+
+            show_camera_component(&camera_component);
+            ImGui::Separator();
+            if (ImGui::Button("Set as Active Camera")) {
+              actions_.set_active_camera(entity);
+            }
+          }
+        }
+
+        if (ImGui::CollapsingHeader("Orbit Cameras", ImGuiTreeNodeFlags_DefaultOpen)) {
+          auto cameras = repository_.orbit_camera_components.snapshot();
+
+          static int selectedCameraIndex = 0;
+          if (!cameras.empty()) {
+            ImGui::SliderInt("Select Camera", &selectedCameraIndex, 0, cameras.size() - 1);
+
+            auto& [entity, camera_component] = cameras[selectedCameraIndex];
+
+            show_camera_component(&camera_component);
+            ImGui::Separator();
+            if (ImGui::Button("Set as Active Camera")) {
+              actions_.set_active_camera(entity);
+            }
+          }
+        }
+
       }
       ImGui::End();
     }
@@ -1197,71 +1274,167 @@ namespace gestalt::application {
           UpdateSpotLightEvent{selected_entity_, range, cosf(innerRadians), cosf(outerRadians)});
     }
 
-    void Gui::show_camera_component(CameraComponent* camera) {
-      std::visit(
-          [&](auto&& projection) {
-            using T = std::decay_t<decltype(projection)>;
-            if constexpr (std::is_same_v<T, PerspectiveProjectionData>) {
-              ImGui::Text("Perspective Projection:");
-              float fovInDegrees = projection.fov * 180.0f / glm::pi<float>();
-              if (ImGui::SliderFloat("Field of View (Degrees)", &fovInDegrees, 30.0f, 120.0f,
-                                     "%.1f")) {
-                // Convert the FOV back to radians when the user changes the slider value
-                projection.fov = fovInDegrees * (glm::pi<float>() / 180.0f);
-              }
-              ImGui::SliderFloat("Near Clip", &projection.near, 0.01f, 10.0f, "%.2f");
-              ImGui::SliderFloat("Far Clip", &projection.far, 10.0f, 10000.0f, "%.2f",
-                                 ImGuiSliderFlags_Logarithmic);
-            } else if constexpr (std::is_same_v<T, OrthographicProjectionData>) {
-              ImGui::Text("Orthographic Projection:");
-              ImGui::SliderFloat("Left", &projection.left, -100.0f, 100.0f, "%.2f");
-              ImGui::SliderFloat("Right", &projection.right, -100.0f, 100.0f, "%.2f");
-              ImGui::SliderFloat("Bottom", &projection.bottom, -100.0f, 100.0f, "%.2f");
-              ImGui::SliderFloat("Top", &projection.top, -100.0f, 100.0f, "%.2f");
-              ImGui::SliderFloat("Near Clip", &projection.near, 0.01f, 10.0f, "%.2f");
-              ImGui::SliderFloat("Far Clip", &projection.far, 10.0f, 10000.0f, "%.2f",
-                                 ImGuiSliderFlags_Logarithmic);
-            }
-          },
-          camera->projection_data);
-      ImGui::Separator();
-      std::visit(
-          [&](auto&& cam) {
-            using T = std::decay_t<decltype(cam)>;
+    void Gui::show_camera_component(const AnimationCameraComponent* camera) {
+      ImGui::Text("Animation Camera:");
+      ImGui::Text("Current Position: (%.2f, %.2f, %.2f)", camera->position().x,
+                  camera->position().y, camera->position().z);
+      ImGui::Text("Current Orientation (Quat): (%.2f, %.2f, %.2f, %.2f)", camera->orientation().x,
+                  camera->orientation().y, camera->orientation().z, camera->orientation().w);
+    }
 
-            if constexpr (std::is_same_v<T, FreeFlyCameraData>) {
-              ImGui::Text("FreeFly Camera:");
-              ImGui::SliderFloat("Mouse Speed", &cam.mouse_speed, 0.1f, 10.0f, "%.2f");
-              ImGui::SliderFloat("Acceleration", &cam.acceleration, 0.1f, 100.0f, "%.2f");
-              ImGui::SliderFloat("Damping", &cam.damping, 0.1f, 1, "%.2f");
-              ImGui::SliderFloat("Max Speed", &cam.max_speed, 0.01f, 10.0f, "%.2f");
-              ImGui::SliderFloat("Fast Coefficient", &cam.fast_coef, 0.1f, 10.0f, "%.2f");
-              ImGui::SliderFloat("Slow Coefficient", &cam.slow_coef, 0.0001f, 1.0f, "%.4f");
-            } else if constexpr (std::is_same_v<T, FirstPersonCameraData>) {
-              ImGui::Text("FirstPerson Camera:");
-              ImGui::SliderFloat("Mouse Speed", &cam.mouse_speed, 0.1f, 10.0f, "%.2f");
-              ImGui::Text("Up Vector: (%.2f, %.2f, %.2f)", cam.up.x, cam.up.y,
-                          cam.up.z);  // Display Up Vector
-            } else if constexpr (std::is_same_v<T, OrbitCameraData>) {
-              ImGui::Text("Orbit Camera:");
-              ImGui::SliderFloat("Distance", &cam.distance, cam.min_distance, cam.max_distance,
-                                 "%.2f");
-              ImGui::SliderFloat("Yaw", &cam.yaw, -180.0f, 180.0f, "%.2f");
-              ImGui::SliderFloat("Pitch", &cam.pitch, -90.0f, 90.0f, "%.2f");
-              ImGui::SliderFloat("Orbit Speed", &cam.orbit_speed, 0.1f, 10.0f, "%.2f");
-              ImGui::SliderFloat("Zoom Speed", &cam.zoom_speed, 0.01f, 1.0f, "%.2f");
-              ImGui::SliderFloat("Pan Speed", &cam.pan_speed, 0.1f, 100.0f, "%.2f");
-              ImGui::Text("Target: (%.2f, %.2f, %.2f)", cam.target.x, cam.target.y,
-                          cam.target.z);  // Display Target
-            } else if constexpr (std::is_same_v<T, AnimationCameraData>) {
-              ImGui::Text("Animation Camera:");
-              ImGui::Text("Current Position: (%.2f, %.2f, %.2f)", cam.position.x, cam.position.y,
-                          cam.position.z);
-              ImGui::Text("Current Orientation (Quat): (%.2f, %.2f, %.2f, %.2f)", cam.orientation.x,
-                          cam.orientation.y, cam.orientation.z, cam.orientation.w);
-            }
-          },
-          camera->camera_data);
+    void Gui::show_camera_component(const FreeFlyCameraComponent* camera) {
+      ImGui::Text("FreeFly Camera:");
+      auto mouse_speed = camera->mouse_speed();
+      if (ImGui::SliderFloat("Mouse Speed", &mouse_speed, 0.1f, 10.0f, "%.2f")) {
+        event_bus_.emit<UpdateFreeFlyCameraEvent>(UpdateFreeFlyCameraEvent{
+            selected_entity_, mouse_speed, camera->acceleration(), camera->damping(),
+            camera->max_speed(), camera->fast_coef(), camera->slow_coef()});
+      }
+      auto acceleration = camera->acceleration();
+      if (ImGui::SliderFloat("Acceleration", &acceleration, 0.1f, 100.0f, "%.2f")) {
+        event_bus_.emit<UpdateFreeFlyCameraEvent>(UpdateFreeFlyCameraEvent{
+            selected_entity_, camera->mouse_speed(), acceleration, camera->damping(),
+            camera->max_speed(), camera->fast_coef(), camera->slow_coef()});
+      }
+      auto damping = camera->damping();
+      if (ImGui::SliderFloat("Damping", &damping, 0.1f, 1, "%.2f")) {
+        event_bus_.emit<UpdateFreeFlyCameraEvent>(UpdateFreeFlyCameraEvent{
+            selected_entity_, camera->mouse_speed(), camera->acceleration(), damping,
+            camera->max_speed(), camera->fast_coef(), camera->slow_coef()});
+      }
+      auto max_speed = camera->max_speed();
+      if (ImGui::SliderFloat("Max Speed", &max_speed, 0.01f, 10.0f, "%.2f")) {
+        event_bus_.emit<UpdateFreeFlyCameraEvent>(UpdateFreeFlyCameraEvent{
+            selected_entity_, camera->mouse_speed(), camera->acceleration(), camera->damping(),
+            max_speed, camera->fast_coef(), camera->slow_coef()});
+      }
+      auto fast_coef = camera->fast_coef();
+      if (ImGui::SliderFloat("Fast Coefficient", &fast_coef, 0.1f, 10.0f, "%.2f")) {
+        event_bus_.emit<UpdateFreeFlyCameraEvent>(UpdateFreeFlyCameraEvent{
+            selected_entity_, camera->mouse_speed(), camera->acceleration(), camera->damping(),
+            camera->max_speed(), fast_coef, camera->slow_coef()});
+      }
+      auto slow_coef = camera->slow_coef();
+      if (ImGui::SliderFloat("Slow Coefficient", &slow_coef, 0.0001f, 1.0f, "%.4f")) {
+        event_bus_.emit<UpdateFreeFlyCameraEvent>(UpdateFreeFlyCameraEvent{
+            selected_entity_, camera->mouse_speed(), camera->acceleration(), camera->damping(),
+            camera->max_speed(), camera->fast_coef(), slow_coef});
+      }
+    }
+
+    void Gui::show_camera_component(const FirstPersonCameraComponent* camera) {
+      ImGui::Text("FirstPerson Camera:");
+      auto mouse_speed = camera->mouse_speed();
+      if (ImGui::SliderFloat("Mouse Speed", &mouse_speed, 0.1f, 10.0f, "%.2f")) {
+        event_bus_.emit<UpdateFirstPersonCameraEvent>(
+            UpdateFirstPersonCameraEvent{selected_entity_, mouse_speed});
+      }
+    }
+
+    void Gui::show_camera_component(const OrbitCameraComponent* camera) {
+      ImGui::Text("Orbit Camera:");
+      auto distance = camera->distance();
+      if (ImGui::SliderFloat("Distance", &distance, camera->min_distance(), camera->max_distance(),
+                             "%.2f")) {
+        event_bus_.emit<UpdateOrbitCameraEvent>(UpdateOrbitCameraEvent{
+            selected_entity_, distance, camera->yaw(), camera->pitch(), camera->orbit_speed(),
+            camera->zoom_speed(), camera->pan_speed()});
+      }
+      auto yaw = camera->yaw();
+      if (ImGui::SliderFloat("Yaw", &yaw, -180.0f, 180.0f, "%.2f")) {
+        event_bus_.emit<UpdateOrbitCameraEvent>(UpdateOrbitCameraEvent{
+            selected_entity_, camera->distance(), yaw, camera->pitch(), camera->orbit_speed(),
+            camera->zoom_speed(), camera->pan_speed()});
+      }
+      auto pitch = camera->pitch();
+      if (ImGui::SliderFloat("Pitch", &pitch, -90.0f, 90.0f, "%.2f")) {
+        event_bus_.emit<UpdateOrbitCameraEvent>(UpdateOrbitCameraEvent{
+            selected_entity_, camera->distance(), camera->yaw(), pitch, camera->orbit_speed(),
+            camera->zoom_speed(), camera->pan_speed()});
+      }
+      auto orbit_speed = camera->orbit_speed();
+      if (ImGui::SliderFloat("Orbit Speed", &orbit_speed, 0.1f, 10.0f, "%.2f")) {
+        event_bus_.emit<UpdateOrbitCameraEvent>(UpdateOrbitCameraEvent{
+            selected_entity_, camera->distance(), camera->yaw(), camera->pitch(), orbit_speed,
+            camera->zoom_speed(), camera->pan_speed()});
+      }
+      auto zoom_speed = camera->zoom_speed();
+      if (ImGui::SliderFloat("Zoom Speed", &zoom_speed, 0.01f, 1.0f, "%.2f")) {
+        event_bus_.emit<UpdateOrbitCameraEvent>(UpdateOrbitCameraEvent{
+            selected_entity_, camera->distance(), camera->yaw(), camera->pitch(),
+            camera->orbit_speed(), zoom_speed, camera->pan_speed()});
+      }
+      auto pan_speed = camera->pan_speed();
+      if (ImGui::SliderFloat("Pan Speed", &pan_speed, 0.1f, 100.0f, "%.2f")) {
+        event_bus_.emit<UpdateOrbitCameraEvent>(UpdateOrbitCameraEvent{
+            selected_entity_, camera->distance(), camera->yaw(), camera->pitch(),
+            camera->orbit_speed(), camera->zoom_speed(), pan_speed});
+      }
+      ImGui::Text("Target: (%.2f, %.2f, %.2f)", camera->target().x, camera->target().y,
+                  camera->target().z);  // Display Target
+    }
+
+    void Gui::show_projection_component(const PerspectiveProjectionComponent* projection) {
+      ImGui::Text("Perspective Projection:");
+      float fovInDegrees = projection->fov() * 180.0f / glm::pi<float>();
+      if (ImGui::SliderFloat("Field of View (Degrees)", &fovInDegrees, 30.0f, 120.0f, "%.1f")) {
+        // Convert the FOV back to radians when the user changes the slider value
+        const float32 fov = fovInDegrees * (glm::pi<float>() / 180.0f);
+        event_bus_.emit<UpdatePerspectiveProjectionEvent>(UpdatePerspectiveProjectionEvent{
+            selected_entity_, fov, projection->near(), projection->far()});
+      }
+      auto near = projection->near();
+      if (ImGui::SliderFloat("Near Clip", &near, 0.01f, 10.0f, "%.2f")) {
+        event_bus_.emit<UpdatePerspectiveProjectionEvent>(UpdatePerspectiveProjectionEvent{
+            selected_entity_, projection->fov(), near, projection->far()});
+      }
+      auto far = projection->far();
+      if (ImGui::SliderFloat("Far Clip", &far, 10.0f, 10000.0f, "%.2f",
+                             ImGuiSliderFlags_Logarithmic)) {
+        event_bus_.emit<UpdatePerspectiveProjectionEvent>(UpdatePerspectiveProjectionEvent{
+            selected_entity_, projection->fov(), projection->near(), far});
+      }
+    }
+
+    void Gui::show_projection_component(const OrthographicProjectionComponent* projection) {
+              ImGui::Text("Orthographic Projection:");
+      auto left = projection->left();
+      if (ImGui::SliderFloat("Left", &left, -100.0f, 100.0f, "%.2f")) {
+        event_bus_.emit<UpdateOrthographicProjectionEvent>(UpdateOrthographicProjectionEvent{
+            selected_entity_, left, projection->right(), projection->bottom(), projection->top(),
+            projection->near(), projection->far()});
+      }
+      auto right = projection->right();
+      if (ImGui::SliderFloat("Right", &right, -100.0f, 100.0f, "%.2f")) {
+        event_bus_.emit<UpdateOrthographicProjectionEvent>(UpdateOrthographicProjectionEvent{
+            selected_entity_, projection->left(), right, projection->bottom(), projection->top(),
+            projection->near(), projection->far()});
+      }
+      auto bottom = projection->bottom();
+      if (ImGui::SliderFloat("Bottom", &bottom, -100.0f, 100.0f, "%.2f")) {
+        event_bus_.emit<UpdateOrthographicProjectionEvent>(UpdateOrthographicProjectionEvent{
+            selected_entity_, projection->left(), projection->right(), bottom,
+            projection->top(), projection->near(), projection->far()});
+      }
+      auto top = projection->top();
+      if (ImGui::SliderFloat("Top", &top, -100.0f, 100.0f, "%.2f")) {
+        event_bus_.emit<UpdateOrthographicProjectionEvent>(UpdateOrthographicProjectionEvent{
+            selected_entity_, projection->left(), projection->right(), projection->bottom(),
+            top, projection->near(), projection->far()});
+      }
+      auto near = projection->near();
+      if (ImGui::SliderFloat("Near Clip", &near, 0.01f, 10.0f, "%.2f")) {
+        event_bus_.emit<UpdateOrthographicProjectionEvent>(UpdateOrthographicProjectionEvent{
+            selected_entity_, projection->left(), projection->right(), projection->bottom(),
+            projection->top(), near, projection->far()});
+      }
+      auto far = projection->far();
+      if (ImGui::SliderFloat("Far Clip", &far, 10.0f, 10000.0f, "%.2f",
+                             ImGuiSliderFlags_Logarithmic)) {
+        event_bus_.emit<UpdateOrthographicProjectionEvent>(UpdateOrthographicProjectionEvent{
+            selected_entity_, projection->left(), projection->right(), projection->bottom(),
+            projection->top(), projection->near(), far});
+      }
     }
 
     void Gui::show_node_component() {
@@ -1304,10 +1477,35 @@ namespace gestalt::application {
           }
         }
 
-        const auto camera = repository_.camera_components.find_mutable(selected_entity_);
-        if (camera != nullptr) {
-          if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (const auto camera = repository_.animation_camera_components.find(selected_entity_); camera != nullptr) {
+          if (ImGui::CollapsingHeader("Animation Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
             show_camera_component(camera);
+          }
+        } else if (const auto camera = repository_.first_person_camera_components.find(selected_entity_); camera != nullptr) {
+          if (ImGui::CollapsingHeader("First Person Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
+            show_camera_component(camera);
+          }
+        } else if (const auto camera = repository_.free_fly_camera_components.find(selected_entity_); camera != nullptr) {
+          if (ImGui::CollapsingHeader("Free Fly Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
+            show_camera_component(camera);
+          }
+        } else if (const auto camera = repository_.orbit_camera_components.find(selected_entity_); camera != nullptr) {
+          if (ImGui::CollapsingHeader("Orbit Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
+            show_camera_component(camera);
+          }
+        }
+
+        if (const auto projection
+            = repository_.perspective_projection_components.find(selected_entity_);
+            projection != nullptr) {
+          if (ImGui::CollapsingHeader("Perspective Projection", ImGuiTreeNodeFlags_DefaultOpen)) {
+            show_projection_component(projection);
+          }
+        } else if (const auto projection
+                   = repository_.orthographic_projection_components.find(selected_entity_);
+                   projection != nullptr) {
+          if (ImGui::CollapsingHeader("Orthographic Projection", ImGuiTreeNodeFlags_DefaultOpen)) {
+            show_projection_component(projection);
           }
         }
       }

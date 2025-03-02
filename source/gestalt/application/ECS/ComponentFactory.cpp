@@ -7,7 +7,6 @@
 #include "Animation/Keyframe.hpp"
 #include "Camera/AnimationCameraData.hpp"
 #include "Components/AnimationComponent.hpp"
-#include "Components/CameraComponent.hpp"
 #include "Components/DirectionalLightComponent.hpp"
 #include "Components/MeshComponent.hpp"
 #include "Components/NodeComponent.hpp"
@@ -246,42 +245,85 @@ namespace gestalt::application {
   Entity ComponentFactory::add_free_fly_camera(const glm::vec3& position,
                                                  const glm::vec3& direction, const glm::vec3& up,
                                                  const Entity entity,
-                                                 const ProjectionData projection_data) const {
+                                                 const PerspectiveProjectionComponent projection) const {
       const auto free_fly_component
-          = CameraComponent(projection_data,
-          FreeFlyCameraData(position, direction, up));
-      repository_.camera_components.upsert(entity, free_fly_component);
+        = FreeFlyCameraComponent(position, direction, up);
+      repository_.free_fly_camera_components.upsert(entity, free_fly_component);
+      repository_.perspective_projection_components.upsert(entity, projection);
+
+      return entity;
+  }
+
+  Entity ComponentFactory::add_free_fly_camera(const glm::vec3& position,
+                                                 const glm::vec3& direction, const glm::vec3& up,
+                                                 const Entity entity,
+                                                 const OrthographicProjectionComponent projection) const {
+      const auto free_fly_component
+        = FreeFlyCameraComponent(position, direction, up);
+      repository_.free_fly_camera_components.upsert(entity, free_fly_component);
+      repository_.orthographic_projection_components.upsert(entity, projection);
 
       return entity;
   }
 
   Entity ComponentFactory::add_animation_camera(const glm::vec3& position, const glm::quat& orientation, const Entity entity,
-                                                const ProjectionData projection_data) const {
+                                                const PerspectiveProjectionComponent projection) const {
     const auto animation_component
-        = CameraComponent(projection_data, AnimationCameraData(position, orientation));
-    repository_.camera_components.upsert(entity, animation_component);
+        = AnimationCameraComponent(position, orientation);
+    repository_.animation_camera_components.upsert(entity, animation_component);
+    repository_.perspective_projection_components.upsert(entity, projection);
+
+    return entity;
+  }
+
+  Entity ComponentFactory::add_animation_camera(const glm::vec3& position, const glm::quat& orientation, const Entity entity,
+                                                const OrthographicProjectionComponent projection) const {
+    const auto animation_component
+        = AnimationCameraComponent(position, orientation);
+    repository_.animation_camera_components.upsert(entity, animation_component);
+    repository_.orthographic_projection_components.upsert(entity, projection);
 
     return entity;
   }
 
   Entity ComponentFactory::add_orbit_camera(const glm::vec3& target, const Entity entity,
-                                            const ProjectionData projection_data) const {
-    const auto orbit_component = CameraComponent(projection_data,
-          OrbitCameraData(target));
-      repository_.camera_components.upsert(entity, orbit_component);
+                                            const PerspectiveProjectionComponent projection) const {
+    const auto orbit_component = OrbitCameraComponent(target);
+    repository_.orbit_camera_components.upsert(entity, orbit_component);
+    repository_.perspective_projection_components.upsert(entity, projection);
 
-      return entity;
-    }
+    return entity;
+  }
+  Entity ComponentFactory::add_orbit_camera(const glm::vec3& target, const Entity entity,
+                                            const OrthographicProjectionComponent projection) const {
+    const auto orbit_component = OrbitCameraComponent(target);
+    repository_.orbit_camera_components.upsert(entity, orbit_component);
+    repository_.orthographic_projection_components.upsert(entity, projection);
 
-  Entity ComponentFactory::add_first_person_camera(const glm::vec3& position, const Entity entity,
-                                                     const ProjectionData projection_data) const {
-      const auto first_person_component = CameraComponent(
-          projection_data,
-          FirstPersonCameraData(position, glm::vec3(0.f,1.f, 0.f)));
-      repository_.camera_components.upsert(entity, first_person_component);
+    return entity;
+  }
 
-      return entity;
-    }
+  Entity ComponentFactory::add_first_person_camera(
+      const glm::vec3& position, const Entity entity,
+      const PerspectiveProjectionComponent projection) const {
+    const auto first_person_component
+        = FirstPersonCameraComponent(position, glm::vec3(0.f, 1.f, 0.f));
+    repository_.first_person_camera_components.upsert(entity, first_person_component);
+    repository_.perspective_projection_components.upsert(entity, projection);
+
+    return entity;
+  }
+
+  Entity ComponentFactory::add_first_person_camera(
+      const glm::vec3& position, const Entity entity,
+      const OrthographicProjectionComponent projection) const {
+    const auto first_person_component
+        = FirstPersonCameraComponent(position, glm::vec3(0.f, 1.f, 0.f));
+    repository_.first_person_camera_components.upsert(entity, first_person_component);
+    repository_.orthographic_projection_components.upsert(entity, projection);
+
+    return entity;
+  }
 
     void ComponentFactory::link_entity_to_parent(const Entity child, const Entity parent) {
       if (child == parent) {

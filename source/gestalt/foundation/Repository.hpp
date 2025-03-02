@@ -9,12 +9,17 @@
 #include "Buffer/MeshBuffer.hpp"
 #include "Buffer/PerFrameDataBuffer.hpp"
 #include "Buffer/RayTracingBuffer.hpp"
+#include "Components/AnimationCameraComponent.hpp"
 #include "Components/AnimationComponent.hpp"
-#include "Components/CameraComponent.hpp"
 #include "Components/DirectionalLightComponent.hpp"
 #include "Components/Entity.hpp"
+#include "Components/FirstPersonCameraComponent.hpp"
+#include "Components/FreeFlyCameraComponent.hpp"
 #include "Components/MeshComponent.hpp"
 #include "Components/NodeComponent.hpp"
+#include "Components/OrbitCameraComponent.hpp"
+#include "Components/OrthographicProjectionComponent.hpp"
+#include "Components/PerspectiveProjectionComponent.hpp"
 #include "Components/TransformComponent.hpp"
 #include "Components/PhysicsComponent.hpp"
 #include "Components/PointLightComponent.hpp"
@@ -156,10 +161,18 @@ namespace gestalt::foundation {
 
     ComponentStorage<NodeComponent> scene_graph;
     ComponentStorage<MeshComponent> mesh_components;
-    ComponentStorage<CameraComponent> camera_components;
+
+    ComponentStorage<AnimationCameraComponent> animation_camera_components;
+    ComponentStorage<FirstPersonCameraComponent> first_person_camera_components;
+    ComponentStorage<FreeFlyCameraComponent> free_fly_camera_components;
+    ComponentStorage<OrbitCameraComponent> orbit_camera_components;
+    ComponentStorage<PerspectiveProjectionComponent> perspective_projection_components;
+    ComponentStorage<OrthographicProjectionComponent> orthographic_projection_components;
+
     ComponentStorage<DirectionalLightComponent> directional_light_components;
     ComponentStorage<PointLightComponent> point_light_components;
     ComponentStorage<SpotLightComponent> spot_light_components;
+
     ComponentStorage<AnimationComponent> animation_components;
     ComponentStorage<TransformComponent> transform_components;
     ComponentStorage<PhysicsComponent> physics_components;

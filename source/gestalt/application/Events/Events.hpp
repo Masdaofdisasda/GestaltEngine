@@ -57,10 +57,61 @@ namespace gestalt::application {
     float32 outer_cos;
   };
 
-  struct UpdateCameraProjectionEvent {
-    UpdateCameraProjectionEvent(Entity entity, PerspectiveProjectionData perspective_projection)
-        : entity(entity), perspective_projection(perspective_projection) {}
+  struct UpdatePerspectiveProjectionEvent {
+    UpdatePerspectiveProjectionEvent(Entity entity, float32 fov, float32 near, float32 far)
+        : entity(entity), fov(fov), near(near), far(far) {}
     Entity entity;
-    PerspectiveProjectionData perspective_projection;
+    float32 fov, near, far;
+  };
+
+  struct UpdateOrthographicProjectionEvent {
+    UpdateOrthographicProjectionEvent(Entity entity, float32 left, float32 right, float32 bottom,
+                                      float32 top, float32 near, float32 far)
+        : entity(entity),
+          left(left),
+          right(right),
+          bottom(bottom),
+          top(top),
+          near(near),
+          far(far) {}
+    Entity entity;
+    float32 left, right, bottom, top, near, far;
+  };
+
+  struct UpdateFirstPersonCameraEvent {
+    UpdateFirstPersonCameraEvent(Entity entity, float32 mouse_speed)
+        : entity(entity), mouse_speed(mouse_speed) {}
+    Entity entity;
+    float32 mouse_speed;
+  };
+
+  struct UpdateFreeFlyCameraEvent {
+    UpdateFreeFlyCameraEvent(Entity entity, float32 mouse_speed, float32 acceleration,
+                             float32 damping, float32 max_speed, float32 fast_coef,
+                             float32 slow_coef)
+        : entity(entity),
+          mouse_speed(mouse_speed),
+          acceleration(acceleration),
+          damping(damping),
+          max_speed(max_speed),
+          fast_coef(fast_coef),
+          slow_coef(slow_coef) {}
+    Entity entity;
+
+    float32 mouse_speed, acceleration, damping, max_speed, fast_coef, slow_coef;
+  };
+
+  struct UpdateOrbitCameraEvent {
+    UpdateOrbitCameraEvent(Entity entity, float32 distance, float32 yaw, float32 pitch,
+                           float32 orbit_speed, float32 zoom_speed, float32 pan_speed)
+        : entity(entity),
+          distance(distance),
+          yaw(yaw),
+          pitch(pitch),
+          orbit_speed(orbit_speed),
+          zoom_speed(zoom_speed),
+          pan_speed(pan_speed) {}
+    Entity entity;
+    float32 distance, yaw, pitch, orbit_speed, zoom_speed, pan_speed;
   };
 }  // namespace gestalt::application

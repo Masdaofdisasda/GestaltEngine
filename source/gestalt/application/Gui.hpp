@@ -63,7 +63,12 @@ namespace gestalt::application {
                                       const TransformComponent* transform);
       void show_spotlight_component(const SpotLightComponent* light,
                                     const TransformComponent* transform);
-      void show_camera_component(CameraComponent* camera);
+      void show_camera_component(const AnimationCameraComponent* camera);
+      void show_camera_component(const FreeFlyCameraComponent* camera);
+      void show_camera_component(const FirstPersonCameraComponent* camera);
+      void show_camera_component(const OrbitCameraComponent* camera);
+      void show_projection_component(const PerspectiveProjectionComponent* projection);
+      void show_projection_component(const OrthographicProjectionComponent* projection);
       void show_node_component();
       void show_scene_hierarchy_window();
       void light_adaptation_settings();

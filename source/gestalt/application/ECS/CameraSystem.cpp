@@ -7,10 +7,6 @@
 #include "PerFrameData.hpp"
 #include "Repository.hpp"
 #include "VulkanTypes.hpp"
-#include "Cameras/AnimationCamera.hpp"
-#include "Cameras/FirstPersonCamera.hpp"
-#include "Cameras/FreeFlyCamera.hpp"
-#include "Cameras/OrbitCamera.hpp"
 #include "Interface/IGpu.hpp"
 #include "Interface/IResourceAllocator.hpp"
 #include <Events/Events.hpp>
@@ -27,20 +23,76 @@ namespace gestalt::application {
         frame_(frame),
         event_bus_(event_bus)
   {
-    event_bus_.subscribe<UpdateCameraProjectionEvent>([this](const UpdateCameraProjectionEvent& event) {
-      auto camera = repository_.camera_components.find_mutable(event.entity);
-      std::visit(
-          [&](auto&& projection) {
-            using T = std::decay_t<decltype(projection)>;
-            if constexpr (std::is_same_v<T, PerspectiveProjectionData>) {
-                projection = event.perspective_projection;
-            }
-          },
-          camera->projection_data);
+    event_bus_.subscribe<UpdateFirstPersonCameraEvent>(
+        [this](const UpdateFirstPersonCameraEvent& event) {
+          const auto first_person_camera
+              = repository_.first_person_camera_components.find_mutable(event.entity);
+          if (first_person_camera != nullptr) {
+            first_person_camera->set_mouse_speed(event.mouse_speed);
+          }
+        });
+
+    event_bus_.subscribe<UpdateFreeFlyCameraEvent>([this](const UpdateFreeFlyCameraEvent& event) {
+      const auto free_fly_camera
+          = repository_.free_fly_camera_components.find_mutable(event.entity);
+      if (free_fly_camera != nullptr) {
+        free_fly_camera->set_mouse_speed(event.mouse_speed);
+        free_fly_camera->set_acceleration(event.acceleration);
+        free_fly_camera->set_damping(event.damping);
+        free_fly_camera->set_max_speed(event.max_speed);
+        free_fly_camera->set_fast_coef(event.fast_coef);
+        free_fly_camera->set_slow_coef(event.slow_coef);
+      }
     });
 
-    const auto cameras = repository_.camera_components.snapshot();
-    if (!cameras.empty()) {
+    event_bus_.subscribe<UpdateOrbitCameraEvent>([this](const UpdateOrbitCameraEvent& event) {
+      const auto orbit_camera = repository_.orbit_camera_components.find_mutable(event.entity);
+      if (orbit_camera != nullptr) {
+        orbit_camera->set_distance(event.distance);
+        orbit_camera->set_yaw(event.yaw);
+        orbit_camera->set_pitch(event.pitch);
+        orbit_camera->set_orbit_speed(event.orbit_speed);
+        orbit_camera->set_zoom_speed(event.zoom_speed);
+        orbit_camera->set_pan_speed(event.pan_speed);
+      }
+    });
+
+    event_bus_.subscribe<UpdatePerspectiveProjectionEvent>(
+        [this](const UpdatePerspectiveProjectionEvent& event) {
+          const auto perspective_projection
+              = repository_.perspective_projection_components.find_mutable(event.entity);
+          if (perspective_projection != nullptr) {
+            perspective_projection->set_fov(event.fov);
+            perspective_projection->set_near(event.near);
+            perspective_projection->set_far(event.far);
+          }
+        });
+    event_bus.subscribe<UpdateOrthographicProjectionEvent>(
+        [this](const UpdateOrthographicProjectionEvent& event) {
+          const auto orthographic_projection
+              = repository_.orthographic_projection_components.find_mutable(event.entity);
+          if (orthographic_projection != nullptr) {
+            orthographic_projection->set_left(event.left);
+            orthographic_projection->set_right(event.right);
+            orthographic_projection->set_bottom(event.bottom);
+            orthographic_projection->set_top(event.top);
+            orthographic_projection->set_near(event.near);
+            orthographic_projection->set_far(event.far);
+          }
+        });
+
+    //TODO set this based on camera create event
+    if (const auto cameras = repository_.animation_camera_components.snapshot(); !cameras.empty()) {
+      active_camera_ = cameras.front().first;
+    } else
+    if (const auto cameras = repository_.first_person_camera_components.snapshot();
+        !cameras.empty()) {
+      active_camera_ = cameras.front().first;
+    } else
+    if (const auto cameras = repository_.free_fly_camera_components.snapshot(); !cameras.empty()) {
+      active_camera_ = cameras.front().first;
+    } else
+    if (const auto cameras = repository_.orbit_camera_components.snapshot(); !cameras.empty()) {
       active_camera_ = cameras.front().first;
     }
 
@@ -66,82 +118,64 @@ namespace gestalt::application {
     void CameraSystem::update(const float delta_time, const UserInput& movement, float aspect) {
       aspect_ratio_ = aspect;
 
-      active_camera_ = repository_.camera_components.snapshot().back().first;
-
-      auto camera_component = repository_.camera_components.find_mutable(active_camera_);
       auto transform_component = repository_.transform_components.find(active_camera_);
-      std::visit(
-          [&]<typename CameraDataType>(CameraDataType& camera_data) {
-            using T = std::decay_t<CameraDataType>;
-            if constexpr (std::is_same_v<T, FreeFlyCameraData>) {
-              FreeFlyCamera::update(delta_time, movement, camera_data);
-              event_bus_.emit<MoveEntityEvent>(
-                  MoveEntityEvent{active_camera_,camera_data.position,camera_data.orientation,transform_component->scale_uniform()
-              });
-            } else if constexpr (std::is_same_v<T, OrbitCameraData>) {
-              OrbitCamera::update(delta_time, movement, camera_data);
-              event_bus_.emit<MoveEntityEvent>(
-                  MoveEntityEvent{ active_camera_, camera_data.position,camera_data.orientation,transform_component->scale_uniform()});
-            } else if constexpr (std::is_same_v<T, FirstPersonCameraData>) {
-              camera_data.set_position(transform_component->position());
-              FirstPersonCamera::update(delta_time, movement, camera_data);
-              event_bus_.emit<MoveEntityEvent>(
-                  MoveEntityEvent{ active_camera_, camera_data.position,camera_data.orientation,transform_component->scale_uniform()});
-            } else if constexpr (std::is_same_v<T, AnimationCameraData>) {
-              camera_data.position = transform_component->position();
-              camera_data.orientation = transform_component->rotation();
-              AnimationCamera::update(delta_time, movement, camera_data);
-            }
-          },
-          camera_component->camera_data);
+      auto view_matrix = glm::mat4(1.0f);
+      if (const auto camera_component
+          = repository_.free_fly_camera_components.find_mutable(active_camera_);
+          camera_component != nullptr) {
+        camera_component->update(delta_time, movement);
+        view_matrix = camera_component->view_matrix();
+        event_bus_.emit<MoveEntityEvent>(
+            MoveEntityEvent{active_camera_, camera_component->position(),
+                            camera_component->orientation(), transform_component->scale_uniform()});
+      } else if (const auto camera_component
+                 = repository_.orbit_camera_components.find_mutable(active_camera_);
+                 camera_component != nullptr) {
+        camera_component->update(delta_time, movement);
+        view_matrix = camera_component->view_matrix();
+        event_bus_.emit<MoveEntityEvent>(
+            MoveEntityEvent{active_camera_, camera_component->position(),
+                            camera_component->orientation(), transform_component->scale_uniform()});
+      } else if (const auto camera_component
+                 = repository_.first_person_camera_components.find_mutable(active_camera_);
+                 camera_component != nullptr) {
+        camera_component->set_position(transform_component->position());
+        camera_component->update(movement);
+        view_matrix = camera_component->view_matrix();
+        event_bus_.emit<MoveEntityEvent>(
+            MoveEntityEvent{active_camera_, camera_component->position(),
+                            camera_component->orientation(), transform_component->scale_uniform()});
+      } else if (const auto camera_component
+                 = repository_.animation_camera_components.find_mutable(active_camera_);
+                 camera_component != nullptr) {
+        camera_component->set_position(transform_component->position());
+        camera_component->set_orientation(transform_component->rotation());
+        camera_component->update();
+        view_matrix = camera_component->view_matrix();
+      }
 
       const auto frame = frame_.get_current_frame_index();
-
       const auto& buffers = repository_.per_frame_data_buffers;
-
-      const glm::mat4 view_matrix = std::visit(
-          []<typename CameraDataType>(const CameraDataType& camera_data) -> glm::mat4 {
-            using T = std::decay_t<CameraDataType>;
-            if constexpr (std::is_same_v<T, FreeFlyCameraData>) {
-              return camera_data.get_view_matrix();
-            } else if constexpr (std::is_same_v<T, OrbitCameraData>) {
-              return camera_data.get_view_matrix();
-            } else if constexpr (std::is_same_v<T, FirstPersonCameraData>) {
-              return camera_data.get_view_matrix();
-            } else if constexpr (std::is_same_v<T, AnimationCameraData>) {
-              return camera_data.get_view_matrix();
-            } else {
-              return glm::mat4(1.0f);  // Default return value if no match
-            }
-          },
-          camera_component->camera_data);
 
       float32 near = 0.1f;
       float32 far = 1000.f;
-      glm::mat4 projection = std::visit(
-          [&]<typename ProjectionDataType>(const ProjectionDataType& projection_data) -> glm::mat4 {
-            using T = std::decay_t<ProjectionDataType>;
-            if constexpr (std::is_same_v<T, PerspectiveProjectionData>) {
-              near = projection_data.near;
-              far = projection_data.far;
-              return glm::perspective(projection_data.fov, aspect_ratio_, projection_data.near,
-                                      projection_data.far);
-            } else if constexpr (std::is_same_v<T, OrthographicProjectionData>) {
-              near = projection_data.near;
-              far = projection_data.far;
-              return glm::orthoRH_ZO(projection_data.left, projection_data.right,
-                                     projection_data.bottom, projection_data.top,
-                                     projection_data.near, projection_data.far);
-            } else {
-              return glm::mat4(1.0f);
-            }
-          },
-          camera_component->projection_data);
+
+    glm::mat4 projection{1.0f};
+
+    if (const auto camera_component
+        = repository_.perspective_projection_components.find_mutable(active_camera_);
+        camera_component != nullptr) {
+      camera_component->set_aspect_ratio(aspect_ratio_);
+      projection = camera_component->projection_matrix();
+    } else if (const auto camera_component
+               = repository_.orthographic_projection_components.find_mutable(active_camera_);
+               camera_component != nullptr) {
+      projection = camera_component->projection_matrix();
+    }
+
       projection[1][1] *= -1;
 
       glm::mat4 projection_t = transpose(projection);
-      camera_component->view_matrix = view_matrix;
-      camera_component->projection_matrix = projection;
       buffers->data[frame].view = view_matrix;
       buffers->data[frame].proj = projection;
       buffers->data[frame].inv_view = inverse(view_matrix);
@@ -150,34 +184,6 @@ namespace gestalt::application {
       buffers->data[frame].P11 = projection_t[1][1];
 
       if (!buffers->freezeCullCamera) {
-        buffers->data[frame].cullView = view_matrix;
-        buffers->data[frame].cullProj = projection;
-
-        buffers->data[frame].znear = near;
-        buffers->data[frame].zfar = far;
-
-        buffers->data[frame].frustum[0] = NormalizePlane(projection_t[3] + projection_t[0]);
-        buffers->data[frame].frustum[1] = NormalizePlane(projection_t[3] - projection_t[0]);
-        buffers->data[frame].frustum[2] = NormalizePlane(projection_t[3] + projection_t[1]);
-        buffers->data[frame].frustum[3] = NormalizePlane(projection_t[3] - projection_t[1]);
-        buffers->data[frame].frustum[4] = NormalizePlane(projection_t[3] + projection_t[2]);
-        buffers->data[frame].frustum[5] = NormalizePlane(projection_t[3] - projection_t[2]);
-      }
-
-      if constexpr (false) {
-        const glm::mat4 view_matrix = repository_.light_view_projections.get(0).view;
-        glm::mat4 projection = repository_.light_view_projections.get(0).proj;
-
-        glm::mat4 projection_t = transpose(projection);
-        camera_component->view_matrix = view_matrix;
-        camera_component->projection_matrix = projection;
-        buffers->data[frame].view = view_matrix;
-        buffers->data[frame].proj = projection;
-        buffers->data[frame].inv_view = inverse(view_matrix);
-        buffers->data[frame].inv_viewProj = inverse(projection * view_matrix);
-        buffers->data[frame].P00 = projection_t[0][0];
-        buffers->data[frame].P11 = projection_t[1][1];
-
         buffers->data[frame].cullView = view_matrix;
         buffers->data[frame].cullProj = projection;
 
