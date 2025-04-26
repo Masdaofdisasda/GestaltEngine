@@ -123,8 +123,6 @@ namespace gestalt::application {
         }
       }
 
-
-
       auto transform_component = repository_.transform_components.find(active_camera_);
       auto view_matrix = glm::mat4(1.0f);
       if (const auto camera_component
