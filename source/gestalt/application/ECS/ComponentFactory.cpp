@@ -5,7 +5,6 @@
 
 #include "Repository.hpp"
 #include "Animation/Keyframe.hpp"
-#include "Camera/AnimationCameraData.hpp"
 #include "Components/AnimationComponent.hpp"
 #include "Components/DirectionalLightComponent.hpp"
 #include "Components/MeshComponent.hpp"

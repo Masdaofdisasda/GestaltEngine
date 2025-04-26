@@ -81,21 +81,6 @@ namespace gestalt::application {
           }
         });
 
-    //TODO set this based on camera create event
-    if (const auto cameras = repository_.animation_camera_components.snapshot(); !cameras.empty()) {
-      active_camera_ = cameras.front().first;
-    } else
-    if (const auto cameras = repository_.first_person_camera_components.snapshot();
-        !cameras.empty()) {
-      active_camera_ = cameras.front().first;
-    } else
-    if (const auto cameras = repository_.free_fly_camera_components.snapshot(); !cameras.empty()) {
-      active_camera_ = cameras.front().first;
-    } else
-    if (const auto cameras = repository_.orbit_camera_components.snapshot(); !cameras.empty()) {
-      active_camera_ = cameras.front().first;
-    }
-
     const auto& per_frame_data_buffers = repository_.per_frame_data_buffers;
 
     per_frame_data_buffers->camera_buffer = resource_allocator_.create_buffer(BufferTemplate(
@@ -117,6 +102,28 @@ namespace gestalt::application {
 
     void CameraSystem::update(const float delta_time, const UserInput& movement, float aspect) {
       aspect_ratio_ = aspect;
+
+    // TODO set this based on camera create event
+      if (!repository_.animation_camera_components.find(active_camera_)
+          && !repository_.first_person_camera_components.find(active_camera_)
+          && !repository_.free_fly_camera_components.find(active_camera_)
+          && !repository_.orbit_camera_components.find(active_camera_)) {
+        if (const auto cameras = repository_.animation_camera_components.snapshot();
+            !cameras.empty()) {
+          active_camera_ = cameras.front().first;
+        } else if (const auto cameras = repository_.first_person_camera_components.snapshot();
+                   !cameras.empty()) {
+          active_camera_ = cameras.front().first;
+        } else if (const auto cameras = repository_.free_fly_camera_components.snapshot();
+                   !cameras.empty()) {
+          active_camera_ = cameras.front().first;
+        } else if (const auto cameras = repository_.orbit_camera_components.snapshot();
+                   !cameras.empty()) {
+          active_camera_ = cameras.front().first;
+        }
+      }
+
+
 
       auto transform_component = repository_.transform_components.find(active_camera_);
       auto view_matrix = glm::mat4(1.0f);

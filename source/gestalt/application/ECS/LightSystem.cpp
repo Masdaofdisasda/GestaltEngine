@@ -2,7 +2,6 @@
 
 #include "FrameProvider.hpp"
 
-#include "Camera/AnimationCameraData.hpp"
 #include "Components/DirectionalLightComponent.hpp"
 #include "Components/PointLightComponent.hpp"
 #include "Components/SpotLightComponent.hpp"

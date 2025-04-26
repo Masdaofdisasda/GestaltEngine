@@ -37,7 +37,7 @@ namespace gestalt::application {
     CameraSystem& operator=(CameraSystem&&) = delete;
 
     void set_active_camera(const Entity camera) { active_camera_ = camera; }
-    Entity get_active_camera() const { return active_camera_; }
+    [[nodiscard]] Entity get_active_camera() const { return active_camera_; }
 
     void update(float delta_time, const UserInput& movement, float aspect);
   };
