@@ -1,4 +1,4 @@
-message(STATUS "Configuring ${GRAPHICS_MODULE} module...")
+message(STATUS "Configuring Graphics module...")
 
 # automate file collection and source grouping
 function(add_sources_from_folder folder_name)
@@ -28,15 +28,14 @@ file(GLOB_RECURSE ROOT_SOURCES
 list(APPEND ALL_SOURCES ${ROOT_SOURCES})
 source_group("Source Files" FILES ${ROOT_SOURCES})
 
-add_library(${GRAPHICS_MODULE} ${ALL_SOURCES})
-
-target_compile_features(${GRAPHICS_MODULE} PRIVATE cxx_std_20)
+add_library(Graphics ${ALL_SOURCES})
 
 target_include_directories(
-  ${GRAPHICS_MODULE}
+  Graphics
   PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"
          "${vk-bootstrap_SOURCE_DIR}/src"
          "${tracy_SOURCE_DIR}/public"
 )
 
-target_link_libraries(${GRAPHICS_MODULE} PUBLIC ${APPLICATION_MODULE} ${FOUNDATION_MODULE})
+target_link_libraries(Graphics Application Foundation)
+set_folder(Graphics "Engine")

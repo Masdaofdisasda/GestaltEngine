@@ -1,0 +1,11 @@
+{
+    "applicationName": "Gestalt Engine",
+    "enableVulkanRayTracing": true,
+    "initialScene": "",
+    "physicalDeviceIndex": 0,
+    "useFullscreen": false,
+    "useValidationLayers": false,
+    "useVsync": false,
+    "windowedHeight": 900,
+    "windowedWidth": 1300
+}

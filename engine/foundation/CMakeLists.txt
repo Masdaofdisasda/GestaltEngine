@@ -1,4 +1,4 @@
-message(STATUS "Configuring ${APPLICATION_MODULE} module...")
+message(STATUS "Configuring Foundation module...")
 
 # automate file collection and source grouping
 function(add_sources_from_folder folder_name)
@@ -14,7 +14,7 @@ function(add_sources_from_folder folder_name)
 endfunction()
 
 # NOTE: source code will be added from these folders:
-set(FOLDERS "ECS" "Resource Loading" "Events")
+set(FOLDERS "Components" "Mesh" "Light" "Material" "Resources" "Buffer" "Animation" "Descriptor" "Interface")
 
 foreach(folder ${FOLDERS})
     add_sources_from_folder(${folder})
@@ -28,22 +28,19 @@ file(GLOB_RECURSE ROOT_SOURCES
 list(APPEND ALL_SOURCES ${ROOT_SOURCES})
 source_group("Source Files" FILES ${ROOT_SOURCES})
 
-add_library(${APPLICATION_MODULE} ${ALL_SOURCES})
-target_compile_features(${APPLICATION_MODULE} PRIVATE cxx_std_20)
+add_library(Foundation ${ALL_SOURCES})
 
 target_include_directories(
-  ${APPLICATION_MODULE}
+        Foundation
   PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"
-         "${fastgltf_SOURCE_DIR}/include"
-         "${meshoptimizer_SOURCE_DIR}/src"
-         "${Stb_SOURCE_DIR}"
-         "${SDL2_INCLUDE_DIR}"
-         "${SoLoud_SOURCE_DIR}/include"
-         "${imgui_SOURCE_DIR}"
-         "${imgui_SOURCE_DIR}/backends"
-         "${ImGuiFileDialog_SOURCE_DIR}"
-         "${ImGuizmo_SOURCE_DIR}"
-         "${JoltPhysics_SOURCE_DIR}"
+         "${Vulkan_INCLUDE_DIRS}"
+         "${VMA_SOURCE_DIR}/include"
+         "${volk_SOURCE_DIR}"
+         "${glm_SOURCE_DIR}"
+         "${fmt_SOURCE_DIR}/include"
+         "${nlohmann_json_SOURCE_DIR}/include"
 )
 
-target_link_libraries(${APPLICATION_MODULE} PUBLIC ${FOUNDATION_MODULE})
+target_link_libraries(Foundation PUBLIC volk)
+
+set_folder(Foundation "Engine")
