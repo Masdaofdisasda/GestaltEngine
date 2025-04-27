@@ -62,7 +62,7 @@ add_dependencies(GestaltApp Shaders)
 	
 target_link_libraries(
   GestaltApp
-  PRIVATE ${VULKAN_LIBRARY}
+  PRIVATE Vulkan::Vulkan
           DearImGui
           ImGuiFileDialog
           ImGuizmo

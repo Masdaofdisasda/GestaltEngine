@@ -149,25 +149,10 @@ set_target_properties(TracyClient PROPERTIES VS_GLOBAL_VcpkgEnabled false)
 set_property(TARGET TracyClient PROPERTY FOLDER "External/")
 
 # ------------ Vulkan ------------------------------
-# Assuming VULKAN_SDK is set in your environment
-set(VULKAN_SDK $ENV{VULKAN_SDK})
-message(STATUS "Vulkan SDK: ${VULKAN_SDK}")
+find_package(Vulkan REQUIRED)
 
-set(Vulkan_INCLUDE_DIRS "${VULKAN_SDK}/Include")
-message(STATUS "Vulkan INCLUDE_DIRS: ${Vulkan_INCLUDE_DIRS}")
-
-set(Vulkan_LIBRARIES "${VULKAN_SDK}/Lib")
-message(STATUS "Vulkan LIBRARIES: ${Vulkan_LIBRARIES}")
-
-if(WIN32)
-  set(VULKAN_LIBRARY "${Vulkan_LIBRARIES}/vulkan-1.lib")
-elseif(UNIX AND NOT APPLE)
-  set(VULKAN_LIBRARY "${Vulkan_LIBRARIES}/libvulkan.so")
-elseif(APPLE)
-  set(VULKAN_LIBRARY "${Vulkan_LIBRARIES}/libvulkan.dylib")
-endif()
-
-message(STATUS "Vulkan LIBRARY: ${VULKAN_LIBRARY}")
+message(STATUS "Found Vulkan include dir: ${Vulkan_INCLUDE_DIRS}")
+message(STATUS "Found Vulkan library: ${Vulkan_LIBRARIES}")
 
 # ------------ vk-bootstrap ------------------------------
 CPMAddPackage(
@@ -221,72 +206,120 @@ CPMAddPackage(
 set_property(TARGET soloud PROPERTY FOLDER "External")
 
 # ------------ imgui ------------------------------
+
+# --------------------------------------------------------------------
+# 1) Dear ImGui core
 CPMAddPackage(
-  NAME imgui
-  GITHUB_REPOSITORY ocornut/imgui
-  GIT_TAG v1.90.4
-)
-file(GLOB IMGUI_SOURCES ${imgui_SOURCE_DIR}/*.cpp
-     ${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp
-     ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl2.cpp
+        NAME            imgui
+        GITHUB_REPOSITORY ocornut/imgui
+        GIT_TAG         v1.90.4
 )
 
-add_library(DearImGui ${IMGUI_SOURCES})
-#add_library(imgui::imgui ALIAS DearImGui) # required for ImNodeFlow
+# ImGui ships without CMake.  Create our own tiny target that:
+#   • compiles the “core” files
+#   • later we’ll append backend .cpp’s with target_sources()
+add_library(DearImGui STATIC
+        ${imgui_SOURCE_DIR}/imgui.cpp
+        ${imgui_SOURCE_DIR}/imgui_demo.cpp
+        ${imgui_SOURCE_DIR}/imgui_draw.cpp
+        ${imgui_SOURCE_DIR}/imgui_tables.cpp
+        ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+)
 
-target_include_directories(DearImGui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
+# Public headers for anyone who links to DearImGui
+target_include_directories(DearImGui
+        PUBLIC
+        ${imgui_SOURCE_DIR}
+)
 
-target_link_libraries(DearImGui PRIVATE ${VULKAN_LIBRARY} SDL2-static)
+set_target_properties(DearImGui PROPERTIES FOLDER "External/ImGui")
 
-target_include_directories(DearImGui PRIVATE "${Vulkan_INCLUDE_DIRS}")
+# --------------------------------------------------------------------
+# 2) Back-ends (SDL2 + Vulkan)
+target_sources(DearImGui
+        PRIVATE
+        ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl2.cpp
+        ${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp
+)
 
-target_compile_definitions(DearImGui PRIVATE IMGUI_IMPL_VULKAN_NO_PROTOTYPES VK_NO_PROTOTYPES)
+# Back-end headers must also be visible to users (target_include_directories PUBLIC)
+target_include_directories(DearImGui
+        PUBLIC
+        ${imgui_SOURCE_DIR}/backends
+)
 
-set_property(TARGET DearImGui PROPERTY FOLDER "External/ImGUI")
+# Link the run-time dependencies the back-ends need.
+#  • Vulkan::Vulkan      – provided by find_package(Vulkan)
+#  • Gestalt_SDL2        – our thin wrapper for SDL2-static
+target_link_libraries(DearImGui
+        PRIVATE
+        Vulkan::Vulkan
+        Gestalt_SDL2
+)
 
-# Add ImNodeFlow
-#CPMAddPackage(
-#  NAME ImNodeFlow
-#  GITHUB_REPOSITORY Fattorino/ImNodeFlow
-#  GIT_TAG v1.2.1
-#  SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/includes/ImNodeFlow"
-#)
+# Tell ImGui back-ends that we use volk/no prototypes
+target_compile_definitions(DearImGui
+        PRIVATE
+        IMGUI_IMPL_VULKAN_NO_PROTOTYPES
+        VK_NO_PROTOTYPES
+)
 
-#target_include_directories(ImNodeFlow PRIVATE "${imgui_SOURCE_DIR}")
-#set_property(TARGET ImNodeFlow PROPERTY FOLDER "External/ImGUI")
-
-# Add ImGuiFileDialog
+# --------------------------------------------------------------------
+# 3) Plug-in: ImGuiFileDialog
 CPMAddPackage(
-  NAME ImGuiFileDialog
-  GITHUB_REPOSITORY aiekick/ImGuiFileDialog
-  GIT_TAG v0.6.7
+        NAME            ImGuiFileDialog
+        GITHUB_REPOSITORY aiekick/ImGuiFileDialog
+        GIT_TAG         v0.6.7
 )
-
 target_include_directories(ImGuiFileDialog PRIVATE "${imgui_SOURCE_DIR}")
-set_property(TARGET ImGuiFileDialog PROPERTY FOLDER "External/ImGUI")
+set_target_properties(ImGuiFileDialog PROPERTIES FOLDER "External/ImGui")
 
-# Add ImGuizmo
+# --------------------------------------------------------------------
+# 4) Plug-in: ImGuizmo
 CPMAddPackage(
-  NAME ImGuizmo
-  GITHUB_REPOSITORY CedricGuillemet/ImGuizmo
-  GIT_TAG 1.83
+        NAME            ImGuizmo
+        GITHUB_REPOSITORY CedricGuillemet/ImGuizmo
+        GIT_TAG         1.83
 )
 
-file(GLOB IMGUIZMO_SOURCES ${ImGuizmo_SOURCE_DIR}/*.cpp ${ImGuizmo_SOURCE_DIR}/*.h)
+# ImGuizmo is a single .cpp library – compile it
+add_library(ImGuizmo STATIC
+        ${ImGuizmo_SOURCE_DIR}/ImGuizmo.cpp
+        ${ImGuizmo_SOURCE_DIR}/GraphEditor.cpp
+)
 
-add_library(ImGuizmo STATIC ${IMGUIZMO_SOURCES})
-target_include_directories(ImGuizmo PRIVATE "${imgui_SOURCE_DIR}")
+target_include_directories(ImGuizmo
+        PUBLIC
+        ${ImGuizmo_SOURCE_DIR}
+        ${imgui_SOURCE_DIR}          # needs ImGui headers
+)
+
 add_custom_command(
-  TARGET ImGuizmo
-  PRE_BUILD
-  COMMAND python ${CMAKE_SOURCE_DIR}/cmake/patch_ImGuizmo.py
-          ${ImGuizmo_SOURCE_DIR}/GraphEditor.cpp
-  COMMENT "Applying patches to ImGuizmo/GraphEditor.cpp"
+        TARGET ImGuizmo PRE_BUILD
+        COMMAND ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/cmake/patch_ImGuizmo.py
+        ${ImGuizmo_SOURCE_DIR}/GraphEditor.cpp
+        COMMENT "Applying patch to ImGuizmo/GraphEditor.cpp"
 )
 
-target_compile_definitions(ImGuizmo PRIVATE IMGUI_DEFINE_MATH_OPERATORS) # triggers a warning but
-                                                                         # wont work otherwise
-set_property(TARGET ImGuizmo PROPERTY FOLDER "External/ImGUI")
+target_compile_definitions(ImGuizmo
+        PRIVATE IMGUI_DEFINE_MATH_OPERATORS     # required by ImGuizmo
+)
+
+set_target_properties(ImGuizmo PROPERTIES FOLDER "External/ImGui")
+
+# --------------------------------------------------------------------
+# 6) Convenience “bundle” target
+# --------------------------------------------------------------------
+# If your engine wants “all of ImGui”, depend on this one target
+add_library(Gestalt_ImGui INTERFACE)
+target_link_libraries(Gestalt_ImGui
+        INTERFACE
+        DearImGui
+        ImGuiFileDialog
+        ImGuizmo
+)
+set_target_properties(Gestalt_ImGui PROPERTIES FOLDER "External/ImGui")
+
 
 # ------------ jolt ------------------------------
 

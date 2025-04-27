@@ -37,13 +37,11 @@ target_include_directories(
          "${meshoptimizer_SOURCE_DIR}/src"
          "${Stb_SOURCE_DIR}"
          "${SoLoud_SOURCE_DIR}/include"
-         "${imgui_SOURCE_DIR}"
-         "${imgui_SOURCE_DIR}/backends"
          "${ImGuiFileDialog_SOURCE_DIR}"
          "${ImGuizmo_SOURCE_DIR}"
          "${JoltPhysics_SOURCE_DIR}"
 )
 
-target_link_libraries(Application PUBLIC Gestalt_SDL2 Foundation)
+target_link_libraries(Application PUBLIC Gestalt_SDL2 Gestalt_ImGui Foundation)
 
 set_folder(Application "Engine")
