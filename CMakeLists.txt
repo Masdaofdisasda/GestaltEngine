@@ -62,8 +62,7 @@ add_dependencies(GestaltApp Shaders)
 	
 target_link_libraries(
   GestaltApp
-  PRIVATE SDL2-static
-          ${VULKAN_LIBRARY}
+  PRIVATE ${VULKAN_LIBRARY}
           DearImGui
           ImGuiFileDialog
           ImGuizmo

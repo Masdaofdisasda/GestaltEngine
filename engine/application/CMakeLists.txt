@@ -36,7 +36,6 @@ target_include_directories(
          "${fastgltf_SOURCE_DIR}/include"
          "${meshoptimizer_SOURCE_DIR}/src"
          "${Stb_SOURCE_DIR}"
-         "${SDL2_INCLUDE_DIR}"
          "${SoLoud_SOURCE_DIR}/include"
          "${imgui_SOURCE_DIR}"
          "${imgui_SOURCE_DIR}/backends"
@@ -45,6 +44,6 @@ target_include_directories(
          "${JoltPhysics_SOURCE_DIR}"
 )
 
-target_link_libraries(Application PUBLIC Foundation)
+target_link_libraries(Application PUBLIC Gestalt_SDL2 Foundation)
 
 set_folder(Application "Engine")
