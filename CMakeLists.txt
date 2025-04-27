@@ -3,31 +3,37 @@ project(GestaltEngine LANGUAGES CXX)
 
 # we want to fully control the dependencies
 set(CMAKE_TOOLCHAIN_FILE "" CACHE STRING "Disable vcpkg")
-set(VCPKG_ENABLED OFF CACHE BOOL "Disable vcpkg globally")
 
 # ── options ────────────────────────────────────────────────────
 option(GESTALT_BUILD_TESTS  "Build unit tests"         OFF)
 option(GESTALT_USE_CCACHE   "Enable ccache if present" ON)
 
 # ── compiler config ────────────────────────────────────────────
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+function(enable_engine_cxx_standard target)
+    set_target_properties(${target} PROPERTIES
+            CXX_STANDARD 23
+            CXX_STANDARD_REQUIRED ON
+            CXX_EXTENSIONS OFF)
+endfunction()
 
 add_compile_definitions($<$<CONFIG:Debug>:TRACY_ENABLE>)
-if(MSVC)
-    add_compile_options(/permissive- /Zc:__cplusplus)
-	add_compile_options(/experimental:module /std:c++latest)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
-else()
-    add_compile_options(-Wall -Wextra -Wshadow -Werror)
-endif()
-set(CMAKE_CONFIGURATION_TYPES "Debug;Release;Distribution" CACHE STRING "Supported build types" FORCE)
+function(enable_engine_warnings target)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /permissive- /Zc:__cplusplus)
+    else()
+        target_compile_options(${target} PRIVATE -Wall -Wextra -Wshadow -Werror)
+    endif()
+endfunction()
 
-if(GESTALT_USE_CCACHE AND NOT MSVC)
+if(CMAKE_CONFIGURATION_TYPES)          # multi-config generator
+    set(CMAKE_CONFIGURATION_TYPES
+            "Debug;Release;Distribution" CACHE STRING "" FORCE)
+endif()
+
+if(GESTALT_USE_CCACHE)
     find_program(CCACHE_PROGRAM ccache)
     if(CCACHE_PROGRAM)
-        message(STATUS "Using ccache")
+        message(STATUS "ccache enabled")
         set(CMAKE_C_COMPILER_LAUNCHER   ${CCACHE_PROGRAM})
         set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
     endif()
@@ -51,17 +57,15 @@ add_subdirectory(engine/graphics)
 add_subdirectory(engine/shaders)
 add_subdirectory(engine/application)
 add_executable(GestaltApp engine/main.cpp)
+enable_engine_cxx_standard(GestaltApp)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}/bin/debug)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}/bin/release)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DISTRIBUTION ${CMAKE_SOURCE_DIR}/bin/distribution)
 if (MSVC)
-	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_SOURCE_DIR}/bin/debug")
-	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/bin/release")
-	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DISTRIBUTION "${CMAKE_SOURCE_DIR}/bin/distribution")
 	set_target_properties(GestaltApp PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "$<$<CONFIG:Debug>:${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG}>$<$<CONFIG:Release>:${CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE}>$<$<CONFIG:Distribution>:${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DISTRIBUTION}>")
 	set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT GestaltApp)
-endif()
-set_target_properties(Foundation PROPERTIES VS_GLOBAL_VcpkgEnabled false)
-set_target_properties(Application PROPERTIES VS_GLOBAL_VcpkgEnabled false)
-set_target_properties(Graphics PROPERTIES VS_GLOBAL_VcpkgEnabled false)
-set_target_properties(GestaltApp PROPERTIES VS_GLOBAL_VcpkgEnabled false)
+endif ()
 add_dependencies(GestaltApp Shaders)
 	
 target_link_libraries(
@@ -87,3 +91,5 @@ if(GESTALT_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
+
+install(TARGETS GestaltApp RUNTIME DESTINATION bin)

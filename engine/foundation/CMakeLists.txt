@@ -29,6 +29,8 @@ list(APPEND ALL_SOURCES ${ROOT_SOURCES})
 source_group("Source Files" FILES ${ROOT_SOURCES})
 
 add_library(Foundation ${ALL_SOURCES})
+enable_engine_cxx_standard(Foundation)
+#enable_engine_warnings(Foundation)
 
 target_include_directories(
         Foundation

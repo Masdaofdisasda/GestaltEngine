@@ -29,6 +29,8 @@ list(APPEND ALL_SOURCES ${ROOT_SOURCES})
 source_group("Source Files" FILES ${ROOT_SOURCES})
 
 add_library(Graphics ${ALL_SOURCES})
+enable_engine_cxx_standard(Graphics)
+#enable_engine_warnings(Graphics)
 
 target_include_directories(
   Graphics
