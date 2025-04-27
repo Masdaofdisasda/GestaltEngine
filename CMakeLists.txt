@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.28)
 project(GestaltEngine LANGUAGES CXX)
 
+# we want to fully control the dependencies
+set(CMAKE_TOOLCHAIN_FILE "" CACHE STRING "Disable vcpkg")
+set(VCPKG_ENABLED OFF CACHE BOOL "Disable vcpkg globally")
+
 # ── options ────────────────────────────────────────────────────
 option(GESTALT_BUILD_TESTS  "Build unit tests"         OFF)
 option(GESTALT_USE_CCACHE   "Enable ccache if present" ON)
