@@ -16,7 +16,7 @@ jobs:
     - name: Install packages
       run: |
         sudo apt update
-        sudo apt install -y ninja-build clang cmake libsdl2-dev libvulkan-dev
+        sudo apt install -y ninja-build clang cmake libsdl2-dev libvulkan-dev glslang-tools
 
     # Optional: cache CPM downloads
     - uses: actions/cache@v4
