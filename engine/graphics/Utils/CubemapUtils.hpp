@@ -1,7 +1,8 @@
 ﻿#pragma once
 
-#include <vector>
+#include <cstring>
 #include <glm/glm.hpp>
+#include <vector>
 
 enum EBitmapType { eBitmapType_2D, eBitmapType_Cube };
 

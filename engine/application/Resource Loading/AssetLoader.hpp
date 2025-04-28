@@ -1,8 +1,10 @@
 ﻿#pragma once
 
 #include <filesystem>
-#include "common.hpp"
+#include <optional>
+
 #include "ECS/ComponentFactory.hpp"
+#include "common.hpp"
 
 namespace gestalt::foundation {
   class ImageInstance;

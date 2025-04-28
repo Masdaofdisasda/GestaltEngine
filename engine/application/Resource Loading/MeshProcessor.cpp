@@ -171,7 +171,7 @@ namespace gestalt::application {
 
     repository->vertex_positions.add(vertex_positions);
     repository->vertex_data.add(vertex_data);
-    const uint32 highest_index = *std::ranges::max_element(indices);
+    const uint32 highest_index = *std::max_element(indices.begin(), indices.end());
     assert(highest_index <= repository->vertex_positions.size());
     repository->indices.add(indices);
 

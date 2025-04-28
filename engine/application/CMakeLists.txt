@@ -44,6 +44,6 @@ target_include_directories(
          "${JoltPhysics_SOURCE_DIR}"
 )
 
-target_link_libraries(Application PUBLIC Gestalt_SDL2 Gestalt_ImGui Foundation)
+target_link_libraries(Application PUBLIC Gestalt_SDL2 Gestalt_ImGui fastgltf::fastgltf meshoptimizer Jolt soloud Foundation)
 
 set_folder(Application "Engine")

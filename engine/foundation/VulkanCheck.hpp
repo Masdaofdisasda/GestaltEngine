@@ -1,8 +1,8 @@
 ﻿#pragma once
 
-#include <fmt/core.h>
+#include <VulkanTypes.hpp>
 
-enum VkResult;
+#include <fmt/core.h>
 
 void vk_check(VkResult result, const char* expr);
 

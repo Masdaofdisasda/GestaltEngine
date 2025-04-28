@@ -36,6 +36,7 @@ target_include_directories(
         Foundation
   PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"
          "${Vulkan_INCLUDE_DIRS}"
+        "${VulkanUtilityLibraries_SOURCE_DIR}/include" # only available on linux, needed for vk_enum_string_helper.h
          "${VMA_SOURCE_DIR}/include"
          "${volk_SOURCE_DIR}"
          "${glm_SOURCE_DIR}"
@@ -43,6 +44,6 @@ target_include_directories(
          "${nlohmann_json_SOURCE_DIR}/include"
 )
 
-target_link_libraries(Foundation PUBLIC volk)
+target_link_libraries(Foundation PUBLIC fmt volk)
 
 set_folder(Foundation "Engine")

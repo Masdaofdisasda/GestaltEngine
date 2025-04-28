@@ -56,6 +56,7 @@ add_subdirectory(engine/foundation)
 add_subdirectory(engine/graphics)
 add_subdirectory(engine/shaders)
 add_subdirectory(engine/application)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE) # to work in wsl with ninja
 add_executable(GestaltApp engine/main.cpp)
 enable_engine_cxx_standard(GestaltApp)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
@@ -71,16 +72,6 @@ add_dependencies(GestaltApp Shaders)
 target_link_libraries(
   GestaltApp
   PRIVATE Vulkan::Vulkan
-          DearImGui
-          ImGuiFileDialog
-          ImGuizmo
-          fastgltf::fastgltf
-          vk-bootstrap
-          meshoptimizer
-          TracyClient
-          fmt::fmt
-		  Jolt
-		  soloud
           Application
           Foundation
           Graphics

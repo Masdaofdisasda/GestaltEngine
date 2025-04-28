@@ -154,6 +154,18 @@ find_package(Vulkan REQUIRED)
 message(STATUS "Found Vulkan include dir: ${Vulkan_INCLUDE_DIRS}")
 message(STATUS "Found Vulkan library: ${Vulkan_LIBRARIES}")
 
+if (UNIX AND NOT APPLE)  # true for Linux (but not MacOS)
+  CPMAddPackage(
+          NAME VulkanUtilityLibraries
+          GIT_REPOSITORY https://github.com/KhronosGroup/Vulkan-Utility-Libraries.git
+          GIT_TAG        vulkan-sdk-1.3.275
+          OPTIONS
+          "VULKAN_UTILITY_LIBRARIES_BUILD_EXAMPLES OFF"
+          "VULKAN_UTILITY_LIBRARIES_BUILD_TESTS OFF"
+          "VULKAN_UTILITY_LIBRARIES_BUILD_DOCUMENTATION OFF"
+  )
+endif()
+
 # ------------ vk-bootstrap ------------------------------
 CPMAddPackage(
   NAME vk-bootstrap
@@ -293,13 +305,16 @@ target_include_directories(ImGuizmo
         ${ImGuizmo_SOURCE_DIR}
         ${imgui_SOURCE_DIR}          # needs ImGui headers
 )
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
-add_custom_command(
-        TARGET ImGuizmo PRE_BUILD
-        COMMAND ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/cmake/patch_ImGuizmo.py
-        ${ImGuizmo_SOURCE_DIR}/GraphEditor.cpp
+add_custom_target(
+        PatchImGuizmo
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/cmake/patch_ImGuizmo.py ${ImGuizmo_SOURCE_DIR}/GraphEditor.cpp
         COMMENT "Applying patch to ImGuizmo/GraphEditor.cpp"
 )
+
+add_dependencies(ImGuizmo PatchImGuizmo)
+
 
 target_compile_definitions(ImGuizmo
         PRIVATE IMGUI_DEFINE_MATH_OPERATORS     # required by ImGuizmo

@@ -3,6 +3,7 @@
 #include "EngineConfiguration.hpp"
 #include "VulkanCheck.hpp"
 #include "vk_initializers.hpp"
+#include "math.h"
 
 namespace gestalt::graphics {
 

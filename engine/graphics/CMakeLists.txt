@@ -39,5 +39,5 @@ target_include_directories(
          "${tracy_SOURCE_DIR}/public"
 )
 
-target_link_libraries(Graphics Application Foundation)
+target_link_libraries(Graphics Tracy::TracyClient vk-bootstrap Application Foundation)
 set_folder(Graphics "Engine")
