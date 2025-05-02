@@ -37,12 +37,8 @@ target_include_directories(
   PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"
          "${fastgltf_SOURCE_DIR}/include"
          "${meshoptimizer_SOURCE_DIR}/src"
-         "${Stb_SOURCE_DIR}"
-         "${SoLoud_SOURCE_DIR}/include"
-         "${ImGuiFileDialog_SOURCE_DIR}"
-         "${ImGuizmo_SOURCE_DIR}"
 )
 
-target_link_libraries(Application PRIVATE Gestalt_SDL2 Gestalt_ImGui fastgltf::fastgltf meshoptimizer Jolt soloud fmt::fmt Foundation)
+target_link_libraries(Application PRIVATE Gestalt_SDL2 Gestalt_ImGui fastgltf::fastgltf Gestalt_Stb meshoptimizer Jolt Gestalt_SoLoud fmt::fmt Foundation)
 
 set_folder(Application "Engine/")

@@ -39,5 +39,5 @@ target_include_directories(
          "${tracy_SOURCE_DIR}/public"
 )
 
-target_link_libraries(Graphics PRIVATE Gestalt_SDL2 Tracy::TracyClient vk-bootstrap fmt::fmt Application Foundation)
+target_link_libraries(Graphics PRIVATE Gestalt_SDL2 Gestalt_Stb Tracy::TracyClient vk-bootstrap fmt::fmt Application Foundation)
 set_folder(Graphics "Engine/")

@@ -72,6 +72,9 @@ CPMAddPackage(
   GITHUB_REPOSITORY nothings/stb
   GIT_TAG master
 )
+add_library(Gestalt_Stb INTERFACE)
+
+target_include_directories(Gestalt_Stb INTERFACE ${Stb_SOURCE_DIR})
 
 # ------------ glm ------------------------------
 CPMAddPackage(
@@ -217,6 +220,11 @@ CPMAddPackage(
         "SDL2_INCLUDE_DIR ${SDL2_SOURCE_DIR}/include"
         "SDL2_LIBRARY ${SDL2_STATIC_LIBRARY_PATH}"
 )
+
+add_library(Gestalt_SoLoud INTERFACE)
+
+target_link_libraries(Gestalt_SoLoud INTERFACE soloud)
+target_include_directories(Gestalt_SoLoud INTERFACE "${SoLoud_SOURCE_DIR}/include")
 
 set_property(TARGET soloud PROPERTY FOLDER "External")
 
