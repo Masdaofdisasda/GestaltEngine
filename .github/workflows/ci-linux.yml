@@ -3,7 +3,6 @@ name: ci-linux
 on:
   push:
     branches: [ "**" ]  # all branches
-  pull_request:
 
 jobs:
   build:

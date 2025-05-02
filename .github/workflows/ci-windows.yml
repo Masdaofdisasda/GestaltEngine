@@ -3,7 +3,6 @@ name: ci-windows
 on:
   push:
     branches: [ "**" ]  # all branches
-  pull_request:
 
 jobs:
   build:
@@ -13,18 +12,21 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    # Optional: cache CPM downloads
-    - uses: actions/cache@v4
-      with:
-        path: ${{ github.workspace }}\\.cache\\CPM
-        key:  cpm-${{ hashFiles('**/Deps.cmake') }}
+    - name: Download Vulkan SDK
+      run: |
+        Invoke-WebRequest `
+          -Uri "https://sdk.lunarg.com/sdk/download/1.3.275.0/windows/VulkanSDK-1.3.275.0-Installer.zip" `
+          -OutFile "vulkan-sdk.zip"
+
+        Expand-Archive -Path vulkan-sdk.zip -DestinationPath "$env:GITHUB_WORKSPACE\vulkan-sdk"
 
     - name: Configure
+      env:
+        VULKAN_SDK: ${{ github.workspace }}\vulkan-sdk\VulkanSDK-1.3.275.0
+        PATH: ${{ github.workspace }}\vulkan-sdk\VulkanSDK-1.3.275.0\Bin;${{ env.PATH }}
       run: >
-        cmake -B build -G "Visual Studio 17 2022"
+        cmake -B build -G "Visual Studio 17 2022" -A x64
         -DCMAKE_BUILD_TYPE=Release
-        -DCMAKE_C_COMPILER=cl
-        -DCMAKE_CXX_COMPILER=cl
 
     - name: Build
       run: cmake --build build --config Release --parallel
@@ -33,4 +35,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: GestaltApp-Windows
-        path: build\\bin\\Release\\GestaltApp.exe
+        path: build/bin/Release/GestaltApp.exe
