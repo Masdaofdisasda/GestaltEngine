@@ -72,11 +72,12 @@ add_dependencies(GestaltApp Shaders)
 target_link_libraries(
   GestaltApp
   PRIVATE Vulkan::Vulkan
+        Gestalt_SDL2
           Application
           Foundation
           Graphics
 )
-set_folder(GestaltApp "App")
+set_folder(GestaltApp "App/")
 
 if(GESTALT_BUILD_TESTS)
     enable_testing()

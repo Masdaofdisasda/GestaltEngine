@@ -44,6 +44,6 @@ target_include_directories(
          "${nlohmann_json_SOURCE_DIR}/include"
 )
 
-target_link_libraries(Foundation PUBLIC fmt volk)
+target_link_libraries(Foundation PRIVATE fmt::fmt volk::volk Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator)
 
-set_folder(Foundation "Engine")
+set_folder(Foundation "Engine/")

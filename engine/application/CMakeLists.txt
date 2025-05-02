@@ -41,9 +41,8 @@ target_include_directories(
          "${SoLoud_SOURCE_DIR}/include"
          "${ImGuiFileDialog_SOURCE_DIR}"
          "${ImGuizmo_SOURCE_DIR}"
-         "${JoltPhysics_SOURCE_DIR}"
 )
 
-target_link_libraries(Application PUBLIC Gestalt_SDL2 Gestalt_ImGui fastgltf::fastgltf meshoptimizer Jolt soloud Foundation)
+target_link_libraries(Application PRIVATE Gestalt_SDL2 Gestalt_ImGui fastgltf::fastgltf meshoptimizer Jolt soloud fmt::fmt Foundation)
 
-set_folder(Application "Engine")
+set_folder(Application "Engine/")
