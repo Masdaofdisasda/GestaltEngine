@@ -36,10 +36,9 @@ target_include_directories(
         Foundation
   PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"
         "${VulkanUtilityLibraries_SOURCE_DIR}/include" # only available on linux, needed for vk_enum_string_helper.h
-         "${nlohmann_json_SOURCE_DIR}/include"
 )
 
 target_link_libraries(Foundation PUBLIC glm::glm Vulkan::Headers volk::volk GPUOpen::VulkanMemoryAllocator)
-target_link_libraries(Foundation PRIVATE fmt::fmt Vulkan::Vulkan )
+target_link_libraries(Foundation PRIVATE fmt::fmt Vulkan::Vulkan nlohmann_json::nlohmann_json)
 
 set_folder(Foundation "Engine/")
