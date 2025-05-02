@@ -1,4 +1,9 @@
 #pragma once
+#include <string>
+#include <vector>
+
+#include "common.hpp"
+#include "Utils/ResourceBindings.hpp"
 
 
 namespace gestalt::graphics {
@@ -6,9 +11,7 @@ namespace gestalt::graphics {
   class RenderPass : Moveable<RenderPass> {
     std::string name_;
   protected:
-    explicit RenderPass(std::string name) : name_(std::move(name)) {
-      fmt::println("Compiling Render Pass: {}", name_);
-    }
+    explicit RenderPass(std::string name);
 
   public:
     [[nodiscard]] std::string_view get_name() const { return name_; }

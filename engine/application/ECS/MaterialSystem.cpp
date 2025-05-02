@@ -1,6 +1,7 @@
 ﻿#include "MaterialSystem.hpp"
 
 #include "VulkanCheck.hpp"
+#include <fmt/core.h>
 #include "Interface/IGpu.hpp"
 #include "Interface/IResourceAllocator.hpp"
 

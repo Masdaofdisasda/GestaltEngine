@@ -6,6 +6,8 @@
 
 #include "VulkanCheck.hpp"
 
+#include <fmt/core.h>
+
 #include "FrameProvider.hpp"
 #include "Interface/IGpu.hpp"
 #include "Interface/IResourceAllocator.hpp"

@@ -3,6 +3,8 @@
 #include "VulkanTypes.hpp"
 #include "VulkanCheck.hpp"
 
+#include <fmt/core.h>
+
 #include <imgui.h>
 #include <imgui_impl_sdl2.h>
 #include <imgui_impl_vulkan.h>

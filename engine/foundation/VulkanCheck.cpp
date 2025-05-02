@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <vulkan/vulkan.h>
 #include <vulkan/vk_enum_string_helper.h>
+#include <fmt/core.h>
 
 void vk_check(const VkResult result, const char* expr) {
   if (result != VK_SUCCESS) {

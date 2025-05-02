@@ -4,6 +4,8 @@
 #include "SynchronizationManager.hpp"
 #include "ResourceRegistry.hpp"
 
+#include <fmt/core.h>
+
 namespace gestalt::graphics {
 
   void FrameGraph::print_graph() const {

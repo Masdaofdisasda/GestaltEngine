@@ -7,6 +7,8 @@
 #include "EngineConfiguration.hpp"
 #include "vk_initializers.hpp"
 
+#include <fmt/core.h>
+
 namespace gestalt::graphics {
 
   
