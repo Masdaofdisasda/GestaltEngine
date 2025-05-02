@@ -35,8 +35,6 @@ enable_engine_cxx_standard(Graphics)
 target_include_directories(
   Graphics
   PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"
-         "${vk-bootstrap_SOURCE_DIR}/src"
-         "${tracy_SOURCE_DIR}/public"
 )
 
 target_link_libraries(Graphics PRIVATE Gestalt_SDL2 Gestalt_Stb Tracy::TracyClient vk-bootstrap fmt::fmt Application Foundation)
