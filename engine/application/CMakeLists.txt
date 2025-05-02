@@ -35,8 +35,6 @@ enable_engine_cxx_standard(Application)
 target_include_directories(
         Application
   PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"
-         "${fastgltf_SOURCE_DIR}/include"
-         "${meshoptimizer_SOURCE_DIR}/src"
 )
 
 target_link_libraries(Application PRIVATE Gestalt_SDL2 Gestalt_ImGui fastgltf::fastgltf Gestalt_Stb meshoptimizer Jolt Gestalt_SoLoud fmt::fmt Foundation)
