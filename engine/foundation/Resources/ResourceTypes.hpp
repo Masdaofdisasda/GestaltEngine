@@ -1,8 +1,9 @@
 ﻿#pragma once
 #include <cassert>
+#include <cstring>
+#include <filesystem>
 #include <memory>
 #include <variant>
-#include <filesystem>
 
 #include <Resources/TextureType.hpp>
 #include "VulkanCheck.hpp"
