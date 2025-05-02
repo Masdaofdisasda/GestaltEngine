@@ -39,11 +39,11 @@ target_include_directories(
         "${VulkanUtilityLibraries_SOURCE_DIR}/include" # only available on linux, needed for vk_enum_string_helper.h
          "${VMA_SOURCE_DIR}/include"
          "${volk_SOURCE_DIR}"
-         "${glm_SOURCE_DIR}"
          "${fmt_SOURCE_DIR}/include"
          "${nlohmann_json_SOURCE_DIR}/include"
 )
 
+target_link_libraries(Foundation PUBLIC glm::glm)
 target_link_libraries(Foundation PRIVATE fmt::fmt volk::volk Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator)
 
 set_folder(Foundation "Engine/")

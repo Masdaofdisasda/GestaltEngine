@@ -71,8 +71,7 @@ add_dependencies(GestaltApp Shaders)
 	
 target_link_libraries(
   GestaltApp
-  PRIVATE Vulkan::Vulkan
-        Gestalt_SDL2
+  PRIVATE Gestalt_SDL2
           Application
           Foundation
           Graphics
