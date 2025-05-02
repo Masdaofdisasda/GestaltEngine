@@ -1,0 +1,36 @@
+name: ci-windows
+
+on:
+  push:
+    branches: [ "**" ]  # all branches
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    # Optional: cache CPM downloads
+    - uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}\\.cache\\CPM
+        key:  cpm-${{ hashFiles('**/Deps.cmake') }}
+
+    - name: Configure
+      run: >
+        cmake -B build -G "Visual Studio 17 2022"
+        -DCMAKE_BUILD_TYPE=Release
+        -DCMAKE_C_COMPILER=cl
+        -DCMAKE_CXX_COMPILER=cl
+
+    - name: Build
+      run: cmake --build build --config Release --parallel
+
+    - name: Archive binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: GestaltApp-Windows
+        path: build\\bin\\Release\\GestaltApp.exe
