@@ -141,8 +141,8 @@ add_compile_definitions(TRACY_ENABLE)
 set_target_properties(TracyClient PROPERTIES VS_GLOBAL_VcpkgEnabled false)
 
 set_property(TARGET TracyClient PROPERTY FOLDER "External/")
-
 # -------- Vulkan Headers ---------------------------
+set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 CPMAddPackage(
   NAME VulkanHeaders
   GITHUB_REPOSITORY KhronosGroup/Vulkan-Headers
@@ -163,8 +163,12 @@ CPMAddPackage(
 
 set_target_properties(vulkan PROPERTIES FOLDER "External/Vulkan")
 set_target_properties(asm_offset PROPERTIES FOLDER "External/Vulkan")
-set_target_properties(loader-opt PROPERTIES FOLDER "External/Vulkan")
-set_target_properties(loader-unknown-chain PROPERTIES FOLDER "External/Vulkan")
+if (TARGET loader-opt)
+  set_target_properties(loader-opt PROPERTIES FOLDER "External/Vulkan")
+endif ()
+if (TARGET loader-unknown-chain)
+  set_target_properties(loader-unknown-chain PROPERTIES FOLDER "External/Vulkan")
+endif ()
 set_target_properties(loader_asm_gen_files PROPERTIES FOLDER "External/Vulkan")
 
 # -------- SPIRV-Headers -----------------------------
@@ -423,6 +427,7 @@ set(USE_STATIC_MSVC_RUNTIME_LIBRARY
     OFF
     CACHE BOOL "Use static runtime library" FORCE)
 
+set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS 1 CACHE BOOL "" FORCE)        # silence policy warning just for Jolt
 cpmaddpackage(
   NAME
   JoltPhysics
