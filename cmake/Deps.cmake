@@ -150,6 +150,7 @@ CPMAddPackage(
 )
 
 set(Vulkan_INCLUDE_DIRS "${VulkanHeaders_SOURCE_DIR}/include")
+
 # -------- Vulkan Loader ----------------------------
 CPMAddPackage(
   NAME VulkanLoader
@@ -159,6 +160,12 @@ CPMAddPackage(
     "BUILD_TESTS OFF"
     "VULKAN_HEADERS_INSTALL OFF"
 )
+
+set_target_properties(vulkan PROPERTIES FOLDER "External/Vulkan")
+set_target_properties(asm_offset PROPERTIES FOLDER "External/Vulkan")
+set_target_properties(loader-opt PROPERTIES FOLDER "External/Vulkan")
+set_target_properties(loader-unknown-chain PROPERTIES FOLDER "External/Vulkan")
+set_target_properties(loader_asm_gen_files PROPERTIES FOLDER "External/Vulkan")
 
 # -------- SPIRV-Headers -----------------------------
 CPMAddPackage(
@@ -177,6 +184,35 @@ CPMAddPackage(
     "SPIRV-Headers_SOURCE_DIR ${SPIRV-Headers_SOURCE_DIR}"
 )
 
+set_target_properties(spirv-tools-build-version PROPERTIES FOLDER "External/SPIRV-Tools/Build")
+set_target_properties(spirv-tools-header-DebugInfo PROPERTIES FOLDER "External/SPIRV-Tools")
+set_target_properties(spirv-tools-header-NonSemanticShaderDebugInfo100 PROPERTIES FOLDER "External/SPIRV-Tools/Build")
+set_target_properties(spirv-tools-header-OpenCLDebugInfo100 PROPERTIES FOLDER "External/SPIRV-Tools/Build")
+set_target_properties(spv-tools-cldi100 PROPERTIES FOLDER "External/SPIRV-Tools/Build")
+set_target_properties(spv-tools-clspvreflection PROPERTIES FOLDER "External/SPIRV-Tools/Build")
+set_target_properties(spv-tools-debuginfo PROPERTIES FOLDER "External/SPIRV-Tools/Build")
+set_target_properties(spv-tools-shdi100 PROPERTIES FOLDER "External/SPIRV-Tools/Build")
+set_target_properties(spv-tools-spv-amd-gs PROPERTIES FOLDER "External/SPIRV-Tools/Build")
+set_target_properties(spv-tools-spv-amd-sb PROPERTIES FOLDER "External/SPIRV-Tools/Build")
+set_target_properties(spv-tools-spv-amd-sevp PROPERTIES FOLDER "External/SPIRV-Tools/Build")
+set_target_properties(spv-tools-spv-amd-stm PROPERTIES FOLDER "External/SPIRV-Tools/Build")
+
+set_target_properties(SPIRV-Tools-diff PROPERTIES FOLDER "External/SPIRV-Tools/Library")
+set_target_properties(SPIRV-Tools-link PROPERTIES FOLDER "External/SPIRV-Tools/Library")
+set_target_properties(SPIRV-Tools-lint PROPERTIES FOLDER "External/SPIRV-Tools/Library")
+set_target_properties(SPIRV-Tools-opt PROPERTIES FOLDER "External/SPIRV-Tools/Library")
+set_target_properties(SPIRV-Tools-reduce PROPERTIES FOLDER "External/SPIRV-Tools/Library")
+set_target_properties(SPIRV-Tools-shared PROPERTIES FOLDER "External/SPIRV-Tools/Library")
+set_target_properties(SPIRV-Tools-static PROPERTIES FOLDER "External/SPIRV-Tools/Library")
+
+set_target_properties(spirv-tools-vimsyntax PROPERTIES FOLDER "External/SPIRV-Tools/Utilities")
+
+set_target_properties(spirv-tools-pkg-config PROPERTIES FOLDER "External/SPIRV-Tools")
+set_target_properties(spirv-tools-shared-pkg-config PROPERTIES FOLDER "External/SPIRV-Tools")
+set_target_properties(core_tables PROPERTIES FOLDER "External/SPIRV-Tools")
+set_target_properties(enum_string_mapping PROPERTIES FOLDER "External/SPIRV-Tools")
+set_target_properties(extinst_tables PROPERTIES FOLDER "External/SPIRV-Tools")
+
 # -------- glslang Validator ------------------------
 CPMAddPackage(
   NAME glslang
@@ -189,6 +225,14 @@ CPMAddPackage(
     "ENABLE_HLSL OFF"
 )
 
+set_target_properties(glslang PROPERTIES FOLDER "External/glslang")
+set_target_properties(GenericCodeGen PROPERTIES FOLDER "External/glslang")
+set_target_properties(glslang-default-resource-limits PROPERTIES FOLDER "External/glslang")
+set_target_properties(OSDependent PROPERTIES FOLDER "External/glslang")
+set_target_properties(MachineIndependent PROPERTIES FOLDER "External/glslang")
+set_target_properties(SPIRV PROPERTIES FOLDER "External/glslang")
+set_target_properties(glslang-standalone PROPERTIES FOLDER "External/glslang")
+
 # -------- VulkanUtilityLibraries ------
 CPMAddPackage(
     NAME VulkanUtilityLibraries
@@ -200,8 +244,12 @@ CPMAddPackage(
       "VULKAN_UTILITY_LIBRARIES_BUILD_DOCUMENTATION OFF"
 )
 
+set_target_properties(VulkanLayerSettings PROPERTIES FOLDER "External/Vulkan")
+set_target_properties(VulkanUtilityHeaders PROPERTIES FOLDER "External/Vulkan")
+
 # emulate what find_package(Vulkan) would have set
 set(Vulkan_LIBRARIES Vulkan::Vulkan)
+set(VK_LAYER_PATH "$<TARGET_FILE_DIR:VkLayer_khronos_validation>")
 
 # ------------ volk ------------------------------
 cpmaddpackage(NAME volk GITHUB_REPOSITORY zeux/volk GIT_TAG 1.3.270)
@@ -343,6 +391,8 @@ add_custom_target(
   COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/cmake/patch_ImGuizmo.py
           ${ImGuizmo_SOURCE_DIR}/GraphEditor.cpp
   COMMENT "Applying patch to ImGuizmo/GraphEditor.cpp")
+
+set_target_properties(PatchImGuizmo PROPERTIES FOLDER "External/ImGui")
 
 add_dependencies(ImGuizmo PatchImGuizmo)
 
