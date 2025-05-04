@@ -14,13 +14,17 @@ else()
 endif()
 
 # ----------------------------------------------------------------
-# 1. Locate glslangValidator (prefer the one from Vulkan SDK)
-if(TARGET Vulkan::glslangValidator)
-  get_target_property(GLSL_VALIDATOR Vulkan::glslangValidator IMPORTED_LOCATION)
-else()
+# Prefer CPM-built glslangValidator if available
+if(TARGET glslang-standalone)
+  set(GLSL_VALIDATOR "$<TARGET_FILE:glslang-standalone>")
+elseif(DEFINED ENV{VULKAN_SDK})
+  set(GLSL_VALIDATOR "$ENV{VULKAN_SDK}/Bin/glslangValidator")
+elseif(NOT GLSL_VALIDATOR)
   find_program(GLSL_VALIDATOR glslangValidator REQUIRED)
 endif()
+
 message(STATUS "glslangValidator: ${GLSL_VALIDATOR}")
+
 
 # Optional spirv-opt for Release optimisation
 find_program(SPIRV_OPT spirv-opt)
@@ -56,16 +60,8 @@ foreach(GLSL ${GLSL_SHADER_FILES})
   # Ensure output folder exists
   file(MAKE_DIRECTORY ${SHADER_BIN_DIR})
 
-  # Compile flags per build-type
-  if(CMAKE_CONFIGURATION_TYPES)
-    set(GLSLANG_FLAGS "$<$<CONFIG:Debug>:-gVS>")
-  else()
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-      set(GLSLANG_FLAGS -gVS)
-    else()
-      set(GLSLANG_FLAGS "")
-    endif()
-  endif()
+  # Debug-only flags
+  set(GLSLANG_FLAGS "$<IF:$<CONFIG:Debug>,-gVS,-Os>")
 
   # Custom command: GLSL → SPIR-V
   add_custom_command(
@@ -92,7 +88,7 @@ foreach(GLSL ${GLSL_SHADER_FILES})
 endforeach()
 
 # ----------------------------------------------------------------
-# 1. Aggregate target “Shaders”
+# 2. Aggregate target “Shaders”
 add_custom_target(
   Shaders ALL
   SOURCES ${GLSL_ALL_FILES}

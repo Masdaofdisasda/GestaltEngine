@@ -148,25 +148,67 @@ set_target_properties(TracyClient PROPERTIES VS_GLOBAL_VcpkgEnabled false)
 
 set_property(TARGET TracyClient PROPERTY FOLDER "External/")
 
-# ------------ Vulkan ------------------------------
-find_package(Vulkan REQUIRED)
+# -------- Vulkan Headers ---------------------------
+CPMAddPackage(
+  NAME VulkanHeaders
+  GITHUB_REPOSITORY KhronosGroup/Vulkan-Headers
+  GIT_TAG vulkan-sdk-1.3.275.0
+)
 
-message(STATUS "Found Vulkan include dir: ${Vulkan_INCLUDE_DIRS}")
-message(STATUS "Found Vulkan library: ${Vulkan_LIBRARIES}")
+set(Vulkan_INCLUDE_DIRS "${VulkanHeaders_SOURCE_DIR}/include")
+# -------- Vulkan Loader ----------------------------
+CPMAddPackage(
+  NAME VulkanLoader
+  GITHUB_REPOSITORY KhronosGroup/Vulkan-Loader
+  GIT_TAG vulkan-sdk-1.3.275.0
+  OPTIONS
+    "BUILD_TESTS OFF"
+    "VULKAN_HEADERS_INSTALL OFF"
+)
 
-if(UNIX AND NOT APPLE) # true for Linux (but not MacOS)
-  cpmaddpackage(
-    NAME
-    VulkanUtilityLibraries
-    GIT_REPOSITORY
-    https://github.com/KhronosGroup/Vulkan-Utility-Libraries.git
-    GIT_TAG
-    vulkan-sdk-1.3.275
+# -------- SPIRV-Headers -----------------------------
+CPMAddPackage(
+  NAME SPIRV-Headers
+  GITHUB_REPOSITORY KhronosGroup/SPIRV-Headers
+  GIT_TAG vulkan-sdk-1.3.275.0
+)
+
+# -------- SPIRV-Tools ------------------------
+CPMAddPackage(
+  NAME SPIRV-Tools
+  GITHUB_REPOSITORY KhronosGroup/SPIRV-Tools
+  GIT_TAG vulkan-sdk-1.3.275.0
+  OPTIONS
+    "SPIRV_SKIP_EXECUTABLES ON"
+    "SPIRV-Headers_SOURCE_DIR ${SPIRV-Headers_SOURCE_DIR}"
+)
+
+# -------- glslang Validator ------------------------
+CPMAddPackage(
+  NAME glslang
+  GITHUB_REPOSITORY KhronosGroup/glslang
+  GIT_TAG vulkan-sdk-1.3.275.0
+  OPTIONS
+    "ENABLE_CTEST OFF"
+    "ENABLE_GLSLANG_BINARIES ON"
+    "ENABLE_SPVREMAPPER OFF"
+    "ENABLE_HLSL OFF"
+)
+
+# -------- VulkanUtilityLibraries ------
+CPMAddPackage(
+    NAME VulkanUtilityLibraries
+    GITHUB_REPOSITORY KhronosGroup/Vulkan-Utility-Libraries
+    GIT_TAG vulkan-sdk-1.3.275
     OPTIONS
-    "VULKAN_UTILITY_LIBRARIES_BUILD_EXAMPLES OFF"
-    "VULKAN_UTILITY_LIBRARIES_BUILD_TESTS OFF"
-    "VULKAN_UTILITY_LIBRARIES_BUILD_DOCUMENTATION OFF")
-endif()
+      "VULKAN_UTILITY_LIBRARIES_BUILD_EXAMPLES OFF"
+      "VULKAN_UTILITY_LIBRARIES_BUILD_TESTS OFF"
+      "VULKAN_UTILITY_LIBRARIES_BUILD_DOCUMENTATION OFF"
+)
+
+# emulate what find_package(Vulkan) would have set
+set(Vulkan_LIBRARIES Vulkan::Vulkan)
+
 
 # ------------ vk-bootstrap ------------------------------
 cpmaddpackage(
@@ -264,10 +306,8 @@ target_sources(
 # PUBLIC)
 target_include_directories(DearImGui PUBLIC ${imgui_SOURCE_DIR}/backends)
 
-# Link the run-time dependencies the back-ends need. • Vulkan::Vulkan      –
-# provided by find_package(Vulkan) • Gestalt_SDL2        – our thin wrapper for
-# SDL2-static
-target_link_libraries(DearImGui PRIVATE Vulkan::Vulkan Gestalt_SDL2)
+# Link the run-time dependencies the back-ends need
+target_link_libraries(DearImGui PRIVATE Vulkan::Headers Vulkan::Loader Gestalt_SDL2)
 
 # Tell ImGui back-ends that we use volk/no prototypes
 target_compile_definitions(DearImGui PRIVATE IMGUI_IMPL_VULKAN_NO_PROTOTYPES

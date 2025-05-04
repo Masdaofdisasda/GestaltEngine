@@ -47,9 +47,9 @@ target_include_directories(
                                                    # vk_enum_string_helper.h
 )
 
-target_link_libraries(Foundation PUBLIC glm::glm Vulkan::Headers volk::volk
+target_link_libraries(Foundation PUBLIC glm::glm Vulkan::Headers Vulkan::UtilityHeaders volk::volk 
                                         GPUOpen::VulkanMemoryAllocator)
-target_link_libraries(Foundation PRIVATE fmt::fmt Vulkan::Vulkan
+target_link_libraries(Foundation PRIVATE fmt::fmt Vulkan::Loader
                                          nlohmann_json::nlohmann_json)
 
 set_folder(Foundation "Engine/")
