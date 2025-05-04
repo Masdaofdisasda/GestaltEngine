@@ -1,0 +1,315 @@
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout( push_constant ) uniform constants
+{
+    float exposure;
+	float maxWhite; 
+	float bloomStrength; 
+	float padding;
+
+	vec4 lift; 
+	vec4 gamma; 
+	vec4 gain;
+	int showBloom;
+    int toneMappingOption;
+    float vignette_radius;
+    float vignette_softness;
+
+    float iso;
+    float shutter;
+    float aperture;
+    float exposureCompensation;
+
+    float saturation;
+    float contrast;
+} params;
+
+layout(set = 0, binding = 0, rgba16f) uniform image2D texScene;
+//layout(set = 0, binding = 1) uniform sampler2D texBloom;
+layout(set = 0, binding = 2, r16f) uniform image2D texLuminance;
+layout(set = 0, binding = 3, rgba16f) writeonly uniform image2D texOut;
+
+float Reinhard_L_scaled(float a, float Lw, float L_avg) {
+	return (a / L_avg) * Lw;
+}
+
+float Reinhard_Ld(float L_scaled) {
+	return L_scaled / (1.0 + L_scaled);
+}
+
+float Reinhard_Ld(float L_scaled, float L_white) {
+    float extension = (1.0 + L_scaled / (L_white * L_white));
+ 	return (L_scaled * extension) / (1 + L_scaled);
+}
+
+vec3 uncharted2_tonemap_partial(vec3 x)
+{
+    float A = 0.15f;
+    float B = 0.50f;
+    float C = 0.10f;
+    float D = 0.20f;
+    float E = 0.02f;
+    float F = 0.30f;
+    return ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F))-E/F;
+}
+
+vec3 Uncharted2Filmic(vec3 v)
+{
+    float exposure_bias = 2.0f;
+    vec3 curr = uncharted2_tonemap_partial(v * exposure_bias);
+
+    vec3 W = vec3(11.2f);
+    vec3 white_scale = vec3(1.0f) / uncharted2_tonemap_partial(W);
+    return curr * white_scale;
+}
+
+
+const mat3 acesInputMatrix = mat3(
+    vec3(0.59719, 0.07600, 0.02840), 
+    vec3(0.35458, 0.90834, 0.13383), 
+    vec3(0.04823, 0.01566, 0.83777)  
+);
+
+const mat3 acesOutputMatrix =  mat3(
+    vec3(1.60475, -0.10208, -0.00327), 
+    vec3(-0.53108, 1.10813, -0.07276),
+    vec3(-0.07367, -0.00605, 1.07602)  
+);
+
+vec3 rtt_and_odt_fit(vec3 v) {
+    vec3 a = v * (v + 0.0245786) - 0.000090537;
+    vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081;
+    return a / b;
+}
+
+vec3 ACES_fitted(vec3 v) {
+    v = acesInputMatrix * v;
+    v = rtt_and_odt_fit(v);
+    return acesOutputMatrix * v;
+}
+
+vec3 ACESAproximation(vec3 x) {
+    float a = 2.51;
+    float b = 0.03;
+    float c = 2.43;
+    float d = 0.59;
+    float e = 0.14;
+    return clamp((x*(a*x+b))/(x*(c*x+d)+e), 0.0, 1.0);
+}
+
+// https://github.com/bWFuanVzYWth/AgX/blob/main/agx.glsl
+vec3 agx_curve3(vec3 v){
+    vec3 mask = step(v, vec3(0.0));
+    vec3 a = (0.013247155) + (0.007716549 - 0.013247155) * mask;
+    vec3 b = (3.0 / 1.0) + (13.0 / 4.0 - 3.0 / 1.0) * mask;
+    vec3 c = (-1.0 / 3.0) + (-4.0 / 13.0 + 1.0 / 3.0) * mask;
+    return 0.5 + 0.12121212 * v * pow(1.0 + a * pow(abs(v), b), c);
+}
+
+vec3 agx_tonemapping(vec3 /*Linear BT.709*/ci) {
+    const mat3 agx_mat = mat3(0.84247905, 0.04232824, 0.04237565, 0.07843360, 0.87846863, 0.07843360, 0.07922374, 0.07916613, 0.87914300);
+    const mat3 agx_mat_inv = mat3(1.19687903, -0.05289685, -0.05297164, -0.09802088, 1.15190315, -0.09804345, -0.09902974, -0.09896117, 1.15107369);
+
+    // Input transform (inset)
+    ci = agx_mat * ci;
+
+    // Apply sigmoid function
+    vec3 co = agx_curve3(log2(ci));
+
+    // Inverse input transform (outset)
+    co = agx_mat_inv * co;
+
+    return /*Linear BT.709*/co;
+}
+
+vec3 ApplyColorGrading(vec3 color, vec3 shadowAdjust, vec3 midtoneAdjust, vec3 highlightAdjust) {
+    // Define tone ranges
+    float shadowMask = smoothstep(0.0, 0.25, max(color.r, max(color.g, color.b))); // Shadows
+    float midtoneMask = smoothstep(0.25, 0.75, max(color.r, max(color.g, color.b))); // Midtones
+    float highlightMask = smoothstep(0.75, 1.0, max(color.r, max(color.g, color.b))); // Highlights
+
+    // Normalize masks so they blend smoothly
+    float totalMask = shadowMask + midtoneMask + highlightMask;
+    shadowMask /= totalMask;
+    midtoneMask /= totalMask;
+    highlightMask /= totalMask;
+
+    // Apply adjustments to each range
+    vec3 adjustedColor = color;
+    adjustedColor = mix(adjustedColor, adjustedColor + shadowAdjust, shadowMask); // Shadows
+    adjustedColor = mix(adjustedColor, adjustedColor * midtoneAdjust, midtoneMask); // Midtones
+    adjustedColor = mix(adjustedColor, adjustedColor * highlightAdjust, highlightMask); // Highlights
+
+    return adjustedColor;
+}
+
+vec3 AdjustSaturation(vec3 color, float saturation) {
+    // Calculate the grayscale intensity (luma)
+    float luma = dot(color, vec3(0.2126, 0.7152, 0.0722)); // Rec. 709 luminance formula
+
+    // Blend between grayscale and original color based on saturation
+    return mix(vec3(luma), color, saturation);
+}
+
+vec3 AdjustContrast(vec3 color, float contrast) {
+    // Scale color around the midpoint (0.5)
+    return 0.5 + (color - 0.5) * contrast;
+}
+
+vec3 linearToSrgb(vec3 linearColor) {
+    return mix(12.92 * linearColor, 1.055 * pow(linearColor, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, linearColor));
+}
+
+vec3 convertYxy2XYZ(vec3 Yxy) {
+    float Y = Yxy.x;
+    float x = Yxy.y;
+    float y = Yxy.z;
+
+    vec3 xyz;
+    if (y > 0.0) {
+        xyz.x = (x * Y) / y;               // X = x * (Y / y)
+        xyz.y = Y;                         // Y remains the same
+        xyz.z = (1.0 - x - y) * (Y / y);   // Z = (1 - x - y) * (Y / y)
+    } else {
+        xyz = vec3(0.0);
+    }
+
+    return xyz;
+}
+vec3 convertXYZ2Yxy(vec3 xyz) {
+    float X = xyz.x;
+    float Y = xyz.y;
+    float Z = xyz.z;
+
+    float sum = X + Y + Z;
+
+    vec3 Yxy;
+    Yxy.x = Y;                            // Luminance Y
+    Yxy.y = (sum > 0.0) ? X / sum : 0.0;  // Chromaticity x
+    Yxy.z = (sum > 0.0) ? Y / sum : 0.0;  // Chromaticity y
+
+    return Yxy;
+}
+
+// Convert RGB to XYZ
+vec3 convertRGB2XYZ(vec3 rgb) {
+    const mat3 RGBtoXYZ = mat3(0.4124564, 0.3575761, 0.1804375,
+                               0.2126729, 0.7151522, 0.0721750,
+                               0.0193339, 0.1191920, 0.9503041);
+
+    return RGBtoXYZ * rgb;
+}
+
+// Convert XYZ to RGB
+vec3 convertXYZ2RGB(vec3 xyz) {
+    const mat3 XYZtoRGB = mat3( 3.2404542, -1.5371385, -0.4985314,
+                               -0.9692660,  1.8760108,  0.0415560,
+                                0.0556434, -0.2040259,  1.0572252);
+
+    return XYZtoRGB * xyz;
+}
+
+// Convert RGB to Yxy
+vec3 convertRGB2Yxy(vec3 rgb) {
+    vec3 xyz = convertRGB2XYZ(rgb);
+    return convertXYZ2Yxy(xyz);
+}
+
+// Convert Yxy to RGB
+vec3 convertYxy2RGB(vec3 Yxy) {
+    vec3 xyz = convertYxy2XYZ(Yxy);
+    return convertXYZ2RGB(xyz);
+}
+
+float camera_exposure()
+{
+    // Aperture^2 / shutter => base EV at ISO=100
+    float ev100 = log2( (params.aperture * params.aperture) / params.shutter );
+
+    // Adjust for iso
+    float isoFactor = log2(params.iso / 100.0f);
+    ev100 -= isoFactor;
+
+    // Add user compensation
+    ev100 += params.exposureCompensation;
+
+    // Then convert EV -> linear scale
+    // negative sign depends on your preferred convention
+    float exposure = pow(2.0f, -ev100);
+    return exposure;
+}
+
+void main()
+{	
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+
+    ivec2 outSize = imageSize(texOut);
+
+    if (gid.x >= outSize.x || gid.y >= outSize.y) {
+        return;
+    }
+    vec2 uv = vec2(gid) / (outSize-1);
+    
+    vec3 sceneColor = imageLoad(texScene, gid).rgb;
+    vec3 bloomColor = vec3(0.0); // texture(texBloom, uv).rgb;
+    float avgLuminance = imageLoad(texLuminance, ivec2(0, 0)).r;
+
+
+    if (params.showBloom == 1) {
+        sceneColor = bloomColor;
+    } else {
+        // todo Upsample bloom if necessary
+        vec3 upsampledBloom = bloomColor;
+        upsampledBloom *= params.bloomStrength;
+        sceneColor += upsampledBloom;
+
+	}
+
+    float keyValue = 0.214; // Middle gray value
+    float autoExposure = keyValue / avgLuminance;
+    float exposure = autoExposure * camera_exposure() * params.exposure;
+
+    sceneColor *= exposure;
+
+    // Tone mapping
+    if (params.toneMappingOption == 0) {
+    
+        vec3 Yxy = convertRGB2Yxy(sceneColor);
+
+        float Lw = Yxy.x;
+        float a = 0.18;
+        float L_scaled = Reinhard_L_scaled(a, Lw, avgLuminance.r);
+        float L_white = Reinhard_L_scaled(a, params.maxWhite, avgLuminance.r);
+        Yxy.x = Reinhard_Ld(L_scaled, L_white);
+
+        sceneColor = convertYxy2RGB(Yxy);
+
+    } else if (params.toneMappingOption == 1) {
+        sceneColor = Uncharted2Filmic(sceneColor);
+    } else if (params.toneMappingOption == 2) {
+        sceneColor = ACESAproximation(sceneColor); 
+    } else if (params.toneMappingOption == 3) {
+        sceneColor = ACES_fitted(sceneColor); 
+    } else if (params.toneMappingOption == 4) {
+        sceneColor = agx_tonemapping(sceneColor); 
+    }
+
+    // Color grading
+    sceneColor = ApplyColorGrading(sceneColor, params.lift.rgb, params.gamma.rgb, params.gain.rgb);
+    sceneColor = AdjustSaturation(sceneColor, params.saturation);
+    sceneColor = AdjustContrast(sceneColor, params.contrast);
+    
+    // vignette
+    float radius = params.vignette_radius;
+    float softness = params.vignette_softness;
+    float dist = length(uv - vec2(0.5)) * 2.0;
+    float vignette = smoothstep(radius, radius - softness, dist);
+    sceneColor *= vignette;
+
+    vec3 finalColor = linearToSrgb(sceneColor);
+
+	imageStore( texOut, gid, vec4(finalColor, 1.0) );
+}
+

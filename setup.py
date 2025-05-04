@@ -17,10 +17,12 @@ def create_build(build_dir, cmake_path='..', generator='Ninja', format_target='f
 
     # Construct the CMake command
     cmake_command = [
-        'cmake',
-        cmake_path,
-        '-G', generator,
+    'cmake',
+    cmake_path,
+    '-G', generator,
+    '--graphviz=deps.dot'
     ]
+
 
     os.chdir(build_dir)
     subprocess.run(cmake_command, check=True)

@@ -1,69 +1,89 @@
 cmake_minimum_required(VERSION 3.28)
+project(GestaltEngine LANGUAGES CXX)
 
-project(GestaltEngine)
+# we want to fully control the dependencies
+set(CMAKE_TOOLCHAIN_FILE
+    ""
+    CACHE STRING "Disable vcpkg")
 
-message(STATUS "Configuring GestaltEngine...")
+# ── options ────────────────────────────────────────────────────
+option(GESTALT_BUILD_TESTS "Build unit tests" OFF)
+option(GESTALT_USE_CCACHE "Enable ccache if present" ON)
 
-set(APPLICATION_NAME "GestaltApp")
-set(GRAPHICS_MODULE "Graphics")
-set(FOUNDATION_MODULE "Foundation")
-set(APPLICATION_MODULE "Application")
+# ── compiler config ────────────────────────────────────────────
+function(enable_engine_cxx_standard target)
+  set_target_properties(
+    ${target}
+    PROPERTIES CXX_STANDARD 23
+               CXX_STANDARD_REQUIRED ON
+               CXX_EXTENSIONS OFF)
+endfunction()
 
-if(NOT EXISTS ${CMAKE_BINARY_DIR}/cmake/CPM.cmake)
-  file(DOWNLOAD https://github.com/cpm-cmake/CPM.cmake/releases/latest/download/CPM.cmake
-       ${CMAKE_BINARY_DIR}/cmake/CPM.cmake
-  )
+add_compile_definitions($<$<CONFIG:Debug>:TRACY_ENABLE>)
+function(enable_engine_warnings target)
+  if(MSVC)
+    target_compile_options(${target} PRIVATE /permissive- /Zc:__cplusplus)
+  else()
+    target_compile_options(${target} PRIVATE -Wall -Wextra -Wshadow -Werror)
+  endif()
+endfunction()
+
+if(CMAKE_CONFIGURATION_TYPES) # multi-config generator
+  set(CMAKE_CONFIGURATION_TYPES
+      "Debug;Release;Distribution"
+      CACHE STRING "" FORCE)
 endif()
-include(${CMAKE_BINARY_DIR}/cmake/CPM.cmake)
 
-set(CMAKE_CONFIGURATION_TYPES "Debug;Release;Distribution" CACHE STRING "Supported build types" FORCE)
+if(GESTALT_USE_CCACHE)
+  find_program(CCACHE_PROGRAM ccache)
+  if(CCACHE_PROGRAM)
+    message(STATUS "ccache enabled")
+    set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+    set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+  endif()
+endif()
 
-include(source/external/format.cmake)
-include(source/external/nlohmann.cmake)
-include(source/external/stb.cmake)
-include(source/external/glm.cmake)
-include(source/external/vma.cmake)
-include(source/external/volk.cmake)
-include(source/external/fmt.cmake)
-include(source/external/fastgltf.cmake)
-include(source/external/meshopt.cmake)
-include(source/external/tracy.cmake)
-include(source/external/vulkan.cmake)
-include(source/external/vkb.cmake)
-include(source/external/sdl2.cmake)
-include(source/external/so-loud.cmake)
-include(source/external/imgui.cmake)
-include(source/external/jolt.cmake)
+# ── third-party ────────────────────────────────────────────────
+include(cmake/Deps.cmake)
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED True)
+# ── sub-directories ────────────────────────────────────────────
+add_compile_definitions(JPH_FLOATING_POINT_EXCEPTIONS_ENABLED JPH_OBJECT_STREAM)
 
-set(CMAKE_CXX_FLAGS_DISTRIBUTION "${CMAKE_CXX_FLAGS_RELEASE}")
-set(CMAKE_C_FLAGS_DISTRIBUTION "${CMAKE_C_FLAGS_RELEASE}")
-set(CMAKE_EXE_LINKER_FLAGS_DISTRIBUTION "${CMAKE_EXE_LINKER_FLAGS_RELEASE}")
-set(CMAKE_SHARED_LINKER_FLAGS_DISTRIBUTION "${CMAKE_SHARED_LINKER_FLAGS_RELEASE}")
+function(set_folder target folder)
+  set_property(TARGET ${target} PROPERTY FOLDER ${folder})
+endfunction()
 
+add_subdirectory(engine/foundation)
+add_subdirectory(engine/graphics)
+add_subdirectory(engine/shaders)
+add_subdirectory(engine/application)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE) # to work in wsl with ninja
+add_executable(GestaltApp engine/main.cpp)
+enable_engine_cxx_standard(GestaltApp)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}/bin/debug)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}/bin/release)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DISTRIBUTION
+    ${CMAKE_SOURCE_DIR}/bin/distribution)
 if(MSVC)
-  add_compile_options(/experimental:module /std:c++latest)
+  set_target_properties(
+    GestaltApp
+    PROPERTIES
+      VS_DEBUGGER_WORKING_DIRECTORY
+      "$<$<CONFIG:Debug>:${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG}>$<$<CONFIG:Release>:${CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE}>$<$<CONFIG:Distribution>:${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DISTRIBUTION}>"
+  )
+  set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT
+                                                              GestaltApp)
+endif()
+add_dependencies(GestaltApp Shaders)
+
+target_link_libraries(GestaltApp PRIVATE Gestalt_SDL2 Application Foundation
+                                         Graphics)
+set_folder(GestaltApp "App/")
+
+if(GESTALT_BUILD_TESTS)
+  enable_testing()
+  add_subdirectory(tests)
 endif()
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_SOURCE_DIR}/bin/debug")
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/bin/release")
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DISTRIBUTION "${CMAKE_SOURCE_DIR}/bin/distribution")
-
-set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${APPLICATION_NAME})
-
-add_subdirectory(source)
-
-set_property(TARGET ${APPLICATION_NAME} PROPERTY FOLDER "GestaltEngine")
-set_property(TARGET ${GRAPHICS_MODULE} PROPERTY FOLDER "GestaltEngine")
-set_property(TARGET ${FOUNDATION_MODULE} PROPERTY FOLDER "GestaltEngine")
-set_property(TARGET ${APPLICATION_MODULE} PROPERTY FOLDER "GestaltEngine")
-set_property(TARGET Shaders PROPERTY FOLDER "GestaltEngine")
-
-set_target_properties(
-  ${APPLICATION_NAME}
-  PROPERTIES
-    VS_DEBUGGER_WORKING_DIRECTORY
-    "$<$<CONFIG:Debug>:${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG}>$<$<CONFIG:Release>:${CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE}>$<$<CONFIG:Distribution>:${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DISTRIBUTION}>"
-)
+install(TARGETS GestaltApp RUNTIME DESTINATION bin)

@@ -32,6 +32,8 @@
 *.app
 
 /build
+/cmake-build-debug
+/.idea
 /project
 /bin/config.json
 /bin/shaders

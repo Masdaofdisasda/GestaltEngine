@@ -1,3 +1,6 @@
+[![ci-linux](https://github.com/Masdaofdisasda/GestaltEngine/actions/workflows/ci-linux.yml/badge.svg?branch=main)](https://github.com/Masdaofdisasda/GestaltEngine/actions/workflows/ci-linux.yml)
+[![ci-windows](https://github.com/Masdaofdisasda/GestaltEngine/actions/workflows/ci-windows.yml/badge.svg?branch=main)](https://github.com/Masdaofdisasda/GestaltEngine/actions/workflows/ci-windows.yml)
+
 # Gestalt Engine
 
 A modern game engine built with Vulkan, focused on high-performance graphics and rendering. The Gestalt Engine is currently tested on Windows 10 and 11, compiled using Visual Studio 2022 (MSVC).
