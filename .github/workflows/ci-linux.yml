@@ -15,9 +15,9 @@ jobs:
     - name: Install packages
       run: |
         sudo apt update
-        sudo apt install -y ninja-build clang cmake libsdl2-dev libvulkan-dev glslang-tools
+        sudo apt install -y ninja-build clang cmake
 
-    # Optional: cache CPM downloads
+    # cache CPM downloads
     - uses: actions/cache@v4
       with:
         path: ${{ github.workspace }}/.cache/CPM
@@ -34,4 +34,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: GestaltApp-Linux
-        path: build/bin/Release/GestaltApp
+        path: bin/Release/GestaltApp

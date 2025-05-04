@@ -1,4 +1,5 @@
-[![Build on Linux](https://github.com/Masdaofdisasda/GestaltEngine/actions/workflows/linux.yml/badge.svg?branch=main)](https://github.com/Masdaofdisasda/GestaltEngine/actions/workflows/linux.yml)
+[![ci-linux](https://github.com/Masdaofdisasda/GestaltEngine/actions/workflows/ci-linux.yml/badge.svg?branch=main)](https://github.com/Masdaofdisasda/GestaltEngine/actions/workflows/ci-linux.yml)
+[![ci-windows](https://github.com/Masdaofdisasda/GestaltEngine/actions/workflows/ci-windows.yml/badge.svg?branch=main)](https://github.com/Masdaofdisasda/GestaltEngine/actions/workflows/ci-windows.yml)
 
 # Gestalt Engine
 
