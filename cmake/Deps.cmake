@@ -97,12 +97,6 @@ target_include_directories(VulkanMemoryAllocator
 
 set_property(TARGET VulkanMemoryAllocator PROPERTY FOLDER "External/")
 
-# ------------ volk ------------------------------
-cpmaddpackage(NAME volk GITHUB_REPOSITORY zeux/volk GIT_TAG 1.3.270)
-set_target_properties(volk PROPERTIES VS_GLOBAL_VcpkgEnabled false)
-
-set_property(TARGET volk PROPERTY FOLDER "External/")
-
 # ------------ fmt ------------------------------
 cpmaddpackage(
   NAME
@@ -209,7 +203,13 @@ CPMAddPackage(
 # emulate what find_package(Vulkan) would have set
 set(Vulkan_LIBRARIES Vulkan::Vulkan)
 
+# ------------ volk ------------------------------
+cpmaddpackage(NAME volk GITHUB_REPOSITORY zeux/volk GIT_TAG 1.3.270)
+set_target_properties(volk PROPERTIES VS_GLOBAL_VcpkgEnabled false)
 
+target_link_libraries(volk PRIVATE Vulkan::Headers)
+
+set_property(TARGET volk PROPERTY FOLDER "External/")
 # ------------ vk-bootstrap ------------------------------
 cpmaddpackage(
   NAME
