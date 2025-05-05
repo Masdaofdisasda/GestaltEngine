@@ -1,14 +1,25 @@
 ﻿#include "VulkanCore.hpp"
 
-// Options that affect generated code
-#pragma warning(push)
-#pragma warning(disable : 4505)  // VMA is not my responsibility
-#pragma warning(disable : 4324) 
-#pragma warning(disable : 4616) 
-#pragma warning(disable : 4100)  
-#pragma warning(disable : 4189) 
-#pragma warning(disable : 4127)
+#if defined(_MSC_VER)
+  #pragma warning(push)
+  #pragma warning(disable : 4505)  // unreferenced local function
+  #pragma warning(disable : 4324)  // alignment
+  #pragma warning(disable : 4616)  // unknown warning number
+  #pragma warning(disable : 4100)  // unreferenced formal parameter
+  #pragma warning(disable : 4189)  // local variable initialized but not referenced
+  #pragma warning(disable : 4127)  // conditional expression is constant
+#elif defined(__GNUC__) || defined(__clang__)
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wunused-function"
+  #pragma GCC diagnostic ignored "-Wunused-parameter"
+  #pragma GCC diagnostic ignored "-Wunused-variable"
+  #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+  #pragma GCC diagnostic ignored "-Wsign-compare"
+  #pragma GCC diagnostic ignored "-Wtype-limits"
+  #pragma GCC diagnostic ignored "-Wstrict-aliasing"
+#endif
 
+// Options that affect generated code
 #define VMA_IMPLEMENTATION
 #define VMA_VULKAN_VERSION 1003000
 #if 0
@@ -21,4 +32,9 @@
 #endif
 
 #include <vk_mem_alloc.h>
-#pragma warning( pop )
+
+#if defined(_MSC_VER)
+  #pragma warning(pop)
+#elif defined(__GNUC__) || defined(__clang__)
+  #pragma GCC diagnostic pop
+#endif

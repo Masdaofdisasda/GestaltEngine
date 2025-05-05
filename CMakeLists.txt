@@ -5,6 +5,7 @@ project(GestaltEngine LANGUAGES CXX)
 set(CMAKE_TOOLCHAIN_FILE
     ""
     CACHE STRING "Disable vcpkg")
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # ── options ────────────────────────────────────────────────────
 option(GESTALT_BUILD_TESTS "Build unit tests" OFF)
@@ -25,7 +26,7 @@ function(enable_engine_warnings target)
   if(MSVC)
     target_compile_options(${target} PRIVATE /permissive- /Zc:__cplusplus /W4 /WX )
   else()
-    target_compile_options(${target} PRIVATE -Wall -Wextra -Wshadow) # -Werror)
+    target_compile_options(${target} PRIVATE -Wall -Wextra -Wshadow -Werror)
   endif()
 endfunction()
 
