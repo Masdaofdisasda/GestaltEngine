@@ -1,5 +1,5 @@
 ﻿#pragma once 
-#include <VulkanTypes.hpp>
+#include <VulkanCore.hpp>
 #include <algorithm>
 #include <fstream>
 #include <map>

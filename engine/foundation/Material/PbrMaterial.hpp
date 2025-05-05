@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include "common.hpp"
-#include "VulkanTypes.hpp"
+#include "VulkanCore.hpp"
 #include "MaterialFlags.hpp"
 #include "glm/vec2.hpp"
 #include "glm/vec3.hpp"

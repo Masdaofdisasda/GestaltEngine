@@ -1,6 +1,6 @@
 ﻿#include "Window.hpp"
 
-#include "VulkanTypes.hpp"
+#include "VulkanCore.hpp"
 #include <SDL.h>
 #include <SDL_vulkan.h>
 

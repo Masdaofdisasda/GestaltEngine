@@ -2,7 +2,8 @@
 
 #include <functional>
 #include "common.hpp"
-#include "VulkanTypes.hpp"
+#include "VulkanCore.hpp"
+#include "VmaInclude.hpp"
 
 namespace gestalt::foundation {
 

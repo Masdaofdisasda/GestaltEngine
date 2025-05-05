@@ -5,7 +5,7 @@
 
 #include "Interface/IGpu.hpp"
 #include "common.hpp"
-#include "VulkanTypes.hpp"
+#include "VulkanCore.hpp"
 
 namespace gestalt::graphics {
 

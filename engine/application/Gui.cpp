@@ -1,6 +1,6 @@
 ﻿#include "Gui.hpp"
 
-#include "VulkanTypes.hpp"
+#include "VulkanCore.hpp"
 #include "VulkanCheck.hpp"
 
 #include <fmt/core.h>

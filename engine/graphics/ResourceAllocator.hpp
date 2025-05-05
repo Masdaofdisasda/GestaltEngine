@@ -4,7 +4,7 @@
 
 #include "TaskQueue.hpp"
 #include "common.hpp"
-#include "VulkanTypes.hpp"
+#include "VulkanCore.hpp"
 #include "Interface/IGpu.hpp"
 #include "Interface/IResourceAllocator.hpp"
 #include "Resources/ResourceTypes.hpp"

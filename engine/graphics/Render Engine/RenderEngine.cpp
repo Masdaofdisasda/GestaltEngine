@@ -31,8 +31,7 @@ namespace gestalt::graphics {
   void FrameData::init(VkDevice device, uint32 graphics_queue_family_index, FrameProvider& frame) {
     frame_ = &frame;
 
-    VkCommandPoolCreateInfo commandPoolInfo = vkinit::command_pool_create_info(
-        graphics_queue_family_index, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    VkCommandPoolCreateInfo commandPoolInfo = vkinit::command_pool_create_info(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
     VkCommandBufferAllocateInfo cmdAllocInfo
         = vkinit::command_buffer_allocate_info(VK_NULL_HANDLE, 1);
     VkFenceCreateInfo fenceCreateInfo = vkinit::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);

@@ -89,11 +89,10 @@ set_property(TARGET glm PROPERTY FOLDER "External/")
 
 # ------------ vma ------------------------------
 cpmaddpackage(NAME VMA GITHUB_REPOSITORY
-              GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator GIT_TAG v3.1.0)
+              GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator GIT_TAG v3.1.0 
+  SYSTEM)
 set_target_properties(VulkanMemoryAllocator PROPERTIES VS_GLOBAL_VcpkgEnabled
                                                        false)
-target_include_directories(VulkanMemoryAllocator
-                           INTERFACE "${VMA_SOURCE_DIR}/include")
 
 set_property(TARGET VulkanMemoryAllocator PROPERTY FOLDER "External/")
 

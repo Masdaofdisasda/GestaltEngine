@@ -7,7 +7,7 @@
 
 #include <Resources/TextureType.hpp>
 #include "VulkanCheck.hpp"
-#include "VulkanTypes.hpp"
+#include "VulkanCore.hpp"
 #include "common.hpp"
 
 #include "AccelerationStructure.hpp"

@@ -1,8 +1,7 @@
 ﻿#include "vk_initializers.hpp"
 
 namespace gestalt {
-  VkCommandPoolCreateInfo vkinit::command_pool_create_info(uint32_t queueFamilyIndex,
-                                                           VkCommandPoolCreateFlags flags /*= 0*/) {
+  VkCommandPoolCreateInfo vkinit::command_pool_create_info(VkCommandPoolCreateFlags flags /*= 0*/) {
     VkCommandPoolCreateInfo info = {};
     info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     info.pNext = nullptr;

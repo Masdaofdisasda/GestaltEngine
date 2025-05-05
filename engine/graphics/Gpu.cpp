@@ -219,8 +219,7 @@ namespace gestalt::graphics {
     VkFenceCreateInfo fence_create_info = vkinit::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
     VK_CHECK(vkCreateFence(getDevice(), &fence_create_info, nullptr, &immediate_submit_fence_));
 
-    VkCommandPoolCreateInfo commandPoolInfo = vkinit::command_pool_create_info(
-        getGraphicsQueueFamily(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    VkCommandPoolCreateInfo commandPoolInfo = vkinit::command_pool_create_info(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
     VK_CHECK(vkCreateCommandPool(getDevice(), &commandPoolInfo, nullptr,
                                  &immediate_submit_command_pool_));
     VkCommandBufferAllocateInfo cmdAllocInfo

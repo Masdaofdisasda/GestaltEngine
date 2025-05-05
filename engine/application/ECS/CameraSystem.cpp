@@ -6,7 +6,7 @@
 #include "FrameProvider.hpp"
 #include "PerFrameData.hpp"
 #include "Repository.hpp"
-#include "VulkanTypes.hpp"
+#include "VulkanCore.hpp"
 #include "Interface/IGpu.hpp"
 #include "Interface/IResourceAllocator.hpp"
 #include <Events/Events.hpp>

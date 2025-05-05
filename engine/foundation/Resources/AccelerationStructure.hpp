@@ -1,6 +1,6 @@
 #pragma once
 
-#include "VulkanTypes.hpp"
+#include "VulkanCore.hpp"
 
 namespace gestalt::foundation {
   struct AccelerationStructure {
