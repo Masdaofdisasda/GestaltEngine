@@ -8,7 +8,16 @@
   #pragma warning(disable : 4100)  // unreferenced formal parameter
   #pragma warning(disable : 4189)  // local variable initialized but not referenced
   #pragma warning(disable : 4127)  // conditional expression is constant
-#elif defined(__GNUC__) || defined(__clang__)
+#elif defined(__clang__)
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wunused-function"
+  #pragma clang diagnostic ignored "-Wunused-parameter"
+  #pragma clang diagnostic ignored "-Wunused-variable"
+  #pragma clang diagnostic ignored "-Wmissing-field-initializers"
+  #pragma clang diagnostic ignored "-Wsign-compare"
+  #pragma clang diagnostic ignored "-Wtype-limits"
+  #pragma clang diagnostic ignored "-Wstrict-aliasing"
+#elif defined(__GNUC__)
   #pragma GCC diagnostic push
   #pragma GCC diagnostic ignored "-Wunused-function"
   #pragma GCC diagnostic ignored "-Wunused-parameter"
