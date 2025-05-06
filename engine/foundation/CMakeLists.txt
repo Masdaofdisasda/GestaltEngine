@@ -37,8 +37,6 @@ source_group("Source Files" FILES ${ROOT_SOURCES})
 add_library(Foundation ${ALL_SOURCES})
 enable_engine_cxx_standard(Foundation)
 enable_engine_warnings(Foundation)
-set_source_files_properties(VmaImpl.cpp
-    PROPERTIES COMPILE_WARNING_AS_ERROR OFF) # cant be avoid because it needs VMA_IMPLEMENTATION
 
 target_include_directories(
   Foundation

@@ -80,6 +80,7 @@ cpmaddpackage(
   g-truc/glm
   GIT_TAG
   1.0.1
+  SYSTEM
   OPTIONS
   "GLM_BUILD_TESTS OFF")
 set_target_properties(glm PROPERTIES VS_GLOBAL_VcpkgEnabled false)
@@ -104,6 +105,7 @@ cpmaddpackage(
   fmtlib/fmt
   GIT_TAG
   10.2.1
+  SYSTEM
   OPTIONS
   "FMT_TEST OFF"
   "FMT_DOC OFF"
@@ -119,6 +121,7 @@ cpmaddpackage(
   spnda/fastgltf
   GIT_TAG
   v0.7.1
+  SYSTEM
   OPTIONS
   "FASTGLTF_ENABLE_TESTS NO"
   "FASTGLTF_ENABLE_DOCS NO"
@@ -287,6 +290,7 @@ cpmaddpackage(
   libsdl-org/SDL
   GIT_TAG
   release-2.30.1
+  SYSTEM
   OPTIONS
   "SDL_SHARED OFF"
   "SDL_STATIC ON"
@@ -332,7 +336,8 @@ set_property(TARGET soloud PROPERTY FOLDER "External")
 
 # --------------------------------------------------------------------
 # 1) Dear ImGui core
-cpmaddpackage(NAME imgui GITHUB_REPOSITORY ocornut/imgui GIT_TAG v1.90.4)
+cpmaddpackage(NAME imgui GITHUB_REPOSITORY ocornut/imgui GIT_TAG v1.90.4 
+  SYSTEM)
 
 # ImGui ships without CMake.  Create our own tiny target that: • compiles the
 # “core” files • later we’ll append backend .cpp’s with target_sources()
@@ -367,14 +372,16 @@ target_compile_definitions(DearImGui PRIVATE IMGUI_IMPL_VULKAN_NO_PROTOTYPES
 # --------------------------------------------------------------------
 # 3) Plug-in: ImGuiFileDialog
 cpmaddpackage(NAME ImGuiFileDialog GITHUB_REPOSITORY aiekick/ImGuiFileDialog
-              GIT_TAG v0.6.7)
+              GIT_TAG v0.6.7 
+  SYSTEM)
 target_include_directories(ImGuiFileDialog PRIVATE "${imgui_SOURCE_DIR}")
 set_target_properties(ImGuiFileDialog PROPERTIES FOLDER "External/ImGui")
 
 # --------------------------------------------------------------------
 # 4) Plug-in: ImGuizmo
 cpmaddpackage(NAME ImGuizmo GITHUB_REPOSITORY CedricGuillemet/ImGuizmo GIT_TAG
-              1.83)
+              1.83 
+  SYSTEM)
 
 # ImGuizmo is a single .cpp library – compile it
 add_library(ImGuizmo STATIC ${ImGuizmo_SOURCE_DIR}/ImGuizmo.cpp

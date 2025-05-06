@@ -238,7 +238,7 @@ namespace gestalt::application {
         const auto& rotation = repository_.transform_components.find(entity)->rotation();
         glm::vec3 direction = -glm::normalize(rotation * glm::vec3(0, 0, -1.f));
 
-        light_component.set_light_view_projection(repository_.light_view_projections.size());
+        light_component.set_light_view_projection(static_cast<uint32>(repository_.light_view_projections.size()));
         // TODO fix this
         glm::mat4 inv_cam
             = repository_.per_frame_data_buffers->data.at(frame_.get_current_frame_index())

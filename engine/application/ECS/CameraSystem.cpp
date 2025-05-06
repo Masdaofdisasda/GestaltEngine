@@ -108,55 +108,57 @@ namespace gestalt::application {
           && !repository_.first_person_camera_components.find(active_camera_)
           && !repository_.free_fly_camera_components.find(active_camera_)
           && !repository_.orbit_camera_components.find(active_camera_)) {
-        if (const auto cameras = repository_.animation_camera_components.snapshot();
-            !cameras.empty()) {
-          active_camera_ = cameras.front().first;
-        } else if (const auto cameras = repository_.first_person_camera_components.snapshot();
-                   !cameras.empty()) {
-          active_camera_ = cameras.front().first;
-        } else if (const auto cameras = repository_.free_fly_camera_components.snapshot();
-                   !cameras.empty()) {
-          active_camera_ = cameras.front().first;
-        } else if (const auto cameras = repository_.orbit_camera_components.snapshot();
-                   !cameras.empty()) {
-          active_camera_ = cameras.front().first;
+        if (const auto animation_cameras = repository_.animation_camera_components.snapshot();
+            !animation_cameras.empty()) {
+          active_camera_ = animation_cameras.front().first;
+        } else if (const auto first_person_cameras
+                   = repository_.first_person_camera_components.snapshot();
+                   !first_person_cameras.empty()) {
+          active_camera_ = first_person_cameras.front().first;
+        } else if (const auto free_fly_cameras = repository_.free_fly_camera_components.snapshot();
+                   !free_fly_cameras.empty()) {
+          active_camera_ = free_fly_cameras.front().first;
+        } else if (const auto orbit_cameras = repository_.orbit_camera_components.snapshot();
+                   !orbit_cameras.empty()) {
+          active_camera_ = orbit_cameras.front().first;
         }
       }
 
       auto transform_component = repository_.transform_components.find(active_camera_);
       auto view_matrix = glm::mat4(1.0f);
-      if (const auto camera_component
+      if (const auto free_fly_camera_component
           = repository_.free_fly_camera_components.find_mutable(active_camera_);
-          camera_component != nullptr) {
-        camera_component->update(delta_time, movement);
-        view_matrix = camera_component->view_matrix();
+          free_fly_camera_component != nullptr) {
+        free_fly_camera_component->update(delta_time, movement);
+        view_matrix = free_fly_camera_component->view_matrix();
         event_bus_.emit<MoveEntityEvent>(
-            MoveEntityEvent{active_camera_, camera_component->position(),
-                            camera_component->orientation(), transform_component->scale_uniform()});
-      } else if (const auto camera_component
+            MoveEntityEvent{active_camera_, free_fly_camera_component->position(),
+            free_fly_camera_component->orientation(), transform_component->scale_uniform()});
+      } else if (const auto orbit_camera_component
                  = repository_.orbit_camera_components.find_mutable(active_camera_);
-                 camera_component != nullptr) {
-        camera_component->update(delta_time, movement);
-        view_matrix = camera_component->view_matrix();
-        event_bus_.emit<MoveEntityEvent>(
-            MoveEntityEvent{active_camera_, camera_component->position(),
-                            camera_component->orientation(), transform_component->scale_uniform()});
-      } else if (const auto camera_component
+                 orbit_camera_component != nullptr) {
+        orbit_camera_component->update(delta_time, movement);
+        view_matrix = orbit_camera_component->view_matrix();
+        event_bus_.emit<MoveEntityEvent>(MoveEntityEvent{
+            active_camera_, orbit_camera_component->position(),
+            orbit_camera_component->orientation(),
+            transform_component->scale_uniform()});
+      } else if (const auto first_person_camera_component
                  = repository_.first_person_camera_components.find_mutable(active_camera_);
-                 camera_component != nullptr) {
-        camera_component->set_position(transform_component->position());
-        camera_component->update(movement);
-        view_matrix = camera_component->view_matrix();
+                 first_person_camera_component != nullptr) {
+        first_person_camera_component->set_position(transform_component->position());
+        first_person_camera_component->update(movement);
+        view_matrix = first_person_camera_component->view_matrix();
         event_bus_.emit<MoveEntityEvent>(
-            MoveEntityEvent{active_camera_, camera_component->position(),
-                            camera_component->orientation(), transform_component->scale_uniform()});
-      } else if (const auto camera_component
+            MoveEntityEvent{active_camera_, first_person_camera_component->position(),
+            first_person_camera_component->orientation(), transform_component->scale_uniform()});
+      } else if (const auto animation_camera_camera_component
                  = repository_.animation_camera_components.find_mutable(active_camera_);
-                 camera_component != nullptr) {
-        camera_component->set_position(transform_component->position());
-        camera_component->set_orientation(transform_component->rotation());
-        camera_component->update();
-        view_matrix = camera_component->view_matrix();
+                 animation_camera_camera_component != nullptr) {
+        animation_camera_camera_component->set_position(transform_component->position());
+        animation_camera_camera_component->set_orientation(transform_component->rotation());
+        animation_camera_camera_component->update();
+        view_matrix = animation_camera_camera_component->view_matrix();
       }
 
       const auto frame = frame_.get_current_frame_index();

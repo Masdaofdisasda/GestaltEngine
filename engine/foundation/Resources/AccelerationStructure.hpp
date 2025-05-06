@@ -5,6 +5,6 @@
 namespace gestalt::foundation {
   struct AccelerationStructure {
     VkAccelerationStructureKHR acceleration_structure {};
-    VkDeviceAddress            address;
+    VkDeviceAddress            address{};
   };
 } // namespace gestalt

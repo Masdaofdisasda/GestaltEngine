@@ -27,7 +27,7 @@ source_group("Source Files" FILES ${ROOT_SOURCES})
 
 add_library(Application ${ALL_SOURCES})
 enable_engine_cxx_standard(Application)
-# enable_engine_warnings(Application)
+enable_engine_warnings(Application)
 
 target_include_directories(Application PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 

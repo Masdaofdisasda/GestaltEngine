@@ -2,7 +2,6 @@
 
 #include <numeric>
 #include <ranges>
-#include <span>
 
 #include "VulkanCheck.hpp"
 
@@ -90,7 +89,7 @@ namespace gestalt::application {
     VkAccelerationStructureBuildSizesInfoKHR tlasBuildSizesInfo = {
         .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR,
     };
-    const uint32_t instanceCount = tlasInstances.size();
+    const uint32 instanceCount = static_cast<uint32>(tlasInstances.size());
     vkGetAccelerationStructureBuildSizesKHR(
         gpu_.getDevice(), VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &tlasBuildGeometryInfo,
         &instanceCount, &tlasBuildSizesInfo);
@@ -138,7 +137,7 @@ namespace gestalt::application {
                       repository_.tlas_instance_buffer->get_buffer_handle(), 1, &copyRegion);
 
       // Build TLAS
-      vkCmdBuildAccelerationStructuresKHR(commandBuffer, tlasBuildRanges.size(),
+      vkCmdBuildAccelerationStructuresKHR(commandBuffer, static_cast<uint32>(tlasBuildRanges.size()),
                                           &tlasBuildGeometryInfo, tlasBuildRanges.data());
     });
 
@@ -158,7 +157,7 @@ namespace gestalt::application {
     auto& meshes = repository_.meshes.data();
 
     const size_t blasCount = std::accumulate(
-        std::begin(meshes), std::end(meshes), 0,
+        std::begin(meshes), std::end(meshes), size_t{0},
         [](const size_t sum, const Mesh& mesh) { return sum + mesh.surfaces.size(); });
 
     for (size_t index = 0; index < blasCount; index++) {
@@ -266,7 +265,7 @@ namespace gestalt::application {
     constexpr VkDeviceSize alignment = 256;
 
     const VkDeviceSize blasDataBufferSize = std::accumulate(
-        std::begin(buildSizesInfos), std::end(buildSizesInfos), 0,
+        std::begin(buildSizesInfos), std::end(buildSizesInfos), VkDeviceSize{0},
         [&alignment](const VkDeviceSize sum,
                      const VkAccelerationStructureBuildSizesInfoKHR& build_sizes_info) {
           return sum + (build_sizes_info.accelerationStructureSize + alignment - 1)
@@ -347,7 +346,7 @@ namespace gestalt::application {
     }
 
     gpu_.immediateSubmit([&](const VkCommandBuffer& commandBuffer) {
-      vkCmdBuildAccelerationStructuresKHR(commandBuffer, buildRangeInfoPtrs.size(),
+      vkCmdBuildAccelerationStructuresKHR(commandBuffer, static_cast<uint32>(buildRangeInfoPtrs.size()),
                                           buildGeometryInfos.data(), buildRangeInfoPtrs.data());
     });
   }
@@ -366,7 +365,7 @@ namespace gestalt::application {
     const auto meshComponent = repository_.mesh_components.find(entity);
     if (meshComponent != nullptr) {
       const auto& mesh = repository_.meshes.get(meshComponent->mesh);
-      for (const auto surface : mesh.surfaces) {
+      for (const auto& surface : mesh.surfaces) {
         if (surface.bottom_level_as != no_component) {
           auto blas_address
               = repository_.ray_tracing_buffer

@@ -116,13 +116,6 @@ namespace gestalt::foundation {
       } else {
         // acceleration
         move_speed_ += accel * acceleration_ * delta_seconds;
-        if (movement.left_control) {
-          float maxSpeed = max_speed_ * fast_coef_;
-        } else if (movement.crouch) {
-          float maxSpeed = max_speed_ * slow_coef_;
-        } else {
-          float maxSpeed = max_speed_;
-        }
         const float maxSpeed = movement.left_control ? max_speed_ * fast_coef_ : max_speed_;
         if (glm::length(move_speed_) > maxSpeed)
           move_speed_ = glm::normalize(move_speed_) * maxSpeed;

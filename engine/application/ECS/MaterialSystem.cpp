@@ -209,7 +209,7 @@ namespace gestalt::application {
           vkDeviceWaitIdle(gpu_.getDevice());
         }
 
-        write_material(config, material_id);
+        write_material(config, static_cast<uint32>(material_id));
         is_dirty = false;
       }
     }
