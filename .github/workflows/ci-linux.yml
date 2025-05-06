@@ -25,7 +25,6 @@ jobs:
       - name: Configure
         run: |
           cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-                 -DCMAKE_C_COMPILER=${{ matrix.compiler }} \
                  -DCMAKE_CXX_COMPILER=${{ matrix.compiler }}
 
       - name: Build
