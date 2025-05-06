@@ -188,9 +188,9 @@ namespace gestalt::application {
                                    * glm::toMat4(transform->rotation())
                                    * glm::scale(glm::mat4(1.0f), transform->scale());
         glm::mat4 parentWorldTransform
-            = glm::translate(glm::mat4(1.0f), transform->parent_position)
-              * glm::toMat4(transform->parent_rotation)
-              * glm::scale(glm::mat4(1.0f), glm::vec3(transform->parent_scale));
+            = glm::translate(glm::mat4(1.0f), transform->parent_position())
+              * glm::toMat4(transform->parent_rotation())
+              * glm::scale(glm::mat4(1.0f), glm::vec3(transform->parent_scale()));
         glm::mat4 inverseParentWorldTransform = glm::inverse(parentWorldTransform);
         glm::mat4 worldTransform = parentWorldTransform * localTransform;
 
@@ -1018,9 +1018,9 @@ namespace gestalt::application {
                                  * toMat4(transform->rotation())
                                  * scale(glm::mat4(1.0f), transform->scale());
       glm::mat4 parentWorldTransform
-          = translate(glm::mat4(1.0f), transform->parent_position)
-            * toMat4(transform->parent_rotation)
-            * scale(glm::mat4(1.0f), glm::vec3(transform->parent_scale));
+          = translate(glm::mat4(1.0f), transform->parent_position())
+            * toMat4(transform->parent_rotation())
+            * scale(glm::mat4(1.0f), glm::vec3(transform->parent_scale()));
       glm::mat4 inverseParentWorldTransform = inverse(parentWorldTransform);
       glm::mat4 worldTransform = parentWorldTransform * localTransform;
 
@@ -1053,7 +1053,7 @@ namespace gestalt::application {
       // World scale control (taking parent transform into account)
       float world_scale = length(glm::vec3(worldTransform[0]));
       if (ImGui::DragFloat("World Scale", &world_scale, 0.005f)) {
-        auto new_scale = world_scale / transform->parent_scale;
+        auto new_scale = world_scale / transform->parent_scale();
         event_bus_.emit<ScaleEntityEvent>(ScaleEntityEvent{selected_entity_, new_scale});
       }
       ImGui::Text("AABB max: (%.3f, %.3f, %.3f)", node->bounds.max.x, node->bounds.max.y,

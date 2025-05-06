@@ -322,20 +322,20 @@ namespace gestalt::foundation {
   };
 
   class ImageInstance final : public ResourceInstance {
-    ImageTemplate image_template;
-    AllocatedImage allocated_image;
-    VkExtent3D extent;
-    VkImageLayout current_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-    VkAccessFlags2 current_access = VK_ACCESS_2_NONE;
-    VkPipelineStageFlags2 current_stage = VK_PIPELINE_STAGE_2_NONE;
+    ImageTemplate image_template_;
+    AllocatedImage allocated_image_;
+    VkExtent3D extent_;
+    VkImageLayout current_layout_ = VK_IMAGE_LAYOUT_UNDEFINED;
+    VkAccessFlags2 current_access_ = VK_ACCESS_2_NONE;
+    VkPipelineStageFlags2 current_stage_ = VK_PIPELINE_STAGE_2_NONE;
 
   public:
     ImageInstance(ImageTemplate&& image_template, const AllocatedImage& allocated_image,
                   const VkExtent3D extent)
       : ResourceInstance(image_template.get_name()),
-        image_template(std::move(image_template)),
-        allocated_image(allocated_image),
-        extent(extent) {}
+        image_template_(std::move(image_template)),
+        allocated_image_(allocated_image),
+        extent_(extent) {}
 
     ImageInstance(const ImageInstance&) = delete;
     ImageInstance& operator=(const ImageInstance&) = delete;
@@ -348,27 +348,27 @@ namespace gestalt::foundation {
       visitor.visit(*this, usage, shader_stage);
     }
 
-    [[nodiscard]] VkImage get_image_handle() const { return allocated_image.image_handle; }
+    [[nodiscard]] VkImage get_image_handle() const { return allocated_image_.image_handle; }
 
     [[nodiscard]] VkImageAspectFlags get_image_aspect() const {
-      return image_template.aspect_flags();
+      return image_template_.aspect_flags();
     }
 
-    [[nodiscard]] VkImageView get_image_view() const { return allocated_image.image_view; }
+    [[nodiscard]] VkImageView get_image_view() const { return allocated_image_.image_view; }
 
-    [[nodiscard]] VkExtent3D get_extent() const { return extent; }
+    [[nodiscard]] VkExtent3D get_extent() const { return extent_; }
 
-    [[nodiscard]] VkImageLayout get_layout() const { return current_layout; }
-    void set_layout(const VkImageLayout layout) { current_layout = layout; }
-    [[nodiscard]] VkFormat get_format() const { return image_template.format(); }
+    [[nodiscard]] VkImageLayout get_layout() const { return current_layout_; }
+    void set_layout(const VkImageLayout layout) { current_layout_ = layout; }
+    [[nodiscard]] VkFormat get_format() const { return image_template_.format(); }
 
-    [[nodiscard]] TextureType get_type() const { return image_template.type(); }
+    [[nodiscard]] TextureType get_type() const { return image_template_.type(); }
 
-    [[nodiscard]] VkAccessFlags2 get_current_access() const { return current_access; }
-    void set_current_access(const VkAccessFlags2 access) { current_access = access; }
+    [[nodiscard]] VkAccessFlags2 get_current_access() const { return current_access_; }
+    void set_current_access(const VkAccessFlags2 access) { current_access_ = access; }
 
-    [[nodiscard]] VkPipelineStageFlags2 get_current_stage() const { return current_stage; }
-    void set_current_stage(const VkPipelineStageFlags2 stage) { current_stage = stage; }
+    [[nodiscard]] VkPipelineStageFlags2 get_current_stage() const { return current_stage_; }
+    void set_current_stage(const VkPipelineStageFlags2 stage) { current_stage_ = stage; }
   };
 
   class ImageArrayInstance final : public ResourceInstance {
@@ -578,14 +578,23 @@ namespace gestalt::foundation {
       const VkBufferCreateInfo buffer_info = {
           .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
           .pNext = nullptr,
+          .flags = 0,
           .size = layout_size_in_bytes_,
           .usage = usage_,
           .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+          .queueFamilyIndexCount = 0,
+          .pQueueFamilyIndices = nullptr,
       };
 
       constexpr VmaAllocationCreateInfo vma_alloc_info = {
           .flags = VMA_ALLOCATION_CREATE_MAPPED_BIT,
           .usage = VMA_MEMORY_USAGE_CPU_TO_GPU,
+          .requiredFlags = 0,
+          .preferredFlags = 0,
+          .memoryTypeBits = 0,
+          .pool = VK_NULL_HANDLE,
+          .pUserData = nullptr,
+          .priority = 0.0f,
       };
       VK_CHECK(vmaCreateBuffer(gpu_->getAllocator(), &buffer_info, &vma_alloc_info, &buffer_handle_,
                                &allocation_, &info_));
@@ -594,6 +603,7 @@ namespace gestalt::foundation {
 
       const VkBufferDeviceAddressInfo device_address_info = {
           .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+          .pNext = nullptr,
           .buffer = buffer_handle_,
       };
       address_ = vkGetBufferDeviceAddress(gpu_->getDevice(), &device_address_info);
@@ -607,10 +617,11 @@ namespace gestalt::foundation {
                             reinterpret_cast<void**>(&descriptor_buf_ptr)));
 
       for (const auto& update : update_infos_) {
-        VkDescriptorGetInfoEXT descriptor_info = {
-            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT,
-            .type = update.type,
-        };
+        VkDescriptorGetInfoEXT descriptor_info
+            = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT,
+               .pNext = nullptr,
+               .type = update.type,
+               .data = {}};
 
         if (update.type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) {
           descriptor_info.data.pUniformBuffer = &update.addr_info;
@@ -684,6 +695,8 @@ namespace gestalt::foundation {
             .range = buffer_size,
             .format = VK_FORMAT_UNDEFINED,
         },
+        .image_info = {},
+        .tlas_address = 0
     };
 
       update_infos_.emplace_back(update_info);

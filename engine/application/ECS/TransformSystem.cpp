@@ -85,13 +85,13 @@ namespace gestalt::application {
     auto local_transform = repository_.transform_components.find_mutable(entity);
     if (node->parent != invalid_entity) {
       const auto& parent_transform_component = repository_.transform_components.find(node->parent);
-      local_transform->parent_position = parent_transform_component->position();
-      local_transform->parent_rotation = parent_transform_component->rotation();
-      local_transform->parent_scale = parent_transform_component->scale().x;
+      local_transform->set_parent_position(parent_transform_component->position());
+      local_transform->set_parent_rotation(parent_transform_component->rotation());
+      local_transform->set_parent_scale(parent_transform_component->scale().x);
     } else {
-      local_transform->parent_position = local_transform->position();
-      local_transform->parent_rotation = local_transform->rotation();
-      local_transform->parent_scale = local_transform->scale().x;
+      local_transform->set_parent_position(local_transform->position());
+      local_transform->set_parent_rotation( local_transform->rotation());
+      local_transform->set_parent_scale(local_transform->scale().x);
     }
 
     const auto& mesh_component = repository_.mesh_components.find(entity);
