@@ -9,25 +9,25 @@ namespace gestalt::application {
   TransformSystem::TransformSystem(Repository& repository, EventBus& event_bus)
       : repository_(repository) {
     event_bus.subscribe<MoveEntityEvent>([this](const MoveEntityEvent& event) {
-      auto transform = repository_.transform_components.find_mutable(event.entity);
-      transform->set_position(event.new_position);
-      transform->set_rotation(event.new_rotation);
-      transform->set_scale(event.new_scale);
+      auto transform = repository_.transform_components.find_mutable(event.entity());
+      transform->set_position(event.new_position());
+      transform->set_rotation(event.new_rotation());
+      transform->set_scale(event.new_scale());
       transform->is_dirty = true;
     });
     event_bus.subscribe<TranslateEntityEvent>([this](const TranslateEntityEvent& event) {
-      auto transform = repository_.transform_components.find_mutable(event.entity);
-      transform->set_position(event.new_position);
+      auto transform = repository_.transform_components.find_mutable(event.entity());
+      transform->set_position(event.new_position());
       transform->is_dirty = true;
     });
     event_bus.subscribe<RotateEntityEvent>([this](const RotateEntityEvent& event) {
-      auto transform = repository_.transform_components.find_mutable(event.entity);
-      transform->set_rotation(event.new_rotation);
+      auto transform = repository_.transform_components.find_mutable(event.entity());
+      transform->set_rotation(event.new_rotation());
       transform->is_dirty = true;
     });
     event_bus.subscribe<ScaleEntityEvent>([this](const ScaleEntityEvent& event) {
-      auto transform = repository_.transform_components.find_mutable(event.entity);
-      transform->set_scale(event.new_scale);
+      auto transform = repository_.transform_components.find_mutable(event.entity());
+      transform->set_scale(event.new_scale());
       transform->is_dirty = true;
     });
   }

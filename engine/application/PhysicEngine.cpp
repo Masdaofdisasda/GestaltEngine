@@ -187,30 +187,30 @@ namespace gestalt::application {
     JPH::EMotionType motion_type;
     JPH::ObjectLayer layer;
 
-    if (physics_component.body_type == DYNAMIC) {
+    if (physics_component.is_body_type(DYNAMIC)) {
       motion_type = JPH::EMotionType::Dynamic;
       layer = Layers::MOVING;
-    } else if (physics_component.body_type == STATIC) {
+    } else if (physics_component.is_body_type(STATIC)) {
       motion_type = JPH::EMotionType::Static;
       layer = Layers::NON_MOVING;
     }
 
-    if (physics_component.collider_type == BOX) {
-      const auto &[bounds] = std::get<BoxCollider>(physics_component.collider);
-      physics_component.shape = new JPH::BoxShape(to(bounds * 0.5f));
-    } else if (physics_component.collider_type == SPHERE) {
-      const auto &[radius] = std::get<SphereCollider>(physics_component.collider);
-      physics_component.shape = new JPH::SphereShape(radius);
-    } else if (physics_component.collider_type == CAPSULE) {
-      const auto &[radius, height] = std::get<CapsuleCollider>(physics_component.collider);
-      physics_component.shape = new JPH::CapsuleShape(height * 0.5f, radius);
+    if (physics_component.is_collider_type(BOX)) {
+      const auto &[bounds] = std::get<BoxCollider>(physics_component.collider());
+      physics_component.set_shape(new JPH::BoxShape(to(bounds * 0.5f)));
+    } else if (physics_component.is_collider_type(SPHERE)) {
+      const auto &[radius] = std::get<SphereCollider>(physics_component.collider());
+      physics_component.set_shape(new JPH::SphereShape(radius));
+    } else if (physics_component.is_collider_type(CAPSULE)) {
+      const auto &[radius, height] = std::get<CapsuleCollider>(physics_component.collider());
+      physics_component.set_shape(new JPH::CapsuleShape(height * 0.5f, radius));
     } else {
-      physics_component.shape = new JPH::MeshShape();
+      physics_component.set_shape(new JPH::MeshShape());
     }
 
-    auto body_settings = JPH::BodyCreationSettings(physics_component.shape, to(position),
+    auto body_settings = JPH::BodyCreationSettings(physics_component.shape(), to(position),
                                                          to(orientation), motion_type, layer);
-    if (physics_component.collider_type == CAPSULE) {
+    if (physics_component.is_collider_type(CAPSULE)) {
       // assumes player is capsule
       //body_settings.mLinearDamping = 0.1f;
       //body_settings.mAngularDamping = 0.1f;

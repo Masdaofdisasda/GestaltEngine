@@ -2,7 +2,7 @@
 #include <glm/fwd.hpp>
 
 namespace gestalt::foundation {
-  struct PhysicsComponent;
+  class PhysicsComponent;
 }
 
 namespace JPH {

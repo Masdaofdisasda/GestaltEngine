@@ -24,30 +24,30 @@ namespace gestalt::graphics {
   }
 
   std::shared_ptr<ImageInstance> ResourceAllocator::create_image(ImageTemplate&& image_template) {
-    if (image_template.get_format() == VK_FORMAT_UNDEFINED) {
+    if (image_template.format() == VK_FORMAT_UNDEFINED) {
       throw std::runtime_error("Image format must be specified.");
     }
 
-    const VkImageUsageFlags usage_flags = get_usage_flags(image_template.get_type());
+    const VkImageUsageFlags usage_flags = get_usage_flags(image_template.type());
 
-    const auto image_size = image_template.get_image_size();
+    const auto image_size = image_template.image_size();
     VkExtent3D extent = {};
     if (std::holds_alternative<RelativeImageSize>(image_size)) {
-      const auto scale = std::get<RelativeImageSize>(image_size).scale;
-      extent = {.width= static_cast<uint32>(getWindowedWidth() * scale),
+      const auto scale = std::get<RelativeImageSize>(image_size).scale();
+      extent = {.width = static_cast<uint32>(getWindowedWidth() * scale),
                 .height= static_cast<uint32>(getWindowedHeight() * scale), .depth= 1};
     } else if (std::holds_alternative<AbsoluteImageSize>(image_size)) {
-      extent = std::get<AbsoluteImageSize>(image_size).extent;
+      extent = std::get<AbsoluteImageSize>(image_size).extent();
     } else {
       throw std::runtime_error("Invalid image size type.");
     }
-    if (image_template.get_image_type() == ImageType::kImage2D) {
+    if (image_template.image_type() == ImageType::kImage2D) {
       extent.depth = 1;
     }
 
-    if (std::holds_alternative<std::filesystem::path>(image_template.get_initial_value())) {
-      const auto path = std::get<std::filesystem::path>(image_template.get_initial_value());
-      if (image_template.get_image_type() == ImageType::kCubeMap) {
+    if (std::holds_alternative<std::filesystem::path>(image_template.initial_value())) {
+      const auto path = std::get<std::filesystem::path>(image_template.initial_value());
+      if (image_template.image_type() == ImageType::kCubeMap) {
         const ImageInfo image_info(path);
         uint32 face_length = image_info.get_extent().height / 2;
 
@@ -66,8 +66,8 @@ namespace gestalt::graphics {
       const ImageInfo image_info(path);
 
       auto allocated_image = allocate_image(
-          image_template.get_name(), image_info.get_format(), usage_flags, image_info.get_extent(), image_template.get_aspect_flags(),
-                           image_template.get_image_type(), image_template.has_mipmap());
+          image_template.get_name(), image_info.get_format(), usage_flags, image_info.get_extent(), image_template.aspect_flags(),
+                           image_template.image_type(), image_template.has_mipmap());
 
       task_queue_.add_image(path, allocated_image.image_handle, false, image_template.has_mipmap());
 
@@ -75,13 +75,13 @@ namespace gestalt::graphics {
                                              image_info.get_extent());
     }
 
-    if (std::holds_alternative<std::vector<unsigned char>>(image_template.get_initial_value())) {
-      auto data = std::get<std::vector<unsigned char>>(image_template.get_initial_value());
+    if (std::holds_alternative<std::vector<unsigned char>>(image_template.initial_value())) {
+      auto data = std::get<std::vector<unsigned char>>(image_template.initial_value());
       const ImageInfo image_info(data.data(), data.size(), extent);
 
       auto allocated_image = allocate_image(
-          image_template.get_name(), image_info.get_format(), usage_flags, image_info.get_extent(), image_template.get_aspect_flags(),
-                           image_template.get_image_type(), image_template.has_mipmap());
+          image_template.get_name(), image_info.get_format(), usage_flags, image_info.get_extent(), image_template.aspect_flags(),
+                           image_template.image_type(), image_template.has_mipmap());
 
       task_queue_.add_image(data, allocated_image.image_handle, image_info.get_extent(),
                             image_template.has_mipmap());
@@ -90,8 +90,8 @@ namespace gestalt::graphics {
                                              image_info.get_extent());
     }
 
-    auto allocated_image = allocate_image(image_template.get_name(), image_template.get_format(),
-                                          usage_flags, extent, image_template.get_aspect_flags(), image_template.get_image_type(),
+    auto allocated_image = allocate_image(image_template.get_name(), image_template.format(),
+                                          usage_flags, extent, image_template.aspect_flags(), image_template.image_type(),
                          image_template.has_mipmap());
 
     return std::make_unique<ImageInstance>(std::move(image_template), allocated_image, extent);

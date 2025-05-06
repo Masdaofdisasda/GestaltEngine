@@ -26,58 +26,58 @@ namespace gestalt::application {
     event_bus_.subscribe<UpdateFirstPersonCameraEvent>(
         [this](const UpdateFirstPersonCameraEvent& event) {
           const auto first_person_camera
-              = repository_.first_person_camera_components.find_mutable(event.entity);
+              = repository_.first_person_camera_components.find_mutable(event.entity());
           if (first_person_camera != nullptr) {
-            first_person_camera->set_mouse_speed(event.mouse_speed);
+            first_person_camera->set_mouse_speed(event.mouse_speed());
           }
         });
 
     event_bus_.subscribe<UpdateFreeFlyCameraEvent>([this](const UpdateFreeFlyCameraEvent& event) {
       const auto free_fly_camera
-          = repository_.free_fly_camera_components.find_mutable(event.entity);
+          = repository_.free_fly_camera_components.find_mutable(event.entity());
       if (free_fly_camera != nullptr) {
-        free_fly_camera->set_mouse_speed(event.mouse_speed);
-        free_fly_camera->set_acceleration(event.acceleration);
-        free_fly_camera->set_damping(event.damping);
-        free_fly_camera->set_max_speed(event.max_speed);
-        free_fly_camera->set_fast_coef(event.fast_coef);
-        free_fly_camera->set_slow_coef(event.slow_coef);
+        free_fly_camera->set_mouse_speed(event.mouse_speed());
+        free_fly_camera->set_acceleration(event.acceleration());
+        free_fly_camera->set_damping(event.damping());
+        free_fly_camera->set_max_speed(event.max_speed());
+        free_fly_camera->set_fast_coef(event.fast_coef());
+        free_fly_camera->set_slow_coef(event.slow_coef());
       }
     });
 
     event_bus_.subscribe<UpdateOrbitCameraEvent>([this](const UpdateOrbitCameraEvent& event) {
-      const auto orbit_camera = repository_.orbit_camera_components.find_mutable(event.entity);
+      const auto orbit_camera = repository_.orbit_camera_components.find_mutable(event.entity());
       if (orbit_camera != nullptr) {
-        orbit_camera->set_distance(event.distance);
-        orbit_camera->set_yaw(event.yaw);
-        orbit_camera->set_pitch(event.pitch);
-        orbit_camera->set_orbit_speed(event.orbit_speed);
-        orbit_camera->set_zoom_speed(event.zoom_speed);
-        orbit_camera->set_pan_speed(event.pan_speed);
+        orbit_camera->set_distance(event.distance());
+        orbit_camera->set_yaw(event.yaw());
+        orbit_camera->set_pitch(event.pitch());
+        orbit_camera->set_orbit_speed(event.orbit_speed());
+        orbit_camera->set_zoom_speed(event.zoom_speed());
+        orbit_camera->set_pan_speed(event.pan_speed());
       }
     });
 
     event_bus_.subscribe<UpdatePerspectiveProjectionEvent>(
         [this](const UpdatePerspectiveProjectionEvent& event) {
           const auto perspective_projection
-              = repository_.perspective_projection_components.find_mutable(event.entity);
+              = repository_.perspective_projection_components.find_mutable(event.entity());
           if (perspective_projection != nullptr) {
-            perspective_projection->set_fov(event.fov);
-            perspective_projection->set_near(event.near);
-            perspective_projection->set_far(event.far);
+            perspective_projection->set_fov(event.fov());
+            perspective_projection->set_near(event.near());
+            perspective_projection->set_far(event.far());
           }
         });
     event_bus.subscribe<UpdateOrthographicProjectionEvent>(
         [this](const UpdateOrthographicProjectionEvent& event) {
           const auto orthographic_projection
-              = repository_.orthographic_projection_components.find_mutable(event.entity);
+              = repository_.orthographic_projection_components.find_mutable(event.entity());
           if (orthographic_projection != nullptr) {
-            orthographic_projection->set_left(event.left);
-            orthographic_projection->set_right(event.right);
-            orthographic_projection->set_bottom(event.bottom);
-            orthographic_projection->set_top(event.top);
-            orthographic_projection->set_near(event.near);
-            orthographic_projection->set_far(event.far);
+            orthographic_projection->set_left(event.left());
+            orthographic_projection->set_right(event.right());
+            orthographic_projection->set_bottom(event.bottom());
+            orthographic_projection->set_top(event.top());
+            orthographic_projection->set_near(event.near());
+            orthographic_projection->set_far(event.far());
           }
         });
 

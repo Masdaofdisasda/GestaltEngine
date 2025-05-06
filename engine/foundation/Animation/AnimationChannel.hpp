@@ -6,12 +6,17 @@
 
 namespace gestalt::foundation {
 
-  template <typename K> struct AnimationChannel {
-    std::vector<Keyframe<K>> keyframes;
-    float32 current_time = 0.0f;  // Current time in the animation
+  template <typename K> class AnimationChannel {
+  public:
+    explicit AnimationChannel(std::vector<Keyframe<K>> keyframes) : keyframes_(keyframes) {}
 
-    explicit AnimationChannel(std::vector<Keyframe<K>> keyframes) : keyframes(keyframes) {}
+    std::vector<Keyframe<K>> keyframes() { return keyframes_; }
+    float32 current_time() const { return current_time_; }
+    void set_current_time(const float32 current_time) { current_time_ = current_time; }
 
+  private:
+    std::vector<Keyframe<K>> keyframes_;
+    float32 current_time_{0.0f};
   };
 
 }  // namespace gestalt
