@@ -83,9 +83,9 @@ namespace gestalt::application {
       if (node_name.empty()) {
         node_name = "entity_" + std::to_string(new_entity);
       }
-      const NodeComponent node = {
-          .name = node_name,
-      };
+
+      NodeComponent node{};
+      node.name = node_name;
 
       create_transform_component(new_entity, position, rotation, scale);
       repository_.scene_graph.upsert(new_entity, node);
