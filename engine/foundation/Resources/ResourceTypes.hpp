@@ -491,8 +491,9 @@ namespace gestalt::foundation {
       }*/
     }
 
-    void accept(ResourceVisitor& visitor, const ResourceUsage usage,
-                const VkShaderStageFlags shader_stage) override {
+    void accept([[maybe_unused]] ResourceVisitor& visitor,
+                [[maybe_unused]] const ResourceUsage usage,
+                [[maybe_unused]] const VkShaderStageFlags shader_stage) override {
       // do nothing
     }
 
@@ -684,17 +685,18 @@ namespace gestalt::foundation {
 
       DescriptorBinding& descriptor_binding = binding_it->second;
 
-      DescriptorUpdate update_info = {
-        .type = type,
-        .descriptorSize = map_descriptor_size(type),
-        .binding = binding,
-        .descriptorIndex = descriptor_index,
-        .addr_info = {
-            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_ADDRESS_INFO_EXT,
-            .address = resource_address,
-            .range = buffer_size,
-            .format = VK_FORMAT_UNDEFINED,
-        },
+      DescriptorUpdate update_info
+          = {.type = type,
+             .descriptorSize = map_descriptor_size(type),
+             .binding = binding,
+             .descriptorIndex = descriptor_index,
+             .addr_info = {
+                 .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_ADDRESS_INFO_EXT,
+                 .pNext = nullptr,
+                 .address = resource_address,
+                 .range = buffer_size,
+                 .format = VK_FORMAT_UNDEFINED,
+             },
         .image_info = {},
         .tlas_address = 0
     };
@@ -714,12 +716,14 @@ namespace gestalt::foundation {
       DescriptorBinding& descriptor_binding = binding_it->second;
 
       DescriptorUpdate update_info = {
-        .type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
-        .descriptorSize = map_descriptor_size(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR),
-        .binding = binding,
-        .descriptorIndex = index,
-        .tlas_address = address,
-    };
+          .type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
+          .descriptorSize = map_descriptor_size(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR),
+          .binding = binding,
+          .descriptorIndex = index,
+          .addr_info = {},
+          .image_info = {},
+          .tlas_address = address,
+      };
 
       update_infos_.emplace_back(update_info);
       descriptor_binding.descriptor_size = map_descriptor_size(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR);
@@ -744,7 +748,9 @@ namespace gestalt::foundation {
             .descriptorSize = descriptor_size,
             .binding = binding,
             .descriptorIndex = static_cast<uint32_t>(i + first_descriptor),
+            .addr_info = {},
             .image_info = image_infos[i],  // Store by value
+            .tlas_address = 0,
         };
 
         update_infos_.emplace_back(std::move(update_info));

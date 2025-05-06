@@ -274,7 +274,7 @@ namespace gestalt::application {
     if (mesh_component) {
       const auto& mesh = repository_.meshes.get(mesh_component->mesh);
 
-      for (const auto surface : mesh.surfaces) {
+      for (const auto& surface : mesh.surfaces) {
         const auto& material = repository_.materials.get(surface.material);
 
         MeshDraw draw{
@@ -290,6 +290,7 @@ namespace gestalt::application {
             .first_index = surface.first_index,
             .vertex_offset = surface.vertex_offset,
             .materialIndex = static_cast<uint32>(surface.material),
+            .pad = 0,
         };
 
         repository_.mesh_draws_.push_back(draw);

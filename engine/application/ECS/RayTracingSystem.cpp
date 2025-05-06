@@ -63,31 +63,42 @@ namespace gestalt::application {
 
     VkAccelerationStructureGeometryInstancesDataKHR geometryInstancesData = {
         .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
+        .pNext = nullptr,
+        .arrayOfPointers = VK_FALSE,
+        .data = VkDeviceOrHostAddressConstKHR(tlasInstanceScratchBuffer->get_address()),
     };
-    geometryInstancesData.arrayOfPointers = VK_FALSE;
-    geometryInstancesData.data
-        = VkDeviceOrHostAddressConstKHR(repository_.tlas_instance_buffer->get_address());
 
     VkAccelerationStructureGeometryDataKHR tlasGeometryData = {};
     tlasGeometryData.instances = geometryInstancesData;
 
-    VkAccelerationStructureGeometryKHR tlasGeometry = {
-        .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
-    };
-    tlasGeometry.geometry = tlasGeometryData;
-    tlasGeometry.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
+    VkAccelerationStructureGeometryKHR tlasGeometry
+        = {.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
+           .pNext = nullptr,
+           .geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR,
+           .geometry = tlasGeometryData,
+           .flags = 0,
+        };
 
     VkAccelerationStructureBuildGeometryInfoKHR tlasBuildGeometryInfo = {
         .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,
+        .pNext = nullptr,
+        .type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR,
+        .flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
+        .mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR,
+        .srcAccelerationStructure = {},
+        .dstAccelerationStructure = {},
+        .geometryCount = 1,
+        .pGeometries = &tlasGeometry,
+        .ppGeometries = nullptr,
+        .scratchData = {},
     };
-    tlasBuildGeometryInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
-    tlasBuildGeometryInfo.geometryCount = 1;
-    tlasBuildGeometryInfo.pGeometries = &tlasGeometry;
-    tlasBuildGeometryInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
-    tlasBuildGeometryInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
 
     VkAccelerationStructureBuildSizesInfoKHR tlasBuildSizesInfo = {
         .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR,
+        .pNext = nullptr,
+        .accelerationStructureSize = 0,
+        .updateScratchSize = 0,
+        .buildScratchSize = 0,
     };
     const uint32 instanceCount = static_cast<uint32>(tlasInstances.size());
     vkGetAccelerationStructureBuildSizesKHR(
@@ -102,11 +113,14 @@ namespace gestalt::application {
 
     VkAccelerationStructureCreateInfoKHR tlasCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR,
+        .pNext = nullptr,
+        .createFlags = 0,
+        .buffer = repository_.tlas_storage_buffer->get_buffer_handle(),
+        .offset = 0,
+        .size = tlasBuildSizesInfo.accelerationStructureSize,
+        .type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR,
+        .deviceAddress = 0,
     };
-    tlasCreateInfo.buffer = repository_.tlas_storage_buffer->get_buffer_handle();
-    tlasCreateInfo.offset = 0;
-    tlasCreateInfo.size = tlasBuildSizesInfo.accelerationStructureSize;
-    tlasCreateInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
 
     vkCreateAccelerationStructureKHR(gpu_.getDevice(), &tlasCreateInfo, nullptr,
                                      &repository_.tlas->acceleration_structure);
@@ -226,14 +240,18 @@ namespace gestalt::application {
     for (const auto& inputGeometry : blasGeometries) {
       VkAccelerationStructureBuildGeometryInfoKHR buildInfo = {
           .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,
-      };
+          .pNext = nullptr,
+          .type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,
+          .flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
+          .mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR,
+          .srcAccelerationStructure = VK_NULL_HANDLE,
+          .dstAccelerationStructure = VK_NULL_HANDLE,
+          .geometryCount = 1,
+          .pGeometries = &inputGeometry,
+          .ppGeometries = nullptr,
+          .scratchData = {},
 
-      buildInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
-      buildInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-      buildInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
-      buildInfo.geometryCount = 1;
-      buildInfo.pGeometries = &inputGeometry;
-      buildInfo.pNext = nullptr;
+      };
 
       buildGeometryInfos.push_back(buildInfo);
     }
