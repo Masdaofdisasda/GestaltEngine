@@ -86,7 +86,7 @@ namespace gestalt::application {
 
     const size_t global_index_offset = repository->vertex_positions.size();
     for (auto& idx : indices) {
-      idx += global_index_offset;
+      idx += static_cast<uint32>(global_index_offset);
     }
 
     MeshSurface surface = MeshProcessor::create_surface(
@@ -197,11 +197,11 @@ namespace gestalt::application {
       Repository* repository) {
     for (int i = 0; i < nodes.size(); i++) {
       fastgltf::Node& node = nodes[i];
-      Entity parent_entity = node_offset + i;
+      Entity parent_entity = static_cast<Entity>(node_offset + i);
       auto scene_object = repository->scene_graph.find_mutable(parent_entity);
 
       for (auto& c : node.children) {
-        Entity child_entity = node_offset + c;
+        Entity child_entity = static_cast<Entity>(node_offset + c);
         auto child = repository->scene_graph.find_mutable(child_entity);
         scene_object->children.push_back(child_entity);
         child->parent = parent_entity;

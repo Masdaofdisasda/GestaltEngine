@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include <VulkanTypes.hpp>
+#include <VulkanCore.hpp>
 
 void vk_check(VkResult result, const char* expr);
 

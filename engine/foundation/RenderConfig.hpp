@@ -10,8 +10,8 @@ namespace gestalt::foundation {
 
     inline struct MeshletPushConstants {
       int cullFlags{1};
-      float32 pyramidWidth, pyramidHeight;  // depth pyramid size in texels
-      int32 clusterOcclusionEnabled;
+      float32 pyramidWidth{0}, pyramidHeight{0};  // depth pyramid size in texels
+      int32 clusterOcclusionEnabled{0};
     } meshlet_push_constants;
 
     struct RenderConfig {
@@ -49,7 +49,7 @@ namespace gestalt::foundation {
         float exposure{1.f};
         float maxWhite{1.35f};
         float bloomStrength{0.01f};
-        float padding{1.f};
+        float padding1{1.f};
 
         glm::vec4 lift{0.f, 0.f, 0.f, 0.f};
         glm::vec4 gamma{1.0f, 1.f, 1.f, 1.f};
@@ -66,6 +66,7 @@ namespace gestalt::foundation {
 
         float saturation{1.0f};
         float contrast{1.0f};
+        float padding2[6] = {};
       } hdr{};
 
       struct LuminanceParams {

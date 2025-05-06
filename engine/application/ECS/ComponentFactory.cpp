@@ -83,9 +83,9 @@ namespace gestalt::application {
       if (node_name.empty()) {
         node_name = "entity_" + std::to_string(new_entity);
       }
-      const NodeComponent node = {
-          .name = node_name,
-      };
+
+      NodeComponent node{};
+      node.name = node_name;
 
       create_transform_component(new_entity, position, rotation, scale);
       repository_.scene_graph.upsert(new_entity, node);
@@ -181,9 +181,9 @@ namespace gestalt::application {
       }
 
 
-      const uint32 matrix_id
+      const size_t matrix_id
           = repository_.light_view_projections.add({glm::mat4(1.0), glm::mat4(1.0)});
-      const DirectionalLightComponent light(color, intensity, matrix_id);
+      const DirectionalLightComponent light(color, intensity, static_cast<uint32>(matrix_id));
 
       repository_.directional_light_components.upsert(entity, light);
 
@@ -204,10 +204,11 @@ namespace gestalt::application {
         event_bus_.emit<MoveEntityEvent>(
             MoveEntityEvent{entity, position,orientation_from_direction(direction),1.f});
       }
-      const uint32 matrix_id
+      const size_t matrix_id
           = repository_.light_view_projections.add({glm::mat4(1.0), glm::mat4(1.0)});
 
-      const SpotLightComponent light(color, intensity, range, matrix_id, cos(inner_cone_radians), cos(outer_cone_radians));
+      const SpotLightComponent light(color, intensity, range, static_cast<uint32>(matrix_id),
+                                     cos(inner_cone_radians), cos(outer_cone_radians));
 
       repository_.spot_light_components.upsert(entity, light);
 
@@ -230,12 +231,12 @@ namespace gestalt::application {
       }
 
 
-      const uint32 matrix_id
+      const size_t matrix_id
           = repository_.light_view_projections.add({glm::mat4(1.0), glm::mat4(1.0)});
       for (int i = 0; i < 5; i++) {
         repository_.light_view_projections.add({glm::mat4(1.0), glm::mat4(1.0)});
       }
-      const PointLightComponent light(color, intensity, range, matrix_id);
+      const PointLightComponent light(color, intensity, range, static_cast<uint32>(matrix_id));
 
       repository_.point_light_components.upsert(entity, light);
       return entity;

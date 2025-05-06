@@ -59,7 +59,7 @@ namespace gestalt::application {
     }
 
     void InputSystem::handle_mouse_wheel(const SDL_Event& e) {
-      user_input_.scroll = e.wheel.y;  // `y` is positive for scroll up and negative for scroll down
+      user_input_.scroll = static_cast<float32>(e.wheel.y);  // `y` is positive for scroll up and negative for scroll down
     }
 
     void InputSystem::handle_keyboard(const SDL_Event& e) {

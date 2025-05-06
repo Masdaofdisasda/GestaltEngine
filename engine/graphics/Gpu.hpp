@@ -1,6 +1,6 @@
 #pragma once
 
-#include "VulkanTypes.hpp"
+#include "VulkanCore.hpp"
 #include "Interface/IGpu.hpp"
 #include "Window.hpp"
 

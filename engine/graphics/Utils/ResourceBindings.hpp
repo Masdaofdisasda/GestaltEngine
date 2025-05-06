@@ -1,5 +1,5 @@
 ﻿#pragma once 
-#include <VulkanTypes.hpp>
+#include <VulkanCore.hpp>
 
 #include "Pipeline.hpp"
 #include "PushDescriptor.hpp"

@@ -7,31 +7,31 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler:
+          - clang
+          - g++
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Install packages
-      run: |
-        sudo apt update
-        sudo apt install -y ninja-build clang cmake libxcb1-dev libx11-dev libsdl2-dev
+      - name: Install packages
+        run: |
+          sudo apt update
+          sudo apt install -y ninja-build cmake libxcb1-dev libx11-dev libsdl2-dev
 
-    # cache CPM downloads
-    - uses: actions/cache@v4
-      with:
-        path: ${{ github.workspace }}/.cache/CPM
-        key:  cpm-${{ hashFiles('**/Deps.cmake') }}
+      - name: Configure
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+                 -DCMAKE_CXX_COMPILER=${{ matrix.compiler }}
 
-    - name: Configure
-      run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-                 -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+      - name: Build
+        run: cmake --build build --config Release --parallel
 
-    - name: Build
-      run: cmake --build build --config Release --parallel
-
-    - name: Archive binary
-      uses: actions/upload-artifact@v4
-      with:
-        name: GestaltApp-Linux
-        path: bin/Release/GestaltApp
+      - name: Archive binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: GestaltApp-Linux-${{ matrix.compiler }}
+          path: bin/Release/GestaltApp

@@ -12,7 +12,7 @@ namespace gestalt::foundation {
       glm::mat4 inv_viewProj{1.f};
       glm::mat4 cullView{1.f};
       glm::mat4 cullProj{1.f};
-      float32 P00, P11, znear, zfar;  // symmetric projection parameters
-      glm::vec4 frustum[6];
+      float32 P00{0.f}, P11{0.f}, znear{0.1f}, zfar{1000.f};  // symmetric projection parameters
+      glm::vec4 frustum[6] = {};
     };
 }  // namespace gestalt

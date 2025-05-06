@@ -1,10 +1,10 @@
 #pragma once
 
-#include "VulkanTypes.hpp"
+#include "VulkanCore.hpp"
 
 namespace gestalt::foundation {
   struct AccelerationStructure {
     VkAccelerationStructureKHR acceleration_structure {};
-    VkDeviceAddress            address;
+    VkDeviceAddress            address{};
   };
 } // namespace gestalt

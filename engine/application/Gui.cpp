@@ -1,6 +1,6 @@
 ﻿#include "Gui.hpp"
 
-#include "VulkanTypes.hpp"
+#include "VulkanCore.hpp"
 #include "VulkanCheck.hpp"
 
 #include <fmt/core.h>
@@ -188,9 +188,9 @@ namespace gestalt::application {
                                    * glm::toMat4(transform->rotation())
                                    * glm::scale(glm::mat4(1.0f), transform->scale());
         glm::mat4 parentWorldTransform
-            = glm::translate(glm::mat4(1.0f), transform->parent_position)
-              * glm::toMat4(transform->parent_rotation)
-              * glm::scale(glm::mat4(1.0f), glm::vec3(transform->parent_scale));
+            = glm::translate(glm::mat4(1.0f), transform->parent_position())
+              * glm::toMat4(transform->parent_rotation())
+              * glm::scale(glm::mat4(1.0f), glm::vec3(transform->parent_scale()));
         glm::mat4 inverseParentWorldTransform = glm::inverse(parentWorldTransform);
         glm::mat4 worldTransform = parentWorldTransform * localTransform;
 
@@ -409,7 +409,7 @@ namespace gestalt::application {
 
           if (ImGui::Button("Generate")) {
             // Calculate grid spacing based on the number of lights
-            int grid_count = std::ceil(std::pow(light_count, 1.0f / 3.0f));
+            int grid_count = static_cast<int>(std::ceil(std::pow(light_count, 1.0f / 3.0f)));
             glm::vec3 grid_spacing = (max_bounds - min_bounds) / static_cast<float>(grid_count);
 
             // Iterate over grid points and place lights
@@ -468,8 +468,9 @@ namespace gestalt::application {
         if (ImGui::CollapsingHeader("Directional Lights", ImGuiTreeNodeFlags_DefaultOpen)) {
           auto lights = repository_.directional_light_components.snapshot();
           int selectedLightIndex = 0;  // Default to the first light
+          int32 maxLights = static_cast<int32>(lights.size()) - 1;
           if (!lights.empty()) {
-            ImGui::SliderInt("Select Light", &selectedLightIndex, 0, lights.size() - 1);
+            ImGui::SliderInt("Select Light", &selectedLightIndex, 0, maxLights);
             auto& [entity, light_component] = lights[selectedLightIndex];
             selected_entity_ = entity;
             const auto transform_component = repository_.transform_components.find(entity);
@@ -480,8 +481,9 @@ namespace gestalt::application {
         if (ImGui::CollapsingHeader("Point Lights", ImGuiTreeNodeFlags_DefaultOpen)) {
           auto lights = repository_.point_light_components.snapshot();
           int selectedLightIndex = 0;  // Default to the first light
+          int32 maxLights = static_cast<int32>(lights.size()) - 1;
           if (!lights.empty()) {
-            ImGui::SliderInt("Select Light", &selectedLightIndex, 0, lights.size() - 1);
+            ImGui::SliderInt("Select Light", &selectedLightIndex, 0, maxLights);
             auto& [entity, light_component] = lights[selectedLightIndex];
             selected_entity_ = entity;
             const auto transform_component = repository_.transform_components.find(entity);
@@ -492,8 +494,9 @@ namespace gestalt::application {
         if (ImGui::CollapsingHeader("Spot Lights", ImGuiTreeNodeFlags_DefaultOpen)) {
           auto lights = repository_.spot_light_components.snapshot();
           int selectedLightIndex = 0;  // Default to the first light
+          int32 maxLights = static_cast<int32>(lights.size()) - 1;
           if (!lights.empty()) {
-            ImGui::SliderInt("Select Light", &selectedLightIndex, 0, lights.size() - 1);
+            ImGui::SliderInt("Select Light", &selectedLightIndex, 0, maxLights);
             auto& [entity, light_component] = lights[selectedLightIndex];
             selected_entity_ = entity;
             const auto transform_component = repository_.transform_components.find(entity);
@@ -511,8 +514,9 @@ namespace gestalt::application {
           auto cameras = repository_.animation_camera_components.snapshot();
 
           static int selectedCameraIndex = 0;
+          uint32 maxCameras = static_cast<uint32>(cameras.size()) - 1;
           if (!cameras.empty()) {
-            ImGui::SliderInt("Select Camera", &selectedCameraIndex, 0, cameras.size() - 1);
+            ImGui::SliderInt("Select Camera", &selectedCameraIndex, 0, maxCameras);
 
             auto& [entity, camera_component] = cameras[selectedCameraIndex];
 
@@ -528,8 +532,9 @@ namespace gestalt::application {
           auto cameras = repository_.first_person_camera_components.snapshot();
 
           static int selectedCameraIndex = 0;
+          uint32 maxCameras = static_cast<uint32>(cameras.size()) - 1;
           if (!cameras.empty()) {
-            ImGui::SliderInt("Select Camera", &selectedCameraIndex, 0, cameras.size() - 1);
+            ImGui::SliderInt("Select Camera", &selectedCameraIndex, 0, maxCameras);
 
             auto& [entity, camera_component] = cameras[selectedCameraIndex];
 
@@ -545,8 +550,9 @@ namespace gestalt::application {
           auto cameras = repository_.free_fly_camera_components.snapshot();
 
           static int selectedCameraIndex = 0;
+          uint32 maxCameras = static_cast<uint32>(cameras.size()) - 1;
           if (!cameras.empty()) {
-            ImGui::SliderInt("Select Camera", &selectedCameraIndex, 0, cameras.size() - 1);
+            ImGui::SliderInt("Select Camera", &selectedCameraIndex, 0, maxCameras);
 
             auto& [entity, camera_component] = cameras[selectedCameraIndex];
 
@@ -562,8 +568,9 @@ namespace gestalt::application {
           auto cameras = repository_.orbit_camera_components.snapshot();
 
           static int selectedCameraIndex = 0;
+          uint32 maxCameras = static_cast<uint32>(cameras.size()) - 1;
           if (!cameras.empty()) {
-            ImGui::SliderInt("Select Camera", &selectedCameraIndex, 0, cameras.size() - 1);
+            ImGui::SliderInt("Select Camera", &selectedCameraIndex, 0, maxCameras);
 
             auto& [entity, camera_component] = cameras[selectedCameraIndex];
 
@@ -580,12 +587,12 @@ namespace gestalt::application {
     }
 
     void Gui::scene_graph() {
-      float windowWidth = 300.0f;  // Width of the ImGui window
-      uint32_t menuBarHeight = 18;
-      float windowHeight
-          = window_.get_height() - menuBarHeight;  // Full height of the application window
-      ImVec2 windowPos
-          = ImVec2(window_.get_width() - windowWidth, menuBarHeight);  // Position to the right
+      float32 windowWidth = 300.0f;  // Width of the ImGui window
+      float32 menuBarHeight = 18.f;
+      float32 windowHeight
+          = static_cast<float32>(window_.get_height()) - menuBarHeight;  // Full height of the application window
+      ImVec2 windowPos = ImVec2(static_cast<float32> (window_.get_width()) - windowWidth,
+                                menuBarHeight);               // Position to the right
       ImVec2 windowSize = ImVec2(windowWidth, windowHeight);            // Size of the ImGui window
 
       ImGui::SetNextWindowPos(windowPos);
@@ -1011,9 +1018,9 @@ namespace gestalt::application {
                                  * toMat4(transform->rotation())
                                  * scale(glm::mat4(1.0f), transform->scale());
       glm::mat4 parentWorldTransform
-          = translate(glm::mat4(1.0f), transform->parent_position)
-            * toMat4(transform->parent_rotation)
-            * scale(glm::mat4(1.0f), glm::vec3(transform->parent_scale));
+          = translate(glm::mat4(1.0f), transform->parent_position())
+            * toMat4(transform->parent_rotation())
+            * scale(glm::mat4(1.0f), glm::vec3(transform->parent_scale()));
       glm::mat4 inverseParentWorldTransform = inverse(parentWorldTransform);
       glm::mat4 worldTransform = parentWorldTransform * localTransform;
 
@@ -1046,7 +1053,7 @@ namespace gestalt::application {
       // World scale control (taking parent transform into account)
       float world_scale = length(glm::vec3(worldTransform[0]));
       if (ImGui::DragFloat("World Scale", &world_scale, 0.005f)) {
-        auto new_scale = world_scale / transform->parent_scale;
+        auto new_scale = world_scale / transform->parent_scale();
         event_bus_.emit<ScaleEntityEvent>(ScaleEntityEvent{selected_entity_, new_scale});
       }
       ImGui::Text("AABB max: (%.3f, %.3f, %.3f)", node->bounds.max.x, node->bounds.max.y,

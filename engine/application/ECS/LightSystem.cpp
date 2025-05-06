@@ -26,40 +26,40 @@ namespace gestalt::application {
         event_bus_(event_bus),
         frame_(frame) {
     event_bus_.subscribe<UpdateLightEvent>([this](const UpdateLightEvent& event) {
-      auto dir_light = repository_.directional_light_components.find_mutable(event.entity);
+      auto dir_light = repository_.directional_light_components.find_mutable(event.entity());
       if (dir_light != nullptr) {
-        dir_light->set_color(event.color);
-        dir_light->set_intensity(event.intensity);
+        dir_light->set_color(event.color());
+        dir_light->set_intensity(event.intensity());
         dir_light->is_dirty = true;
         return;
       }
-      auto point_light = repository_.point_light_components.find_mutable(event.entity);
+      auto point_light = repository_.point_light_components.find_mutable(event.entity());
       if (point_light != nullptr) {
-        point_light->set_color(event.color);
-        point_light->set_intensity(event.intensity);
+        point_light->set_color(event.color());
+        point_light->set_intensity(event.intensity());
         point_light->is_dirty = true;
         return;
       }
-      auto spot_light = repository_.spot_light_components.find_mutable(event.entity);
+      auto spot_light = repository_.spot_light_components.find_mutable(event.entity());
       if (spot_light != nullptr) {
-        spot_light->set_color(event.color);
-        spot_light->set_intensity(event.intensity);
+        spot_light->set_color(event.color());
+        spot_light->set_intensity(event.intensity());
         spot_light->is_dirty = true;
       }
     });
     event_bus_.subscribe<UpdatePointLightEvent>([this](const UpdatePointLightEvent& event) {
-      auto point_light = repository_.point_light_components.find_mutable(event.entity);
+      auto point_light = repository_.point_light_components.find_mutable(event.entity());
       if (point_light != nullptr) {
-        point_light->set_range(event.range);
+        point_light->set_range(event.range());
         point_light->is_dirty = true;
       }
     });
     event_bus_.subscribe<UpdateSpotLightEvent>([this](const UpdateSpotLightEvent& event) {
-      auto spot_light = repository_.spot_light_components.find_mutable(event.entity);
+      auto spot_light = repository_.spot_light_components.find_mutable(event.entity());
       if (spot_light != nullptr) {
-        spot_light->set_range(event.range);
-        spot_light->set_inner_cone_cos(event.inner_cos);
-        spot_light->set_outer_cone_cos(event.outer_cos);
+        spot_light->set_range(event.range());
+        spot_light->set_inner_cone_cos(event.inner_cos());
+        spot_light->set_outer_cone_cos(event.outer_cos());
         spot_light->is_dirty = true;
       }
     });
@@ -238,7 +238,7 @@ namespace gestalt::application {
         const auto& rotation = repository_.transform_components.find(entity)->rotation();
         glm::vec3 direction = -glm::normalize(rotation * glm::vec3(0, 0, -1.f));
 
-        light_component.set_light_view_projection(repository_.light_view_projections.size());
+        light_component.set_light_view_projection(static_cast<uint32>(repository_.light_view_projections.size()));
         // TODO fix this
         glm::mat4 inv_cam
             = repository_.per_frame_data_buffers->data.at(frame_.get_current_frame_index())

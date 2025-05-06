@@ -67,11 +67,11 @@ namespace gestalt::application {
 
     const size_t vertex_count = vertices.size();
 
-    float complexity_threshold
+    float32 complexity_threshold
         = static_cast<float>(max_indices) / static_cast<float>(index_count);
     complexity_threshold = std::min(complexity_threshold, 1.0f);
 
-    const size_t target_index_count = index_count * complexity_threshold;
+    const size_t target_index_count = index_count * static_cast<size_t>(complexity_threshold);
     constexpr float target_error = 1e-2f;
     constexpr unsigned int options = 0;
 
@@ -216,8 +216,8 @@ namespace gestalt::application {
           reinterpret_cast<const float*>(vertices.data()), vertices.size(),
           sizeof(GpuVertexPosition));
 
-      meshlet.vertex_offset = local_meshlet.vertex_offset + global_meshlet_vertex_offset;
-      meshlet.index_offset = local_meshlet.triangle_offset + global_meshlet_index_offset;
+      meshlet.vertex_offset = static_cast<uint32>(local_meshlet.vertex_offset + global_meshlet_vertex_offset);
+      meshlet.index_offset = static_cast<uint32>(local_meshlet.triangle_offset + global_meshlet_index_offset);
       meshlet.vertex_count = local_meshlet.vertex_count;
       meshlet.triangle_count = local_meshlet.triangle_count;
 

@@ -18,10 +18,9 @@ namespace gestalt::application {
     Repository& repository_;
     EventBus& event_bus_;
     float delta_time_ = 0.0f;
-    glm::vec3 update_translation(const Entity& entity,
-                                 AnimationChannel<glm::vec3>& translation_channel,
+    glm::vec3 update_translation(AnimationChannel<glm::vec3>& translation_channel,
                             bool loop) const;
-    glm::quat update_rotation(const Entity& entity, AnimationChannel<glm::quat>& rotation_channel,
+    glm::quat update_rotation(AnimationChannel<glm::quat>& rotation_channel,
                          bool loop) const;
 
   public:

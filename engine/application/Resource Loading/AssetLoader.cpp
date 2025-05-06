@@ -101,11 +101,11 @@ namespace gestalt::application {
       std::vector<Keyframe<glm::vec3>> translation_keyframes;
       std::vector<Keyframe<glm::quat>> rotation_keyframes;
       std::vector<Keyframe<glm::vec3>> scale_keyframes;
-      Entity entity;
+      Entity entity = invalid_entity;
 
       for (auto& channel : animation.channels) {
         auto& sampler = animation.samplers[channel.samplerIndex];
-        entity = channel.nodeIndex.value_or(0) + node_offset;
+        entity = static_cast<Entity>(channel.nodeIndex.value_or(0) + node_offset);
         auto& type = channel.path;
         auto interpolation = MapInterpolationType(sampler.interpolation);
 

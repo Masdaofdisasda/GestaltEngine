@@ -3,7 +3,7 @@
 #include <vector>
 
 #include "common.hpp"
-#include "VulkanTypes.hpp"
+#include "VulkanCore.hpp"
 #include <Window.hpp>
 
 namespace gestalt::foundation {

@@ -5,10 +5,12 @@ project(GestaltEngine LANGUAGES CXX)
 set(CMAKE_TOOLCHAIN_FILE
     ""
     CACHE STRING "Disable vcpkg")
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # ── options ────────────────────────────────────────────────────
 option(GESTALT_BUILD_TESTS "Build unit tests" OFF)
 option(GESTALT_USE_CCACHE "Enable ccache if present" ON)
+option(ENABLE_SANITIZERS "Build with LLVM/GCC sanitizers" OFF)
 
 # ── compiler config ────────────────────────────────────────────
 function(enable_engine_cxx_standard target)
@@ -22,7 +24,7 @@ endfunction()
 add_compile_definitions($<$<CONFIG:Debug>:TRACY_ENABLE>)
 function(enable_engine_warnings target)
   if(MSVC)
-    target_compile_options(${target} PRIVATE /permissive- /Zc:__cplusplus)
+    target_compile_options(${target} PRIVATE /permissive- /Zc:__cplusplus /W3 /WX )
   else()
     target_compile_options(${target} PRIVATE -Wall -Wextra -Wshadow -Werror)
   endif()
@@ -43,6 +45,23 @@ if(GESTALT_USE_CCACHE)
   endif()
 endif()
 
+set(SAN_FLAGS
+        -fsanitize=address
+        -fsanitize=undefined
+        -fno-omit-frame-pointer
+)
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  list(APPEND SAN_FLAGS -fuse-ld=lld)
+endif()
+function(add_sanitizers target)
+  if (ENABLE_SANITIZERS)
+    message(STATUS "add sanitizer to ${target}")
+    target_compile_options(${target} PRIVATE ${SAN_FLAGS} -g)
+    target_link_options   (${target} PRIVATE ${SAN_FLAGS})
+  endif()
+endfunction()
+
+
 # ── third-party ────────────────────────────────────────────────
 include(cmake/Deps.cmake)
 
@@ -59,6 +78,12 @@ add_subdirectory(engine/shaders)
 add_subdirectory(engine/application)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE) # to work in wsl with ninja
 add_executable(GestaltApp engine/main.cpp)
+
+add_sanitizers(Foundation)
+add_sanitizers(Graphics)
+add_sanitizers(Application)
+add_sanitizers(GestaltApp)
+
 enable_engine_cxx_standard(GestaltApp)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}/bin/debug)

@@ -28,7 +28,7 @@ namespace gestalt::application {
     physic_engine_->init();
 
     for (auto& [entity, physics_component] : repository_.physics_components.snapshot()) {
-      if (physics_component.collider_type == CAPSULE) {
+      if (physics_component.is_collider_type(CAPSULE)) {
         player_ = entity;
       }
     }
@@ -36,7 +36,7 @@ namespace gestalt::application {
 
   void PhysicSystem::move_player(const float delta_time, const UserInput& movement) const {
     const auto player_physics = repository_.physics_components.find(player_);
-    if (player_physics->body == nullptr) return;
+    if (player_physics->body() == nullptr) return;
     const auto player_transform = repository_.transform_components.find(player_);
 
     auto orientation = player_transform->rotation();
@@ -64,7 +64,7 @@ namespace gestalt::application {
       movement_direction = movement_direction.Normalized();
     }
 
-    player_physics->body->AddForce(movement_direction * movement_speed * delta_time);
+    player_physics->body()->AddForce(movement_direction * movement_speed * delta_time);
 
     // Ground detection logic (simplified for illustration)
     bool mIsGrounded = true;  // check_if_grounded(player_physics.body);
@@ -72,7 +72,7 @@ namespace gestalt::application {
 
     // Apply jump if grounded
     if (movement.up && mIsGrounded) {
-       player_physics->body->AddForce(jump_strength);
+      player_physics->body()->AddForce(jump_strength);
     }
   }
 
@@ -84,16 +84,16 @@ namespace gestalt::application {
 
     for (auto& [entity, physics_component] : repository_.physics_components.snapshot()) {
 
-      if (physics_component.body == nullptr) {
+      if (physics_component.body() == nullptr) {
         auto transform = repository_.transform_components.find(entity);
-        physics_component.body = physic_engine_->create_body(
-            physics_component, transform->position(), transform->rotation());
+        physics_component.set_body(physic_engine_->create_body(
+            physics_component, transform->position(), transform->rotation()));
       }
 
-      if (physics_component.body_type == DYNAMIC) {
+      if (physics_component.is_body_type(DYNAMIC)) {
         glm::vec3 position;
         glm::quat orientation;
-        physic_engine_->get_body_transform(physics_component.body, position,
+        physic_engine_->get_body_transform(physics_component.body(), position,
                                            orientation);
         event_bus_.emit<TranslateEntityEvent>({entity, position});
         event_bus_.emit<RotateEntityEvent>({entity, orientation});
